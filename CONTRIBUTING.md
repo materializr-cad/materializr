@@ -48,6 +48,18 @@ A few rules keep the codebase coherent — PRs are reviewed against them:
   the core `Application`. Generic *infrastructure* a plugin needs (a new
   contribution type, a render hook) can go in core, but the feature itself stays
   in its plugin.
+- **Exception: in-sketch tools live in `SketchTool`.** A tool that runs *inside*
+  sketch mode — a new `SketchToolMode` such as Line, Trim, Mirror or Dimension —
+  goes in `src/modeling/SketchTool.{h,cpp}` with its dispatch in `Application`,
+  not in a plugin. This is not a licence to skip the rule above; it records that
+  the plugin system cannot host these yet. `InteractiveTool::handleInput()` is
+  never called from `Application`, so a plugin-hosted sketch tool receives no
+  viewport input at all — see the comment on `REGISTER_PLUGIN(Sketch, ...)` in
+  `src/plugins/SketchPlugin.cpp`, whose `SketchModeTool` is kept deliberately
+  unwired as a reference for a future input-routing migration. Until that
+  migration lands, every in-sketch tool lives in `SketchTool` and a new one
+  follows them. Everything else — modeling ops, importers, exporters, body-level
+  tools — obeys the plugin rule without exception.
 - **Touch is a runtime mode, not a build flag.** Adaptations for touch screens
   go behind `materializr::touchMode()` (see `src/touch_mode.h`), never
   `#if defined(__ANDROID__)`. A tablet with a keyboard/mouse runs the desktop
