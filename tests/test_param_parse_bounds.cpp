@@ -24,6 +24,7 @@
 #include "modeling/BoundaryFillOp.h"
 #include "modeling/LoftOp.h"
 #include "modeling/PushPullOp.h"
+#include "modeling/ExtrudeOp.h"
 
 #include <BRepBuilderAPI_MakePolygon.hxx>
 #include <gp_Ax3.hxx>
@@ -252,4 +253,39 @@ TEST(PushPullBounds, HugeCountIsRejectedBeforeAllocating) {
 TEST(PushPullBounds, ReasonableCountStillWorks) {
     PushPullOp op;
     EXPECT_TRUE(op.deserializeParams("dist=1;count=2"));
+}
+
+// ── Real BREP payload round-trip ────────────────────────────────────────────
+// The ops that carry a ";brep=<len>:<raw>" payload had their length parsing
+// rewritten. A brep blob is far larger than the toy strings above and contains
+// newlines and colons of its own, so it is the case most likely to be broken by
+// a stricter parser — and a break here is SILENT: the profile just goes missing
+// and the op quietly falls back to different geometry.
+TEST(ExtrudeRoundTrip, BrepProfileSurvivesSerializeDeserialize) {
+    BRepBuilderAPI_MakePolygon poly;
+    poly.Add(gp_Pnt(0, 0, 0));
+    poly.Add(gp_Pnt(10, 0, 0));
+    poly.Add(gp_Pnt(10, 10, 0));
+    poly.Add(gp_Pnt(0, 10, 0));
+    poly.Close();
+    ASSERT_TRUE(poly.IsDone());
+
+    ExtrudeOp out;
+    out.setProfile(poly.Wire());
+    const std::string blob = out.serializeParams();
+    ASSERT_NE(blob.find(";brep="), std::string::npos)
+        << "fixture produced no brep payload; the test would be vacuous";
+
+    // No public profile accessor, so assert via re-serialization. Comparing the
+    // brep SECTIONS byte for byte, not merely checking one exists: a truncated
+    // payload that still parsed into some smaller shape would satisfy a
+    // presence check while having quietly lost geometry.
+    ExtrudeOp in;
+    in.deserializeParams(blob);
+    const std::string again = in.serializeParams();
+    ASSERT_NE(again.find(";brep="), std::string::npos)
+        << "the brep payload did not survive the length-prefix parsing";
+    EXPECT_EQ(again.substr(again.find(";brep=")),
+              blob.substr(blob.find(";brep=")))
+        << "the brep payload round-tripped but changed";
 }
