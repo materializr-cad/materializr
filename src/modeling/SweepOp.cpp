@@ -7,6 +7,7 @@
 #include <imgui.h>
 #include "../i18n.h"
 #include "../i18n.h"
+#include "modeling/ParamParse.h"
 
 SweepOp::SweepOp() = default;
 
@@ -124,10 +125,12 @@ bool SweepOp::deserializeParams(const std::string& blob) {
         if (key == "brep") {
             size_t colon = blob.find(':', eq);
             if (colon == std::string::npos) break;
-            size_t n = static_cast<size_t>(
-                std::atoll(blob.substr(eq + 1, colon - eq - 1).c_str()));
-            if (colon + 1 + n > blob.size()) break;
-            std::istringstream is(blob.substr(colon + 1, n));
+            // Checked length, bounded by subtraction (ParamParse.h):
+            // the old `colon + 1 + n > blob.size()` wrapped on a
+            // negative length and let the guard pass.
+            size_t n = 0, payload = 0;
+            if (!materializr::readLenPrefix(blob, eq + 1, colon, n, payload)) break;
+            std::istringstream is(blob.substr(payload, n));
             TopoDS_Shape comp;
             BRep_Builder bb;
             try { BRepTools::Read(comp, is, bb); } catch (...) { return false; }

@@ -565,6 +565,17 @@ add_executable(test_brepio_dos test_brepio_dos.cpp)
 target_link_libraries(test_brepio_dos PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_brepio_dos COMMAND test_brepio_dos)
 
+# test_param_parse_bounds — the untrusted length/index fields in operation
+# parameter blobs: the atoll wrap that defeated the `colon + 1 + n` bound, the
+# topo::readTok cursor rewind that made Ref::parse hang, and the h<N>/p<N>/count
+# fields that sized allocations straight from the file.
+# RefParseTerminates HANGS rather than fails if the cursor fix regresses, so the
+# per-test timeout below is the signal.
+add_executable(test_param_parse_bounds test_param_parse_bounds.cpp)
+target_link_libraries(test_param_parse_bounds PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_param_parse_bounds COMMAND test_param_parse_bounds)
+set_tests_properties(test_param_parse_bounds PROPERTIES TIMEOUT 60)
+
 # test_sketch_dimension — DistancePointLine solver, dimension pair resolution,
 # and K-line label-offset persistence (Onshape-style dimension tool).
 # Pulls in SketchTool.h/.cpp (the Dimension pick state machine), which in turn

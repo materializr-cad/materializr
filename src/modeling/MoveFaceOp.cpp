@@ -45,6 +45,7 @@
 #include <Standard_Failure.hxx>
 #include <algorithm>
 #include "../i18n.h"
+#include "modeling/ParamParse.h"
 
 namespace {
 // The far cross-section of the feature attached to `face`: the edge LOOPS where
@@ -632,9 +633,10 @@ bool MoveFaceOp::deserializeParams(const std::string& blob) {
             std::string rest = blob.substr(eq + 1);
             size_t c = rest.find(':');
             if (c != std::string::npos) {
-                size_t n = static_cast<size_t>(std::atoll(rest.substr(0, c).c_str()));
-                if (c + 1 + n <= rest.size())
-                    m_faceRef = materializr::topo::Ref::parse(rest.substr(c + 1, n));
+                // Checked length, bounded by subtraction (ParamParse.h).
+                size_t n = 0, payload = 0;
+                if (materializr::readLenPrefix(rest, 0, c, n, payload))
+                    m_faceRef = materializr::topo::Ref::parse(rest.substr(payload, n));
             }
             any = true;
             break;

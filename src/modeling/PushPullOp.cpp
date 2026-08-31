@@ -44,6 +44,7 @@
 #include "../ui/NumField.h"
 #include "../i18n.h"
 #include "../i18n.h"
+#include "modeling/ParamParse.h"
 
 // A point that genuinely lies on the face's MATERIAL. Returns `center` when it's
 // already inside the trimmed face; otherwise samples a UV grid (rejecting points
@@ -710,7 +711,11 @@ bool PushPullOp::deserializeParams(const std::string& blob) {
         else if (key == "count") { count = std::atoi(val.c_str()); any = true; }
         pos = end + 1;
     }
+    // `count` is supplied by the file and is the SIZE of the five allocations
+    // below — the indexed writes further down are bounds-checked against it, but
+    // that happens far too late: "count=2000000000" allocates first. Bound it here.
     if (count <= 0) return any;
+    if (count > materializr::kMaxProfiles) return false;
     m_targets.assign(count, Target{});          // profiles rebuilt on rehydrate
     m_sketchSourceIds.assign(count, -1);
     m_sketchSourceRegions.assign(count, -1);

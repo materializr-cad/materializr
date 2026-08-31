@@ -61,6 +61,7 @@ void ExtrudeOp::setProfile(const TopoDS_Shape& wire) {
 #include "../i18n.h"
 #include "../i18n.h"
 #include "../i18n.h"
+#include "modeling/ParamParse.h"
 
 namespace {
 // Interior points of `face`, up to `maxPts`, spread over a UV grid. MANY
@@ -609,10 +610,10 @@ bool ExtrudeOp::deserializeParams(const std::string& blob) {
     if (bkey != std::string::npos) {
         size_t colon = blob.find(':', bkey + 6);
         if (colon != std::string::npos) {
-            size_t n = static_cast<size_t>(
-                std::atoll(blob.substr(bkey + 6, colon - bkey - 6).c_str()));
-            if (colon + 1 + n <= blob.size()) {
-                std::istringstream is(blob.substr(colon + 1, n));
+            // Checked length, bounded by subtraction (ParamParse.h).
+            size_t n = 0, payload = 0;
+            if (materializr::readLenPrefix(blob, bkey + 6, colon, n, payload)) {
+                std::istringstream is(blob.substr(payload, n));
                 BRep_Builder bb;
                 try { BRepTools::Read(m_profile, is, bb); } catch (...) {}
             }

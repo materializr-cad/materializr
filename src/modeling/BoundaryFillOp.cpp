@@ -24,6 +24,7 @@
 #include <cstdio>
 #include <sstream>
 #include "../i18n.h"
+#include "modeling/ParamParse.h"
 
 namespace {
 
@@ -216,10 +217,12 @@ bool BoundaryFillOp::deserializeParams(const std::string& blob) {
         if (key == "brep") {
             size_t colon = blob.find(':', eq);
             if (colon == std::string::npos) break;
-            size_t nBytes = static_cast<size_t>(
-                std::atoll(blob.substr(eq + 1, colon - eq - 1).c_str()));
-            if (colon + 1 + nBytes > blob.size()) break;
-            std::istringstream is(blob.substr(colon + 1, nBytes));
+            // Checked length, bounded by subtraction (ParamParse.h):
+            // the old `colon + 1 + nBytes > blob.size()` wrapped on a
+            // negative length and let the guard pass.
+            size_t nBytes = 0, payload = 0;
+            if (!materializr::readLenPrefix(blob, eq + 1, colon, nBytes, payload)) break;
+            std::istringstream is(blob.substr(payload, nBytes));
             TopoDS_Shape comp;
             BRep_Builder bb;
             try { BRepTools::Read(comp, is, bb); } catch (...) { return false; }
@@ -246,16 +249,22 @@ bool BoundaryFillOp::deserializeParams(const std::string& blob) {
         std::string val = blob.substr(eq + 1, end - eq - 1);
         if      (key == "created") { m_createdBodyId = std::atoi(val.c_str()); any = true; }
         else if (key == "np")      { np = std::atoi(val.c_str()); any = true; }
-        else if (!key.empty() && key[0] == 'h' && key.size() > 1 &&
-                 std::isdigit(static_cast<unsigned char>(key[1]))) {
-            int idx = std::atoi(key.c_str() + 1);
+        // h<N> / p<N>: N comes from the file and SIZES the vector below, so it is
+        // bounded before the resize. Unbounded, "p2000000000=" asked for a ~200 GB
+        // allocation, and idx == INT_MAX made `idx + 1` signed-overflow (UB).
+        else if (!key.empty() && key[0] == 'h' && key.size() > 1) {
+            int idx = materializr::parseIndexKey(key, 1);
+            if (idx < 0 || idx >= materializr::kMaxProfiles) return false;
+            int nh = 0;
+            if (!materializr::parseWholeInt(val, nh) || nh < 0 || nh > materializr::kMaxHolesPerProfile)
+                return false;
             if (idx >= static_cast<int>(holeCounts.size()))
                 holeCounts.resize(idx + 1, 0);
-            holeCounts[idx] = std::atoi(val.c_str());
+            holeCounts[idx] = nh;
         }
-        else if (!key.empty() && key[0] == 'p' && key.size() > 1 &&
-                 std::isdigit(static_cast<unsigned char>(key[1]))) {
-            int idx = std::atoi(key.c_str() + 1);
+        else if (!key.empty() && key[0] == 'p' && key.size() > 1) {
+            int idx = materializr::parseIndexKey(key, 1);
+            if (idx < 0 || idx >= materializr::kMaxProfiles) return false;
             double v[9] = {0, 0, 0, 1, 0, 0, 0, 1, 0};
             std::istringstream ps(val);
             for (int k = 0; k < 9; ++k) {
@@ -263,6 +272,9 @@ bool BoundaryFillOp::deserializeParams(const std::string& blob) {
                 if (!std::getline(ps, tokn, ',')) break;
                 v[k] = std::atof(tokn.c_str());
             }
+            // A crafted blob can spell inf/nan; those poison the OCCT constructors
+            // below rather than throwing cleanly.
+            for (double d : v) if (!std::isfinite(d)) return false;
             if (idx >= static_cast<int>(planes.size()))
                 planes.resize(idx + 1, gp_Pln());
             try {

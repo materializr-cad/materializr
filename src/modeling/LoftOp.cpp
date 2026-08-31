@@ -37,6 +37,7 @@
 #include <imgui.h>
 #include "../i18n.h"
 #include "../i18n.h"
+#include "modeling/ParamParse.h"
 
 namespace {
 
@@ -666,10 +667,12 @@ bool LoftOp::deserializeParams(const std::string& blob) {
             // <len>:<raw ascii brep>, runs to end.
             size_t colon = blob.find(':', eq);
             if (colon == std::string::npos) break;
-            size_t n = static_cast<size_t>(
-                std::atoll(blob.substr(eq + 1, colon - eq - 1).c_str()));
-            if (colon + 1 + n > blob.size()) break;
-            std::istringstream is(blob.substr(colon + 1, n));
+            // Checked length, bounded by subtraction (ParamParse.h):
+            // the old `colon + 1 + n > blob.size()` wrapped on a
+            // negative length and let the guard pass.
+            size_t n = 0, payload = 0;
+            if (!materializr::readLenPrefix(blob, eq + 1, colon, n, payload)) break;
+            std::istringstream is(blob.substr(payload, n));
             TopoDS_Shape comp;
             BRep_Builder bb;
             try { BRepTools::Read(comp, is, bb); } catch (...) { return false; }
@@ -697,11 +700,18 @@ bool LoftOp::deserializeParams(const std::string& blob) {
         else if (key == "ruled")   { m_ruled = val == "1"; any = true; }
         else if (key == "created") { m_createdBodyId = std::atoi(val.c_str()); any = true; }
         else if (key == "np")      { np = std::atoi(val.c_str()); any = true; }
+        // h<N>: N comes from the file and SIZES the vector below, so it is bounded
+        // before the resize. This site was weaker than BoundaryFillOp's twin — it
+        // had no digit guard at all, so any "h*" key reached std::atoi.
         else if (!key.empty() && key[0] == 'h') {
-            int idx = std::atoi(key.c_str() + 1);
+            int idx = materializr::parseIndexKey(key, 1);
+            if (idx < 0 || idx >= materializr::kMaxProfiles) return false;
+            int nh = 0;
+            if (!materializr::parseWholeInt(val, nh) || nh < 0 || nh > materializr::kMaxHolesPerProfile)
+                return false;
             if (idx >= static_cast<int>(holeCounts.size()))
                 holeCounts.resize(idx + 1, 0);
-            holeCounts[idx] = std::atoi(val.c_str());
+            holeCounts[idx] = nh;
         }
         pos = end + 1;
     }

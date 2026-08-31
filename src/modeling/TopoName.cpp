@@ -3,6 +3,7 @@
 #include "FaceAnchor.h"
 #include "GenerationLedger.h"
 #include "core/Document.h"
+#include "modeling/ParamParse.h"
 #include "modeling/Sketch.h"
 
 #include <TopExp.hxx>
@@ -30,16 +31,13 @@ void writeTok(std::string& out, const std::string& s) {
     out += s;
 }
 // Reads one token at pos; returns false at end/parse error.
+//
+// The length is parsed unsigned with full-consumption checking and bounded by
+// subtraction (see ParamParse.h). The old `atoll` + `start + n > b.size()` form
+// was defeated by its own wrap: a "-3" length made `pos` land back where it
+// started, so Ref::parse() below looped forever appending names.
 bool readTok(const std::string& b, size_t& pos, std::string& out) {
-    if (pos >= b.size()) return false;
-    size_t colon = b.find(':', pos);
-    if (colon == std::string::npos) return false;
-    size_t n = static_cast<size_t>(std::atoll(b.substr(pos, colon - pos).c_str()));
-    size_t start = colon + 1;
-    if (start + n > b.size()) return false;
-    out = b.substr(start, n);
-    pos = start + n;
-    return true;
+    return materializr::readLenRecord(b, pos, out);
 }
 } // namespace
 

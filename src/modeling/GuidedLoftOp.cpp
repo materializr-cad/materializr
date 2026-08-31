@@ -24,6 +24,7 @@
 #include <cstdio>
 #include <sstream>
 #include "../i18n.h"
+#include "modeling/ParamParse.h"
 
 namespace {
 
@@ -465,10 +466,12 @@ bool GuidedLoftOp::deserializeParams(const std::string& blob) {
         if (key == "brep") {
             size_t colon = blob.find(':', eq);
             if (colon == std::string::npos) break;
-            size_t nBytes = static_cast<size_t>(
-                std::atoll(blob.substr(eq + 1, colon - eq - 1).c_str()));
-            if (colon + 1 + nBytes > blob.size()) break;
-            std::istringstream is(blob.substr(colon + 1, nBytes));
+            // Checked length, bounded by subtraction (ParamParse.h):
+            // the old `colon + 1 + nBytes > blob.size()` wrapped on a
+            // negative length and let the guard pass.
+            size_t nBytes = 0, payload = 0;
+            if (!materializr::readLenPrefix(blob, eq + 1, colon, nBytes, payload)) break;
+            std::istringstream is(blob.substr(payload, nBytes));
             TopoDS_Shape comp;
             BRep_Builder bb;
             try { BRepTools::Read(comp, is, bb); } catch (...) { return false; }

@@ -25,6 +25,7 @@
 #include "../ui/NumField.h"
 #include "../i18n.h"
 #include "../i18n.h"
+#include "modeling/ParamParse.h"
 
 namespace {
 
@@ -376,14 +377,12 @@ bool ShellOp::deserializeParams(const std::string& blob) {
             std::string rest = blob.substr(eq + 1);
             m_faceRefs.clear();
             size_t p = 0;
-            while (p < rest.size()) {
-                size_t c = rest.find(':', p);
-                if (c == std::string::npos) break;
-                size_t n = static_cast<size_t>(std::atoll(rest.substr(p, c - p).c_str()));
-                if (c + 1 + n > rest.size()) break;
-                m_faceRefs.push_back(materializr::topo::Ref::parse(rest.substr(c + 1, n)));
-                p = c + 1 + n;
-            }
+            std::string tok;
+            // Checked length + guaranteed cursor advance (ParamParse.h).
+            // The old `c + 1 + n` bound wrapped on a negative length and
+            // could drive `p` backwards, looping forever.
+            while (materializr::readLenRecord(rest, p, tok))
+                m_faceRefs.push_back(materializr::topo::Ref::parse(tok));
             any = true;
             break;
         }
