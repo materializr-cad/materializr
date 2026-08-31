@@ -35,6 +35,7 @@ add_library(materializr_core STATIC
     ${CMAKE_SOURCE_DIR}/src/modeling/BatchTransformOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/PushPullOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/Sketch.cpp
+    ${CMAKE_SOURCE_DIR}/src/modeling/SketchOffset.cpp
     ${CMAKE_SOURCE_DIR}/src/i18n.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/AirfoilImport.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/SketchTool.cpp
@@ -232,6 +233,12 @@ add_test(NAME test_sketch_edit_cascade COMMAND test_sketch_edit_cascade)
 add_executable(test_extrude_recovered_profile test_extrude_recovered_profile.cpp)
 target_link_libraries(test_extrude_recovered_profile PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_extrude_recovered_profile COMMAND test_extrude_recovered_profile)
+
+# test_sketch_offset - sketch Offset geometry: validation, refusals, conversion
+add_executable(test_sketch_offset test_sketch_offset.cpp)
+target_link_libraries(test_sketch_offset PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_sketch_offset COMMAND test_sketch_offset)
+set_tests_properties(test_sketch_offset PROPERTIES TIMEOUT 120)
 
 # test_section_cap - section-view cross-section cap geometry (issue #15)
 add_executable(test_section_cap test_section_cap.cpp)
