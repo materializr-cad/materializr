@@ -47,17 +47,23 @@ TEST(DxfBudgets, WellFormedFileStillImports) {
     EXPECT_TRUE(r.success) << r.errorMessage;
 }
 
-TEST(DxfBudgets, OverlongSingleLineIsRefused) {
-    // One 8 MB "line" with no newline. The old reader getline'd it into a
-    // std::string and only then checked .size() — the allocation had already
-    // happened. Now the length cap applies to a view, before any string.
-    std::string evil = "0\nSECTION\n2\nENTITIES\n0\nLINE\n10\n";
-    evil += std::string(8u * 1024 * 1024, '9');
-    evil += "\n";
-    const std::string path = writeTemp("mz_budget_longline.dxf", evil);
+TEST(DxfBudgets, OverlongLineAfterValidGeometryIsRefusedNotTruncated) {
+    // THE discriminating case. An earlier version of this test put the long
+    // line first, so nothing was ever emitted and the failure actually came
+    // from "no profile entities found" — it passed without exercising the cap
+    // at all. Here a complete LINE lands FIRST, so if the budget breach is
+    // mistaken for clean EOF the import SUCCEEDS with the drawing silently
+    // truncated, which is the bug.
+    std::string evil = "0\nSECTION\n2\nENTITIES\n"
+                       "0\nLINE\n10\n0.0\n20\n0.0\n11\n10.0\n21\n10.0\n"
+                       "0\nLINE\n10\n";
+    evil += std::string(8u * 1024 * 1024, '9');   // one 8 MB group value
+    evil += "\n0\nENDSEC\n0\nEOF\n";
+    const std::string path = writeTemp("mz_budget_trunc.dxf", evil);
     materializr::Sketch sk;
     const auto r = materializr::DxfImport::importFile(path, sk);
-    EXPECT_FALSE(r.success);
+    EXPECT_FALSE(r.success)
+        << "over-budget input must be refused, not silently truncated";
 }
 
 TEST(DxfBudgets, AbsurdSplineDegreeDoesNotOverflow) {

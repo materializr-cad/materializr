@@ -9,6 +9,7 @@
 #include <limits>
 #include <string>
 #include <vector>
+#include <charconv>
 #include <string_view>
 
 #ifndef M_PI
@@ -62,9 +63,11 @@ constexpr int    kMaxSplineDegree    = 32;
 class PairReader {
 public:
     explicit PairReader(std::string_view buf) : m_buf(buf) {}
-    // False at EOF, on an over-long line, or once the pair budget is spent.
+    // False at EOF *or* on a budget breach — call failed() to tell them apart.
+    // They must not be conflated: treating a breach as EOF silently imports a
+    // TRUNCATED drawing, i.e. geometry the user never drew.
     bool next(Pair& out) {
-        if (m_pairs >= kMaxDxfPairs) return false;
+        if (m_pairs >= kMaxDxfPairs) { m_failed = true; return false; }
         std::string_view codeLine, valueLine;
         if (!nextLine(codeLine)) return false;
         if (!nextLine(valueLine)) return false;
@@ -83,7 +86,7 @@ private:
         if (m_pos >= m_buf.size()) return false;
         const size_t nl = m_buf.find('\n', m_pos);
         const size_t end = (nl == std::string_view::npos) ? m_buf.size() : nl;
-        if (end - m_pos > kMaxDxfLineBytes) return false;
+        if (end - m_pos > kMaxDxfLineBytes) { m_failed = true; return false; }
         out = m_buf.substr(m_pos, end - m_pos);
         // Windows-authored files: drop the \r the line separator leaves behind.
         if (!out.empty() && out.back() == '\r') out.remove_suffix(1);
@@ -91,28 +94,30 @@ private:
         return true;
     }
 
-    // std::atoi needs a NUL-terminated string; the view is not one. Group codes
-    // are small integers, so parse them directly.
+    // from_chars takes a pointer PAIR, so it needs no NUL terminator and works
+    // directly on the view — and it REJECTS rather than silently saturating.
+    // (An earlier hand-rolled parser here was justified by "std::atoi needs a
+    // NUL-terminated string"; that argued against atoi, not for a hand-roll.)
     static int svToInt(std::string_view sv) {
         while (!sv.empty() && (sv.front() == ' ' || sv.front() == '\t'))
             sv.remove_prefix(1);
-        bool neg = false;
-        if (!sv.empty() && (sv.front() == '-' || sv.front() == '+')) {
-            neg = sv.front() == '-';
-            sv.remove_prefix(1);
-        }
-        long v = 0;
-        for (char c : sv) {
-            if (c < '0' || c > '9') break;
-            if (v > 100000) break;              // group codes are tiny
-            v = v * 10 + (c - '0');
-        }
-        return static_cast<int>(neg ? -v : v);
+        int v = 0;
+        const char* first = sv.data();
+        const char* last  = sv.data() + sv.size();
+        if (first == last) return 0;
+        auto [ptr, ec] = std::from_chars(first, last, v);
+        if (ec != std::errc{}) return 0;   // not a group code we understand
+        (void)ptr;                          // trailing junk is tolerated, as atoi did
+        return v;
     }
 
     std::string_view m_buf;
     size_t m_pos = 0;
     size_t m_pairs = 0;
+    bool   m_failed = false;
+
+public:
+    bool failed() const { return m_failed; }
 };
 
 double insunitsToMM(int code) {
@@ -386,6 +391,9 @@ bool parse(std::string_view buf, Drawing& d, std::string& error) {
         }
     }
     flush();
+    // A reader breach ends the loop the same way EOF does, so it has to be
+    // folded in here or the refusal below never fires.
+    if (rd.failed()) overBudget = true;
 
     // Refuse, don't truncate: a partially-read DXF would import as geometry the
     // user never drew, which is worse than an honest failure.
@@ -416,19 +424,32 @@ DxfImportResult DxfImport::importFile(const std::string& filePath, Sketch& sketc
     // Absolute input cap, matching SvgImport::load. The per-container budgets in
     // parse() bound what the file can expand into; this bounds the file itself.
     //
-    // Read at most kMaxDxfBytes + 1 and refuse if that extra byte materialises.
-    // Deliberately NOT a std::filesystem::file_size() pre-check: that is a
-    // check-then-read TOCTOU, and — worse — its error path failed OPEN, so any
-    // file_size failure skipped the cap entirely.
-    std::string buf(kMaxDxfBytes + 1, '\0');
-    in.read(buf.data(), static_cast<std::streamsize>(buf.size()));
-    const std::streamsize got = in.gcount();
-    if (got < 0) {
+    // Size the read from the ALREADY-OPEN handle, not from the path. Sizing via
+    // std::filesystem::file_size(filePath) would re-resolve the path — a genuine
+    // check-then-read TOCTOU — and its error path is easy to write fail-OPEN.
+    // seekg/tellg here interrogate the same file description we are about to
+    // read, and any failure below refuses the file.
+    in.seekg(0, std::ios::end);
+    const std::streampos endPos = in.tellg();
+    in.seekg(0, std::ios::beg);
+    if (!in.good() || endPos < 0) {
         result.errorMessage = "Could not read file: " + filePath;
         return result;
     }
-    if (static_cast<size_t>(got) > kMaxDxfBytes) {
+    if (static_cast<unsigned long long>(endPos) > kMaxDxfBytes) {
         result.errorMessage = "DXF file is too large to import (over 64 MB).";
+        return result;
+    }
+    // Allocate what the file actually needs. Sizing the buffer at the 64 MB cap
+    // instead would memset 64 MB on every import, including a 2 KB one.
+    std::string buf(static_cast<size_t>(endPos), '\0');
+    in.read(buf.data(), static_cast<std::streamsize>(buf.size()));
+    const std::streamsize got = in.gcount();
+    // in.bad() means a real I/O failure; eof() alone is fine (a short final
+    // read). Without this an I/O error mid-read parses truncated content as a
+    // success — the same fail-open class the size cap above was fixed for.
+    if (in.bad()) {
+        result.errorMessage = "Could not read file: " + filePath;
         return result;
     }
     buf.resize(static_cast<size_t>(got));

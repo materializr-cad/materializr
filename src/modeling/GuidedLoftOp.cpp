@@ -501,8 +501,14 @@ bool GuidedLoftOp::deserializeParams(const std::string& blob) {
                 if (!std::getline(ps, tokn, ',')) break;
                 v[i] = std::atof(tokn.c_str());
             }
+            // Same discipline as BoundaryFillOp: a crafted blob can spell
+            // inf/nan, which poisons the OCCT constructors rather than throwing
+            // cleanly, and parallel axes make the cross product ~zero.
+            for (double d : v) if (!std::isfinite(d)) return false;
             try {
                 gp_Dir xd(v[3], v[4], v[5]), yd(v[6], v[7], v[8]);
+                const gp_Vec cross = gp_Vec(xd).Crossed(gp_Vec(yd));
+                if (cross.Magnitude() < 1e-9) return false;
                 m_basePlane = gp_Pln(gp_Ax3(gp_Pnt(v[0], v[1], v[2]),
                                             xd.Crossed(yd), xd));
             } catch (...) { return false; }
