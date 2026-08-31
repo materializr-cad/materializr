@@ -576,6 +576,16 @@ target_link_libraries(test_param_parse_bounds PRIVATE materializr_core gtest gte
 add_test(NAME test_param_parse_bounds COMMAND test_param_parse_bounds)
 set_tests_properties(test_param_parse_bounds PROPERTIES TIMEOUT 60)
 
+# test_import_budgets — the DXF and image-decode input budgets (F6/F7): the
+# over-long line that used to be allocated before its length was checked, the
+# spline degree that signed-overflowed `n + degree + 1`, and the tiny PNG that
+# declares 30000x30000 (~3.6 GB) which must be refused at the probe, before
+# stbi_load_from_memory allocates.
+add_executable(test_import_budgets test_import_budgets.cpp)
+target_link_libraries(test_import_budgets PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_import_budgets COMMAND test_import_budgets)
+set_tests_properties(test_import_budgets PROPERTIES TIMEOUT 120)
+
 # test_sketch_dimension — DistancePointLine solver, dimension pair resolution,
 # and K-line label-offset persistence (Onshape-style dimension tool).
 # Pulls in SketchTool.h/.cpp (the Dimension pick state machine), which in turn

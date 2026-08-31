@@ -46,7 +46,7 @@
 #include "../ui/NumField.h"
 #include "../i18n.h"
 #include "../i18n.h"
-#include "modeling/ParamParse.h"
+#include "ParamParse.h"
 
 namespace {
 

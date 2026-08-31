@@ -44,7 +44,7 @@
 #include "../ui/NumField.h"
 #include "../i18n.h"
 #include "../i18n.h"
-#include "modeling/ParamParse.h"
+#include "ParamParse.h"
 
 // A point that genuinely lies on the face's MATERIAL. Returns `center` when it's
 // already inside the trimmed face; otherwise samples a UV grid (rejecting points

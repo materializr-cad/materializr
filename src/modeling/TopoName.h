@@ -60,7 +60,14 @@ struct Ref {
     // scheme this build can't resolve still round-trip untouched.
     std::string serialize() const;
     static Ref parse(const std::string& blob);
+
 };
+
+// Parses a back-to-back run of length-prefixed Ref records ("<n>:<bytes>...")
+// into `out`, stopping at the first malformed record. Shared by the ops that
+// serialize a ref LIST (fillet/chamfer edgerefs, shell/taper facerefs), which
+// each carried a byte-identical copy of this loop.
+void parseRefList(const std::string& blob, std::vector<Ref>& out);
 
 // Everything a strategy needs to mint OR resolve, for BOTH edges and faces.
 // `shape` is the shape to name a sub-shape INTO (at mint) or resolve a name

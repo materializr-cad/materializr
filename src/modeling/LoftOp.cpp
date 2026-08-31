@@ -1,4 +1,5 @@
 #include "LoftOp.h"
+#include <cctype>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepGProp.hxx>
 #include <BRepOffsetAPI_ThruSections.hxx>
@@ -37,7 +38,7 @@
 #include <imgui.h>
 #include "../i18n.h"
 #include "../i18n.h"
-#include "modeling/ParamParse.h"
+#include "ParamParse.h"
 
 namespace {
 
@@ -655,7 +656,7 @@ std::string LoftOp::serializeParams() const {
 bool LoftOp::deserializeParams(const std::string& blob) {
     m_profiles.clear();
     m_holeProfiles.clear();
-    std::vector<int> holeCounts;
+    materializr::HoleCountReader holeReader;
     int np = 0;
     bool any = false;
     size_t pos = 0;
@@ -677,6 +678,9 @@ bool LoftOp::deserializeParams(const std::string& blob) {
             BRep_Builder bb;
             try { BRepTools::Read(comp, is, bb); } catch (...) { return false; }
             // Unpack: per profile i, one wire + holeCounts[i] hole wires.
+            // Every h<N> key precedes ";brep=", so the counts are complete.
+            if (!holeReader.finish(np)) return false;
+            const std::vector<int>& holeCounts = holeReader.counts();
             TopoDS_Iterator it(comp);
             for (int i = 0; i < np && it.More(); ++i) {
                 if (it.Value().ShapeType() != TopAbs_WIRE) return false;
@@ -703,15 +707,12 @@ bool LoftOp::deserializeParams(const std::string& blob) {
         // h<N>: N comes from the file and SIZES the vector below, so it is bounded
         // before the resize. This site was weaker than BoundaryFillOp's twin — it
         // had no digit guard at all, so any "h*" key reached std::atoi.
-        else if (!key.empty() && key[0] == 'h') {
-            int idx = materializr::parseIndexKey(key, 1);
-            if (idx < 0 || idx >= materializr::kMaxProfiles) return false;
-            int nh = 0;
-            if (!materializr::parseWholeInt(val, nh) || nh < 0 || nh > materializr::kMaxHolesPerProfile)
-                return false;
-            if (idx >= static_cast<int>(holeCounts.size()))
-                holeCounts.resize(idx + 1, 0);
-            holeCounts[idx] = nh;
+        // isdigit() gates the branch so an unknown future 'h*' key is ignored
+        // rather than failing the whole op. (The original had no digit test at
+        // all here, so every "h*" key reached std::atoi.)
+        else if (!key.empty() && key[0] == 'h' && key.size() > 1 &&
+                 std::isdigit(static_cast<unsigned char>(key[1]))) {
+            if (!holeReader.add(key, val)) return false;
         }
         pos = end + 1;
     }

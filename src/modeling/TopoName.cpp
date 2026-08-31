@@ -3,7 +3,7 @@
 #include "FaceAnchor.h"
 #include "GenerationLedger.h"
 #include "core/Document.h"
-#include "modeling/ParamParse.h"
+#include "ParamParse.h"
 #include "modeling/Sketch.h"
 
 #include <TopExp.hxx>
@@ -45,6 +45,13 @@ std::string Ref::serialize() const {
     std::string out;
     for (const auto& nm : names) { writeTok(out, nm.scheme); writeTok(out, nm.payload); }
     return out;
+}
+
+void parseRefList(const std::string& blob, std::vector<Ref>& out) {
+    size_t pos = 0;
+    std::string tok;
+    while (materializr::readLenRecord(blob, pos, tok))
+        out.push_back(Ref::parse(tok));
 }
 
 Ref Ref::parse(const std::string& blob) {

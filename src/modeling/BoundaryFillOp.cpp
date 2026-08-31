@@ -23,8 +23,9 @@
 #include <cmath>
 #include <cstdio>
 #include <sstream>
+#include <cctype>
 #include "../i18n.h"
-#include "modeling/ParamParse.h"
+#include "ParamParse.h"
 
 namespace {
 
@@ -206,7 +207,7 @@ std::string BoundaryFillOp::serializeParams() const {
 bool BoundaryFillOp::deserializeParams(const std::string& blob) {
     clearProfiles();
     int np = 0;
-    std::vector<int> holeCounts;
+    materializr::HoleCountReader holeReader;
     std::vector<gp_Pln> planes;
     bool any = false;
     size_t pos = 0;
@@ -226,6 +227,11 @@ bool BoundaryFillOp::deserializeParams(const std::string& blob) {
             TopoDS_Shape comp;
             BRep_Builder bb;
             try { BRepTools::Read(comp, is, bb); } catch (...) { return false; }
+            // Every h<N> key precedes ";brep=" in the serialized form, so the
+            // counts are complete here. finish() also refuses an index that
+            // names a profile np never declared.
+            if (!holeReader.finish(np)) return false;
+            const std::vector<int>& holeCounts = holeReader.counts();
             TopoDS_Iterator it(comp);
             for (int i = 0; i < np && it.More(); ++i) {
                 if (it.Value().ShapeType() != TopAbs_WIRE) return false;
@@ -252,17 +258,16 @@ bool BoundaryFillOp::deserializeParams(const std::string& blob) {
         // h<N> / p<N>: N comes from the file and SIZES the vector below, so it is
         // bounded before the resize. Unbounded, "p2000000000=" asked for a ~200 GB
         // allocation, and idx == INT_MAX made `idx + 1` signed-overflow (UB).
-        else if (!key.empty() && key[0] == 'h' && key.size() > 1) {
-            int idx = materializr::parseIndexKey(key, 1);
-            if (idx < 0 || idx >= materializr::kMaxProfiles) return false;
-            int nh = 0;
-            if (!materializr::parseWholeInt(val, nh) || nh < 0 || nh > materializr::kMaxHolesPerProfile)
-                return false;
-            if (idx >= static_cast<int>(holeCounts.size()))
-                holeCounts.resize(idx + 1, 0);
-            holeCounts[idx] = nh;
+        // The isdigit() test stays part of the BRANCH CONDITION, not the body:
+        // an unknown key that merely starts with 'h'/'p' (a field a future
+        // version adds) must fall through and be IGNORED, as it always was.
+        // Only a key that really is h<digits> is held to the bounds below.
+        else if (!key.empty() && key[0] == 'h' && key.size() > 1 &&
+                 std::isdigit(static_cast<unsigned char>(key[1]))) {
+            if (!holeReader.add(key, val)) return false;
         }
-        else if (!key.empty() && key[0] == 'p' && key.size() > 1) {
+        else if (!key.empty() && key[0] == 'p' && key.size() > 1 &&
+                 std::isdigit(static_cast<unsigned char>(key[1]))) {
             int idx = materializr::parseIndexKey(key, 1);
             if (idx < 0 || idx >= materializr::kMaxProfiles) return false;
             double v[9] = {0, 0, 0, 1, 0, 0, 0, 1, 0};
@@ -279,6 +284,11 @@ bool BoundaryFillOp::deserializeParams(const std::string& blob) {
                 planes.resize(idx + 1, gp_Pln());
             try {
                 gp_Dir xd(v[3], v[4], v[5]), yd(v[6], v[7], v[8]);
+                // Reject a degenerate frame explicitly. Parallel axes make the
+                // cross product ~zero, which gp_Ax3 turns into an exception we
+                // would otherwise swallow as a generic failure.
+                const gp_Vec cross = gp_Vec(xd).Crossed(gp_Vec(yd));
+                if (cross.Magnitude() < 1e-9) return false;
                 planes[idx] = gp_Pln(gp_Ax3(gp_Pnt(v[0], v[1], v[2]),
                                             xd.Crossed(yd), xd));
             } catch (...) { return false; }

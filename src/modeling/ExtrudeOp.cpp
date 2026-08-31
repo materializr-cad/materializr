@@ -61,7 +61,7 @@ void ExtrudeOp::setProfile(const TopoDS_Shape& wire) {
 #include "../i18n.h"
 #include "../i18n.h"
 #include "../i18n.h"
-#include "modeling/ParamParse.h"
+#include "ParamParse.h"
 
 namespace {
 // Interior points of `face`, up to `maxPts`, spread over a UV grid. MANY

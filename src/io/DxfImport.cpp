@@ -9,7 +9,7 @@
 #include <limits>
 #include <string>
 #include <vector>
-#include <filesystem>
+#include <string_view>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -56,29 +56,62 @@ constexpr size_t kMaxDxfOutputPrims  = 1000000;
 // `n + degree + 1` below from signed-overflowing, and >32 is meaningless anyway.
 constexpr int    kMaxSplineDegree    = 32;
 
+// Scans an already-bounded, immutable buffer. Taking the whole file as one
+// buffer (rather than streaming) is what removes the size-check-then-read
+// TOCTOU: there is no second read of a file that may have changed underneath.
 class PairReader {
 public:
-    explicit PairReader(std::istream& in) : m_in(in) {}
-    // False at EOF, on a malformed line, or once the pair budget is spent.
+    explicit PairReader(std::string_view buf) : m_buf(buf) {}
+    // False at EOF, on an over-long line, or once the pair budget is spent.
     bool next(Pair& out) {
         if (m_pairs >= kMaxDxfPairs) return false;
-        std::string codeLine, valueLine;
-        if (!std::getline(m_in, codeLine)) return false;
-        if (!std::getline(m_in, valueLine)) return false;
-        // Refuse absurd lines before they become long std::strings.
-        if (codeLine.size() > kMaxDxfLineBytes ||
-            valueLine.size() > kMaxDxfLineBytes) return false;
+        std::string_view codeLine, valueLine;
+        if (!nextLine(codeLine)) return false;
+        if (!nextLine(valueLine)) return false;
         ++m_pairs;
-        // Windows-authored files: strip \r (getline keeps it on Unix).
-        if (!codeLine.empty() && codeLine.back() == '\r') codeLine.pop_back();
-        if (!valueLine.empty() && valueLine.back() == '\r') valueLine.pop_back();
-        out.code = std::atoi(codeLine.c_str());
-        out.value = valueLine;
+        out.code = svToInt(codeLine);
+        out.value = std::string(valueLine);   // only now is a string built
         return true;
     }
 
 private:
-    std::istream& m_in;
+    // Returns one line as a VIEW. The length cap is applied to the view, so an
+    // absurd single line is refused before any allocation — the previous
+    // getline-then-check form had already materialised a 1 GB std::string by
+    // the time it looked at .size().
+    bool nextLine(std::string_view& out) {
+        if (m_pos >= m_buf.size()) return false;
+        const size_t nl = m_buf.find('\n', m_pos);
+        const size_t end = (nl == std::string_view::npos) ? m_buf.size() : nl;
+        if (end - m_pos > kMaxDxfLineBytes) return false;
+        out = m_buf.substr(m_pos, end - m_pos);
+        // Windows-authored files: drop the \r the line separator leaves behind.
+        if (!out.empty() && out.back() == '\r') out.remove_suffix(1);
+        m_pos = (nl == std::string_view::npos) ? m_buf.size() : nl + 1;
+        return true;
+    }
+
+    // std::atoi needs a NUL-terminated string; the view is not one. Group codes
+    // are small integers, so parse them directly.
+    static int svToInt(std::string_view sv) {
+        while (!sv.empty() && (sv.front() == ' ' || sv.front() == '\t'))
+            sv.remove_prefix(1);
+        bool neg = false;
+        if (!sv.empty() && (sv.front() == '-' || sv.front() == '+')) {
+            neg = sv.front() == '-';
+            sv.remove_prefix(1);
+        }
+        long v = 0;
+        for (char c : sv) {
+            if (c < '0' || c > '9') break;
+            if (v > 100000) break;              // group codes are tiny
+            v = v * 10 + (c - '0');
+        }
+        return static_cast<int>(neg ? -v : v);
+    }
+
+    std::string_view m_buf;
+    size_t m_pos = 0;
     size_t m_pairs = 0;
 };
 
@@ -174,8 +207,8 @@ void sampleSpline(const std::vector<glm::dvec2>& ctrl, int degree,
         samples.push_back(samples.front());
 }
 
-bool parse(std::istream& in, Drawing& d, std::string& error) {
-    PairReader rd(in);
+bool parse(std::string_view buf, Drawing& d, std::string& error) {
+    PairReader rd(buf);
     Pair p;
     enum class Where { Limbo, Header, Entities } where = Where::Limbo;
     std::string section;
@@ -382,16 +415,26 @@ DxfImportResult DxfImport::importFile(const std::string& filePath, Sketch& sketc
     }
     // Absolute input cap, matching SvgImport::load. The per-container budgets in
     // parse() bound what the file can expand into; this bounds the file itself.
-    {
-        std::error_code ec;
-        const auto sz = std::filesystem::file_size(filePath, ec);
-        if (!ec && sz > kMaxDxfBytes) {
-            result.errorMessage = "DXF file is too large to import (over 64 MB).";
-            return result;
-        }
+    //
+    // Read at most kMaxDxfBytes + 1 and refuse if that extra byte materialises.
+    // Deliberately NOT a std::filesystem::file_size() pre-check: that is a
+    // check-then-read TOCTOU, and — worse — its error path failed OPEN, so any
+    // file_size failure skipped the cap entirely.
+    std::string buf(kMaxDxfBytes + 1, '\0');
+    in.read(buf.data(), static_cast<std::streamsize>(buf.size()));
+    const std::streamsize got = in.gcount();
+    if (got < 0) {
+        result.errorMessage = "Could not read file: " + filePath;
+        return result;
     }
+    if (static_cast<size_t>(got) > kMaxDxfBytes) {
+        result.errorMessage = "DXF file is too large to import (over 64 MB).";
+        return result;
+    }
+    buf.resize(static_cast<size_t>(got));
+
     Drawing d;
-    if (!parse(in, d, result.errorMessage)) return result;
+    if (!parse(buf, d, result.errorMessage)) return result;
 
     // Scale to mm, then centre the drawing's bounding box on the sketch
     // origin (dimensions preserved exactly; only the offset is normalized —

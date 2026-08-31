@@ -7,7 +7,7 @@
 #include <imgui.h>
 #include "../i18n.h"
 #include "../i18n.h"
-#include "modeling/ParamParse.h"
+#include "ParamParse.h"
 
 SweepOp::SweepOp() = default;
 

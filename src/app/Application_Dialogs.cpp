@@ -1873,7 +1873,11 @@ bool Application::loadRefImageFile(const std::string& path, RefImageEntry& out,
                                      std::istreambuf_iterator<char>());
     int w = 0, h = 0;
     if (!materializr::probeImageSize(bytes.data(), bytes.size(), w, h)) {
-        showToast("Not a readable image (PNG / JPEG / BMP supported).");
+        // probeImageSize also refuses images that are readable but too large to
+        // decode safely, so the message has to cover both — "not readable" alone
+        // is simply untrue for a valid 30000x30000 photo.
+        showToast("Could not use this image — it must be a PNG / JPEG / BMP "
+                  "no larger than 16384 x 16384.");
         return false;
     }
     baseName = std::filesystem::path(path).stem().string();

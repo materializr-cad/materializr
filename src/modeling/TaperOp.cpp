@@ -16,7 +16,7 @@
 #include "../ui/NumField.h"
 #include "../i18n.h"
 #include "../i18n.h"
-#include "modeling/ParamParse.h"
+#include "ParamParse.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -190,13 +190,7 @@ bool TaperOp::deserializeParams(const std::string& blob) {
         if (key == "facerefs") {
             std::string rest = blob.substr(eq + 1);
             m_faceRefs.clear();
-            size_t p = 0;
-            std::string tok;
-            // Checked length + guaranteed cursor advance (ParamParse.h).
-            // The old `c + 1 + n` bound wrapped on a negative length and
-            // could drive `p` backwards, looping forever.
-            while (materializr::readLenRecord(rest, p, tok))
-                m_faceRefs.push_back(materializr::topo::Ref::parse(tok));
+            materializr::topo::parseRefList(rest, m_faceRefs);
             any = true;
             break;
         }

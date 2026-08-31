@@ -45,7 +45,7 @@
 #include <Standard_Failure.hxx>
 #include <algorithm>
 #include "../i18n.h"
-#include "modeling/ParamParse.h"
+#include "ParamParse.h"
 
 namespace {
 // The far cross-section of the feature attached to `face`: the edge LOOPS where

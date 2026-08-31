@@ -159,6 +159,33 @@ TEST(BoundaryFillBounds, NonFinitePlaneIsRejected) {
         "created=-1;np=2;p0=inf,0,0,1,0,0,0,1,0"));
 }
 
+TEST(BoundaryFillBounds, UnknownKeyStartingWithHOrPIsIgnoredNotFatal) {
+    // Forward compatibility: an unknown field a future version adds that merely
+    // starts with 'h'/'p' ("phase=...") must fall through and be ignored, the
+    // way it always was. The bounds checks apply only to real h<digits>/p<digits>
+    // keys. Tightening this into the branch body (rather than its condition)
+    // would make an older build reject the whole operation.
+    BoundaryFillOp op;
+    // Well-formed apart from the unknown key: parsing must not fail on it. The
+    // op still returns false overall (no brep payload here), so assert on the
+    // discriminator instead: the same blob WITHOUT the unknown key behaves
+    // identically.
+    const bool withUnknown =
+        op.deserializeParams("created=-1;np=2;phase=7;h0=0");
+    BoundaryFillOp op2;
+    const bool withoutUnknown =
+        op2.deserializeParams("created=-1;np=2;h0=0");
+    EXPECT_EQ(withUnknown, withoutUnknown);
+}
+
+TEST(LoftBounds, UnknownKeyStartingWithHIsIgnoredNotFatal) {
+    LoftOp op;
+    const bool withUnknown = op.deserializeParams("np=2;hint=3;h0=0");
+    LoftOp op2;
+    const bool withoutUnknown = op2.deserializeParams("np=2;h0=0");
+    EXPECT_EQ(withUnknown, withoutUnknown);
+}
+
 TEST(LoftBounds, HugeHoleIndexIsRejected) {
     LoftOp op;
     // This site was weaker than BoundaryFill's twin: no digit guard at all, so

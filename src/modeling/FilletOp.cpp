@@ -31,7 +31,7 @@
 #include "../ui/NumField.h"
 #include "../i18n.h"
 #include "../i18n.h"
-#include "modeling/ParamParse.h"
+#include "ParamParse.h"
 
 namespace {
 // Representative point on a face (midpoint of its UV bounds). Stable for the
@@ -725,13 +725,7 @@ bool FilletOp::deserializeParams(const std::string& blob) {
         if (key == "edgerefs") {
             std::string rest = blob.substr(eq + 1);
             m_edgeRefs.clear();
-            size_t p = 0;
-            std::string tok;
-            // Checked length + guaranteed cursor advance (ParamParse.h).
-            // The old `c + 1 + n` bound wrapped on a negative length and
-            // could drive `p` backwards, looping forever.
-            while (materializr::readLenRecord(rest, p, tok))
-                m_edgeRefs.push_back(materializr::topo::Ref::parse(tok));
+            materializr::topo::parseRefList(rest, m_edgeRefs);
             any = true;
             break;
         }

@@ -27,6 +27,7 @@
 #include <charconv>
 #include <cstddef>
 #include <string>
+#include <vector>
 
 namespace materializr {
 
@@ -40,6 +41,28 @@ namespace materializr {
 inline constexpr int kMaxProfiles        = 4096;   // valid indices are 0..4095
 inline constexpr int kMaxHolesPerProfile = 4096;
 inline constexpr int kMaxHolesTotal      = 65536;
+
+// Accumulates the h<N> hole-count fields shared by the profile-based operations
+// (BoundaryFillOp, LoftOp), which previously carried byte-identical copies of
+// this parsing. Applies the per-index, per-profile and total budgets, and
+// rejects a repeated index so the running total cannot be double-counted or
+// silently overwritten.
+class HoleCountReader {
+public:
+    // Returns false if the key/value is malformed or any budget is exceeded.
+    bool add(const std::string& key, const std::string& val);
+    // Final consistency check: every index used must belong to a declared
+    // profile, so a sparse "h4095" alongside "np=2" is refused.
+    bool finish(int np) const {
+        return static_cast<int>(m_counts.size()) <= np;
+    }
+    const std::vector<int>& counts() const { return m_counts; }
+
+private:
+    std::vector<int>  m_counts;
+    std::vector<bool> m_seen;
+    long long         m_total = 0;
+};
 
 // Parses `s` in full as a decimal int. Returns false on an empty string, any
 // trailing junk ("12abc"), or a value outside int — where std::atoi would
@@ -116,6 +139,26 @@ inline bool readLenRecord(const std::string& s, std::size_t& pos,
     if (next <= pos) return false;                      // must make progress
     payloadOut = s.substr(payload, n);
     pos = next;
+    return true;
+}
+
+inline bool HoleCountReader::add(const std::string& key, const std::string& val) {
+    const int idx = parseIndexKey(key, 1);
+    if (idx < 0 || idx >= kMaxProfiles) return false;
+    int nh = 0;
+    if (!parseWholeInt(val, nh)) return false;
+    if (nh < 0 || nh > kMaxHolesPerProfile) return false;
+
+    if (idx >= static_cast<int>(m_counts.size())) {
+        m_counts.resize(idx + 1, 0);   // bounded above by kMaxProfiles
+        m_seen.resize(idx + 1, false);
+    }
+    if (m_seen[idx]) return false;     // duplicate index: reject, don't overwrite
+    m_seen[idx] = true;
+
+    m_total += nh;
+    if (m_total > kMaxHolesTotal) return false;
+    m_counts[idx] = nh;
     return true;
 }
 

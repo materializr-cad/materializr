@@ -24,7 +24,7 @@
 #include <cstdio>
 #include <sstream>
 #include "../i18n.h"
-#include "modeling/ParamParse.h"
+#include "ParamParse.h"
 
 namespace {
 
