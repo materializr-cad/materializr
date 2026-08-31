@@ -9,6 +9,7 @@
 #include <limits>
 #include <string>
 #include <vector>
+#include <filesystem>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -36,13 +37,38 @@ struct Drawing {
 // One group-code/value pair per two lines; DXF's entire syntax.
 struct Pair { int code; std::string value; };
 
+// ─── Input budgets ──────────────────────────────────────────────────────────
+// A DXF is untrusted input. Unlike SvgImport (32 MB + a 500k-point budget) and
+// IgesIO (kMaxEntities), this importer had no ceiling of any kind: nothing
+// bounded the pair count, the vertices in one polyline, the control points of
+// one spline, or the primitives they expand into. Each budget is checked before
+// the push_back it guards, and an over-budget file is refused with a message
+// rather than silently truncated — the SvgImport precedent.
+constexpr size_t kMaxDxfBytes        = 64u * 1024 * 1024;
+constexpr size_t kMaxDxfLineBytes    = 4096;
+constexpr size_t kMaxDxfPairs        = 4000000;
+constexpr size_t kMaxDxfEntities     = 200000;
+constexpr size_t kMaxPolyVertices    = 500000;
+constexpr size_t kMaxSplineControls  = 100000;
+constexpr size_t kMaxSplineKnots     = 100000;
+constexpr size_t kMaxDxfOutputPrims  = 1000000;
+// A spline degree arrives from group code 71. Bounding it is what stops
+// `n + degree + 1` below from signed-overflowing, and >32 is meaningless anyway.
+constexpr int    kMaxSplineDegree    = 32;
+
 class PairReader {
 public:
     explicit PairReader(std::istream& in) : m_in(in) {}
+    // False at EOF, on a malformed line, or once the pair budget is spent.
     bool next(Pair& out) {
+        if (m_pairs >= kMaxDxfPairs) return false;
         std::string codeLine, valueLine;
         if (!std::getline(m_in, codeLine)) return false;
         if (!std::getline(m_in, valueLine)) return false;
+        // Refuse absurd lines before they become long std::strings.
+        if (codeLine.size() > kMaxDxfLineBytes ||
+            valueLine.size() > kMaxDxfLineBytes) return false;
+        ++m_pairs;
         // Windows-authored files: strip \r (getline keeps it on Unix).
         if (!codeLine.empty() && codeLine.back() == '\r') codeLine.pop_back();
         if (!valueLine.empty() && valueLine.back() == '\r') valueLine.pop_back();
@@ -53,6 +79,7 @@ public:
 
 private:
     std::istream& m_in;
+    size_t m_pairs = 0;
 };
 
 double insunitsToMM(int code) {
@@ -108,10 +135,17 @@ void emitPolyline(Drawing& d, const std::vector<PolyVertex>& vs, bool closed) {
 void sampleSpline(const std::vector<glm::dvec2>& ctrl, int degree,
                   const std::vector<double>& knots, bool closed,
                   std::vector<glm::dvec2>& samples) {
+    // Bound the degree BEFORE computing expectKnots — that expression is the
+    // overflow site: group code 71 can spell 2147483647, and `n + degree + 1`
+    // is then signed overflow (UB) evaluated before any guard below runs.
+    if (degree < 1 || degree > kMaxSplineDegree ||
+        ctrl.size() > kMaxSplineControls || knots.size() > kMaxSplineKnots) {
+        samples = ctrl; // fallback: control polygon
+        return;
+    }
     const int n = static_cast<int>(ctrl.size());
     const int expectKnots = n + degree + 1;
-    if (degree < 1 || n <= degree ||
-        static_cast<int>(knots.size()) != expectKnots) {
+    if (n <= degree || static_cast<int>(knots.size()) != expectKnots) {
         samples = ctrl; // fallback: control polygon
         return;
     }
@@ -146,6 +180,11 @@ bool parse(std::istream& in, Drawing& d, std::string& error) {
     enum class Where { Limbo, Header, Entities } where = Where::Limbo;
     std::string section;
 
+    // Budget tripwires. Set anywhere a cap is hit; parse() then refuses the file
+    // rather than returning a silently truncated drawing.
+    bool overBudget = false;
+    size_t entities = 0;
+
     // Current-entity accumulation
     std::string ent;
     glm::dvec2 v10(0), v11(0), center(0);
@@ -162,6 +201,11 @@ bool parse(std::istream& in, Drawing& d, std::string& error) {
 
     auto flush = [&]() {
         if (ent.empty()) return;
+        // Output budget: an entity can expand into many primitives (an ELLIPSE
+        // fans into 64 segments, a SPLINE into up to 512), so cap the total
+        // before the expansion rather than after it.
+        if (d.lines.size() + d.circles.size() + d.arcs.size() >
+            kMaxDxfOutputPrims) { overBudget = true; return; }
         if (ent == "LINE") {
             if (have10 && have11) d.lines.push_back({v10, v11});
         } else if (ent == "CIRCLE") {
@@ -217,19 +261,24 @@ bool parse(std::istream& in, Drawing& d, std::string& error) {
                 if (p.value == "VERTEX") {
                     // stash the previous VERTEX's data, stay in polyline mode
                     if (ent == "VERTEX" && have10) {
+                        if (poly.size() >= kMaxPolyVertices) { overBudget = true; break; }
                         poly.push_back({v10, a0 /* bulge via 42 → a0 slot */});
                     }
                     ent = "VERTEX"; have10 = false; a0 = 0;
                     continue;
                 }
                 if (p.value == "SEQEND") {
-                    if (ent == "VERTEX" && have10) poly.push_back({v10, a0});
+                    if (ent == "VERTEX" && have10) {
+                        if (poly.size() >= kMaxPolyVertices) { overBudget = true; break; }
+                        poly.push_back({v10, a0});
+                    }
                     emitPolyline(d, poly, polyClosed);
                     poly.clear(); polyClosed = false; inPolyline = false;
                     ent.clear(); have10 = false; a0 = 0;
                     continue;
                 }
                 flush();
+                if (++entities > kMaxDxfEntities) { overBudget = true; break; }
                 ent = p.value;
                 if (ent == "POLYLINE") { inPolyline = true; poly.clear(); polyClosed = false; }
                 if (ent == "LWPOLYLINE") { poly.clear(); polyClosed = false; }
@@ -257,7 +306,10 @@ bool parse(std::istream& in, Drawing& d, std::string& error) {
             // Vertices arrive as repeated 10/20 pairs; 42 = bulge of the
             // segment leaving the MOST RECENT vertex; 70 bit 0 = closed.
             switch (p.code) {
-                case 10: poly.push_back({{v, 0.0}, 0.0}); break;
+                case 10:
+                    if (poly.size() >= kMaxPolyVertices) { overBudget = true; break; }
+                    poly.push_back({{v, 0.0}, 0.0});
+                    break;
                 case 20: if (!poly.empty()) poly.back().p.y = v; break;
                 case 42: if (!poly.empty()) poly.back().bulge = v; break;
                 case 70: polyClosed = (std::atoi(p.value.c_str()) & 1) != 0; break;
@@ -268,8 +320,14 @@ bool parse(std::istream& in, Drawing& d, std::string& error) {
             switch (p.code) {
                 case 71: splDegree = std::atoi(p.value.c_str()); break;
                 case 70: splFlags = std::atoi(p.value.c_str()); break;
-                case 40: splKnots.push_back(v); break;
-                case 10: splCtrl.push_back({v, 0.0}); break;
+                case 40:
+                    if (splKnots.size() >= kMaxSplineKnots) { overBudget = true; break; }
+                    splKnots.push_back(v);
+                    break;
+                case 10:
+                    if (splCtrl.size() >= kMaxSplineControls) { overBudget = true; break; }
+                    splCtrl.push_back({v, 0.0});
+                    break;
                 case 20: if (!splCtrl.empty()) splCtrl.back().y = v; break;
             }
             continue;
@@ -296,6 +354,14 @@ bool parse(std::istream& in, Drawing& d, std::string& error) {
     }
     flush();
 
+    // Refuse, don't truncate: a partially-read DXF would import as geometry the
+    // user never drew, which is worse than an honest failure.
+    if (overBudget) {
+        error = "DXF is too large or too complex to import safely "
+                "(entity, vertex or output budget exceeded).";
+        return false;
+    }
+
     if (d.lines.empty() && d.circles.empty() && d.arcs.empty()) {
         error = d.skipped > 0
             ? "DXF contained only unsupported entities (text, dimensions, …)."
@@ -313,6 +379,16 @@ DxfImportResult DxfImport::importFile(const std::string& filePath, Sketch& sketc
     if (!in.good()) {
         result.errorMessage = "Could not open file: " + filePath;
         return result;
+    }
+    // Absolute input cap, matching SvgImport::load. The per-container budgets in
+    // parse() bound what the file can expand into; this bounds the file itself.
+    {
+        std::error_code ec;
+        const auto sz = std::filesystem::file_size(filePath, ec);
+        if (!ec && sz > kMaxDxfBytes) {
+            result.errorMessage = "DXF file is too large to import (over 64 MB).";
+            return result;
+        }
     }
     Drawing d;
     if (!parse(in, d, result.errorMessage)) return result;
