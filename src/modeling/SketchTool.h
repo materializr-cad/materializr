@@ -1,6 +1,7 @@
 #pragma once
 #include "Sketch.h"
 #include "SketchSolver.h"
+#include "SketchOffset.h"
 #include "SvgImport.h"
 #include "AirfoilImport.h"
 #include <glm/glm.hpp>
@@ -9,6 +10,7 @@
 #include <set>
 #include <string>
 #include <cstddef>   // size_t
+#include <cstdint>   // uint64_t
 
 namespace materializr {
 
@@ -16,7 +18,7 @@ namespace materializr {
 // (Application::setActiveSketchMode) and the sketch toolbar hardcodes those
 // indices, so inserting a mode in the middle silently highlights the wrong
 // button -- Dimension would become 13 while the button still tests 12.
-enum class SketchToolMode { None, Select, Line, Circle, Rectangle, Arc, Spline, Polygon, Trim, Text, Svg, Mirror, Dimension, Airfoil };
+enum class SketchToolMode { None, Select, Line, Circle, Rectangle, Arc, Spline, Polygon, Trim, Text, Svg, Mirror, Dimension, Airfoil, Offset };
 
 enum class DimEntityKind { None, Point, Line, Circle, Arc };
 struct DimPick { DimEntityKind kind = DimEntityKind::None; int id = -1; };
@@ -227,6 +229,39 @@ public:
     // Create the reflected elements; returns the new point + line ids so the
     // host can select them. Coincident vertices weld onto existing geometry.
     void commitMirror(std::set<int>& outPoints, std::set<int>& outLines);
+    // --- Interactive Offset -------------------------------------------------
+    // Offset builds a parallel copy of ONE closed loop taken from the element
+    // selection. The cursor picks both side and distance; a typed value in the
+    // Offset panel overrides the magnitude. Unlike Mirror there is no
+    // whole-sketch fallback: offsetting everything at once is meaningless, and
+    // an ambiguous selection is refused with a reason rather than guessed at.
+    //
+    // The geometry itself lives in SketchOffset.{h,cpp} (pure OCCT, headless
+    // testable); this is only the interaction state around it.
+    bool isOffsetActive() const { return m_offsetActive; }
+    // Capture the selected loop and arm the tool. Returns the reason on
+    // failure, so the host can toast something specific rather than "failed".
+    OffsetError beginOffset();
+    void cancelOffset();
+    // Cursor -> signed distance (sign = side). Refuses nothing; the guards run
+    // at commit, so the ghost can show what WOULD happen.
+    void updateOffsetFromCursor(glm::vec2 cursor);
+    double getOffsetDistance() const { return m_offsetDistance; }
+    // Typed entry supplies magnitude only; the side stays as the cursor left it.
+    void setOffsetMagnitude(double mm);
+    // Swap inward/outward without dragging the cursor across the loop.
+    void flipOffsetSide() { m_offsetDistance = -m_offsetDistance; }
+    // Ghost polylines in sketch space, or empty when the current distance
+    // would be refused. Arcs are sampled for DRAWING only -- the committed
+    // geometry stays as real arcs.
+    void getOffsetPreview(std::vector<std::vector<glm::vec2>>& polylines) const;
+    // Apply. Returns the reason on failure; the sketch is untouched unless
+    // this returns OffsetError::None.
+    OffsetError commitOffset(std::set<int>& outPoints, std::set<int>& outEntities);
+    // True while the captured source still matches what was captured. Undo or
+    // a delete during the drag invalidates it -- see m_offsetSourceHash.
+    bool offsetSourceUnchanged() const;
+
     // Rectangle's typed-value placement is two-stage: first Enter sets the
     // horizontal side, second Enter the vertical (and commits). Stage 0 =
     // expecting H, 1 = expecting V. Read by the UI to swap the popup label.
@@ -554,6 +589,17 @@ private:
     // Captured source element ids (resolved at beginMirror).
     std::set<int> m_mirrorPoints, m_mirrorLines, m_mirrorCircles,
                   m_mirrorArcs, m_mirrorSplines;
+
+    // --- Interactive Offset state ---
+    bool m_offsetActive = false;
+    OffsetSource m_offsetSource;      // the captured loop
+    double m_offsetDistance = 0.0;    // signed: + is outward
+    // Hash of the CAPTURED SOURCE ONLY -- deliberately not Sketch::geometryHash(),
+    // which covers the whole sketch: committing an offset changes that, and
+    // since the tool re-arms after a commit the next preview would read its own
+    // output as a stale-source edit and cancel itself.
+    uint64_t m_offsetSourceHash = 0;
+    uint64_t hashOffsetSource() const;
 
     // Rectangle's typed-value placement is two-stage: first Enter sets the
     // horizontal side, second Enter sets the vertical side and commits.

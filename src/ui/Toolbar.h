@@ -17,7 +17,7 @@ enum class ToolAction {
     SketchOnFace, SelectSketch, Line, Circle, Rectangle, Arc, Spline, Polygon, Trim, SketchText,
     SketchSvg, SketchAirfoil, SketchDimension,
     FinishSketch, ExitSketchDiscard, EditSketch, ExtrudeSketch, SubtractSketch, PushPull, MoveFace, LookAtSketch,
-    SketchCopy, SketchMirror, SketchLinearPattern, SketchRadialPattern,
+    SketchCopy, SketchMirror, SketchOffset, SketchLinearPattern, SketchRadialPattern,
     // Cycle the drawing-inference level Full → Reduced → Off.
     SketchCycleInference,
     // Toggle the active rect/circle draw origin (Corner↔Center / Center↔2-Point).

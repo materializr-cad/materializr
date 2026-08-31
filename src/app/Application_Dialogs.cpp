@@ -4251,6 +4251,79 @@ void Application::renderSvgToolPanel() {
     if (!open) m_sketchTool->setMode(SketchToolMode::Select);
 }
 
+// Offset's own floating panel, modelled on Mirror's.
+//
+// It deliberately does NOT reuse the ##SketchDimInput popup: both of that
+// popup's branches funnel into SketchTool::applyDimension, which opens
+// `if (!m_sketch || !m_isPlacing || value <= 0.0f) return false;` and whose
+// mode switch ends `default: return false`. Offset never sets m_isPlacing, so
+// a label case there would have produced a field that silently does nothing.
+void Application::renderOffsetToolPanel() {
+    if (!m_inSketchMode || !m_sketchTool ||
+        m_sketchTool->getMode() != SketchToolMode::Offset ||
+        !m_sketchTool->isOffsetActive())
+        return;
+
+    // The source can be deleted or undone while the ghost is live; committing
+    // against stale ids would offset geometry that no longer exists.
+    if (!m_sketchTool->offsetSourceUnchanged()) {
+        m_sketchTool->cancelOffset();
+        m_sketchTool->setMode(SketchToolMode::Select);
+        showToast(materializr::tr("Offset cancelled — the selected geometry changed."));
+        return;
+    }
+
+    ImGuiViewport* vp = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(
+        ImVec2(vp->WorkPos.x + vp->WorkSize.x * 0.5f, vp->WorkPos.y + 60.0f),
+        ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.0f));
+    ImGui::SetNextWindowBgAlpha(0.92f);
+    bool open = true;
+    if (ImGui::Begin("Offset", &open,
+                     ImGuiWindowFlags_AlwaysAutoResize |
+                     ImGuiWindowFlags_NoSavedSettings)) {
+        ImGui::TextDisabled(materializr::tr(
+            "Move the cursor to set the side and distance, or type a value."));
+
+        const double d = m_sketchTool->getOffsetDistance();
+        ImGui::Text("%s: %.3f mm (%s)", materializr::tr("Distance"), std::abs(d),
+                    materializr::tr(d < 0.0 ? "inward" : "outward"));
+
+        ImGui::SetNextItemWidth(materializr::uiSz(120, 0).x);
+        if (ImGui::InputText(materializr::tr("mm"), m_offsetBuf, sizeof(m_offsetBuf),
+                             ImGuiInputTextFlags_EnterReturnsTrue)) {
+            float v = 0.0f;
+            if (materializr::parseFinite(m_offsetBuf, v) && v > 0.0f)
+                m_sketchTool->setOffsetMagnitude(v);   // magnitude only; side stays
+            m_offsetBuf[0] = '\0';
+        }
+
+        // Flip without having to drag the cursor across the loop.
+        if (ImGui::Button(materializr::tr("Flip side"))) m_sketchTool->flipOffsetSide();
+        ImGui::SameLine();
+
+        if (ImGui::Button(materializr::tr("Offset"))) {
+            std::set<int> newPts, newEnts;
+            materializr::OffsetError e = materializr::OffsetError::None;
+            recordSketchMutation([&]{ e = m_sketchTool->commitOffset(newPts, newEnts); });
+            if (e != materializr::OffsetError::None)
+                showToast(materializr::tr(materializr::offsetErrorMessage(e)));
+            // The tool stays armed and the SOURCE stays selected, so a second
+            // offset nests from the same pick.
+        }
+        ImGui::SameLine();
+        if (ImGui::Button(materializr::tr("Done"))) {
+            m_sketchTool->cancelOffset();
+            m_sketchTool->setMode(SketchToolMode::Select);
+        }
+    }
+    ImGui::End();
+    if (!open) {
+        m_sketchTool->cancelOffset();
+        m_sketchTool->setMode(SketchToolMode::Select);
+    }
+}
+
 void Application::renderMirrorToolPanel() {
     if (!m_inSketchMode || !m_sketchTool ||
         m_sketchTool->getMode() != SketchToolMode::Mirror ||

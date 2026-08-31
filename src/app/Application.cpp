@@ -2335,6 +2335,21 @@ void Application::handleToolAction(int action) {
                 std::fprintf(stdout, "Mirror: nothing to mirror\n");
             break;
         }
+        case ToolAction::SketchOffset: {
+            // Interactive offset: capture the selected loop and arm a live
+            // ghost; the Offset panel commits (Application_Dialogs.cpp).
+            // Failure reasons are DISTINCT and user-visible -- unlike Mirror,
+            // which only fprintf's to stdout where nobody sees it.
+            if (!m_inSketchMode || !m_activeSketch || !m_sketchTool) break;
+            const materializr::OffsetError e = m_sketchTool->beginOffset();
+            if (e != materializr::OffsetError::None) {
+                showToast(materializr::tr(materializr::offsetErrorMessage(e)));
+                m_sketchTool->cancelOffset();
+            } else {
+                m_offsetBuf[0] = '\0';
+            }
+            break;
+        }
         case ToolAction::SketchCopy: {
             if (!m_inSketchMode || !m_activeSketch || !m_sketchTool) break;
 
@@ -3167,6 +3182,12 @@ void Application::handleShortcuts() {
             // Escape, once the popup is actually gone.
             if (m_dimPopupConsumedEsc) {
                 m_dimPopupConsumedEsc = false;
+            } else if (m_sketchTool && m_sketchTool->isOffsetActive()) {
+                // Offset never sets m_isPlacing, so without this branch Escape
+                // falls through to exitSketchMode() and closes the sketch
+                // instead of cancelling the offset.
+                m_sketchTool->cancelOffset();
+                m_sketchTool->setMode(SketchToolMode::Select);
             } else if (m_sketchTool && m_sketchTool->getMode() == SketchToolMode::Dimension) {
                 m_sketchTool->onCancel();
             } else if (m_sketchTool && m_sketchTool->isPlacing()) {
@@ -7567,6 +7588,7 @@ void Application::run() {
             renderSvgToolPanel();
             renderAirfoilToolPanel();
             renderMirrorToolPanel();
+            renderOffsetToolPanel();
             renderLoftPanel();
             renderBoundaryFillPanel();
             renderRefImagePanel();

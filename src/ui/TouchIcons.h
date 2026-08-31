@@ -55,6 +55,7 @@
 #define MZ_ICON_THREAD     "\xee\x80\x85"
 #define MZ_ICON_SCALE      ICON_IC_SCALE_FRAME_ENLARGE
 #define MZ_ICON_MIRROR     ICON_IC_MIRROR
+#define MZ_ICON_OFFSET     ICON_IC_BORDER_OUT
 #define MZ_ICON_MEASURE    ICON_IC_RULER
 #define MZ_ICON_AXES       ICON_IC_AXES
 // Sentinels drawn by drawIconCentered (TouchWidgets.cpp): a cube-unfold "Latin

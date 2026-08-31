@@ -126,6 +126,8 @@ private:
     std::string m_airfoilSource;   // path the profile came from, for re-reading
     int  m_airfoilPointBudget = 40; // spline control points per surface
     void renderMirrorToolPanel(); // interactive mirror line controls (floating)
+    void renderOffsetToolPanel(); // interactive offset distance controls (floating)
+    char m_offsetBuf[32] = "";    // typed offset distance, mm
     // Camera-upright default rotation for Text/SVG placement.
     void seedUprightPlacementAngle();
     void initRenderers();

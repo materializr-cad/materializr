@@ -203,6 +203,8 @@ std::vector<Toolbar::RailTool> Toolbar::railTools() const {
             "Duplicate the selected sketch elements at an offset.");
         add(MZ_ICON_MIRROR,  "Mirror",   ToolAction::SketchMirror, false,
             "Mirror selected elements across a sketch line you'll pick next.");
+        add(MZ_ICON_OFFSET,  "Offset",   ToolAction::SketchOffset, false,
+            "Offset a selected closed loop: drag to set the side and distance.");
         add(MZ_ICON_PATTERN_LINEAR,   "Linear",   ToolAction::SketchLinearPattern, false,
             "Linear pattern: copy the selected sketch elements N times along the sketch X axis.");
         add(MZ_ICON_PATTERN_CIRCULAR, "Circular", ToolAction::SketchRadialPattern, false,
@@ -758,6 +760,8 @@ ToolAction Toolbar::renderSketchTools() {
     tip(materializr::tr("Duplicate the selected sketch elements at an offset."));
     if (ImGui::Button(materializr::tr("Mirror"), ImVec2(-1, bh(28)))) action = ToolAction::SketchMirror;
     tip(materializr::tr("Mirror selected elements across a sketch line you'll pick next."));
+    if (ImGui::Button(materializr::tr("Offset"), ImVec2(-1, bh(28)))) action = ToolAction::SketchOffset;
+    tip(materializr::tr("Offset a selected closed loop: drag to set the side and distance."));
     if (ImGui::Button(materializr::tr("Linear Pattern"), ImVec2(-1, bh(28)))) action = ToolAction::SketchLinearPattern;
     tip(materializr::tr("Copy the selected sketch elements N times along the sketch X axis."));
     if (ImGui::Button(materializr::tr("Circular Pattern"), ImVec2(-1, bh(28)))) action = ToolAction::SketchRadialPattern;

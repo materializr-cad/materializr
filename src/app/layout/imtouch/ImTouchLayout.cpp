@@ -864,6 +864,7 @@ void Application::renderImTouchLayout() {
                     case ToolAction::Trim:
                     case ToolAction::SketchCopy:
                     case ToolAction::SketchMirror:
+                    case ToolAction::SketchOffset:
                     case ToolAction::SketchLinearPattern:
                     case ToolAction::SketchRadialPattern:
                         modify.push_back(&t); break;

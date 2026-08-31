@@ -2310,6 +2310,25 @@ void Application::renderViewport() {
                     }
                 }
 
+                // Interactive Offset: a live ghost of the parallel loop. Drawn
+                // in the same colour as Mirror's ghost so "unplaced preview"
+                // reads consistently. When the current distance would be
+                // refused (too small, collapsing, splitting) getOffsetPreview
+                // returns nothing, so the ghost simply vanishes rather than
+                // showing geometry that cannot be committed.
+                if (m_sketchTool->getMode() == SketchToolMode::Offset &&
+                    m_sketchTool->isOffsetActive()) {
+                    std::vector<std::vector<glm::vec2>> polys;
+                    m_sketchTool->getOffsetPreview(polys);
+                    const ImU32 ghost = IM_COL32(255, 170, 60, 230);
+                    for (const auto& poly : polys)
+                        for (size_t i = 0; i + 1 < poly.size(); ++i) {
+                            ImVec2 a, b;
+                            if (toImg(sk2w(poly[i]), a) && toImg(sk2w(poly[i + 1]), b))
+                                dl->AddLine(a, b, ghost, 1.8f);
+                        }
+                }
+
                 // Interactive Mirror: the dashed mirror line + a live ghost of the
                 // reflected geometry. The move/rotate GIZMO itself is drawn in the
                 // input-handling scope (so its hit-test and visual stay in sync).
@@ -6432,6 +6451,10 @@ void Application::renderViewport() {
                     // reference point; then update the rubber-band snap.
                     m_sketchTool->updateHoverCharge(ImGui::GetTime(), sketchCoord);
                     m_sketchTool->onMouseMove(sketchCoord);
+                    // Offset takes both its side and its distance from where
+                    // the cursor sits relative to the captured loop.
+                    if (m_sketchTool->isOffsetActive())
+                        m_sketchTool->updateOffsetFromCursor(sketchCoord);
                 }
                 } // if (!patternPickingNow)
             }

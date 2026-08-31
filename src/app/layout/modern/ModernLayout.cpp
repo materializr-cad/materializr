@@ -499,6 +499,7 @@ void Application::renderModernLayout() {
                     switch (t.action) {
                         case ToolAction::SketchCopy:
                         case ToolAction::SketchMirror:
+                        case ToolAction::SketchOffset:
                         case ToolAction::Mirror:
                         case ToolAction::Split:
                         case ToolAction::SketchLinearPattern:

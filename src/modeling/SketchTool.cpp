@@ -51,6 +51,7 @@ void SketchTool::setMode(SketchToolMode mode) {
     m_rectDimStage = 0;
     m_rectDimH = 0.0f;
     m_mirrorActive = false; // switching tools aborts any in-progress mirror
+    cancelOffset();         // ...and any in-progress offset
     // Entering or leaving Dimension mode always starts a fresh pick sequence.
     clearDimState();
 }
@@ -3417,6 +3418,157 @@ void SketchTool::commitStamp() {
     if (m_mode == SketchToolMode::Text)     handleTextTool(m_currentPos);
     else if (m_mode == SketchToolMode::Svg) handleSvgTool(m_currentPos);
     else if (m_mode == SketchToolMode::Airfoil) handleAirfoilTool(m_currentPos);
+}
+
+// --- Interactive Offset ----------------------------------------------------
+// Interaction state only. All geometry -- validation, the OCCT call, and
+// conversion back to sketch entities -- lives in SketchOffset.cpp so it can be
+// tested without a window. See docs/specs/spec-sketch-offset/.
+
+uint64_t SketchTool::hashOffsetSource() const {
+    // Covers EVERY geometry-defining field, not just endpoints: a circle is
+    // {centre, radius} and an arc is {centre, start, end, radius}, so hashing
+    // endpoints alone would miss a dragged centre and let the tool commit
+    // against geometry that moved under it.
+    if (!m_sketch) return 0;
+    uint64_t h = 1469598103934665603ull;
+    auto mix = [&h](const void* data, size_t n) {
+        const unsigned char* b = static_cast<const unsigned char*>(data);
+        for (size_t i = 0; i < n; ++i) { h ^= b[i]; h *= 1099511628211ull; }
+    };
+    auto mixI = [&](int v) { mix(&v, sizeof v); };
+    auto mixD = [&](double v) { mix(&v, sizeof v); };
+    auto mixPt = [&](int id) {
+        mixI(id);
+        if (const SketchPoint* p = m_sketch->getPoint(id)) { mix(&p->pos.x, sizeof p->pos.x); mix(&p->pos.y, sizeof p->pos.y); }
+        else mixI(-1);   // deleted counts as a change
+    };
+    for (int id : m_offsetSource.lineIds) {
+        mixI(1); mixI(id);
+        for (const auto& l : m_sketch->getLines())
+            if (l.id == id) { mixPt(l.startPointId); mixPt(l.endPointId); break; }
+    }
+    for (int id : m_offsetSource.arcIds) {
+        mixI(2); mixI(id);
+        for (const auto& a : m_sketch->getArcs())
+            if (a.id == id) { mixPt(a.centerPointId); mixPt(a.startPointId); mixPt(a.endPointId); mixD(a.radius); break; }
+    }
+    for (int id : m_offsetSource.circleIds) {
+        mixI(3); mixI(id);
+        for (const auto& c : m_sketch->getCircles())
+            if (c.id == id) { mixPt(c.centerPointId); mixD(c.radius); break; }
+    }
+    return h;
+}
+
+bool SketchTool::offsetSourceUnchanged() const {
+    return m_offsetActive && hashOffsetSource() == m_offsetSourceHash;
+}
+
+OffsetError SketchTool::beginOffset() {
+    if (!m_sketch) return OffsetError::EmptySelection;
+
+    OffsetSource src;
+    // Points are ignored: a lone vertex is not part of a loop, and including
+    // it would turn an otherwise valid selection into a spurious refusal.
+    if (const OffsetError e = gatherSource(*m_sketch, m_selectedLines, m_selectedArcs,
+                                           m_selectedCircles, m_selectedSplines, src);
+        e != OffsetError::None)
+        return e;
+    if (const OffsetError e = validateSource(*m_sketch, src); e != OffsetError::None)
+        return e;
+
+    // Capture BEFORE setMode: setMode clears the element selection for every
+    // mode except Select.
+    const std::set<int> keepL = m_selectedLines, keepA = m_selectedArcs,
+                        keepC = m_selectedCircles, keepP = m_selectedPoints;
+
+    setMode(SketchToolMode::Offset);   // this calls cancelOffset(), so arm after
+
+    // Restore it: the source must stay visibly selected during the drag and
+    // after commit, which is what lets repeated offsets nest from one pick.
+    m_selectedLines = keepL; m_selectedArcs = keepA;
+    m_selectedCircles = keepC; m_selectedPoints = keepP;
+
+    m_offsetSource = src;
+    m_offsetDistance = 0.0;
+    m_offsetActive = true;
+    m_offsetSourceHash = hashOffsetSource();
+    return OffsetError::None;
+}
+
+void SketchTool::cancelOffset() {
+    m_offsetActive = false;
+    m_offsetSource = OffsetSource{};
+    m_offsetDistance = 0.0;
+    m_offsetSourceHash = 0;
+}
+
+void SketchTool::updateOffsetFromCursor(glm::vec2 cursor) {
+    if (!m_sketch || !m_offsetActive) return;
+    m_offsetDistance = signedDistanceToLoop(*m_sketch, m_offsetSource, cursor);
+}
+
+void SketchTool::setOffsetMagnitude(double mm) {
+    if (!m_offsetActive) return;
+    // Magnitude only. Direction stays wherever the cursor put it -- and starts
+    // outward, so typing a value without moving the mouse is deterministic
+    // rather than dependent on stale cursor state.
+    const double mag = std::abs(mm);
+    m_offsetDistance = (m_offsetDistance < 0.0) ? -mag : mag;
+}
+
+void SketchTool::getOffsetPreview(std::vector<std::vector<glm::vec2>>& polylines) const {
+    polylines.clear();
+    if (!m_sketch || !m_offsetActive) return;
+
+    OffsetPlan plan;
+    if (computeOffsetPlan(*m_sketch, m_offsetSource, m_offsetDistance, plan) != OffsetError::None)
+        return;   // nothing drawn when the current distance would be refused
+
+    for (const auto& l : plan.lines) polylines.push_back({l.a, l.b});
+    for (const auto& a : plan.arcs) {
+        // Sampled for DRAWING only; the committed entity stays a real arc.
+        const glm::vec2 u = a.start - a.center, v = a.end - a.center;
+        double a0 = std::atan2(double(u.y), double(u.x));
+        double a1 = std::atan2(double(v.y), double(v.x));
+        double sweep = a1 - a0;
+        while (sweep < 0.0) sweep += 2.0 * M_PI;
+        std::vector<glm::vec2> arc;
+        const int N = 16;
+        for (int i = 0; i <= N; ++i) {
+            const double t = a0 + sweep * (double(i) / N);
+            arc.push_back(a.center + glm::vec2(float(std::cos(t) * a.radius),
+                                               float(std::sin(t) * a.radius)));
+        }
+        polylines.push_back(std::move(arc));
+    }
+    for (const auto& c : plan.circles) {
+        std::vector<glm::vec2> loop;
+        const int N = 48;
+        for (int i = 0; i <= N; ++i) {
+            const double t = 2.0 * M_PI * double(i) / N;
+            loop.push_back(c.center + glm::vec2(float(std::cos(t) * c.radius),
+                                                float(std::sin(t) * c.radius)));
+        }
+        polylines.push_back(std::move(loop));
+    }
+}
+
+OffsetError SketchTool::commitOffset(std::set<int>& outPoints, std::set<int>& outEntities) {
+    if (!m_sketch || !m_offsetActive) return OffsetError::EmptySelection;
+    // The source may have been deleted or undone while the ghost was live.
+    if (!offsetSourceUnchanged()) return OffsetError::EmptySelection;
+
+    OffsetPlan plan;
+    const OffsetError e = computeOffsetPlan(*m_sketch, m_offsetSource, m_offsetDistance, plan);
+    if (e != OffsetError::None) return e;   // nothing written: plan-then-apply
+
+    applyOffsetPlan(*m_sketch, plan, &outPoints, &outEntities);
+    // Re-baseline so the next preview does not see this commit's own output as
+    // a source edit. Only correct because the hash covers the SOURCE alone.
+    m_offsetSourceHash = hashOffsetSource();
+    return OffsetError::None;
 }
 
 // --- Interactive Mirror ----------------------------------------------------
