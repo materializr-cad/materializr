@@ -95,6 +95,18 @@ _(The plugin-architecture blocker that stood here through review rounds 2–5 is
 
   The alternative — building input routing so sketch tools can be true plugins — remains the right long-term move and is the "future input-routing migration" that `SketchPlugin.cpp` already names. It is a separate infrastructure project and is deliberately not gating this tool.
 
+## Implementation deviations (recorded after building it)
+
+The contract above is what was agreed. Three things differ in the code, each deliberate:
+
+1. **Geometry lives in `src/modeling/SketchOffset.{h,cpp}`, not in `SketchTool.{h,cpp}`.** The spec named `SketchTool` to say *not a plugin*; that intent holds. Splitting the pure-OCCT half out makes every refusal path testable headless, following `SectionCap`. 29 tests exist that could not otherwise have been written.
+2. **Source self-intersection uses `ShapeAnalysis_Wire::CheckSelfIntersection()`** rather than the hand-rolled line/line, line/arc and arc/arc predicates `tolerances.md` enumerates. Reuse beats reimplementing a numerically fiddly predicate; this is what actually rejects the bow-tie in the tests.
+3. **There is no separate `Dragging` state.** `m_offsetActive` covers Armed and Dragging together — mouse-down updates the distance, mouse-up commits. Behaviourally identical to the state table, with one fewer state to keep in sync.
+
+Added beyond the spec, both trivial: a **Flip side** button and a **Done** button.
+
+**Verification status.** The geometry is covered by 29 headless tests, and every guard was mutation-tested by reverting it and confirming a test fails. That found two fixes no test could detect — the `TopAbs_REVERSED` endpoint swap (which turns 90° join fillets into 270° ones; endpoints are identical either way, only the swept angle differs) and result-to-result welding — both now tested. **The GUI interaction is not visually verified:** Screen Recording was unavailable, so `screencapture` failed on both the window rect and the whole display.
+
 ## Assumptions retired by review
 
 - ~~The Line tool's typed-value popup is reusable unmodified.~~ Retired twice over. The popup the assumption first pointed at (`##SketchDim`) is in the unwired plugin; the live one (`##SketchDimInput`) funnels into `applyDimension`, which hard-requires `m_isPlacing` and ends `default: return false`. Offset never sets `m_isPlacing`, so a label case would have produced a field that silently does nothing. Offset gets a bespoke panel instead — see `state-machine.md`.

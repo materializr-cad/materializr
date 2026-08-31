@@ -6096,6 +6096,12 @@ void Application::renderViewport() {
                         m_boxSelect->begin(glm::vec2(localX, localY));
                         m_sketchBoxSelectActive = true;
                         m_sketchDragBefore.reset();
+                    } else if (m_sketchTool->isOffsetActive()) {
+                        // Offset owns the click: mouse-down latches, mouse-up
+                        // commits at the current distance. Without this branch
+                        // the press would fall through to the drawing/selection
+                        // path and start placing geometry mid-offset.
+                        m_sketchTool->updateOffsetFromCursor(sketchCoord);
                     } else if (m_sketchTool->getMode() == SketchToolMode::Select) {
                         // Select/drag mutates point positions only — no structural
                         // change — so recordSketchMutation's signature wouldn't see
@@ -6295,7 +6301,18 @@ void Application::renderViewport() {
                     }
                 }
 
-                if (ImGui::IsMouseReleased(ImGuiMouseButton_Left) && !m_sketchBoxSelectActive) {
+                if (ImGui::IsMouseReleased(ImGuiMouseButton_Left) &&
+                    !m_sketchBoxSelectActive && m_sketchTool->isOffsetActive()) {
+                    // Release commits at whatever the cursor last indicated.
+                    // The tool stays armed and the source stays selected, so a
+                    // second drag nests another offset from the same pick.
+                    m_sketchTool->updateOffsetFromCursor(sketchCoord);
+                    std::set<int> newPts, newEnts;
+                    materializr::OffsetError e = materializr::OffsetError::None;
+                    recordSketchMutation([&]{ e = m_sketchTool->commitOffset(newPts, newEnts); });
+                    if (e != materializr::OffsetError::None)
+                        showToast(materializr::tr(materializr::offsetErrorMessage(e)));
+                } else if (ImGui::IsMouseReleased(ImGuiMouseButton_Left) && !m_sketchBoxSelectActive) {
                     m_sketchTool->onMouseUp(sketchCoord);
                     if (materializr::touchMode()) {
                     // Press-drag-release: place the drawing tool's point now, at
