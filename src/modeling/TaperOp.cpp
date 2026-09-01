@@ -190,7 +190,8 @@ bool TaperOp::deserializeParams(const std::string& blob) {
         if (key == "facerefs") {
             std::string rest = blob.substr(eq + 1);
             m_faceRefs.clear();
-            materializr::topo::parseRefList(rest, m_faceRefs);
+            if (!materializr::topo::parseRefList(rest, m_faceRefs))
+                return false;
             any = true;
             break;
         }

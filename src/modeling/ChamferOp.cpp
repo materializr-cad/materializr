@@ -881,7 +881,8 @@ bool ChamferOp::deserializeParams(const std::string& blob) {
         if (key == "edgerefs") {
             std::string rest = blob.substr(eq + 1);
             m_edgeRefs.clear();
-            materializr::topo::parseRefList(rest, m_edgeRefs);
+            if (!materializr::topo::parseRefList(rest, m_edgeRefs))
+                return false;
             any = true;
             break;
         }

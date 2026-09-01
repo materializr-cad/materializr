@@ -42,6 +42,13 @@ inline constexpr int kMaxProfiles        = 4096;   // valid indices are 0..4095
 inline constexpr int kMaxHolesPerProfile = 4096;
 inline constexpr int kMaxHolesTotal      = 65536;
 
+// A ref LIST (fillet/chamfer edgerefs, shell/taper facerefs) is length-prefixed
+// records back to back. readLenRecord bounds each RECORD, but nothing bounded
+// how MANY: "0:" is a valid zero-length record in two bytes, so a run of them
+// yields one Ref per two input bytes — a ~50x memory amplification from an
+// otherwise-bounded file. Cap the count as well as each record's length.
+inline constexpr std::size_t kMaxRefsPerList = 65536;
+
 // Accumulates the h<N> hole-count fields shared by the profile-based operations
 // (BoundaryFillOp, LoftOp), which previously carried byte-identical copies of
 // this parsing. Applies the per-index, per-profile and total budgets, and

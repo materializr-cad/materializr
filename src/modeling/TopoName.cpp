@@ -47,11 +47,18 @@ std::string Ref::serialize() const {
     return out;
 }
 
-void parseRefList(const std::string& blob, std::vector<Ref>& out) {
+bool parseRefList(const std::string& blob, std::vector<Ref>& out) {
     size_t pos = 0;
     std::string tok;
-    while (materializr::readLenRecord(blob, pos, tok))
+    while (materializr::readLenRecord(blob, pos, tok)) {
+        // Checked BEFORE the push_back it guards, like every other budget here.
+        if (out.size() >= materializr::kMaxRefsPerList) {
+            out.clear();   // refuse whole, never hand back a truncated list
+            return false;
+        }
         out.push_back(Ref::parse(tok));
+    }
+    return true;
 }
 
 Ref Ref::parse(const std::string& blob) {

@@ -27,6 +27,10 @@
 #include "modeling/ExtrudeOp.h"
 
 #include <BRepBuilderAPI_MakePolygon.hxx>
+#include <BRepBuilderAPI_MakeVertex.hxx>
+#include <BRepTools.hxx>
+#include <BRep_Builder.hxx>
+#include <TopoDS_Compound.hxx>
 #include <gp_Ax3.hxx>
 #include <gp_Dir.hxx>
 #include <gp_Pln.hxx>
@@ -35,7 +39,9 @@
 
 #include <gtest/gtest.h>
 
+#include <sstream>
 #include <string>
+#include <vector>
 
 using materializr::readLenPrefix;
 using materializr::readLenRecord;
@@ -288,4 +294,68 @@ TEST(ExtrudeRoundTrip, BrepProfileSurvivesSerializeDeserialize) {
     EXPECT_EQ(again.substr(again.find(";brep=")),
               blob.substr(blob.find(";brep=")))
         << "the brep payload round-tripped but changed";
+}
+
+// ── The ref-list count budget ───────────────────────────────────────────────
+// readLenRecord bounds each RECORD's length, but nothing bounded how MANY
+// records a list could hold. "0:" is a well-formed zero-length record in two
+// bytes, so a run of them yields one Ref per two input bytes — the one
+// untrusted-input path in this area that had no count budget.
+
+TEST(RefListBounds, RejectsAnUnboundedRunOfRecords) {
+    std::string blob;
+    const std::size_t over = materializr::kMaxRefsPerList + 16;
+    blob.reserve(over * 2);
+    for (std::size_t i = 0; i < over; ++i) blob += "0:";
+
+    std::vector<materializr::topo::Ref> refs;
+    EXPECT_FALSE(materializr::topo::parseRefList(blob, refs));
+    EXPECT_TRUE(refs.empty())
+        << "a refused list must not hand back a truncated set of refs";
+}
+
+TEST(RefListBounds, AcceptsAListWithinBudget) {
+    // The discriminating half: the budget must not reject ordinary lists.
+    std::vector<materializr::topo::Ref> refs;
+    EXPECT_TRUE(materializr::topo::parseRefList("0:0:0:", refs));
+    EXPECT_EQ(refs.size(), 3u);
+}
+
+TEST(RefListBounds, MalformedTailStillEndsTheListWithoutFailing) {
+    // Forward compatibility is deliberately preserved: a trailing record this
+    // build cannot parse ends the list, it does not fail the whole blob.
+    std::vector<materializr::topo::Ref> refs;
+    EXPECT_TRUE(materializr::topo::parseRefList("0:0:junk", refs));
+    EXPECT_EQ(refs.size(), 2u);
+}
+
+// ── LoftOp hole children are type-checked ───────────────────────────────────
+
+TEST(LoftBounds, NonWireHoleShapeIsRejectedNotThrown) {
+    // BoundaryFillOp's twin loop checks ShapeType on every HOLE child; LoftOp's
+    // checked only the profile wire. A compound whose hole slot holds a vertex
+    // therefore reached TopoDS::Wire() and threw Standard_TypeMismatch straight
+    // out of deserializeParams (the try/catch covers only BRepTools::Read).
+    BRepBuilderAPI_MakePolygon poly;
+    poly.Add(gp_Pnt(0, 0, 0));
+    poly.Add(gp_Pnt(10, 0, 0));
+    poly.Add(gp_Pnt(10, 10, 0));
+    poly.Close();
+    ASSERT_TRUE(poly.IsDone());
+
+    TopoDS_Compound comp;
+    BRep_Builder bb;
+    bb.MakeCompound(comp);
+    bb.Add(comp, poly.Wire());                                 // profile: a wire
+    bb.Add(comp, BRepBuilderAPI_MakeVertex(gp_Pnt(1, 1, 0)));  // hole: NOT a wire
+
+    std::ostringstream os;
+    BRepTools::Write(comp, os);
+    const std::string payload = os.str();
+    ASSERT_FALSE(payload.empty()) << "fixture wrote no brep; test would be vacuous";
+
+    LoftOp op;
+    const std::string blob =
+        "np=1;h0=1;brep=" + std::to_string(payload.size()) + ":" + payload;
+    EXPECT_FALSE(op.deserializeParams(blob));
 }

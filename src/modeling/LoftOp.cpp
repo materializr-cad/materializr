@@ -689,6 +689,12 @@ bool LoftOp::deserializeParams(const std::string& blob) {
                 std::vector<TopoDS_Wire> holes;
                 int nh = i < static_cast<int>(holeCounts.size()) ? holeCounts[i] : 0;
                 for (int j = 0; j < nh && it.More(); ++j) {
+                    // Check the HOLE children too, as BoundaryFillOp's twin loop
+                    // does. Without this a crafted compound reached TopoDS::Wire()
+                    // on a non-wire and threw Standard_TypeMismatch out of
+                    // deserializeParams — the try/catch above covers only
+                    // BRepTools::Read, so nothing here caught it.
+                    if (it.Value().ShapeType() != TopAbs_WIRE) return false;
                     holes.push_back(TopoDS::Wire(it.Value()));
                     it.Next();
                 }
