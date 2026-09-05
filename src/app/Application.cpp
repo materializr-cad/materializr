@@ -7558,6 +7558,7 @@ void Application::run() {
                     case InteractiveOp::Loft:           beginLoft();           break;
                     case InteractiveOp::BoundaryFill:   beginBoundaryFill();   break;
                     case InteractiveOp::Patch:          beginPatch();          break;
+                    case InteractiveOp::Sew:            beginSew();            break;
                     case InteractiveOp::LoftPickSecond: m_loftPickHintPending = true; break;
                     case InteractiveOp::ConstructionPlane: beginConstructionPlane(); break;
                     case InteractiveOp::ImportRefImage: beginRefImageImport(); break;

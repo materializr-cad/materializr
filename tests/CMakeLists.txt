@@ -61,6 +61,7 @@ add_library(materializr_core STATIC
     ${CMAKE_SOURCE_DIR}/src/modeling/PatchOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/FaceTweak.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/FaceTweakOp.cpp
+    ${CMAKE_SOURCE_DIR}/src/modeling/SewOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/SweepOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/ConstructionPlaneOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/ConstructionAxisOp.cpp
@@ -778,6 +779,11 @@ add_test(NAME test_face_tweak COMMAND test_face_tweak)
 add_executable(test_iop_latch test_iop_latch.cpp)
 target_link_libraries(test_iop_latch PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_iop_latch COMMAND test_iop_latch)
+
+# Sew: loose surfaces into one body, and into a solid when they close.
+add_executable(test_sew test_sew.cpp)
+target_link_libraries(test_sew PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_sew COMMAND test_sew)
 
 # ─── Loader path for a source-built OCCT ─────────────────────────────────────
 # With MZR_OCCT_PREFIX the kernel lives outside the loader's default search

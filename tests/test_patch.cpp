@@ -300,3 +300,71 @@ TEST(Patch, RefusesAGarbageBlob) {
     EXPECT_FALSE(op.deserializeParams("body=0;ne=2;ns=0;brep=99999999999999:x"));
     EXPECT_FALSE(op.deserializeParams("body=0;ne=2;ns=0;t3d=nan;brep=2:xx"));
 }
+
+// ── Why a patch didn't join the body ───────────────────────────────────────
+//
+// Three different situations hand the user the same loose surface, and they
+// want three different things done next. The one that reads as the tool
+// ignoring you is a hole that goes right THROUGH: capping one end cannot close
+// the body, so the patch correctly refuses to sew — and used to say nothing at
+// all about why.
+
+TEST(Patch, AClosedBodyReportsThatThereIsNothingToSewInto) {
+    Document doc;
+    const TopoDS_Shape box = BRepPrimAPI_MakeBox(10.0, 10.0, 10.0).Shape();
+    const int id = doc.addBody(box, "Box");
+
+    // The four top edges of an intact solid: a perfectly good ring, on a body
+    // with no opening anywhere.
+    const TopoDS_Face top = [&] {
+        TopoDS_Face best;
+        double bestZ = -1e30;
+        for (TopExp_Explorer ex(box, TopAbs_FACE); ex.More(); ex.Next()) {
+            GProp_GProps g;
+            BRepGProp::SurfaceProperties(ex.Current(), g);
+            if (g.CentreOfMass().Z() > bestZ) { bestZ = g.CentreOfMass().Z(); best = TopoDS::Face(ex.Current()); }
+        }
+        return best;
+    }();
+    std::vector<TopoDS_Edge> ring;
+    for (TopExp_Explorer ex(top, TopAbs_EDGE); ex.More(); ex.Next())
+        ring.push_back(TopoDS::Edge(ex.Current()));
+    ASSERT_EQ(ring.size(), 4u);
+
+    PatchOp op;
+    op.setBody(id);
+    op.setEdges(ring);
+    op.setContinuity(PatchOp::Continuity::Position);
+    ASSERT_TRUE(op.execute(doc)) << "the surface still fits";
+
+    EXPECT_FALSE(op.healedIntoBody());
+    EXPECT_EQ(op.healOutcome(), PatchOp::Heal::BodyIsClosed)
+        << "and the panel can now say WHY, instead of dropping a silent extra body";
+    EXPECT_EQ(doc.getAllBodyIds().size(), 2u) << "the patch is its own surface";
+    EXPECT_NEAR(vol(doc.getBody(id)), 1000.0, 1e-6) << "the solid is untouched";
+}
+
+TEST(Patch, HealingReportsItself) {
+    Document doc;
+    const TopoDS_Shape open =
+        shellWithFaceRemoved(BRepPrimAPI_MakeBox(10.0, 10.0, 10.0).Shape(), true);
+    const int id = doc.addBody(open, "Open");
+
+    PatchOp op;
+    op.setBody(id);
+    op.setEdges(freeEdges(open));
+    op.setContinuity(PatchOp::Continuity::Position);
+    ASSERT_TRUE(op.execute(doc));
+    EXPECT_EQ(op.healOutcome(), PatchOp::Heal::Sewn);
+}
+
+TEST(Patch, EdgesFromNoBodyReportNoSingleBody) {
+    Document doc;
+    const gp_Pnt a(0, 0, 0), b(10, 0, 0), c(10, 10, 3), d(0, 10, 3);
+    PatchOp op;
+    op.setEdges({BRepBuilderAPI_MakeEdge(a, b), BRepBuilderAPI_MakeEdge(b, c),
+                 BRepBuilderAPI_MakeEdge(c, d), BRepBuilderAPI_MakeEdge(d, a)});
+    op.setContinuity(PatchOp::Continuity::Position);
+    ASSERT_TRUE(op.execute(doc));
+    EXPECT_EQ(op.healOutcome(), PatchOp::Heal::NoSingleBody);
+}

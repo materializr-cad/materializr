@@ -39,6 +39,7 @@
 #include "modeling/GuidedLoftOp.h"
 #include "modeling/BoundaryFillOp.h"
 #include "modeling/PatchOp.h"
+#include "modeling/SewOp.h"
 #include "modeling/ConstructionPlaneOp.h"
 #include "io/FileDialogs.h"
 #include "modeling/ConstructionAxisOp.h"
@@ -1500,6 +1501,51 @@ void Application::cancelPatch() {
     m_patchActive = false;
     m_patchEdges.clear();
     m_patchSupports.clear();
+    m_meshesDirty = true;
+}
+
+// ─── Sew (one-shot) ─────────────────────────────────────────────────────────
+
+void Application::beginSew() {
+    if (refuseMeshSelection("Sew")) return;
+    if (!m_selection || !m_document || !m_history) return;
+
+    std::vector<int> ids;
+    for (const auto& e : m_selection->getSelection()) {
+        if (e.bodyId < 0) continue;
+        bool dup = false;
+        for (int x : ids) if (x == e.bodyId) { dup = true; break; }
+        if (!dup) ids.push_back(e.bodyId);
+    }
+    if (ids.empty()) {
+        showToast("Sew needs the surfaces selected - pick the bodies to stitch "
+                  "together, then click Sew.");
+        return;
+    }
+
+    auto op = std::make_unique<SewOp>();
+    op->setBodies(ids);
+    SewOp* raw = op.get();
+    if (!m_history->pushOperation(std::move(op), *m_document)) {
+        showToast("Sew: those surfaces wouldn't join - they may not touch "
+                  "anywhere, or there was nothing to stitch.");
+        return;
+    }
+
+    // Report what it managed, not that it ran. "Closed" and "still open" are
+    // different outcomes and the second one is actionable — the edge count is
+    // how many gaps are left to patch.
+    if (raw->madeSolid()) {
+        showToast("Sewed " + std::to_string(raw->facesSewn()) +
+                  " faces into a solid.");
+    } else {
+        showToast("Sewed " + std::to_string(raw->facesSewn()) + " faces, but " +
+                  std::to_string(raw->freeEdgesLeft()) +
+                  " edge(s) are still open - it isn't a solid yet.");
+    }
+    // The consumed bodies are gone; a selection naming them would resolve to
+    // nothing.
+    m_selection->clear();
     m_meshesDirty = true;
 }
 

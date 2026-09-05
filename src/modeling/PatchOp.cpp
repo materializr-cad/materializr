@@ -321,11 +321,16 @@ bool PatchOp::execute(Document& doc) {
 
         // Prefer healing the body over adding a second object: "fill the void"
         // means the part ends up whole, not shadowed by a loose surface.
+        m_healOutcome = base.IsNull() ? Heal::NoSingleBody
+                      : (isSolid(base) && freeEdgeCount(base) == 0)
+                            ? Heal::BodyIsClosed
+                            : Heal::SewFailed;
         if (!base.IsNull()) {
             const TopoDS_Shape healed = healInto(base, patch);
             if (!healed.IsNull()) {
                 m_previousShape = base;
                 m_healed = true;
+                m_healOutcome = Heal::Sewn;
                 // A previously-created standalone body is stale now (the user
                 // raised continuity and the patch finally closed). Drop it so
                 // the document doesn't keep both.

@@ -32,6 +32,7 @@ enum class InteractiveOp {
 
     BoundaryFill,
     Patch,
+    Sew,
     Revolve,
 
     // Construction planes

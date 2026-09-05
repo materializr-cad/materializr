@@ -2328,8 +2328,36 @@ void Application::renderPatchPanel() {
     if (!m_patchSupports.empty())
         ImGui::TextDisabled(materializr::tr("%d picked support face(s)"),
                             static_cast<int>(m_patchSupports.size()));
-    if (m_patchBodyId < 0)
+    // Why the patch is (or isn't) going to join the body. Three different
+    // reasons produce the same loose surface, and the one that reads as the
+    // tool ignoring you — a hole that goes right THROUGH, which capping one end
+    // cannot close — used to say nothing at all.
+    if (auto* pop = static_cast<PatchOp*>(m_patchPreview.op())) {
+        switch (pop->healOutcome()) {
+            case PatchOp::Heal::Sewn:
+                break;
+            case PatchOp::Heal::NoSingleBody:
+                ImGui::TextDisabled("%s", materializr::tr("Standalone surface (the edges\ndon't bound one body)."));
+                break;
+            case PatchOp::Heal::BodyIsClosed:
+                ImGui::PushTextWrapPos(280.0f);
+                ImGui::TextDisabled("%s", materializr::tr(
+                    "This body is already closed, so there's nothing to sew into - "
+                    "the patch lands as its own surface. A hole that goes right "
+                    "through needs both ends capped, then Sew."));
+                ImGui::PopTextWrapPos();
+                break;
+            case PatchOp::Heal::SewFailed:
+                ImGui::PushTextWrapPos(280.0f);
+                ImGui::TextDisabled("%s", materializr::tr(
+                    "The patch wouldn't join the opening, so it lands as its own "
+                    "surface - the fitted edge may not reach the rim."));
+                ImGui::PopTextWrapPos();
+                break;
+        }
+    } else if (m_patchBodyId < 0) {
         ImGui::TextDisabled("%s", materializr::tr("Standalone surface (the edges\ndon't bound one body)."));
+    }
 
     ImGui::Separator();
 

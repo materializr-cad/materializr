@@ -68,6 +68,9 @@
 // which is Defeature) on purpose — the two are offered on different selections
 // and do opposite things, one filling a hole and one dissolving a feature.
 #define MZ_ICON_PATCH      ICON_IC_PUZZLE
+// Sew: separate pieces becoming one. NOT ICON_IC_COMBINE — that is already
+// MZ_ICON_PROJECT, and a duplicate glyph in a set this small reads as a mistake.
+#define MZ_ICON_SEW        ICON_IC_HORIZONTAL_MERGE
 #define MZ_ICON_LATHE      ICON_IC_ROTATE_CAMERA_RIGHT
 #define MZ_ICON_SUBTRACT   ICON_IC_MINUS
 #define MZ_ICON_LOOK       ICON_IC_EYE

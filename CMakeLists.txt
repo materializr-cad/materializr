@@ -250,6 +250,7 @@ add_executable(materializr
     src/plugins/RefImagePlugin.cpp
     src/plugins/BoundaryFillPlugin.cpp
     src/plugins/PatchPlugin.cpp
+    src/plugins/SewPlugin.cpp
     src/plugins/ConstructionAxisPlugin.cpp
     src/plugins/RevolvePlugin.cpp
     src/plugins/FilletPlugin.cpp
@@ -312,6 +313,7 @@ add_executable(materializr
     src/modeling/PatchOp.cpp
     src/modeling/FaceTweak.cpp
     src/modeling/FaceTweakOp.cpp
+    src/modeling/SewOp.cpp
     src/modeling/SketchTransformOp.cpp
     src/modeling/ConstructionPlaneOp.cpp
     src/modeling/ConstructionAxisOp.cpp

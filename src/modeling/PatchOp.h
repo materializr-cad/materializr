@@ -54,6 +54,16 @@
 // the right answer for bridging geometry the user will sew up later.
 class PatchOp : public Operation {
 public:
+    // What became of the attempt to sew the patch into its body. The user sees
+    // a loose surface either way, and the three reasons want three different
+    // things done next, so the panel has to be able to tell them apart:
+    //   NoSingleBody   — the edges came from two bodies; pick one ring.
+    //   BodyIsClosed   — the body has no opening. A hole that goes right
+    //                    THROUGH cannot be closed by capping one end, which is
+    //                    the case that reads as the tool ignoring you.
+    //   SewFailed      — there was an opening and the patch would not join it.
+    enum class Heal { Sewn, NoSingleBody, BodyIsClosed, SewFailed };
+
     // Continuity the patch is asked to hold along its boundary. Stored as a
     // small int in the parameter blob rather than the OCCT enum, whose values
     // are not part of any file format we control.
@@ -99,6 +109,7 @@ public:
     // True when the patch closed the target body back into a solid, rather
     // than being added as a standalone surface.
     bool healedIntoBody() const { return m_healed; }
+    Heal healOutcome() const { return m_healOutcome; }
     // Edges that ended up with no support face, so their stretch of the
     // boundary is only C0 no matter what continuity was asked for.
     int unsupportedEdgeCount() const { return m_unsupported; }
@@ -167,6 +178,7 @@ private:
     int m_createdBodyId = -1;
     bool m_healed = false;
 
+    Heal m_healOutcome = Heal::NoSingleBody;
     TopoDS_Face m_patchFace;
     double m_g0Error = 0.0, m_g1Error = 0.0, m_g2Error = 0.0;
     int m_unsupported = 0;

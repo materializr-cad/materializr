@@ -1667,6 +1667,12 @@ private:
     void cancelPatch();
     void renderPatchPanel();
 
+    // ── Sew (one-shot) ──
+    // No panel: the tolerance is a ladder inside the op and there is nothing
+    // else to tune, so this pushes a history step immediately and reports what
+    // it got through a toast. See SewOp.h.
+    void beginSew();
+
     // ── Reference image (photo underlay hosted on a construction plane) ──
     // Import: file dialog → decode/validate → addPlane + setRefImage; the
     // photo then moves/rotates via the normal plane gizmo and is sketch-on-able
