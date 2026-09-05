@@ -288,6 +288,16 @@ public:
 
     // Grid step (in sketch-plane mm). Used for both visual grid and snap-to-line.
     // 0 disables grid snap entirely.
+    // POINTING precision, not grid coarseness. Trim, pick, inference and hover
+    // distances track the grid so a fine grid gives fine picking — but they
+    // must not grow without bound when the grid is coarse. With the step
+    // following the display unit, a 1 ft grid put the trim threshold at
+    // 152 mm: a click on empty space could cut geometry 15 cm away, with grid
+    // snapping OFF. The cap is the largest step the presets ever offered in
+    // millimetres, so every mm and cm grid behaves exactly as it always has.
+    static constexpr float kToleranceStepCapMm = 10.0f;
+    float tolStep() const { return std::min(m_gridStep, kToleranceStepCapMm); }
+
     void setGridStep(float step) { m_gridStep = step; }
     float getGridStep() const { return m_gridStep; }
     // Mirrors the toolbar "Snap to grid" checkbox. When on (default), placed

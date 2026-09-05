@@ -4496,12 +4496,27 @@ void Application::applyDisplayUnitChange(int unit) {
     // Guarded: settings are applied before the ImGui context exists.
     if (ImGui::GetCurrentContext()) ImGui::ClearActiveID();
 
+    // Carry the grid step's DISPLAYED NUMBER across, not its millimetres. The
+    // step is the snap lattice and the visible grid, so leaving it at 1 mm
+    // while the view frames 40 ft draws 12192 lines (the renderer fades them
+    // to nothing: the grid vanishes) and offers a lattice 1/300th of a usable
+    // one. Working "in feet" means a grid of one foot.
+    //
+    // Safe only because SketchTool::tolStep() now caps what POINTING
+    // tolerances take from the step. Rescaling it while trim, pick, inference
+    // and hover distances derived from it directly put the trim threshold at
+    // 152 mm — see 0733a59, which reverted exactly that.
+    const auto next = static_cast<materializr::LengthUnit>(unit);
+    if (next != materializr::currentUnit() && m_sketchGridStep > 0.0f) {
+        const double shownStep = materializr::toDisplay(m_sketchGridStep);
+        materializr::setCurrentUnit(next);
+        m_sketchGridStep = static_cast<float>(materializr::toMm(shownStep));
+        if (m_toolbar)    m_toolbar->setGridStep(m_sketchGridStep);
+        if (m_sketchTool) m_sketchTool->setGridStep(m_sketchGridStep);
+    } else {
+        materializr::setCurrentUnit(next);
+    }
     m_displayUnit = unit;
-    materializr::setCurrentUnit(static_cast<materializr::LengthUnit>(unit));
-    // NOTE: the sketch grid step is deliberately NOT rescaled here. See
-    // frameSketchView below for what fixes the working-scale complaint, and
-    // why rescaling the step cannot until interaction tolerances stop deriving
-    // from it.
 }
 
 void Application::markDirty() {

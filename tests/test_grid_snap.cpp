@@ -222,3 +222,34 @@ TEST(GridSnap, LatticeAnchorSitsOnTheSnapLattice) {
         }
     }
 }
+
+// Pointing tolerances must not scale without bound when the grid does.
+// The grid step follows the display unit, so a 1 ft grid is 304.8 mm — and
+// trim, pick, inference and hover distances all derived from it directly.
+// That put the trim threshold at max(0.3, 304.8*0.5) = 152 mm: a click on
+// empty space could cut geometry 15 cm away, with grid snapping OFF.
+TEST(GridSnap, ToleranceStepIsCappedWhileTheLatticeIsNot) {
+    SketchTool t;
+    const float cap = SketchTool::kToleranceStepCapMm;
+
+    // Every grid the presets ever offered in millimetres behaves EXACTLY as
+    // before — the cap is the largest of them, so nothing existing moves.
+    for (float mm : { 0.1f, 0.5f, 1.0f, 10.0f }) {
+        t.setGridStep(mm);
+        EXPECT_FLOAT_EQ(mm, t.tolStep()) << "mm grid unchanged: " << mm;
+    }
+
+    // A foot of lattice, but pointing stays human-scaled.
+    t.setGridStep(304.8f);
+    EXPECT_FLOAT_EQ(cap, t.tolStep());
+    EXPECT_NEAR(5.0f, std::max(0.3f, t.tolStep() * 0.5f), 1e-4)
+        << "the trim threshold must stay millimetres, not become 152 mm";
+
+    // The LATTICE itself is not capped — a foot grid still snaps to a foot.
+    // The LATTICE itself is not capped: tolStep() is a ceiling on POINTING
+    // distance only, and the snap arithmetic keeps using m_gridStep. Asserted
+    // on the accessor because snap() is private; the lattice sites were left
+    // reading m_gridStep deliberately.
+    EXPECT_FLOAT_EQ(304.8f, t.getGridStep())
+        << "the grid must still be a foot even though tolerances are not";
+}

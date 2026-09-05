@@ -751,7 +751,7 @@ void SketchTool::updateHoverCharge(double tNow, glm::vec2 cursor) {
     // charged it at coarse grid steps (zoomed out) — "latching to edges I
     // never hovered". Charging is a deliberate act: tighter catch, and the
     // linger tolerance below is a small fraction of a cell.
-    const float band = std::max(0.4f, m_gridStep * 0.6f);
+    const float band = std::max(0.4f, tolStep() * 0.6f);
     ChargedRef best;
     float bestD = band;
     for (const auto& pt : m_sketch->getPoints()) {
@@ -811,7 +811,7 @@ void SketchTool::updateHoverCharge(double tNow, glm::vec2 cursor) {
     // and same sourceId; FacePoint and FaceLineMid match by position
     // since they have no id.
     const double dwell = 0.30;
-    const float  moveTol = std::max(0.25f, m_gridStep * 0.25f);
+    const float  moveTol = std::max(0.25f, tolStep() * 0.25f);
     bool sameCandidate =
         m_hoverCandidate.kind == best.kind &&
         ((best.sourceId >= 0 && m_hoverCandidate.sourceId == best.sourceId) ||
@@ -924,7 +924,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     // extension guides all derive from it, so the touch widening flows to all.
     const bool gridSnapOnForBand = m_snapToGridEnabled && m_gridStep > 0.0f;
     float pointSnapThreshold =
-        (gridSnapOnForBand ? m_gridStep * 0.6f : 0.25f) * snapScale();
+        (gridSnapOnForBand ? tolStep() * 0.6f : 0.25f) * snapScale();
     float curveSnapThreshold = pointSnapThreshold; // same band for circle/arc perimeters
 
     // Without a sketch only grid snap can apply.
@@ -1009,7 +1009,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
                  m_inferenceLevel == InferenceLevel::Max) && gridActive) {
                 glm::vec2 gc;
                 if (snapCurveToGrid(center->pos, r, pos, m_gridStep,
-                                    std::max(curveSnapThreshold, m_gridStep * 0.6f), gc))
+                                    std::max(curveSnapThreshold, tolStep() * 0.6f), gc))
                     { m_snapRimId = c.id; noteRimGuide(gc, c.id); return gc; }
             }
             // Reduced (and Full/Max fallback): grid wins ties — only land on the
@@ -1052,7 +1052,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
                  m_inferenceLevel == InferenceLevel::Max) && gridActive) {
                 glm::vec2 gc;
                 if (snapCurveToGrid(center->pos, r, pos, m_gridStep,
-                                    std::max(curveSnapThreshold, m_gridStep * 0.6f), gc)) {
+                                    std::max(curveSnapThreshold, tolStep() * 0.6f), gc)) {
                     // Accept grid crossing only when it lies on the arc.
                     float gcA = std::atan2(gc.y - center->pos.y,
                                            gc.x - center->pos.x) - startA;
@@ -1328,7 +1328,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     // snap above: with grid snap on, an absolute 0.2 mm floor would fire a
     // horizontal/vertical guide off a point within 0.2 mm on a fine grid,
     // hijacking the cursor within one increment. Tie it to the grid instead.
-    const float axisThresh   = (gridActive ? m_gridStep * 0.3f : 0.2f);
+    const float axisThresh   = (gridActive ? tolStep() * 0.3f : 0.2f);
     const float onLineThresh = pointSnapThreshold * 0.7f;
     const float extThresh    = pointSnapThreshold * 0.6f;
     // POSITIONAL cap on directional / charged inferences: fires-checks are
@@ -1341,7 +1341,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     // stopped grabbing, these took over and the preview wouldn't start until
     // ~1.3 mm out. Tie the pull to the grid so it can't reach past ~1.5
     // increments; coarse grids and grid-off keep the absolute cap.
-    const float posCap       = (gridActive ? m_gridStep * 1.5f : 1.5f);
+    const float posCap       = (gridActive ? tolStep() * 1.5f : 1.5f);
 
     // On-line: cursor's perpendicular projection lands within an existing
     // sketch segment.
@@ -2219,7 +2219,7 @@ void SketchTool::handleSelectTool(glm::vec2 pos) {
     int nearLine = -1;
     int nearCircle = -1;
     int nearArc = -1;
-    const float tol = std::max(m_gridStep * 0.5f, 0.5f) * snapScale(); // sketch units (wider on touch)
+    const float tol = std::max(tolStep() * 0.5f, 0.5f) * snapScale(); // sketch units (wider on touch)
     if (nearPt < 0) {
         // Line segments.
         float bestD = 0.0f;
@@ -2477,8 +2477,8 @@ float SketchTool::rimBreakBand(bool wholeSelection) const {
     // the rim through any normal repositioning and only lets go if the line is
     // hauled somewhere else entirely. Dragging the point alone gets a tight one,
     // so a deliberate pull detaches immediately.
-    const float tight = std::max(m_gridStep * 0.75f, 0.5f) * snapScale();
-    return wholeSelection ? std::max(tight * 8.0f, 4.0f * m_gridStep) : tight;
+    const float tight = std::max(tolStep() * 0.75f, 0.5f) * snapScale();
+    return wholeSelection ? std::max(tight * 8.0f, 4.0f * tolStep()) : tight;
 }
 
 // Sticky, not locked. While the drag stays near the rim the point rides it —
@@ -3474,7 +3474,7 @@ void applyTrim(Sketch& sketch, const TrimAction& a) {
 
 void SketchTool::handleTrimTool(glm::vec2 pos) {
     if (!m_sketch) return;
-    float threshold = std::max(0.3f, m_gridStep * 0.5f);
+    float threshold = std::max(0.3f, tolStep() * 0.5f);
     TrimAction a = planTrim(*m_sketch, pos, threshold);
     if (!a.valid()) return;
     applyTrim(*m_sketch, a);
@@ -3487,7 +3487,7 @@ void SketchTool::handleTrimTool(glm::vec2 pos) {
 void SketchTool::computeTrimHover(glm::vec2 pos) {
     m_trimHoverPoints.clear();
     if (!m_sketch) return;
-    float threshold = std::max(0.3f, m_gridStep * 0.5f);
+    float threshold = std::max(0.3f, tolStep() * 0.5f);
     TrimAction a = planTrim(*m_sketch, pos, threshold);
     if (a.valid()) densifyTrimPreview(*m_sketch, a, m_trimHoverPoints);
 }
@@ -3792,12 +3792,12 @@ void SketchTool::updateOffsetHover(glm::vec2 pos) {
     m_offsetChainHover.clear();
     if (!m_sketch) return;
     if (m_offsetSuppressHover) {
-        if (glm::length(pos - m_offsetCommitPos) < std::max(1.0f, m_gridStep * 2.0f))
+        if (glm::length(pos - m_offsetCommitPos) < std::max(1.0f, tolStep() * 2.0f))
             return;
         m_offsetSuppressHover = false;
     }
     // Same catch range Trim picks with, so the two hover the same way.
-    const float threshold = std::max(0.3f, m_gridStep * 0.5f);
+    const float threshold = std::max(0.3f, tolStep() * 0.5f);
     OffsetChain ch = walkOffsetChain(*m_sketch, pos, threshold);
     if (ch.valid()) densifyChain(ch, m_offsetChainHover);
 }
@@ -3826,7 +3826,7 @@ void SketchTool::handleOffsetTool(glm::vec2 pos) {
     if (!m_sketch) return;
 
     if (m_offsetPhase == OffsetPhase::Pick) {
-        const float threshold = std::max(0.3f, m_gridStep * 0.5f);
+        const float threshold = std::max(0.3f, tolStep() * 0.5f);
         OffsetChain ch = walkOffsetChain(*m_sketch, pos, threshold);
         if (!ch.valid()) return; // missed, or landed on something unofferable
         m_offsetChain = std::move(ch);
@@ -3911,7 +3911,7 @@ DimPick SketchTool::hitTestDimEntity(glm::vec2 pos) const {
             return {DimEntityKind::Point, nearPt};
         }
     }
-    const float tol = std::max(m_gridStep * 0.5f, 0.5f) * snapScale();
+    const float tol = std::max(tolStep() * 0.5f, 0.5f) * snapScale();
     // Lines (segment distance), skipping fromText — same math as handleSelectTool.
     float bestD = 0.0f; int bestLine = -1;
     for (const auto& l : m_sketch->getLines()) {
