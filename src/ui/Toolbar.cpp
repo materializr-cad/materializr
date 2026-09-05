@@ -142,6 +142,7 @@ std::vector<Toolbar::RailTool> Toolbar::railTools() const {
             else if (c.name == "Delete")             icon = MZ_ICON_DELETE;
             else if (c.name == "Duplicate")          icon = MZ_ICON_COPY;
             else if (c.name == "Loft")               icon = MZ_ICON_SPLINE;
+            else if (c.name == "Patch")              icon = MZ_ICON_PATCH;
             else if (c.name == "Linear Pattern")   { icon = MZ_ICON_PATTERN_LINEAR;   label = "Linear"; }
             else if (c.name == "Circular Pattern") { icon = MZ_ICON_PATTERN_CIRCULAR; label = "Circular"; }
             else if (c.name.rfind("Split", 0) == 0)  icon = MZ_ICON_SPLIT;

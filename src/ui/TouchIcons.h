@@ -64,6 +64,10 @@
 #define MZ_ICON_PATTERN_LINEAR   "\xee\x80\x83"  // U+E003
 #define MZ_ICON_PATTERN_CIRCULAR "\xee\x80\x84"  // U+E004
 #define MZ_ICON_REPAIR     ICON_IC_CUBE_BANDAGE
+// Patch: a piece fitted into a gap. Distinct from REPAIR (the bandaged cube,
+// which is Defeature) on purpose — the two are offered on different selections
+// and do opposite things, one filling a hole and one dissolving a feature.
+#define MZ_ICON_PATCH      ICON_IC_PUZZLE
 #define MZ_ICON_LATHE      ICON_IC_ROTATE_CAMERA_RIGHT
 #define MZ_ICON_SUBTRACT   ICON_IC_MINUS
 #define MZ_ICON_LOOK       ICON_IC_EYE

@@ -2335,52 +2335,95 @@ void Application::renderPatchPanel() {
 
     bool dirty = false;
     const char* contLabels[] = {"Position (C0)", "Tangent (G1)", "Curvature (G2)"};
-    ImGui::SetNextItemWidth(uiSz(160, 0).x);
+    ImGui::SetNextItemWidth(uiSz(170, 0).x);
     if (ImGui::Combo(materializr::tr("Continuity"), &m_patchParams.continuity,
                      contLabels, 3))
         dirty = true;
 
-    // Samples per boundary curve is the control users actually reach for, so it
-    // sits with continuity rather than under Advanced: it decides whether the
-    // patch tracks a wiggly rim or smooths across it.
-    ImGui::SetNextItemWidth(uiSz(160, 0).x);
-    if (ImGui::SliderInt(materializr::tr("Detail"), &m_patchParams.nbPtsOnCur, 4, 60))
+    // Every numeric control goes through materializr::inputNumber* rather than
+    // an ImGui slider. On desktop that is an InputInt/InputDouble with its
+    // spinners; under touchMode() it unfolds the number pad, so a tolerance can
+    // be TYPED. A slider is draggable with a finger but there is no way to ask
+    // it for 5e-4, and the tolerances are exactly where an exact value matters.
+    // Steppers sit beside the ones people scrub rather than type.
+    auto clampInt = [](int& v, int lo, int hi) { v = std::min(hi, std::max(lo, v)); };
+
+    ImGui::Text("%s", materializr::tr("Detail"));
+    ImGui::SetNextItemWidth(uiSz(110, 0).x);
+    if (materializr::inputNumberInt("##patchDetail", &m_patchParams.nbPtsOnCur, 1, 5)) {
+        clampInt(m_patchParams.nbPtsOnCur, 4, 60);
         dirty = true;
+    }
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("%s", materializr::tr("Sample points per boundary curve. More follows the rim more closely; fewer smooths it out."));
+    {
+        float f = static_cast<float>(m_patchParams.nbPtsOnCur);
+        if (materializr::stepperRow("patchDetailStep", &f, /*allowNegative=*/false,
+                                    4.0f, 60.0f)) {
+            m_patchParams.nbPtsOnCur = static_cast<int>(std::lround(f));
+            clampInt(m_patchParams.nbPtsOnCur, 4, 60);
+            dirty = true;
+        }
+    }
 
-    ImGui::SetNextItemWidth(uiSz(160, 0).x);
-    if (ImGui::SliderInt(materializr::tr("Stiffness"), &m_patchParams.degree, 2, 8))
+    ImGui::Text("%s", materializr::tr("Stiffness"));
+    ImGui::SetNextItemWidth(uiSz(110, 0).x);
+    if (materializr::inputNumberInt("##patchDegree", &m_patchParams.degree, 1, 1)) {
+        clampInt(m_patchParams.degree, 2, 8);
         dirty = true;
+    }
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("%s", materializr::tr("Degree of the surface the fit starts from. Higher lets it bulge more freely - and invent waves the boundary never asked for."));
 
     if (ImGui::CollapsingHeader(materializr::tr("Advanced"))) {
-        ImGui::SetNextItemWidth(uiSz(140, 0).x);
-        float t3 = static_cast<float>(m_patchParams.tol3d);
-        if (ImGui::SliderFloat(materializr::tr("Gap tolerance (mm)"), &t3, 1e-5f, 1e-1f,
-                               "%.5f", ImGuiSliderFlags_Logarithmic)) {
-            m_patchParams.tol3d = t3; dirty = true;
-        }
-        ImGui::SetNextItemWidth(uiSz(140, 0).x);
-        float ta = static_cast<float>(m_patchParams.tolAng * 180.0 / 3.14159265358979323846);
-        if (ImGui::SliderFloat(materializr::tr("Tangency tolerance"), &ta, 0.01f, 10.0f, "%.2f deg")) {
-            m_patchParams.tolAng = ta * 3.14159265358979323846 / 180.0; dirty = true;
-        }
-        ImGui::SetNextItemWidth(uiSz(140, 0).x);
-        float tc = static_cast<float>(m_patchParams.tolCurv);
-        if (ImGui::SliderFloat(materializr::tr("Curvature tolerance"), &tc, 0.01f, 2.0f, "%.2f")) {
-            m_patchParams.tolCurv = tc; dirty = true;
-        }
-        ImGui::SetNextItemWidth(uiSz(140, 0).x);
-        if (ImGui::SliderInt(materializr::tr("Iterations"), &m_patchParams.nbIter, 1, 8))
+        ImGui::Text("%s", materializr::tr("Gap tolerance (mm)"));
+        ImGui::SetNextItemWidth(uiSz(130, 0).x);
+        if (materializr::inputNumber("##patchTol3d", &m_patchParams.tol3d,
+                                     1e-4, 1e-3, "%.5f")) {
+            m_patchParams.tol3d = std::min(1e-1, std::max(1e-5, m_patchParams.tol3d));
             dirty = true;
-        ImGui::SetNextItemWidth(uiSz(140, 0).x);
-        if (ImGui::SliderInt(materializr::tr("Max degree"), &m_patchParams.maxDeg, 3, 16))
+        }
+
+        ImGui::Text("%s", materializr::tr("Tangency tolerance (deg)"));
+        ImGui::SetNextItemWidth(uiSz(130, 0).x);
+        {
+            double deg = m_patchParams.tolAng * 180.0 / 3.14159265358979323846;
+            if (materializr::inputNumber("##patchTolAng", &deg, 0.1, 1.0, "%.2f")) {
+                deg = std::min(10.0, std::max(0.01, deg));
+                m_patchParams.tolAng = deg * 3.14159265358979323846 / 180.0;
+                dirty = true;
+            }
+        }
+
+        ImGui::Text("%s", materializr::tr("Curvature tolerance"));
+        ImGui::SetNextItemWidth(uiSz(130, 0).x);
+        if (materializr::inputNumber("##patchTolCurv", &m_patchParams.tolCurv,
+                                     0.05, 0.25, "%.2f")) {
+            m_patchParams.tolCurv = std::min(2.0, std::max(0.01, m_patchParams.tolCurv));
             dirty = true;
-        ImGui::SetNextItemWidth(uiSz(140, 0).x);
-        if (ImGui::SliderInt(materializr::tr("Max segments"), &m_patchParams.maxSegments, 1, 40))
+        }
+
+        ImGui::Text("%s", materializr::tr("Iterations"));
+        ImGui::SetNextItemWidth(uiSz(110, 0).x);
+        if (materializr::inputNumberInt("##patchIter", &m_patchParams.nbIter, 1, 1)) {
+            clampInt(m_patchParams.nbIter, 1, 8);
             dirty = true;
+        }
+
+        ImGui::Text("%s", materializr::tr("Max degree"));
+        ImGui::SetNextItemWidth(uiSz(110, 0).x);
+        if (materializr::inputNumberInt("##patchMaxDeg", &m_patchParams.maxDeg, 1, 2)) {
+            clampInt(m_patchParams.maxDeg, 3, 16);
+            dirty = true;
+        }
+
+        ImGui::Text("%s", materializr::tr("Max segments"));
+        ImGui::SetNextItemWidth(uiSz(110, 0).x);
+        if (materializr::inputNumberInt("##patchMaxSeg", &m_patchParams.maxSegments, 1, 5)) {
+            clampInt(m_patchParams.maxSegments, 1, 40);
+            dirty = true;
+        }
+
         if (ImGui::Checkbox(materializr::tr("Anisotropic"), &m_patchParams.anisotropic))
             dirty = true;
         if (ImGui::IsItemHovered())
@@ -2412,9 +2455,14 @@ void Application::renderPatchPanel() {
     }
 
     ImGui::Separator();
-    bool applyClicked  = ImGui::Button(materializr::tr("Apply"), materializr::uiSz(120, 0));
+    // Touch has no Escape key and Patch is not in anyInteractivePreviewActive(),
+    // so im-touch hosts no confirm corner for it — these two buttons are the
+    // only way out of the gesture on a tablet. Full-height so a finger can hit
+    // them, matching the other op popups.
+    const ImVec2 btn = materializr::uiSz(130, materializr::touchMode() ? 44 : 0);
+    bool applyClicked  = ImGui::Button(materializr::tr("Apply"), btn);
     ImGui::SameLine();
-    bool cancelClicked = ImGui::Button(materializr::tr("Cancel"), materializr::uiSz(120, 0));
+    bool cancelClicked = ImGui::Button(materializr::tr("Cancel"), btn);
     bool escPressed = ImGui::IsKeyPressed(ImGuiKey_Escape, false);
 
     ImGui::End();
