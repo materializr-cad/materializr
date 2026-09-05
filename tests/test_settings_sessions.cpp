@@ -5,6 +5,8 @@
 #include "core/Units.h"
 #include "io/Settings.h"
 
+#include <cstdlib>
+#include <cstdio>
 #include <gtest/gtest.h>
 
 #include <filesystem>
@@ -177,4 +179,39 @@ TEST(SettingsSessions, GridStepPersistsAsADisplayNumber) {
         const double stored = 0.5;
         EXPECT_NEAR(stored, materializr::toDisplay(materializr::toMm(stored)), 1e-6);
     }
+}
+
+// The grid step changed meaning, so it changed key. A file carrying only the
+// legacy "sketchGridStep" is millimetres; one carrying "sketchGridStepUnits"
+// is a display number. Without that distinction a 304.8 saved under feet (one
+// foot, in millimetres) would have been re-read as 304.8 FEET — a 93-metre
+// grid — and no version counter can tell them apart after the fact.
+TEST(SettingsSessions, LegacyGridStepMigratesByKey) {
+    auto roundTrip = [](const std::string& body) {
+        const std::string path = std::string(std::getenv("TMPDIR") ?
+                                 std::getenv("TMPDIR") : "/tmp") + "/mz_grid_mig.cfg";
+        { std::ofstream o(path); o << body; }
+        materializr::AppSettings s = materializr::SettingsIO::load(path);
+        std::remove(path.c_str());
+        return s;
+    };
+
+    // Legacy millimetres under FEET: one foot of grid was stored as 304.8.
+    // Read as a display number that would be 93 metres.
+    auto ft = roundTrip("displayUnit = 4\nsketchGridStep = 304.8\n");
+    EXPECT_NEAR(1.0f, ft.sketchGridStep, 1e-3)
+        << "304.8 mm under feet is ONE foot, not 304.8 of them";
+
+    // Legacy millimetres under mm: unchanged, which is every existing user.
+    auto mm = roundTrip("displayUnit = 0\nsketchGridStep = 10\n");
+    EXPECT_FLOAT_EQ(10.0f, mm.sketchGridStep);
+
+    // The new key is taken at face value and never re-migrated.
+    auto neu = roundTrip("displayUnit = 4\nsketchGridStepUnits = 0.5\n");
+    EXPECT_FLOAT_EQ(0.5f, neu.sketchGridStep);
+
+    // A millimetre grid carried into feet is finer than any preset and would
+    // render as nothing; it snaps up to the smallest preset instead.
+    auto stuck = roundTrip("displayUnit = 4\nsketchGridStep = 1\n");
+    EXPECT_FLOAT_EQ(1.0f, stuck.sketchGridStep);
 }

@@ -1,3 +1,4 @@
+#include "core/Units.h"
 #include "Settings.h"
 
 #include <cctype>
@@ -142,7 +143,30 @@ void applyKv(const std::map<std::string, std::string>& kv, AppSettings& s) {
     readBool(kv, "includePrereleases",   s.includePrereleases);
     readBool(kv, "supporter",            s.supporter);
     readBool(kv, "snapToGrid",           s.snapToGrid);
-    readFloat(kv, "sketchGridStep",      s.sketchGridStep); // was written but never read back
+    // The grid step changed MEANING, so it changed KEY. "sketchGridStep" was
+    // always millimetres; "sketchGridStepUnits" is a display number, because
+    // the presets are labelled 0.1 / 0.5 / 1 / 10 and "1" means one of
+    // whatever unit is showing. Two keys rather than a version counter: a file
+    // says which it carries, and no counter has to be kept in step.
+    if (kv.count("sketchGridStepUnits")) {
+        readFloat(kv, "sketchGridStepUnits", s.sketchGridStep);
+    } else if (kv.count("sketchGridStep")) {
+        float legacyMm = 1.0f;
+        readFloat(kv, "sketchGridStep", legacyMm);
+        // Millimetres -> display number, using the unit from THIS file rather
+        // than whatever the process happens to be showing.
+        int u = 0;
+        readIntClamped(kv, "displayUnit", u, 0, materializr::kLengthUnitCount - 1);
+        const double toMm = materializr::unitInfo(
+            static_cast<materializr::LengthUnit>(u)).toMm;
+        s.sketchGridStep = static_cast<float>(legacyMm / toMm);
+        // A millimetre grid carried into feet migrates to 0.0033 of a foot —
+        // faithful to the stored number and useless: finer than the smallest
+        // preset, and a lattice the renderer fades to nothing. The user picked
+        // a preset labelled with a bare number, so restore that intent by
+        // snapping up to the smallest one on offer.
+        if (s.sketchGridStep < 0.1f) s.sketchGridStep = 1.0f;
+    }
     readIntClamped(kv, "inferenceLevel", s.inferenceLevel, 0, 3);
     // -1 is meaningful here ("never chosen"), so the floor is -1, not 0.
     readIntClamped(kv, "language", s.language, -1, 5);
@@ -406,7 +430,7 @@ bool SettingsIO::save(const std::string& path, const AppSettings& s) {
     ofs << "includePrereleases = "      << (s.includePrereleases ? "true" : "false") << "\n";
     ofs << "supporter = "               << (s.supporter ? "true" : "false") << "\n";
     ofs << "snapToGrid = "              << (s.snapToGrid ? "true" : "false") << "\n";
-    ofs << "sketchGridStep = "          << s.sketchGridStep      << "\n";
+    ofs << "sketchGridStepUnits = "     << s.sketchGridStep      << "\n";
     ofs << "inferenceLevel = "          << s.inferenceLevel      << "\n";
     ofs << "language = "                << s.language            << "\n";
     ofs << "displayUnit = "             << s.displayUnit         << "\n";
@@ -509,7 +533,7 @@ bool SettingsIO::exportJson(const std::string& path, const AppSettings& s) {
     ofs << "  \"includePrereleases\": " << b(s.includePrereleases) << ",\n";
     ofs << "  \"supporter\": "               << b(s.supporter)          << ",\n";
     ofs << "  \"snapToGrid\": "              << b(s.snapToGrid)         << ",\n";
-    ofs << "  \"sketchGridStep\": "          << s.sketchGridStep        << ",\n";
+    ofs << "  \"sketchGridStepUnits\": "     << s.sketchGridStep        << ",\n";
     ofs << "  \"inferenceLevel\": "          << s.inferenceLevel        << ",\n";
     ofs << "  \"language\": "                << s.language              << ",\n";
     ofs << "  \"displayUnit\": "             << s.displayUnit           << ",\n";
