@@ -264,3 +264,35 @@ TEST(Units, LengthFormatFollowsTheTable) {
     ASSERT_TRUE(materializr::parseLength(buf, back));
     EXPECT_NEAR(1234.5, back, 0.05) << "4 decimals of metres keeps 0.1 mm";
 }
+
+// Switching to a large unit must move the WORKING SCALE with it. The sketch
+// grid step is stored in millimetres and also sizes the initial sketch view
+// (orthoSize = gridStep * 40), so a 1 mm grid gives a ~40 mm working area.
+// Relabelling that as feet leaves the whole visible sketch 0.13 ft across and
+// the snap lattice 1/300th of a useful one. Carrying the DISPLAYED NUMBER
+// across is what "work in feet now" means.
+TEST(Units, GridStepCarriesItsNumberNotItsMillimetres) {
+    // The transform applyDisplayUnitChange performs, in isolation.
+    auto carry = [](float stepMm, materializr::LengthUnit from,
+                    materializr::LengthUnit to) {
+        materializr::ScopedUnit s(from);
+        const double shown = materializr::toDisplay(stepMm);
+        materializr::setCurrentUnit(to);
+        return static_cast<float>(materializr::toMm(shown));
+    };
+
+    // 1 mm -> feet is 1 FOOT, not 1 mm relabelled as 0.00328 ft.
+    EXPECT_NEAR(304.8f, carry(1.0f, materializr::LengthUnit::Mm,
+                              materializr::LengthUnit::Ft), 1e-3);
+    // and the view it drives becomes ~40 ft rather than ~40 mm.
+    EXPECT_NEAR(12192.0f, 304.8f * 40.0f, 1e-1);
+
+    // 10 mm under cm reads "1", so inches give one inch.
+    EXPECT_NEAR(25.4f, carry(10.0f, materializr::LengthUnit::Cm,
+                             materializr::LengthUnit::In), 1e-3);
+    // Round trip returns exactly where it started.
+    const float there = carry(1.0f, materializr::LengthUnit::Mm, materializr::LengthUnit::Ft);
+    EXPECT_NEAR(1.0f, carry(there, materializr::LengthUnit::Ft,
+                            materializr::LengthUnit::Mm), 1e-4);
+    materializr::setCurrentUnit(materializr::LengthUnit::Mm);
+}

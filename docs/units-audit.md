@@ -250,7 +250,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 
 - CONVERTED: 1
 - allowed-by-hand: 13
-- comment: 222
+- comment: 225
 - diagnostic: 9
 - identifier/other: 9
 
@@ -261,16 +261,19 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | comment | src/app/Application.cpp:1806 | `// Absolute linear deflection (mm) and angular deflection (radians). Lower` |
 | comment | src/app/Application.cpp:4120 | `// Sketch origin should lie on the face's plane within 0.05 mm.` |
 | comment | src/app/Application.cpp:4146 | `// origin on the face plane within 0.05 mm). Used to re-adopt a sketch whose` |
-| comment | src/app/Application.cpp:5075 | `// the surface's parametric origin ~0.3 mm off-axis — the fitted anchor` |
-| comment | src/app/Application.cpp:5137 | `// 0.64 mm off-axis). Fit a circle to the OUTER wire instead, then` |
-| comment | src/app/Application.cpp:5202 | `// then keeps the wrong band, landing 0.6 mm off with a` |
-| comment | src/app/Application.cpp:5251 | `// 0.64 mm off-axis at the surface origin) that WON` |
-| comment | src/app/Application.cpp:5345 | `// sides at a generous offset (1 mm) so tessellation slack near the` |
-| comment | src/app/Application.cpp:5360 | `const double eps = 1.0; // mm` |
-| comment | src/app/Application.cpp:5988 | `// lines wrote raw millimetres: placing a dimension under any non-mm unit` |
-| comment | src/app/Application.cpp:6024 | `// Hash point positions and circle/arc radii too (quantised to 1e-4 mm)` |
-| comment | src/app/Application.cpp:6409 | `// Measured offsets were 10–50% of a cell. At a 1 mm grid that reads as` |
-| comment | src/app/Application.cpp:6410 | `// slightly-fat lines; at 0.1 mm it is most of a cell, i.e. "I can't draw a` |
+| comment | src/app/Application.cpp:4500 | `// The step is stored in mm and drives both the snap lattice and the` |
+| comment | src/app/Application.cpp:4501 | `// initial sketch framing (orthoSize = gridStep * 40), so a 1 mm grid` |
+| comment | src/app/Application.cpp:4502 | `// left a ~40 mm working area. Switch that to feet and the whole visible` |
+| comment | src/app/Application.cpp:5096 | `// the surface's parametric origin ~0.3 mm off-axis — the fitted anchor` |
+| comment | src/app/Application.cpp:5158 | `// 0.64 mm off-axis). Fit a circle to the OUTER wire instead, then` |
+| comment | src/app/Application.cpp:5223 | `// then keeps the wrong band, landing 0.6 mm off with a` |
+| comment | src/app/Application.cpp:5272 | `// 0.64 mm off-axis at the surface origin) that WON` |
+| comment | src/app/Application.cpp:5366 | `// sides at a generous offset (1 mm) so tessellation slack near the` |
+| comment | src/app/Application.cpp:5381 | `const double eps = 1.0; // mm` |
+| comment | src/app/Application.cpp:6009 | `// lines wrote raw millimetres: placing a dimension under any non-mm unit` |
+| comment | src/app/Application.cpp:6045 | `// Hash point positions and circle/arc radii too (quantised to 1e-4 mm)` |
+| comment | src/app/Application.cpp:6430 | `// Measured offsets were 10–50% of a cell. At a 1 mm grid that reads as` |
+| comment | src/app/Application.cpp:6431 | `// slightly-fat lines; at 0.1 mm it is most of a cell, i.e. "I can't draw a` |
 | comment | src/app/Application.h:615 | `// buttons are an explicit fine override (a 0.1 nudge under a 1 mm grid must` |
 | comment | src/app/Application.h:884 | `// Sketch grid step in mm (drives both the visual face grid and snap-to-line)` |
 | comment | src/app/Application.h:1061 | `// sketch mm, so the tag keeps its grab point instead of snapping its centre` |

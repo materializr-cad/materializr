@@ -4495,8 +4495,29 @@ void Application::applyDisplayUnitChange(int unit) {
     // the switch would interpret those digits in the NEW one. Drop the edit.
     // Guarded: settings are applied before the ImGui context exists.
     if (ImGui::GetCurrentContext()) ImGui::ClearActiveID();
+
+    // Carry the grid step's DISPLAYED NUMBER across, not its millimetres.
+    // The step is stored in mm and drives both the snap lattice and the
+    // initial sketch framing (orthoSize = gridStep * 40), so a 1 mm grid
+    // left a ~40 mm working area. Switch that to feet and the whole visible
+    // sketch is 0.13 ft: every number on screen becomes a fraction, and the
+    // snap lattice is 1/300th of a sensible one. Working "in feet" means a
+    // grid of one foot, not a grid of one millimetre relabelled.
+    //
+    // The number is what the user chose (the presets are 0.1 / 0.5 / 1 / 10),
+    // so a step sitting on a preset stays on the same preset in the new unit.
+    // Skipped when the unit is unchanged, so re-applying settings is inert.
+    const auto next = static_cast<materializr::LengthUnit>(unit);
+    if (next != materializr::currentUnit() && m_sketchGridStep > 0.0f) {
+        const double shownStep = materializr::toDisplay(m_sketchGridStep);
+        materializr::setCurrentUnit(next);
+        m_sketchGridStep = static_cast<float>(materializr::toMm(shownStep));
+        if (m_toolbar) m_toolbar->setGridStep(m_sketchGridStep);
+        if (m_sketchTool) m_sketchTool->setGridStep(m_sketchGridStep);
+    } else {
+        materializr::setCurrentUnit(next);
+    }
     m_displayUnit = unit;
-    materializr::setCurrentUnit(static_cast<materializr::LengthUnit>(unit));
 }
 
 void Application::markDirty() {
