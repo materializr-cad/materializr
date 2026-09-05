@@ -280,7 +280,19 @@ protected:
     void teardown() { cleanup(); }
     // For custom-lifecycle controllers only: keeps the base active() flag —
     // what every generic loop gates on — in step with their own state.
-    void setActive(bool a) { m_active = a; }
+    //
+    // Deactivating also drops a latched handle, for the same reason cleanup()
+    // does: a controller that is not active cannot own a viewport drag, and a
+    // latch left set makes anyIopDraggingHandle() true forever, which suppresses
+    // camera orbit AND pan for the rest of the session. The ViewCube keeps
+    // working — it doesn't go through the drag path — so it reads as "the mouse
+    // broke" rather than "an op never finished", which is what made it hard to
+    // place. Move Face is the controller that hits this: it commits and cancels
+    // through setActive(false) rather than cleanup(), so it was the one custom
+    // lifecycle that skipped the line cleanup() has for exactly this hazard.
+    // Reached by cancelling or committing mid-gesture, and by opening another
+    // project — which cancels every active controller.
+    void setActive(bool a) { m_active = a; if (!a) m_draggingHandle = false; }
 
     int bodyId() const { return m_bodyId; }
     const TopoDS_Shape& snapshot() const { return m_snapshot; }
