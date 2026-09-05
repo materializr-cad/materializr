@@ -489,11 +489,17 @@ void Application::renderModernLayout() {
                 // to sit loose. The name belongs here (classic's palette has
                 // always headed that trio "Transform"); everything that changes
                 // how MANY bodies you end up with is Multiply.
+                //   Repair    = Patch + Sew + Merge Faces + Remove Feature
+                // The repair group is the one whose members come from four
+                // different selection contexts, so it collapses to whichever
+                // are usable right now — and to nothing at all when none are.
                 auto groupOf = [](const Toolbar::RailTool& t) -> int {
                     if (t.pluginIndex >= 0) {
                         if (t.label && std::strcmp(t.label, "Linear") == 0)    return 1;
                         if (t.label && std::strcmp(t.label, "Circular") == 0)  return 1;
                         if (t.label && std::strcmp(t.label, "Duplicate") == 0) return 1;
+                        if (t.label && std::strcmp(t.label, "Patch") == 0)     return 4;
+                        if (t.label && std::strcmp(t.label, "Sew") == 0)       return 4;
                         return 0;
                     }
                     switch (t.action) {
@@ -511,6 +517,8 @@ void Application::renderModernLayout() {
                         // the rail short and makes the pair discoverable.
                         case ToolAction::SketchSvg:
                         case ToolAction::SketchAirfoil:        return 3;
+                        case ToolAction::MergeFaces:
+                        case ToolAction::RemoveFace:           return 4;
                         default: return 0;
                     }
                 };
@@ -529,7 +537,7 @@ void Application::renderModernLayout() {
                     else handleToolAction(static_cast<int>(t.action));
                 };
 
-                bool done[4] = { false, false, false, false };
+                bool done[5] = { false, false, false, false, false };
                 int railIdx = 0;
                 for (const auto& tool : rail) {
                     if (skip(tool)) continue;
@@ -540,11 +548,14 @@ void Application::renderModernLayout() {
                         if (done[g]) continue;
                         done[g] = true;
                         const char* gIcon  = g == 1 ? MZ_ICON_COPY
-                                           : g == 2 ? MZ_ICON_MOVE : MZ_ICON_SVG;
+                                           : g == 2 ? MZ_ICON_MOVE
+                                           : g == 4 ? MZ_ICON_REPAIR : MZ_ICON_SVG;
                         const char* gLabel = g == 1 ? "Multiply"
-                                           : g == 2 ? "Transform" : "Import";
+                                           : g == 2 ? "Transform"
+                                           : g == 4 ? "Repair" : "Import";
                         const char* gPopup = g == 1 ? "##railMultiply"
                                            : g == 2 ? "##railTransform"
+                                           : g == 4 ? "##railRepair"
                                                     : "##railImport";
                         ImGui::PushID(2000 + g);
                         if (touchui::railButton(gLabel, gIcon, tr(gLabel), false, cell()))
@@ -552,6 +563,9 @@ void Application::renderModernLayout() {
                         tip(materializr::tr(
                             g == 3 ? "Bring outside artwork into the sketch: an "
                                      "SVG outline or an aerofoil section"
+                          : g == 4 ? "Fix up geometry: fill an opening, stitch "
+                                     "surfaces into a solid, merge split faces, "
+                                     "or take a feature back off"
                           : g == 1 ? "Copy, mirror, pattern or split the selection"
                                    : "Move, rotate or scale the selection"));
                         pushPopupPad();

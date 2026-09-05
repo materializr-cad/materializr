@@ -24,7 +24,7 @@ REGISTER_PLUGIN(Sew, [](materializr::PluginContext& ctx) {
         "Joined at the tightest tolerance that closes, so surfaces that only "
         "nearly meet are not silently welded together.";
 
-    ctx.registerToolbarButton({"Sew", "Sew",
+    ctx.registerToolbarButton({"Sew", "Repair",
         materializr::SelectionContext::HasBodies, 403,
         action, nullptr, tooltip});
 })

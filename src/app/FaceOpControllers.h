@@ -64,7 +64,7 @@ private:
 // or clean an unwanted round/hole off an imported part.
 class DefeatureController : public InteractiveOpController {
 protected:
-    const char* title() const override { return "Repair Geometry"; }
+    const char* title() const override { return "Remove Feature"; }
     int onBegin(const IopContext& ctx) override;
     std::unique_ptr<Operation> buildOp(const IopContext& ctx) override;
     void panelBody(const IopContext& ctx, bool& changed) override;

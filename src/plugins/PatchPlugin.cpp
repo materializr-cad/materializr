@@ -35,7 +35,7 @@ REGISTER_PLUGIN(Patch, [](materializr::PluginContext& ctx) {
         "Select faces as well as edges to say which side a bridging patch "
         "should blend into.";
 
-    ctx.registerToolbarButton({"Patch", "Patch",
+    ctx.registerToolbarButton({"Patch", "Repair",
         materializr::SelectionContext::HasEdges, 402,
         action, nullptr, tooltip});
 })

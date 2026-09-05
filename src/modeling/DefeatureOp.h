@@ -24,7 +24,7 @@ public:
 
     bool execute(Document& doc) override;
     bool undo(Document& doc) override;
-    std::string name() const override { return "Repair Geometry"; }
+    std::string name() const override { return "Remove Feature"; }
     std::string description() const override;
     void renderProperties() override;
     std::string typeId() const override { return "defeature"; }

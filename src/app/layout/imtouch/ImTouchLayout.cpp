@@ -815,7 +815,11 @@ void Application::renderImTouchLayout() {
                 //   Multiply  = Duplicate + Mirror + patterns + splits
                 // Everything else — including unrecognised future plugins —
                 // renders in catalogue order so nothing silently vanishes.
-                std::vector<const Toolbar::RailTool*> multiply, transform;
+                //   Repair    = Patch + Sew + Merge Faces + Remove Feature
+                // Its members come from four different selection contexts, so
+                // the flyout holds whichever are usable right now — and the
+                // group button doesn't appear at all when none are.
+                std::vector<const Toolbar::RailTool*> multiply, transform, repair;
                 int railIdx = 0;
                 for (const auto& t : tools) {
                     if (t.pluginIndex >= 0 && t.label) {
@@ -824,6 +828,10 @@ void Application::renderImTouchLayout() {
                             std::strcmp(t.label, "Duplicate") == 0) {
                             multiply.push_back(&t); continue;
                         }
+                        if (std::strcmp(t.label, "Patch") == 0 ||
+                            std::strcmp(t.label, "Sew") == 0) {
+                            repair.push_back(&t); continue;
+                        }
                     } else if (t.action == ToolAction::Mirror ||
                                t.action == ToolAction::Split) {
                         multiply.push_back(&t); continue;
@@ -831,6 +839,9 @@ void Application::renderImTouchLayout() {
                                t.action == ToolAction::Rotate ||
                                t.action == ToolAction::Scale) {
                         transform.push_back(&t); continue;
+                    } else if (t.action == ToolAction::MergeFaces ||
+                               t.action == ToolAction::RemoveFace) {
+                        repair.push_back(&t); continue;
                     }
                     flatButton(t, railIdx++);
                 }
@@ -840,6 +851,11 @@ void Application::renderImTouchLayout() {
                 group("multiplyGroup", "##bodyMultiply", MZ_ICON_COPY,
                       "Multiply", "Copy, mirror, pattern or split the selection",
                       multiply);
+                group("repairGroup", "##bodyRepair", MZ_ICON_REPAIR,
+                      "Repair", "Fix up geometry: fill an opening, stitch "
+                      "surfaces into a solid, merge split faces, or take a "
+                      "feature back off",
+                      repair);
             } else {
                 // Sketch mode: the flat catalogue is ~19 buttons — a screen
                 // and a half of scrolling. The DRAWING tools stay flat (they're

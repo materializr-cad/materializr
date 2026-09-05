@@ -4049,7 +4049,7 @@ void Application::rebuildHistoryFromProject(const ProjectHistory& hist,
             "This project was saved in an older format: " + std::to_string(n) + " " +
             what + " are frozen and can't be edited by value. The shapes are intact "
             "\xE2\x80\x94 to change a baked round/chamfer, select its face and use "
-            "Repair Geometry to restore the sharp edge, then redo it. New saves "
+            "Remove Feature to restore the sharp edge, then redo it. New saves "
             "won't have this.";
         showToast(msg, 9.0);
     }

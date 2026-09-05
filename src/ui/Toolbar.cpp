@@ -339,8 +339,14 @@ std::vector<Toolbar::RailTool> Toolbar::railTools() const {
             "by an angle about a fixed neutral plane. Unlike Rotate it takes "
             "SEVERAL faces at one angle (all four walls of a box) and works on "
             "curved faces too \xE2\x80\x94 a cylinder drafts into a cone.");
-        add(MZ_ICON_REPAIR,   "Repair",  ToolAction::RemoveFace, false,
-            "Delete the face and heal the body over it.");
+        // Named for what it does. It was "Repair Geometry", which promises a
+        // general fixer and delivers one specific act: delete the picked face
+        // and heal the neighbours over the gap — which is how you take a baked
+        // fillet or chamfer back to a sharp edge. The Repair GROUP is the
+        // general fixer now, and this is one member of it.
+        add(MZ_ICON_REPAIR,   "Remove Feature", ToolAction::RemoveFace, false,
+            "Delete the picked face and heal the body over it - takes a baked "
+            "fillet or chamfer back to a sharp edge so it can be re-applied.");
         add(MZ_ICON_PROJECT,  "Project", ToolAction::ProjectSketch, false,
             "Project a sketch onto this face along the sketch's normal, then "
             "engrave (cut in) or emboss (raise out) to a depth.");
@@ -976,10 +982,6 @@ ToolAction Toolbar::renderFaceTools() {
         "angle about a fixed neutral plane. Unlike Rotate it takes SEVERAL "
         "faces at one angle (all four walls of a box) and works on cylindrical "
         "and conical faces too \xE2\x80\x94 a cylinder drafts into a cone.");
-    btn(ToolAction::RemoveFace, "Repair Geometry",
-        "Delete the picked face(s) and heal the surrounding faces back together "
-        "\xE2\x80\x94 take a baked fillet/chamfer back to a sharp edge so it can be "
-        "re-applied, or clean a round/hole off an imported part.");
     btn(ToolAction::ProjectSketch, "Projection",
         "Project a sketch onto this face along the sketch's normal, then "
         "engrave (cut in) or emboss (raise out) to a depth - wrap a logo "
@@ -1009,11 +1011,35 @@ ToolAction Toolbar::renderFaceTools() {
         }
     }
 
+    // ── Repair ──
+    // The fixing-up verbs, gathered. They were scattered: Remove Feature sat
+    // mid-way through Face Operations under the name "Repair Geometry", Merge
+    // Faces only ever appeared as a catalogue leftover at the end, and Patch and
+    // Sew each had a section of their own. They are one job — make geometry that
+    // is wrong right again — and mostly wanted on imported parts, so they belong
+    // together. Each still appears only when the selection can use it: that gate
+    // is catalogOffers(), i.e. the same catalogue the rails read.
+    if (catalogOffers(ToolAction::RemoveFace) || catalogOffers(ToolAction::MergeFaces)) {
+        ImGui::Separator();
+        ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Repair"));
+        ImGui::Separator();
+        btn(ToolAction::RemoveFace, "Remove Feature",
+            "Delete the picked face(s) and heal the surrounding faces back "
+            "together \xE2\x80\x94 take a baked fillet/chamfer back to a sharp edge so "
+            "it can be re-applied, or clean a round/hole off an imported part.");
+        btn(ToolAction::MergeFaces, "Merge Faces",
+            "Merge faces that are really one surface into one face. Imported "
+            "STEP parts arrive with flat surfaces split into pieces \xE2\x80\x94 the seam "
+            "lines across an otherwise flat face, which also confuse Unfold and "
+            "sketch-on-face.");
+    }
+
     if (action == ToolAction::None)
         action = renderCatalogRemainder({
             ToolAction::SketchOnFace, ToolAction::PushPull, ToolAction::ExtrudeSketch,
             ToolAction::Shell, ToolAction::ScaleFace, ToolAction::Taper,
-            ToolAction::RemoveFace, ToolAction::ProjectSketch, ToolAction::EditDiameter,
+            ToolAction::RemoveFace, ToolAction::MergeFaces,
+            ToolAction::ProjectSketch, ToolAction::EditDiameter,
             ToolAction::Thread, ToolAction::Unfold, ToolAction::EditFilletChamfer,
             // Move/Rotate come from the shared Transform row that render()
             // falls through to (renderBodyTools). Scale is listed too so the
@@ -1022,10 +1048,10 @@ ToolAction Toolbar::renderFaceTools() {
 
     // Frozen-round hint: a fillet-shaped face with no editable op behind it
     // (an older save's baked geometry). "Edit Fillet" can't appear for it, so
-    // point the user at Repair Geometry — restore the edge, then re-fillet.
+    // point the user at Remove Feature — restore the edge, then re-fillet.
     if (m_selFrozenRound) {
         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 240.0f);
-        ImGui::TextColored(materializr::dimText(), "%s", materializr::tr("This round is frozen (saved before edit support). Use Repair Geometry above to restore the sharp edge, then re-fillet."));
+        ImGui::TextColored(materializr::dimText(), "%s", materializr::tr("This round is frozen (saved before edit support). Use Remove Feature above to restore the sharp edge, then re-fillet."));
         ImGui::PopTextWrapPos();
     }
 

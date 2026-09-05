@@ -82,7 +82,7 @@ bool HistoryPanel::renderContent() {
         ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.3f, 1.0f), "%s", materializr::tr("Amber (frozen) steps reloaded without editable parameters. (hover for more)"));
         ImGui::PopTextWrapPos();
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", materializr::tr("Undo/redo still work; to change one, select its feature and\nuse Repair Geometry, then redo it.\n(Usual cause: a save from an older version.)"));
+            ImGui::SetTooltip("%s", materializr::tr("Undo/redo still work; to change one, select its feature and\nuse Remove Feature, then redo it.\n(Usual cause: a save from an older version.)"));
         ImGui::Separator();
     }
 

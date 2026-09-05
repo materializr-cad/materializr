@@ -62,7 +62,7 @@ std::string DefeatureOp::description() const {
 }
 
 void DefeatureOp::renderProperties() {
-    ImGui::Text("%s", materializr::tr("Repair Geometry"));
+    ImGui::Text("%s", materializr::tr("Remove Feature"));
     ImGui::Separator();
     ImGui::Text(materializr::tr("Faces removed: %d"), m_faces.Size());
     ImGui::Text(materializr::tr("Body ID: %d"), m_bodyId);
