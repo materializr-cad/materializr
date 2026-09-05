@@ -1,4 +1,5 @@
 #include "core/Units.h"
+#include <cmath>
 #include "Settings.h"
 
 #include <cctype>
@@ -143,37 +144,59 @@ void applyKv(const std::map<std::string, std::string>& kv, AppSettings& s) {
     readBool(kv, "includePrereleases",   s.includePrereleases);
     readBool(kv, "supporter",            s.supporter);
     readBool(kv, "snapToGrid",           s.snapToGrid);
+    // Normalised HERE, before anything reads it. An out-of-range value means
+    // millimetres, never a clamp to the nearest legal index — clamping made 99
+    // mean Feet during the grid-step migration below while the same 99 meant
+    // millimetres for the setting itself, so one file was read two ways.
+    { int v = s.displayUnit; readInt(kv, "displayUnit", v);
+      s.displayUnit = (v >= 0 && v < materializr::kLengthUnitCount) ? v : 0; }
+
     // The grid step changed MEANING, so it changed KEY. "sketchGridStep" was
     // always millimetres; "sketchGridStepUnits" is a display number, because
     // the presets are labelled 0.1 / 0.5 / 1 / 10 and "1" means one of
     // whatever unit is showing. Two keys rather than a version counter: a file
     // says which it carries, and no counter has to be kept in step.
-    if (kv.count("sketchGridStepUnits")) {
-        readFloat(kv, "sketchGridStepUnits", s.sketchGridStep);
-    } else if (kv.count("sketchGridStep")) {
-        float legacyMm = 1.0f;
-        readFloat(kv, "sketchGridStep", legacyMm);
-        // Millimetres -> display number, using the unit from THIS file rather
-        // than whatever the process happens to be showing.
-        int u = 0;
-        readIntClamped(kv, "displayUnit", u, 0, materializr::kLengthUnitCount - 1);
-        const double toMm = materializr::unitInfo(
-            static_cast<materializr::LengthUnit>(u)).toMm;
-        s.sketchGridStep = static_cast<float>(legacyMm / toMm);
-        // A millimetre grid carried into feet migrates to 0.0033 of a foot —
-        // faithful to the stored number and useless: finer than the smallest
-        // preset, and a lattice the renderer fades to nothing. The user picked
-        // a preset labelled with a bare number, so restore that intent by
-        // snapping up to the smallest one on offer.
-        if (s.sketchGridStep < 0.1f) s.sketchGridStep = 1.0f;
+    //
+    // Anything that reaches m_sketchGridStep divides the snap lattice and
+    // sizes the grid renderer, so a non-finite or non-positive value is not a
+    // small cosmetic problem: NaN passes every `<= 0` guard and then reaches
+    // an int conversion in SketchRenderer. Validated before it is accepted.
+    {
+        auto usable = [](float v) {
+            return std::isfinite(v) && v > 0.0f && v <= AppSettings::kMaxGridStepUnits;
+        };
+        if (kv.count("sketchGridStepUnits")) {
+            float v = s.sketchGridStep;
+            readFloat(kv, "sketchGridStepUnits", v);
+            if (usable(v)) s.sketchGridStep = v;      // else keep the default
+        } else if (kv.count("sketchGridStep")) {
+            float legacyMm = 1.0f;
+            readFloat(kv, "sketchGridStep", legacyMm);
+            const double toMm = materializr::unitInfo(
+                static_cast<materializr::LengthUnit>(s.displayUnit)).toMm;
+            const float shown = static_cast<float>(legacyMm / toMm);
+            if (usable(shown)) {
+                s.sketchGridStep = shown;
+                // A millimetre grid carried into FEET migrates to 0.0033 of a
+                // foot: finer than the smallest preset and a lattice the
+                // renderer fades to nothing. The presets are labelled with bare
+                // numbers, so someone who picked "1" meant one of something.
+                // Only where a CONVERSION made it impractical — never under
+                // millimetres, where a deliberate 0.05 mm grid is a real choice
+                // and not something to overwrite.
+                if (s.displayUnit != 0 && s.sketchGridStep < 0.1f)
+                    s.sketchGridStep = 1.0f;
+            }
+        }
     }
+
     readIntClamped(kv, "inferenceLevel", s.inferenceLevel, 0, 3);
     // -1 is meaningful here ("never chosen"), so the floor is -1, not 0.
     readIntClamped(kv, "language", s.language, -1, 5);
     // Not readIntClamped: clamping a corrupt "9" to the range edge would silently
     // select Feet. An invalid unit means "back to millimetres", the same rule
     // Application::applyDisplayUnitChange enforces at the other end.
-    { int v = s.displayUnit; readInt(kv, "displayUnit", v); s.displayUnit = (v >= 0 && v < 5) ? v : 0; }
+
     readBool(kv, "showInferenceToolbarToggle", s.showInferenceToolbarToggle);
     readIntClamped(kv, "angleSnapDeg",   s.angleSnapDeg, 1, 90);
     readFloat(kv, "stlImportAccuracy",   s.stlImportAccuracy);
@@ -369,6 +392,12 @@ bool SettingsIO::save(const std::string& path, const AppSettings& s) {
         oldKv.erase("imTouchLite");
         oldKv.erase("imTouchLiteTree");
         oldKv.erase("imTouchLiteTimeline");
+        // Same reason, different migration: superseded by sketchGridStepUnits.
+        // Left in place the legacy key round-trips forever, so a downgrade
+        // would edit it while the stale new key silently won on the next
+        // upgrade. The first save by this build completes the migration.
+        oldKv.erase("sketchGridStep");
+
     }
 
     ensureParentDir(path);

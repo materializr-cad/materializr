@@ -171,6 +171,10 @@ struct AppSettings {
     // body/sketch gizmo translate. Persisting these means the user doesn't
     // have to re-enable snap and re-pick a 1 mm step every launch.
     bool  snapToGrid    = true;
+    // Largest grid step accepted from a file, in display units. A huge finite
+    // value makes framing unusable and a NaN reaches an int conversion in the
+    // renderer, so both are rejected rather than clamped.
+    static constexpr float kMaxGridStepUnits = 10000.0f;
     // In DISPLAY UNITS, not millimetres: "1" means one of whatever unit is
     // showing, which is what the presets (0.1 / 0.5 / 1 / 10) offer. Converted
     // to mm on load, after the display unit is applied.

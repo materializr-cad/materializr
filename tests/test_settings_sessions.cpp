@@ -215,3 +215,71 @@ TEST(SettingsSessions, LegacyGridStepMigratesByKey) {
     auto stuck = roundTrip("displayUnit = 4\nsketchGridStep = 1\n");
     EXPECT_FLOAT_EQ(1.0f, stuck.sketchGridStep);
 }
+
+// The migration reads two keys, a unit index and a float from a file anyone
+// can hand-edit. Each of those is an input, so each gets a boundary.
+TEST(SettingsSessions, GridStepMigrationBoundaries) {
+    const std::string path = std::string(std::getenv("TMPDIR") ?
+                             std::getenv("TMPDIR") : "/tmp") + "/mz_grid_bounds.cfg";
+    auto load = [&](const std::string& body) {
+        { std::ofstream o(path); o << body; }
+        AppSettings s = SettingsIO::load(path);
+        std::remove(path.c_str());
+        return s;
+    };
+    const float kDefault = AppSettings().sketchGridStep;
+
+    // Both keys: the current one wins outright. The legacy value is not
+    // consulted, so a stale 304.8 cannot leak in behind it.
+    EXPECT_FLOAT_EQ(0.5f, load("displayUnit = 4\n"
+                               "sketchGridStepUnits = 0.5\n"
+                               "sketchGridStep = 304.8\n").sketchGridStep);
+
+    // Neither key (a file written before the setting existed): the default.
+    EXPECT_FLOAT_EQ(kDefault, load("displayUnit = 4\n").sketchGridStep);
+
+    // An out-of-range displayUnit means MILLIMETRES — the same rule the
+    // setting itself uses. Clamping it to the nearest legal index instead
+    // would make 99 mean Feet here and mm there, so one file would be read
+    // two ways and 304.8 mm would migrate to one foot of grid.
+    auto bad = load("displayUnit = 99\nsketchGridStep = 304.8\n");
+    EXPECT_EQ(0, bad.displayUnit);
+    EXPECT_FLOAT_EQ(304.8f, bad.sketchGridStep);
+
+    // Values that are not a usable grid step are refused, not clamped. NaN
+    // matters most: it survives every `< 0.1` and `<= 0` guard and then
+    // reaches a float-to-int conversion in the grid renderer.
+    for (const char* bad : {"0", "-5", "nan", "inf", "1e30"}) {
+        EXPECT_FLOAT_EQ(kDefault,
+            load(std::string("sketchGridStepUnits = ") + bad + "\n").sketchGridStep)
+            << "new key: " << bad;
+        EXPECT_FLOAT_EQ(kDefault,
+            load(std::string("sketchGridStep = ") + bad + "\n").sketchGridStep)
+            << "legacy key: " << bad;
+    }
+
+    // Under millimetres a deliberate 0.05 mm grid is a real choice. The
+    // snap-up-to-a-preset heuristic exists only to rescue a value a UNIT
+    // CONVERSION made impractical, so it must not fire here.
+    EXPECT_FLOAT_EQ(0.05f, load("displayUnit = 0\nsketchGridStep = 0.05\n").sketchGridStep);
+}
+
+// A save completes the migration. Without this the legacy key rides along as
+// an unknown key forever, and downgrade-then-upgrade silently discards every
+// grid-step change made in between.
+TEST(SettingsSessions, SavingRetiresTheLegacyGridStepKey) {
+    const std::string p = tmpCfg("gridlegacy");
+    { std::ofstream o(p); o << "displayUnit = 4\nsketchGridStep = 304.8\n"; }
+    AppSettings s = SettingsIO::load(p);
+    s.sketchGridStep = 2.0f;
+    ASSERT_TRUE(SettingsIO::save(p, s));
+
+    const std::string txt = readAll(p);
+    EXPECT_EQ(std::string::npos, txt.find("sketchGridStep ="))
+        << "the legacy key must not survive the save:\n" << txt;
+    EXPECT_NE(std::string::npos, txt.find("sketchGridStepUnits ="));
+
+    // The upgrade half of the cycle: reloading sees only the new key.
+    EXPECT_FLOAT_EQ(2.0f, SettingsIO::load(p).sketchGridStep);
+    std::remove(p.c_str());
+}
