@@ -105,6 +105,15 @@ struct MoveFaceState {
     bool moveFaceMoveOuter = true;
     std::vector<bool> moveFaceHoleSlant;     // top edge picked → top ring follows
     std::vector<bool> moveFaceHoleVertical;  // cylinder wall picked → tube follows
+    // LOCAL TILT. Route the gesture through the FaceTweak engine — which
+    // rebuilds only the faces meeting this one — instead of MoveFaceOp's
+    // whole-body GTransform shear. Tilt only: an in-plane slide has no local
+    // answer at all (a plane translated along itself is the same plane), and
+    // Scale/Twist have no three-plane formulation. See FaceTweak.h.
+    bool moveFaceLocal = false;
+    // Why the last local attempt declined, for the panel to print. Points at a
+    // static string owned by tweak::refusalText; null = nothing to report.
+    const char* moveFaceLocalRefusal = nullptr;
     // Sketches sitting ON the moved face — they slide with it. Original planes
     // snapshotted so the live preview / cancel can restore them.
     std::vector<int>    moveFaceSketchIds;

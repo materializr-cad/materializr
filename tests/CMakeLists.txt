@@ -58,6 +58,9 @@ add_library(materializr_core STATIC
     ${CMAKE_SOURCE_DIR}/src/modeling/LoftOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/GuidedLoftOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/BoundaryFillOp.cpp
+    ${CMAKE_SOURCE_DIR}/src/modeling/PatchOp.cpp
+    ${CMAKE_SOURCE_DIR}/src/modeling/FaceTweak.cpp
+    ${CMAKE_SOURCE_DIR}/src/modeling/FaceTweakOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/SweepOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/ConstructionPlaneOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/ConstructionAxisOp.cpp
@@ -100,6 +103,10 @@ add_library(materializr_core STATIC
     # branch lands in touchui::numberField. Tests never take that branch —
     # touchMode() is off — but the symbol still has to resolve at link time,
     # and this list is separate from the app's, so it does not inherit it.
+    # The interactive-op controller base: its handle latch gates camera orbit
+    # and pan, so the invariant needs a test (see test_iop_latch.cpp). Pulls in
+    # only Document / History / SelectionManager / Operation + imgui.
+    ${CMAKE_SOURCE_DIR}/src/app/InteractiveOpController.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/TouchWidgets.cpp
     # Installs OCCT's signal handler for every test binary — see the file for
     # why tests must run in the app's signal environment.
@@ -755,6 +762,22 @@ add_test(NAME test_i18n COMMAND test_i18n)
 add_executable(test_airfoil_import test_airfoil_import.cpp)
 target_link_libraries(test_airfoil_import PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_airfoil_import COMMAND test_airfoil_import)
+
+# Patch: N-sided surface fitted across picked edges, with tangency/curvature
+# continuity into the faces the edges came from.
+add_executable(test_patch test_patch.cpp)
+target_link_libraries(test_patch PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_patch COMMAND test_patch)
+
+# Local face tweak: move a face, rebuild only its neighbourhood.
+add_executable(test_face_tweak test_face_tweak.cpp)
+target_link_libraries(test_face_tweak PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_face_tweak COMMAND test_face_tweak)
+
+# A deactivated controller must not keep a viewport handle latched.
+add_executable(test_iop_latch test_iop_latch.cpp)
+target_link_libraries(test_iop_latch PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_iop_latch COMMAND test_iop_latch)
 
 # ─── Loader path for a source-built OCCT ─────────────────────────────────────
 # With MZR_OCCT_PREFIX the kernel lives outside the loader's default search

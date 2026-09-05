@@ -59,6 +59,7 @@
 #include "modeling/ExtrudeOp.h"
 #include "modeling/ReplayOp.h"
 #include "modeling/PrimitiveOp.h"
+#include "modeling/PatchOp.h"
 #include "modeling/ThreadOp.h"
 #include <chrono>
 #include <future>
@@ -2309,6 +2310,121 @@ void Application::renderBoundaryFillPanel() {
     else if (cancelClicked || escPressed) cancelBoundaryFill();
 
     ImGui::End();
+}
+
+void Application::renderPatchPanel() {
+    if (!m_patchActive) return;
+
+    ImGui::SetNextWindowPos(ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - 300,
+                                   ImGui::GetWindowPos().y + 50),
+                            ImGuiCond_Appearing);
+    ImGui::SetNextWindowSize(uiSz(300, 0), ImGuiCond_Appearing);
+    ImGui::Begin("Patch", nullptr,
+        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
+        ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_AlwaysAutoResize);
+
+    ImGui::TextColored(materializr::accentText(), materializr::tr("Boundary edges: %d"),
+                       static_cast<int>(m_patchEdges.size()));
+    if (!m_patchSupports.empty())
+        ImGui::TextDisabled(materializr::tr("%d picked support face(s)"),
+                            static_cast<int>(m_patchSupports.size()));
+    if (m_patchBodyId < 0)
+        ImGui::TextDisabled("%s", materializr::tr("Standalone surface (the edges\ndon't bound one body)."));
+
+    ImGui::Separator();
+
+    bool dirty = false;
+    const char* contLabels[] = {"Position (C0)", "Tangent (G1)", "Curvature (G2)"};
+    ImGui::SetNextItemWidth(uiSz(160, 0).x);
+    if (ImGui::Combo(materializr::tr("Continuity"), &m_patchParams.continuity,
+                     contLabels, 3))
+        dirty = true;
+
+    // Samples per boundary curve is the control users actually reach for, so it
+    // sits with continuity rather than under Advanced: it decides whether the
+    // patch tracks a wiggly rim or smooths across it.
+    ImGui::SetNextItemWidth(uiSz(160, 0).x);
+    if (ImGui::SliderInt(materializr::tr("Detail"), &m_patchParams.nbPtsOnCur, 4, 60))
+        dirty = true;
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("%s", materializr::tr("Sample points per boundary curve. More follows the rim more closely; fewer smooths it out."));
+
+    ImGui::SetNextItemWidth(uiSz(160, 0).x);
+    if (ImGui::SliderInt(materializr::tr("Stiffness"), &m_patchParams.degree, 2, 8))
+        dirty = true;
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("%s", materializr::tr("Degree of the surface the fit starts from. Higher lets it bulge more freely - and invent waves the boundary never asked for."));
+
+    if (ImGui::CollapsingHeader(materializr::tr("Advanced"))) {
+        ImGui::SetNextItemWidth(uiSz(140, 0).x);
+        float t3 = static_cast<float>(m_patchParams.tol3d);
+        if (ImGui::SliderFloat(materializr::tr("Gap tolerance (mm)"), &t3, 1e-5f, 1e-1f,
+                               "%.5f", ImGuiSliderFlags_Logarithmic)) {
+            m_patchParams.tol3d = t3; dirty = true;
+        }
+        ImGui::SetNextItemWidth(uiSz(140, 0).x);
+        float ta = static_cast<float>(m_patchParams.tolAng * 180.0 / 3.14159265358979323846);
+        if (ImGui::SliderFloat(materializr::tr("Tangency tolerance"), &ta, 0.01f, 10.0f, "%.2f deg")) {
+            m_patchParams.tolAng = ta * 3.14159265358979323846 / 180.0; dirty = true;
+        }
+        ImGui::SetNextItemWidth(uiSz(140, 0).x);
+        float tc = static_cast<float>(m_patchParams.tolCurv);
+        if (ImGui::SliderFloat(materializr::tr("Curvature tolerance"), &tc, 0.01f, 2.0f, "%.2f")) {
+            m_patchParams.tolCurv = tc; dirty = true;
+        }
+        ImGui::SetNextItemWidth(uiSz(140, 0).x);
+        if (ImGui::SliderInt(materializr::tr("Iterations"), &m_patchParams.nbIter, 1, 8))
+            dirty = true;
+        ImGui::SetNextItemWidth(uiSz(140, 0).x);
+        if (ImGui::SliderInt(materializr::tr("Max degree"), &m_patchParams.maxDeg, 3, 16))
+            dirty = true;
+        ImGui::SetNextItemWidth(uiSz(140, 0).x);
+        if (ImGui::SliderInt(materializr::tr("Max segments"), &m_patchParams.maxSegments, 1, 40))
+            dirty = true;
+        if (ImGui::Checkbox(materializr::tr("Anisotropic"), &m_patchParams.anisotropic))
+            dirty = true;
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", materializr::tr("Let the fit stretch differently along and across the patch. Helps on long thin openings."));
+    }
+
+    // What the fit actually achieved, not what was asked for. A patch whose
+    // tangency was discarded is still a good plug for the hole, and saying so
+    // beats letting the user hunt for a setting that would not have helped.
+    ImGui::Separator();
+    if (auto* op = static_cast<PatchOp*>(m_patchPreview.op())) {
+        if (m_patchPreview.applied()) {
+            ImGui::TextDisabled(materializr::tr("Gap %.4f mm  -  tangency %.2f deg"),
+                                op->g0Error(),
+                                op->g1Error() * 180.0 / 3.14159265358979323846);
+            if (op->healedIntoBody())
+                ImGui::TextDisabled("%s", materializr::tr("Sewn into the body."));
+            if (op->unsupportedEdgeCount() > 0)
+                ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f),
+                                   materializr::tr("%d edge(s) have no neighbouring face, so\nthey only hold position."),
+                                   op->unsupportedEdgeCount());
+            else if (!op->continuityAchieved())
+                ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s",
+                                   materializr::tr("No tangent surface exists here - the faces\naround the opening stand square to it.\nThe hole is filled, held in position only."));
+        } else {
+            ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s",
+                               materializr::tr("No surface fits these edges."));
+        }
+    }
+
+    ImGui::Separator();
+    bool applyClicked  = ImGui::Button(materializr::tr("Apply"), materializr::uiSz(120, 0));
+    ImGui::SameLine();
+    bool cancelClicked = ImGui::Button(materializr::tr("Cancel"), materializr::uiSz(120, 0));
+    bool escPressed = ImGui::IsKeyPressed(ImGuiKey_Escape, false);
+
+    ImGui::End();
+
+    // Re-fit AFTER the window closes: updatePatch retracts and re-executes the
+    // op, which can churn body ids, and doing that mid-window leaves the panel
+    // drawing against state it has already read.
+    if (dirty) updatePatch();
+    if (applyClicked) commitPatch();
+    else if (cancelClicked || escPressed) cancelPatch();
 }
 
 void Application::renderSketchMovePanel() {

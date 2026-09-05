@@ -15,6 +15,8 @@
 #include "../modeling/ProjectSketchOp.h"
 #include "../modeling/DefeatureOp.h"
 #include "../modeling/ResizeCylindricalOp.h"
+#include "../modeling/FaceTweak.h"
+#include "../modeling/FaceTweakOp.h"
 #include "../modeling/MoveFaceOp.h"
 #include "../core/PlaneAxes.h"
 #include <BRepTools_WireExplorer.hxx>
@@ -1046,6 +1048,41 @@ void MoveFaceController::bakeFaceRotationDrag() {
     m_st.moveFaceAngleBase = 0.0f;
 }
 
+bool MoveFaceController::localTweakApplies() const {
+    // Tilt only. A slide lands the plane back on itself, so the local rebuild
+    // has literally nothing to solve; scale and twist aren't rigid transforms
+    // of the face at all. The panel only offers the box under Rotate, but the
+    // gesture can switch to a twist mid-session, so re-check it here.
+    return m_st.moveFaceLocal && m_st.faceXformKind == FaceXform::Rotate &&
+           !m_st.moveFaceIsTwist;
+}
+
+gp_Trsf MoveFaceController::faceTweakTrsf() const {
+    // The same composed rotation configureFaceOp hands MoveFaceOp — live drag
+    // stacked on the tilts already banked this session, about the face centre.
+    const glm::mat3 R = faceRotTotal();
+    const glm::vec3 t = m_st.moveFacePivot - R * m_st.moveFacePivot;
+    gp_Trsf trsf;
+    trsf.SetValues(R[0][0], R[1][0], R[2][0], t.x,
+                   R[0][1], R[1][1], R[2][1], t.y,
+                   R[0][2], R[1][2], R[2][2], t.z);
+    return trsf;
+}
+
+bool MoveFaceController::applyLocalTweak(const IopContext& ctx) {
+    m_st.moveFaceLocalRefusal = nullptr;
+    if (m_st.moveFaceBodyId < 0 || m_st.moveFaceFace.IsNull()) return false;
+    const auto r = materializr::tweak::moveFace(
+        ctx.doc.getBody(m_st.moveFaceBodyId), m_st.moveFaceFace, faceTweakTrsf());
+    if (!r.ok()) {
+        m_st.moveFaceLocalRefusal = materializr::tweak::refusalText(r.refusal);
+        return false;
+    }
+    ctx.doc.updateBody(m_st.moveFaceBodyId, r.shape);
+    ctx.markMeshesDirty();
+    return true;
+}
+
 void MoveFaceController::configureFaceOp(MoveFaceOp& op) const {
     switch (m_st.faceXformKind) {
         case FaceXform::Translate:
@@ -1569,6 +1606,17 @@ void MoveFaceController::updateMoveFace(const IopContext& ctx) {
     ctx.doc.updateBody(m_st.moveFaceBodyId, m_st.moveFacePreviousShape);
     ctx.markMeshesDirty();
     if (!faceXformNontrivial()) { moveFaceSlideSketches(ctx, glm::vec3(0.0f)); return; }
+    // Local tilt previews through the FaceTweak engine directly (no op needed —
+    // the preview only has to put a shape on the document). A refusal leaves the
+    // body on its snapshot and the reason on the state for the panel; it is not
+    // quietly retried as a shear, because the two produce different bodies and
+    // the user picked one.
+    if (localTweakApplies()) {
+        if (!applyLocalTweak(ctx))
+            ctx.doc.updateBody(m_st.moveFaceBodyId, m_st.moveFacePreviousShape);
+        ctx.markMeshesDirty();
+        return;
+    }
     try {
         auto op = std::make_unique<MoveFaceOp>();
         op->setBody(m_st.moveFaceBodyId);
@@ -1622,7 +1670,16 @@ void MoveFaceController::commitMoveFace(const IopContext& ctx) {
     moveFaceSlideSketches(ctx, glm::vec3(0.0f)); // restore sketches to snapshot
 
     bool committed = false;
-    if (faceXformNontrivial() && m_st.moveFaceBodyId >= 0 && !m_st.moveFaceFace.IsNull()) {
+    if (localTweakApplies() && faceXformNontrivial() && m_st.moveFaceBodyId >= 0 &&
+        !m_st.moveFaceFace.IsNull()) {
+        auto op = std::make_unique<FaceTweakOp>();
+        op->setBody(m_st.moveFaceBodyId);
+        op->setFace(m_st.moveFaceFace);
+        op->setTransform(faceTweakTrsf());
+        committed = ctx.history.pushOperation(std::move(op), ctx.doc);
+        std::fprintf(stdout, committed ? "Local face tilt committed\n"
+                                       : "Local face tilt refused\n");
+    } else if (faceXformNontrivial() && m_st.moveFaceBodyId >= 0 && !m_st.moveFaceFace.IsNull()) {
         auto op = std::make_unique<MoveFaceOp>();
         op->setBody(m_st.moveFaceBodyId);
         op->setFace(m_st.moveFaceFace);
@@ -2047,6 +2104,30 @@ void MoveFaceController::renderMoveFacePanel(const IopContext& ctx,
         ImGui::TextWrapped("%s", materializr::tr("Tilt and Twist are separate ops — one gesture does either a tilt OR a twist, not both. For a tapered-and-twisted face, commit one then the other."));
         ImGui::PopTextWrapPos();
         ImGui::PopStyleColor();
+
+        // The two readings of a tilt, offered as a choice rather than one being
+        // silently right. Off: the body shears, so every feature inside it leans
+        // to match. On: only the faces meeting this one are rebuilt and the rest
+        // of the part stays exactly where it is.
+        ImGui::Separator();
+        if (ImGui::Checkbox(materializr::tr("Local (rebuild neighbours)"),
+                            &m_st.moveFaceLocal)) {
+            m_st.moveFaceLocalRefusal = nullptr;
+            updateMoveFace(ctx);
+        }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", materializr::tr(
+                "Off: the whole body shears, so holes and features inside it lean with the face.\n"
+                "On: only the faces touching this one are rebuilt - everything else stays put.\n"
+                "The face you tilt has to be flat; what it meets can curve."));
+        if (m_st.moveFaceLocal && m_st.moveFaceLocalRefusal &&
+            m_st.moveFaceLocalRefusal[0] != '\0') {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.7f, 0.2f, 1.0f));
+            ImGui::PushTextWrapPos(230.0f);
+            ImGui::TextWrapped("%s", m_st.moveFaceLocalRefusal);
+            ImGui::PopTextWrapPos();
+            ImGui::PopStyleColor();
+        }
     } else if (isScl) {
         ImGui::Text("%s", materializr::tr("Scale (%%)")); ImGui::Separator();
         bool ch = false;

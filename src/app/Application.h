@@ -19,6 +19,7 @@
 #include <TopoDS_Shape.hxx>
 #include <gp_Trsf.hxx>
 #include <TopoDS_Face.hxx>
+#include <TopoDS_Edge.hxx>
 #include <TopoDS_Wire.hxx>
 #include <gp_Pln.hxx>
 #include <gp_Ax1.hxx>
@@ -1627,6 +1628,44 @@ private:
     void commitBoundaryFill();
     void cancelBoundaryFill();
     void renderBoundaryFillPanel();
+
+    // ── Patch (N-sided surface across picked edges) ──
+    // Pick the ring of edges bounding a void and a single face is fitted across
+    // it, optionally running tangent or curvature-continuous into the faces the
+    // edges came from. When the ring bounds an opening in one body the patch is
+    // sewn back in and the body closes; otherwise it lands as its own surface.
+    //
+    // The solver settings are the shape controls, not a preferences dialog:
+    // GeomPlate fits a minimal-energy plate to the boundary, so samples-per-
+    // curve and the degrees are what decide whether the surface tracks a wiggly
+    // rim or smooths across it. Defaults MUST mirror PatchOp::Solver — the panel
+    // pushes these into the op every frame, so a mismatch here silently
+    // overrides the op's own defaults.
+    struct PatchParams {
+        int continuity = 1;          // 0 position, 1 tangent, 2 curvature
+        int degree = 3;
+        int nbPtsOnCur = 15;
+        int nbIter = 2;
+        bool anisotropic = false;
+        double tol3d = 1e-4;
+        double tolAng = 0.01;
+        double tolCurv = 0.1;
+        int maxDeg = 8;
+        int maxSegments = 9;
+    };
+    bool m_patchActive = false;
+    std::vector<TopoDS_Edge> m_patchEdges;
+    std::vector<TopoDS_Face> m_patchSupports;   // user-picked tangency supports
+    int m_patchBodyId = -1;                     // -1 = standalone patch
+    PatchParams m_patchParams;
+    bool m_patchShowAdvanced = false;
+    materializr::LiveOpPreview m_patchPreview;
+
+    void beginPatch();
+    void updatePatch();
+    void commitPatch();
+    void cancelPatch();
+    void renderPatchPanel();
 
     // ── Reference image (photo underlay hosted on a construction plane) ──
     // Import: file dialog → decode/validate → addPlane + setRefImage; the

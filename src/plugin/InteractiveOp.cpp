@@ -11,6 +11,7 @@ const char* interactiveOpName(InteractiveOp op) {
         case InteractiveOp::Loft:              return "Loft";
         case InteractiveOp::LoftPickSecond:    return "LoftPickSecond";
         case InteractiveOp::BoundaryFill:      return "BoundaryFill";
+        case InteractiveOp::Patch:             return "Patch";
         case InteractiveOp::Revolve:           return "Revolve";
         case InteractiveOp::ConstructionPlane: return "ConstructionPlane";
         case InteractiveOp::Midplane:          return "Midplane";
