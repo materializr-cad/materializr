@@ -799,3 +799,11 @@ if(DEFINED MZR_OCCT_PREFIX)
             ENVIRONMENT "LD_LIBRARY_PATH=${MZR_OCCT_PREFIX}/lib:$ENV{LD_LIBRARY_PATH}")
     endif()
 endif()
+
+# test_grid_scale — the sketch grid's drawn lattice vs its snap lattice.
+# GridScale.h is header-only and deliberately GL-free, so this links against
+# neither the viewport nor ImGui.
+add_executable(test_grid_scale test_grid_scale.cpp)
+target_include_directories(test_grid_scale PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(test_grid_scale PRIVATE gtest gtest_main)
+add_test(NAME test_grid_scale COMMAND test_grid_scale)

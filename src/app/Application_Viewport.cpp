@@ -3,6 +3,8 @@
 #include "ui_scale.h"
 #include "touch_mode.h"
 #include "gl_common.h"
+#include "viewport/GridScale.h"
+#include <cmath>
 #include <chrono>
 #include <cstdio>
 
@@ -120,6 +122,11 @@ namespace materializr { namespace force_link { void linkAll(); } }
 // Implementations split out of Application.cpp — the giant 3D viewport
 // renderer plus its drag-projection helper.
 namespace materializr {
+
+// Smallest on-screen cell, in pixels, the sketch grid will draw. Below this
+// the shader's density fade greys the lines out anyway, so a finer lattice
+// costs fill rate and shows nothing.
+constexpr float kGridMinPx = 8.0f;
 
 // opDialogDragGrip moved to ui/OpDialogGrip.h — Move Face's panel (in
 // FaceOpControllers.cpp) uses it too.
@@ -588,8 +595,19 @@ void Application::renderViewport() {
             // depthBias: + draws the grid ON the coplanar sketch face; - lets a
             // coplanar body face (e.g. a body sitting on the XZ ground) occlude
             // the ground grid instead of it bleeding through.
+            // The DRAWN lattice may be coarser than the snap step, never
+            // finer — see GridScale.h for why decades-only keeps every drawn
+            // line on a snap point. Without this, switching feet -> mm leaves a
+            // 1 mm grid in a view framing 40 ft and the grid reads as gone.
+            float gridDrawStepMm = std::max(m_sketchGridStep, 0.01f);
+            if (sketching) {
+                const glm::vec2 g0 = screenToSketch(0.0f, 0.0f, contentSize.x, contentSize.y);
+                const glm::vec2 g1 = screenToSketch(1.0f, 0.0f, contentSize.x, contentSize.y);
+                gridDrawStepMm = gridDrawStep(gridDrawStepMm,
+                                              glm::length(g1 - g0), kGridMinPx);
+            }
             m_grid->render(view, proj, fadeCenter, gridFade,
-                           gp, std::max(m_sketchGridStep, 0.01f),
+                           gp, gridDrawStepMm,
                            minorAlpha, worldGridAlpha /*globalAlpha*/,
                            sketching ? 1.0f : 0.0f /*sketchGrid: uniform single tier*/,
                            sketching ? 0.0005f : -0.0005f /*depthBias*/,
