@@ -311,6 +311,7 @@ add_executable(materializr
     src/modeling/BoundaryFillOp.cpp
     src/modeling/PatchOp.cpp
     src/modeling/FaceTweak.cpp
+    src/modeling/FaceTweakOp.cpp
     src/modeling/SketchTransformOp.cpp
     src/modeling/ConstructionPlaneOp.cpp
     src/modeling/ConstructionAxisOp.cpp

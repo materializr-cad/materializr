@@ -228,3 +228,112 @@ TEST(FaceTweak, AMoveThatFlattensTheBodyIsRefused) {
     const auto r = tweak::moveFace(box, faceTowards(box, gp_Dir(0, 0, 1)), down);
     EXPECT_FALSE(r.ok()) << "a zero-volume solid is not a valid answer";
 }
+
+// ── The history step ────────────────────────────────────────────────────────
+
+#include "core/Document.h"
+#include "core/History.h"
+#include "modeling/FaceTweakOp.h"
+#include "modeling/OperationFactory.h"
+
+namespace {
+gp_Trsf tiltTop(double deg) {
+    gp_Trsf t;
+    t.SetRotation(gp_Ax1(gp_Pnt(0, 0, 10), gp_Dir(0, 1, 0)), deg * M_PI / 180.0);
+    return t;
+}
+} // namespace
+
+TEST(FaceTweakOp, AppliesAndUndoes) {
+    Document doc;
+    const TopoDS_Shape box = BRepPrimAPI_MakeBox(10.0, 10.0, 10.0).Shape();
+    const int id = doc.addBody(box, "Box");
+
+    FaceTweakOp op;
+    op.setBody(id);
+    op.setFace(faceTowards(box, gp_Dir(0, 0, 1)));
+    op.setTransform(tiltTop(10.0));
+    ASSERT_TRUE(op.execute(doc));
+
+    const double wedge = 0.5 * 10.0 * (10.0 * std::tan(10.0 * M_PI / 180.0)) * 10.0;
+    EXPECT_NEAR(vol(doc.getBody(id)), 1000.0 - wedge, 1e-3);
+
+    const OperationDiff d = op.captureDiff();
+    ASSERT_EQ(d.modifiedBefore.size(), 1u);
+    EXPECT_EQ(d.modifiedBefore[0].first, id);
+
+    ASSERT_TRUE(op.undo(doc));
+    EXPECT_NEAR(vol(doc.getBody(id)), 1000.0, 1e-6);
+}
+
+TEST(FaceTweakOp, RefusalIsReportedNotSwallowed) {
+    Document doc;
+    const TopoDS_Shape cyl = BRepPrimAPI_MakeCylinder(5.0, 10.0).Shape();
+    const int id = doc.addBody(cyl, "Cyl");
+
+    FaceTweakOp op;
+    op.setBody(id);
+    op.setFace(faceTowards(cyl, gp_Dir(0, 0, 1)));   // flat top, curved neighbour
+    gp_Trsf up;
+    up.SetTranslation(gp_Vec(0, 0, 2));
+    op.setTransform(up);
+    EXPECT_FALSE(op.execute(doc));
+    EXPECT_NE(op.refusal(), tweak::Refusal::None);
+    // The body must be exactly as it was — a refused op leaves no residue.
+    EXPECT_NEAR(vol(doc.getBody(id)), M_PI * 25.0 * 10.0, 1e-6);
+}
+
+TEST(FaceTweakOp, ParamsRoundTripAndReplay) {
+    Document doc;
+    const TopoDS_Shape box = BRepPrimAPI_MakeBox(10.0, 10.0, 10.0).Shape();
+    const int id = doc.addBody(box, "Box");
+
+    FaceTweakOp op;
+    op.setBody(id);
+    op.setFace(faceTowards(box, gp_Dir(0, 0, 1)));
+    op.setTransform(tiltTop(10.0));
+    ASSERT_TRUE(op.execute(doc));
+    const double tilted = vol(doc.getBody(id));
+
+    const std::string blob = op.serializeParams();
+    auto back = OperationFactory::create("face_tweak");
+    ASSERT_NE(back, nullptr) << "the factory has to know the type id";
+    ASSERT_TRUE(back->deserializeParams(blob));
+
+    // Replay onto a fresh document: same body, same result.
+    Document doc2;
+    const int id2 = doc2.addBody(box, "Box");
+    ASSERT_EQ(id2, id);
+    ASSERT_TRUE(back->execute(doc2));
+    EXPECT_NEAR(vol(doc2.getBody(id2)), tilted, 1e-9);
+}
+
+TEST(FaceTweakOp, RebindsToARegeneratedBody) {
+    // The stored TopoDS_Face is from the body as it stood when the gesture was
+    // made. Replaying against a body rebuilt from scratch means every TShape is
+    // new, so the op has to find its face by normal + centroid or the step is
+    // dead on reload.
+    Document doc;
+    const TopoDS_Shape box = BRepPrimAPI_MakeBox(10.0, 10.0, 10.0).Shape();
+    const int id = doc.addBody(box, "Box");
+    FaceTweakOp op;
+    op.setBody(id);
+    op.setFace(faceTowards(box, gp_Dir(0, 0, 1)));
+    op.setTransform(tiltTop(10.0));
+    ASSERT_TRUE(op.execute(doc));
+    const double tilted = vol(doc.getBody(id));
+
+    // A structurally identical box built independently: same geometry, all-new
+    // handles.
+    doc.updateBody(id, BRepPrimAPI_MakeBox(10.0, 10.0, 10.0).Shape());
+    ASSERT_TRUE(op.execute(doc)) << "rebind by normal + centroid";
+    EXPECT_NEAR(vol(doc.getBody(id)), tilted, 1e-9);
+}
+
+TEST(FaceTweakOp, RefusesAGarbageBlob) {
+    FaceTweakOp op;
+    EXPECT_FALSE(op.deserializeParams(""));
+    EXPECT_FALSE(op.deserializeParams("body=0;brep=0:"));            // no transform
+    EXPECT_FALSE(op.deserializeParams("body=0;xf=nan,0,0,0,0,1,0,0,0,0,1,0;brep=0:"));
+    EXPECT_FALSE(op.deserializeParams("body=0;an=0,0,0;xf=1,0,0,0,0,1,0,0,0,0,1,0;brep=0:"));
+}

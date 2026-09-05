@@ -7,6 +7,7 @@
 // configureFaceOp's signature so this header stays cheap to include.
 class MoveFaceOp;
 #include <TopoDS_Face.hxx>
+#include <gp_Trsf.hxx>
 #include <TopoDS_Shape.hxx>
 #include <glm/glm.hpp>
 #include <vector>
@@ -231,6 +232,15 @@ public:
     glm::mat3 faceRotTotal() const;
     void bakeFaceRotationDrag();          // fold a released ring drag in
     void configureFaceOp(MoveFaceOp& op) const;
+    // True when the current gesture is one the local rebuild can express: the
+    // Local box is ticked and this is a tilt (not a twist, slide or scale).
+    bool localTweakApplies() const;
+    // The gesture as one rigid transform, for FaceTweakOp.
+    gp_Trsf faceTweakTrsf() const;
+    // Run the local rebuild against the snapshot. Returns false (and leaves the
+    // body on its snapshot) when the engine refuses, recording why in the state
+    // so the panel can say it.
+    bool applyLocalTweak(const IopContext& ctx);
 
     // The face gizmo (slice 3). Checks its own active flag — this controller
     // isn't in m_iops yet, so Application_Viewport calls it unconditionally.
