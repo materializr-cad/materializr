@@ -1041,6 +1041,15 @@ void Application::renderViewport() {
             // sketch plane), so face sketches no longer need a separate per-face
             // grid — drawing across to neighbouring faces just works.
             m_sketchTool->setGridStep(m_sketchGridStep);
+            // Sketch millimetres per screen pixel, measured by unprojecting two
+            // points one pixel apart — exact for any camera and any plane
+            // orientation. Pointing tolerances are a screen distance, so they
+            // need the zoom, not just the grid.
+            {
+                const glm::vec2 p0 = screenToSketch(0.0f, 0.0f, contentSize.x, contentSize.y);
+                const glm::vec2 p1 = screenToSketch(1.0f, 0.0f, contentSize.x, contentSize.y);
+                m_sketchTool->setPixelScale(glm::length(p1 - p0));
+            }
             m_sketchRenderer->render(m_activeSketch.get(), m_sketchTool.get(), view, proj,
                                      m_sketchSolver.get());
         }

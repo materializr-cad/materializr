@@ -223,6 +223,36 @@ TEST(GridSnap, LatticeAnchorSitsOnTheSnapLattice) {
     }
 }
 
+// A pointing tolerance is a SCREEN distance. Deriving it from the grid failed
+// in both directions: uncapped it was 152 mm under a foot grid, so a click on
+// empty space cut geometry 15 cm away; capped at 10 mm it was 5 mm in a view
+// where one pixel is 8 mm, which is sub-pixel — nothing could be picked at all.
+TEST(GridSnap, PointingToleranceTracksTheScreenNotTheModel) {
+    SketchTool t;
+    const float cap = SketchTool::kToleranceStepCapMm;
+    const float px  = SketchTool::kPointingRadiusPx;
+
+    // Millimetre work, zoomed so a pixel is a fraction of a mm: the grid floor
+    // dominates and every existing sketch behaves exactly as it always has.
+    t.setPixelScale(0.027f);            // ~40 mm across a 1500 px viewport
+    for (float mm : { 0.1f, 0.5f, 1.0f, 10.0f }) {
+        t.setGridStep(mm);
+        EXPECT_FLOAT_EQ(std::max(mm, px * 0.027f), t.tolStep()) << "mm grid: " << mm;
+    }
+
+    // Feet: one pixel is ~8 mm, so the SCREEN term takes over and the target
+    // stays a constant handful of pixels instead of collapsing under a pixel.
+    t.setGridStep(304.8f);
+    t.setPixelScale(8.128f);            // ~40 ft across a 1500 px viewport
+    EXPECT_FLOAT_EQ(px * 8.128f, t.tolStep());
+    EXPECT_GT(t.tolStep(), cap) << "the 10 mm cap would have been sub-pixel here";
+    // The same gesture, in pixels, whatever the unit.
+    EXPECT_NEAR(px, t.tolStep() / 8.128f, 1e-3);
+
+    // The LATTICE is untouched by any of this — a foot grid is still a foot.
+    EXPECT_FLOAT_EQ(304.8f, t.getGridStep());
+}
+
 // Pointing tolerances must not scale without bound when the grid does.
 // The grid step follows the display unit, so a 1 ft grid is 304.8 mm — and
 // trim, pick, inference and hover distances all derived from it directly.
@@ -231,6 +261,7 @@ TEST(GridSnap, LatticeAnchorSitsOnTheSnapLattice) {
 TEST(GridSnap, ToleranceStepIsCappedWhileTheLatticeIsNot) {
     SketchTool t;
     const float cap = SketchTool::kToleranceStepCapMm;
+    t.setPixelScale(0.0f);   // no frame yet: the grid term alone
 
     // Every grid the presets ever offered in millimetres behaves EXACTLY as
     // before — the cap is the largest of them, so nothing existing moves.

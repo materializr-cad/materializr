@@ -296,7 +296,31 @@ public:
     // snapping OFF. The cap is the largest step the presets ever offered in
     // millimetres, so every mm and cm grid behaves exactly as it always has.
     static constexpr float kToleranceStepCapMm = 10.0f;
-    float tolStep() const { return std::min(m_gridStep, kToleranceStepCapMm); }
+    // How many SCREEN PIXELS of slop a pointing gesture gets. Tuned so that at
+    // the default millimetre framing this lands on the 0.3-1 mm the tolerances
+    // have always used.
+    static constexpr float kPointingRadiusPx = 12.0f;
+
+    // Sketch millimetres per screen pixel, pushed in each frame by the
+    // viewport. 0 until the first frame, which falls back to the grid.
+    void setPixelScale(float mmPerPx) { m_mmPerPixel = mmPerPx > 0.0f ? mmPerPx : 0.0f; }
+
+    // Pointing tolerance, in sketch millimetres. A tolerance is a SCREEN
+    // distance — how near the cursor is in pixels — not a property of the
+    // model. Deriving it from the grid alone gave 152 mm under a foot grid
+    // (a click on empty space cut distant geometry) and, once capped at 10 mm,
+    // gave 5 mm in a view where one pixel is 8 mm: sub-pixel, so nothing could
+    // be picked at all. Both failures are the same mistake in opposite
+    // directions.
+    //
+    // The screen term is what makes this usable at any zoom; the grid term is
+    // a floor, so a fine grid still gives fine picking and every existing
+    // millimetre sketch behaves exactly as it did.
+    float tolStep() const {
+        const float fromGrid   = std::min(m_gridStep, kToleranceStepCapMm);
+        const float fromScreen = kPointingRadiusPx * m_mmPerPixel;
+        return std::max(fromGrid, fromScreen);
+    }
 
     void setGridStep(float step) { m_gridStep = step; }
     float getGridStep() const { return m_gridStep; }
@@ -628,6 +652,7 @@ private:
     float m_rectDimH = 0.0f;
 
     float m_gridStep = 1.0f; // default 1 mm grid
+    float m_mmPerPixel = 0.0f;   // set per frame; see setPixelScale
     bool  m_snapToGridEnabled = true; // toolbar checkbox, see setSnapToGridEnabled
 
     // Updated each frame in Trim mode so the renderer can outline the segment
