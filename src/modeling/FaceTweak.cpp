@@ -88,8 +88,12 @@ gp_Pnt midOf(const TopoDS_Edge& e) {
 // edge running off the moved face keeps its geometry, so the new corner is
 // simply where that edge now meets the face's new plane. Works for a line, an
 // arc, a spline — which is the whole reason the neighbours are free to curve.
+// `nearTo`, not `near`: windows.h defines near and far as empty macros, and
+// OCCT 7.9.3 leaks windows.h into its own headers, so a parameter called `near`
+// vanishes on MSVC and takes the comma with it. Costs nothing to avoid; costs a
+// red Windows build to discover.
 bool curveMeetsPlane(const Handle(Geom_Curve)& c, double f, double l,
-                     const gp_Pln& pl, const gp_Pnt& near, gp_Pnt& out) {
+                     const gp_Pln& pl, const gp_Pnt& nearTo, gp_Pnt& out) {
     if (c.IsNull()) return false;
     Handle(Geom_Plane) gp = new Geom_Plane(pl);
     GeomAPI_IntCS ics(c, gp);
@@ -111,7 +115,7 @@ bool curveMeetsPlane(const Handle(Geom_Curve)& c, double f, double l,
     double best = 1e300;
     for (int i = 1; i <= ics.NbPoints(); ++i) {
         const gp_Pnt p = ics.Point(i);
-        const double d = p.Distance(near);
+        const double d = p.Distance(nearTo);
         if (d < best) { best = d; out = p; found = true; }
     }
     return found;
