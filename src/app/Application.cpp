@@ -7557,6 +7557,7 @@ void Application::run() {
                     case InteractiveOp::RadialPattern:  beginPattern(PatternKind::Radial); break;
                     case InteractiveOp::Loft:           beginLoft();           break;
                     case InteractiveOp::BoundaryFill:   beginBoundaryFill();   break;
+                    case InteractiveOp::Patch:          beginPatch();          break;
                     case InteractiveOp::LoftPickSecond: m_loftPickHintPending = true; break;
                     case InteractiveOp::ConstructionPlane: beginConstructionPlane(); break;
                     case InteractiveOp::ImportRefImage: beginRefImageImport(); break;
@@ -7695,6 +7696,7 @@ void Application::run() {
             renderOffsetToolPanel();
             renderLoftPanel();
             renderBoundaryFillPanel();
+            renderPatchPanel();
             renderRefImagePanel();
             renderConstructionPlanePanel();
             renderConstructionAxisPanel();

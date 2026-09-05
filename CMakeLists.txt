@@ -249,6 +249,7 @@ add_executable(materializr
     src/plugins/ConstructionPlanePlugin.cpp
     src/plugins/RefImagePlugin.cpp
     src/plugins/BoundaryFillPlugin.cpp
+    src/plugins/PatchPlugin.cpp
     src/plugins/ConstructionAxisPlugin.cpp
     src/plugins/RevolvePlugin.cpp
     src/plugins/FilletPlugin.cpp
@@ -308,6 +309,7 @@ add_executable(materializr
     src/modeling/LoftOp.cpp
     src/modeling/GuidedLoftOp.cpp
     src/modeling/BoundaryFillOp.cpp
+    src/modeling/PatchOp.cpp
     src/modeling/SketchTransformOp.cpp
     src/modeling/ConstructionPlaneOp.cpp
     src/modeling/ConstructionAxisOp.cpp

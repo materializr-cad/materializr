@@ -58,6 +58,7 @@ add_library(materializr_core STATIC
     ${CMAKE_SOURCE_DIR}/src/modeling/LoftOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/GuidedLoftOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/BoundaryFillOp.cpp
+    ${CMAKE_SOURCE_DIR}/src/modeling/PatchOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/SweepOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/ConstructionPlaneOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/ConstructionAxisOp.cpp
@@ -755,6 +756,12 @@ add_test(NAME test_i18n COMMAND test_i18n)
 add_executable(test_airfoil_import test_airfoil_import.cpp)
 target_link_libraries(test_airfoil_import PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_airfoil_import COMMAND test_airfoil_import)
+
+# Patch: N-sided surface fitted across picked edges, with tangency/curvature
+# continuity into the faces the edges came from.
+add_executable(test_patch test_patch.cpp)
+target_link_libraries(test_patch PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_patch COMMAND test_patch)
 
 # ─── Loader path for a source-built OCCT ─────────────────────────────────────
 # With MZR_OCCT_PREFIX the kernel lives outside the loader's default search

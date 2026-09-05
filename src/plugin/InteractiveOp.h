@@ -31,6 +31,7 @@ enum class InteractiveOp {
     LoftPickSecond,    // banner hint: pick the second sketch
 
     BoundaryFill,
+    Patch,
     Revolve,
 
     // Construction planes

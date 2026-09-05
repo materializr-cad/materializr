@@ -38,6 +38,7 @@
 #include "modeling/LoftOp.h"
 #include "modeling/GuidedLoftOp.h"
 #include "modeling/BoundaryFillOp.h"
+#include "modeling/PatchOp.h"
 #include "modeling/ConstructionPlaneOp.h"
 #include "io/FileDialogs.h"
 #include "modeling/ConstructionAxisOp.h"
@@ -1393,6 +1394,112 @@ void Application::cancelBoundaryFill() {
     m_bfillPreview.clear(*m_document);
     m_bfillActive = false;
     m_bfillProfiles.clear();
+    m_meshesDirty = true;
+}
+
+// ─── Patch (interactive popup) ──────────────────────────────────────────────
+//
+// PatchPlugin fires requestInteractiveOp(InteractiveOp::Patch) with edges
+// selected. Same live-preview scaffolding as Loft and Boundary Fill: one
+// PatchOp is held against the document, re-synced on every parameter change,
+// committed on Apply, undone on Cancel.
+//
+// The op wants a body id so it can find each boundary edge's neighbouring face
+// (the thing tangency is measured against) and so it can sew the finished patch
+// back in. Edges from two different bodies have no single such body, so the
+// patch is fitted as a standalone surface instead — which is the honest answer
+// for geometry that bridges a gap rather than filling one.
+
+void Application::beginPatch() {
+    if (refuseMeshSelection("Patch")) return;
+    if (!m_selection || !m_document) return;
+
+    m_patchEdges.clear();
+    m_patchSupports.clear();
+    m_patchBodyId = -1;
+
+    bool oneBody = true;
+    for (const auto& e : m_selection->getSelection()) {
+        if (e.shape.IsNull()) continue;
+        if (e.type == SelectionType::Edge && e.shape.ShapeType() == TopAbs_EDGE) {
+            bool dup = false;
+            for (const auto& have : m_patchEdges)
+                if (have.IsSame(e.shape)) { dup = true; break; }
+            if (dup) continue;
+            m_patchEdges.push_back(TopoDS::Edge(e.shape));
+            if (e.bodyId >= 0) {
+                if (m_patchBodyId < 0) m_patchBodyId = e.bodyId;
+                else if (m_patchBodyId != e.bodyId) oneBody = false;
+            }
+        } else if (e.type == SelectionType::Face &&
+                   e.shape.ShapeType() == TopAbs_FACE) {
+            m_patchSupports.push_back(TopoDS::Face(e.shape));
+        }
+    }
+
+    if (m_patchEdges.empty()) {
+        showToast("Patch needs the edges around the opening - Ctrl-click each "
+                  "one, then click Patch.");
+        return;
+    }
+    // Edges spanning two bodies: keep them, drop the heal target. The fit still
+    // works; it just can't sew into a body that only owns half the boundary.
+    if (!oneBody) m_patchBodyId = -1;
+
+    m_patchPreview.clear(*m_document);
+    m_patchParams = PatchParams{};
+    m_patchShowAdvanced = false;
+    m_patchActive = true;
+    updatePatch();
+}
+
+void Application::updatePatch() {
+    if (!m_patchActive || !m_history || !m_document) return;
+    if (m_patchEdges.empty()) return;
+
+    // Retract the applied preview, re-sync the SAME instance, re-execute —
+    // History sees nothing until commit. See LiveOpPreview.
+    m_patchPreview.retract(*m_document);
+    if (!m_patchPreview.op())
+        m_patchPreview.hold(std::make_unique<PatchOp>(), *m_document);
+    auto* op = static_cast<PatchOp*>(m_patchPreview.op());
+
+    op->setBody(m_patchBodyId);
+    op->setEdges(m_patchEdges);
+    op->setSupportFaces(m_patchSupports);
+    op->setContinuity(static_cast<PatchOp::Continuity>(m_patchParams.continuity));
+
+    PatchOp::Solver s;
+    s.degree      = m_patchParams.degree;
+    s.nbPtsOnCur  = m_patchParams.nbPtsOnCur;
+    s.nbIter      = m_patchParams.nbIter;
+    s.anisotropic = m_patchParams.anisotropic;
+    s.tol3d       = m_patchParams.tol3d;
+    s.tolAng      = m_patchParams.tolAng;
+    s.tolCurv     = m_patchParams.tolCurv;
+    s.maxDeg      = m_patchParams.maxDeg;
+    s.maxSegments = m_patchParams.maxSegments;
+    op->setSolver(s);
+
+    if (!m_patchPreview.apply(*m_document))
+        showToast("Patch: no surface fits these edges. They need to form one "
+                  "closed ring around the opening.");
+    m_meshesDirty = true;
+}
+
+void Application::commitPatch() {
+    m_patchPreview.commit(*m_history);   // record the applied instance as-is
+    m_patchActive = false;
+    m_patchEdges.clear();
+    m_patchSupports.clear();
+    m_meshesDirty = true;
+}
+
+void Application::cancelPatch() {
+    m_patchPreview.clear(*m_document);
+    m_patchActive = false;
+    m_patchEdges.clear();
+    m_patchSupports.clear();
     m_meshesDirty = true;
 }
 
