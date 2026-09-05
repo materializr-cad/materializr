@@ -21,24 +21,32 @@
 // two do. Move one face's surface and those definitions still hold — they just
 // resolve somewhere else. So the rebuild is:
 //
-//   * every vertex ON the moved face  -> re-solve as the intersection of the
-//                                        moved surface with the two other faces
-//                                        meeting there,
-//   * every edge ON the moved face    -> the moved surface against its one
-//                                        neighbour, trimmed between those
-//                                        vertices,
-//   * every edge LEAVING one of those -> unchanged geometry, retrimmed to the
-//     vertices into the body             new endpoint. A box's vertical edges
-//                                        keep their lines and simply shorten.
-//   * everything else                 -> untouched, which is the entire point.
+//   * every edge LEAVING the moved     -> unchanged geometry (neither of ITS
+//     face into the body                  faces moved), retrimmed to a new end.
+//                                         A box's vertical edges keep their
+//                                         lines and simply shorten.
+//   * every vertex ON the moved face   -> where that leaving edge now crosses
+//                                         the moved surface.
+//   * every edge ON the moved face     -> the moved surface intersected with
+//                                         its one neighbour, trimmed between
+//                                         those vertices.
+//   * everything else                  -> untouched, which is the entire point.
 //
-// SCOPE OF THIS VERSION. The moved face and every face meeting it must be
-// planar, and each of its corners must be an ordinary three-face manifold
-// corner. That covers boxes, brackets, plates and the flat regions of most
-// parts, and it is refused explicitly — with a reason the UI can print —
-// rather than silently producing a mangled body. Curved neighbours are the
-// next step: the arithmetic below becomes GeomAPI_IntSS and the rebuilt faces
-// need pcurves, but the shape of the algorithm does not change.
+// Solving the VERTEX off the leaving edge rather than off three surfaces is
+// what lets the neighbours curve. The three-plane version this started as
+// needed every face at a corner to be a plane; a curve crossing a plane needs
+// nothing of the sort, and it answers the awkward corners for free — the seam
+// vertex where a bore meets a face has only TWO faces at it, not three, so
+// there was never a third plane to solve with.
+//
+// SCOPE OF THIS VERSION. The moved face itself must be PLANAR; its neighbours
+// need not be. Each of its corners must have exactly one edge leaving into the
+// body — an ordinary manifold corner — and each rebuilt edge's new curve has to
+// come out of the kernel as a real intersection. Everything else is refused
+// explicitly, with a reason the UI can print, rather than silently producing a
+// mangled body. A curved MOVED face is the next step and a bigger one: the
+// corner solve becomes curve-against-curved-surface and the moved face itself
+// needs a new trimmed surface, not just a new plane.
 namespace materializr::tweak {
 
 // Why a tweak was refused. Every one of these is a case the caller should be
@@ -46,11 +54,11 @@ namespace materializr::tweak {
 enum class Refusal {
     None,
     FaceNotFound,        // the face isn't part of that body
-    NotPlanar,           // the moved face is curved
-    NeighbourNotPlanar,  // something meeting it is curved — see SCOPE above
-    NonManifoldCorner,   // a corner where more or fewer than three faces meet
+    NotPlanar,           // the moved face is curved — see SCOPE above
+    NonManifoldCorner,   // a corner with no single edge leaving into the body
     NoChange,            // the move slid the face inside its own plane
-    Degenerate,          // the move made two planes parallel: no intersection
+    Degenerate,          // an edge or surface no longer meets the moved face
+    NoIntersection,      // a neighbour's surface doesn't cross the new plane
     OffCurve,            // a retrimmed edge's new end doesn't lie on it
     BuildFailed,         // a face, the sew, or the solid wouldn't build
     Invalid,             // it built and then failed validation
@@ -65,8 +73,7 @@ struct Result {
 };
 
 // Move `face` of `body` by `xf` and rebuild its neighbourhood. `xf` may be any
-// rigid transform that leaves the face planar — an offset along the normal, a
-// tilt, or a combination — which is what the three-plane corner solve needs.
+// rigid transform: the face is planar, so it stays planar under all of them.
 //
 // A slide INSIDE the face's own plane is refused as NoChange, and that is
 // geometry, not a limitation: a planar face has no identity beyond its plane,

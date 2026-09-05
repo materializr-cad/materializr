@@ -2119,7 +2119,7 @@ void MoveFaceController::renderMoveFacePanel(const IopContext& ctx,
             ImGui::SetTooltip("%s", materializr::tr(
                 "Off: the whole body shears, so holes and features inside it lean with the face.\n"
                 "On: only the faces touching this one are rebuilt - everything else stays put.\n"
-                "Flat faces with flat neighbours only, for now."));
+                "The face you tilt has to be flat; what it meets can curve."));
         if (m_st.moveFaceLocal && m_st.moveFaceLocalRefusal &&
             m_st.moveFaceLocalRefusal[0] != '\0') {
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.7f, 0.2f, 1.0f));

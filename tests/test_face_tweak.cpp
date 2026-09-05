@@ -140,46 +140,6 @@ TEST(FaceTweak, TiltRotatesTheFaceAboutItsOwnEdge) {
     EXPECT_NEAR(vol(r.shape), 1000.0 - wedge, 1e-3);
 }
 
-// ── The locality claim, stated as a measurement ─────────────────────────────
-
-TEST(FaceTweak, FeaturesAwayFromTheMovedFaceDoNotFollow) {
-    // A box with a bore up through it. Slide the TOP face sideways: a whole-body
-    // shear would lean the bore with it, which is exactly the behaviour this
-    // engine exists to replace. Here the bore is nowhere near the moved face's
-    // corners, so it must come out of the rebuild untouched.
-    const TopoDS_Shape box = BRepPrimAPI_MakeBox(gp_Pnt(-10, -10, 0), 20.0, 20.0, 10.0).Shape();
-    const TopoDS_Shape drill =
-        BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(0, 0, -1), gp_Dir(0, 0, 1)), 3.0, 12.0).Shape();
-    BRepAlgoAPI_Cut cut(box, drill);
-    cut.Build();
-    ASSERT_TRUE(cut.IsDone());
-    const TopoDS_Shape bored = cut.Shape();
-
-    gp_Trsf slide;
-    slide.SetTranslation(gp_Vec(4, 0, 0));
-    const auto r = tweak::moveFace(bored, faceTowards(bored, gp_Dir(0, 0, 1)), slide);
-
-    // The top face now has a hole in it, so its corners are still three-face
-    // corners but the face carries two wires. Either it rebuilds — and then the
-    // bore must be exactly where it was — or it is refused with a reason.
-    if (!r.ok()) {
-        std::printf("bored box refused: %s\n", tweak::refusalText(r.refusal));
-        SUCCEED() << "refused with a reason, which is the contract";
-        return;
-    }
-    // The bore's axis is unmoved: its cylindrical face still centres on x=0.
-    bool foundBore = false;
-    for (TopExp_Explorer ex(r.shape, TopAbs_FACE); ex.More(); ex.Next()) {
-        BRepAdaptor_Surface s(TopoDS::Face(ex.Current()));
-        if (s.GetType() != GeomAbs_Cylinder) continue;
-        foundBore = true;
-        EXPECT_NEAR(s.Cylinder().Location().X(), 0.0, 1e-6)
-            << "the bore followed the face that moved - that is the shear bug";
-        EXPECT_NEAR(s.Cylinder().Radius(), 3.0, 1e-9);
-    }
-    EXPECT_TRUE(foundBore);
-}
-
 // ── Refusals are explicit, never a mangled body ─────────────────────────────
 
 TEST(FaceTweak, CurvedFaceIsRefusedNotAttempted) {
@@ -198,17 +158,90 @@ TEST(FaceTweak, CurvedFaceIsRefusedNotAttempted) {
     EXPECT_STRNE(tweak::refusalText(r.refusal), "");
 }
 
-TEST(FaceTweak, CurvedNeighbourIsRefused) {
-    // The flat top of a cylinder: planar itself, but the only thing meeting it
-    // is the curved wall, so the corner solve has no third plane.
+TEST(FaceTweak, FlatTopOfACylinderOffsetsAlongItsWall) {
+    // The lid of a cylinder: planar itself, with nothing but the curved wall
+    // meeting it. There is no third plane at any of its corners, which is why
+    // the three-plane version of this engine had to refuse it outright. Solving
+    // the corner off the LEAVING edge instead needs no such thing — the seam
+    // runs up the wall and simply crosses the new plane higher up.
     const TopoDS_Shape cyl = BRepPrimAPI_MakeCylinder(5.0, 10.0).Shape();
-    gp_Trsf t;
-    t.SetTranslation(gp_Vec(0, 0, 2));
-    const auto r = tweak::moveFace(cyl, faceTowards(cyl, gp_Dir(0, 0, 1)), t);
-    EXPECT_FALSE(r.ok());
-    EXPECT_TRUE(r.refusal == tweak::Refusal::NeighbourNotPlanar ||
-                r.refusal == tweak::Refusal::NonManifoldCorner)
-        << "got: " << tweak::refusalText(r.refusal);
+    gp_Trsf up;
+    up.SetTranslation(gp_Vec(0, 0, 3));
+
+    const auto r = tweak::moveFace(cyl, faceTowards(cyl, gp_Dir(0, 0, 1)), up);
+    ASSERT_TRUE(r.ok()) << tweak::refusalText(r.refusal);
+    EXPECT_NEAR(vol(r.shape), M_PI * 25.0 * 13.0, 1e-6);
+    EXPECT_EQ(faceCount(r.shape), 3);
+    EXPECT_TRUE(BRepCheck_Analyzer(r.shape).IsValid());
+
+    double lo, hi;
+    zRange(r.shape, lo, hi);
+    EXPECT_NEAR(lo, 0.0, 1e-9) << "the base is untouched";
+    EXPECT_NEAR(hi, 13.0, 1e-9);
+}
+
+TEST(FaceTweak, TiltingACylinderLidCutsItToAnEllipse) {
+    // Tilt the lid about a diameter through its own centre. The wedge added on
+    // one side is the mirror of the wedge removed on the other, so the volume
+    // is unchanged — and the lid is no longer a circle but the ellipse where
+    // the tilted plane crosses the wall. Nothing about that is expressible with
+    // planes, which makes it the test that says curved neighbours work.
+    const double r = 5.0, h = 10.0;
+    const TopoDS_Shape cyl = BRepPrimAPI_MakeCylinder(r, h).Shape();
+    gp_Trsf tilt;
+    tilt.SetRotation(gp_Ax1(gp_Pnt(0, 0, h), gp_Dir(0, 1, 0)), 10.0 * M_PI / 180.0);
+
+    const auto res = tweak::moveFace(cyl, faceTowards(cyl, gp_Dir(0, 0, 1)), tilt);
+    ASSERT_TRUE(res.ok()) << tweak::refusalText(res.refusal);
+    EXPECT_TRUE(BRepCheck_Analyzer(res.shape).IsValid());
+    EXPECT_NEAR(vol(res.shape), M_PI * r * r * h, 1e-3)
+        << "tilting about a centre diameter trades equal wedges";
+    EXPECT_EQ(faceCount(res.shape), 3);
+
+    // The lid: an ellipse with the same minor axis as the cylinder radius and a
+    // major axis stretched by 1/cos(tilt). Its area is the giveaway.
+    const TopoDS_Face lid = faceTowards(res.shape, gp_Dir(0, 0, 1));
+    GProp_GProps g;
+    BRepGProp::SurfaceProperties(lid, g);
+    EXPECT_NEAR(g.Mass(), M_PI * r * r / std::cos(10.0 * M_PI / 180.0), 1e-3);
+}
+
+TEST(FaceTweak, TheBoreThroughAMovedFaceSurvivesIt) {
+    // A box with a bore up through it, top face raised. Every corner of the
+    // hole in that face is a SEAM vertex where only two faces meet — no third
+    // surface to solve against — and the hole's rim is a circle, not a segment.
+    // This is the case the planar version refused outright, and the one real
+    // parts are full of.
+    const TopoDS_Shape box =
+        BRepPrimAPI_MakeBox(gp_Pnt(-10, -10, 0), 20.0, 20.0, 10.0).Shape();
+    const TopoDS_Shape drill =
+        BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(0, 0, -1), gp_Dir(0, 0, 1)), 3.0, 12.0).Shape();
+    BRepAlgoAPI_Cut cut(box, drill);
+    cut.Build();
+    ASSERT_TRUE(cut.IsDone());
+    const TopoDS_Shape bored = cut.Shape();
+    const double before = vol(bored);
+
+    gp_Trsf up;
+    up.SetTranslation(gp_Vec(0, 0, 5));
+    const auto r = tweak::moveFace(bored, faceTowards(bored, gp_Dir(0, 0, 1)), up);
+    ASSERT_TRUE(r.ok()) << tweak::refusalText(r.refusal);
+    EXPECT_TRUE(BRepCheck_Analyzer(r.shape).IsValid());
+
+    // 5 mm more box, less the 5 mm of bore that went up with it.
+    EXPECT_NEAR(vol(r.shape), before + 5.0 * (400.0 - M_PI * 9.0), 1e-3);
+
+    // And the bore itself is where it always was.
+    bool foundBore = false;
+    for (TopExp_Explorer ex(r.shape, TopAbs_FACE); ex.More(); ex.Next()) {
+        BRepAdaptor_Surface s(TopoDS::Face(ex.Current()));
+        if (s.GetType() != GeomAbs_Cylinder) continue;
+        foundBore = true;
+        EXPECT_NEAR(s.Cylinder().Location().X(), 0.0, 1e-6);
+        EXPECT_NEAR(s.Cylinder().Location().Y(), 0.0, 1e-6);
+        EXPECT_NEAR(s.Cylinder().Radius(), 3.0, 1e-9);
+    }
+    EXPECT_TRUE(foundBore) << "the bore must still be a cylinder of its own";
 }
 
 TEST(FaceTweak, AFaceFromAnotherBodyIsRefused) {
@@ -267,18 +300,28 @@ TEST(FaceTweakOp, AppliesAndUndoes) {
 }
 
 TEST(FaceTweakOp, RefusalIsReportedNotSwallowed) {
+    // The cylinder's curved WALL — the moved face itself has to be planar, and
+    // that is still the real limit. (Its flat top is no longer a refusal: a
+    // curved NEIGHBOUR is fine now.)
     Document doc;
     const TopoDS_Shape cyl = BRepPrimAPI_MakeCylinder(5.0, 10.0).Shape();
     const int id = doc.addBody(cyl, "Cyl");
 
+    TopoDS_Face wall;
+    for (TopExp_Explorer ex(cyl, TopAbs_FACE); ex.More(); ex.Next()) {
+        BRepAdaptor_Surface s(TopoDS::Face(ex.Current()));
+        if (s.GetType() == GeomAbs_Cylinder) { wall = TopoDS::Face(ex.Current()); break; }
+    }
+    ASSERT_FALSE(wall.IsNull());
+
     FaceTweakOp op;
     op.setBody(id);
-    op.setFace(faceTowards(cyl, gp_Dir(0, 0, 1)));   // flat top, curved neighbour
-    gp_Trsf up;
-    up.SetTranslation(gp_Vec(0, 0, 2));
-    op.setTransform(up);
+    op.setFace(wall);
+    gp_Trsf out;
+    out.SetTranslation(gp_Vec(1, 0, 0));
+    op.setTransform(out);
     EXPECT_FALSE(op.execute(doc));
-    EXPECT_NE(op.refusal(), tweak::Refusal::None);
+    EXPECT_EQ(op.refusal(), tweak::Refusal::NotPlanar);
     // The body must be exactly as it was — a refused op leaves no residue.
     EXPECT_NEAR(vol(doc.getBody(id)), M_PI * 25.0 * 10.0, 1e-6);
 }
