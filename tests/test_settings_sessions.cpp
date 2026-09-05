@@ -2,6 +2,7 @@
 // launch" list. These guard the SHRINK case: the writer preserves keys it
 // didn't emit (so another build's settings round-trip instead of vanishing),
 // which for an INDEXED LIST silently resurrects removed entries.
+#include "core/Units.h"
 #include "io/Settings.h"
 
 #include <gtest/gtest.h>
@@ -144,4 +145,36 @@ TEST(SettingsSessions, UnknownKeysStillPreserved) {
     EXPECT_NE(readAll(p).find("someFutureSetting = 42"), std::string::npos)
         << readAll(p);
     fs::remove(p);
+}
+
+// The sketch grid step is stored as a DISPLAY NUMBER, not millimetres. It is
+// chosen from presets labelled 0.1 / 0.5 / 1 / 10, and "1" means one of
+// whatever unit is showing. Stored as millimetres, a session in feet saved
+// sketchGridStep=1 and reloaded it as a 1 mm grid inside a 40 ft view — 12192
+// lines, faded to nothing by the renderer, so the grid vanished entirely.
+TEST(SettingsSessions, GridStepPersistsAsADisplayNumber) {
+    // Millimetre users are unaffected: 1 means 1 mm either way.
+    {
+        materializr::ScopedUnit s(materializr::LengthUnit::Mm);
+        EXPECT_FLOAT_EQ(1.0f, static_cast<float>(materializr::toMm(1.0)));
+        EXPECT_FLOAT_EQ(1.0f, static_cast<float>(materializr::toDisplay(1.0)));
+    }
+    // Under feet, the same stored "1" is one FOOT, which is what the preset
+    // labelled "1" set — not one millimetre.
+    {
+        materializr::ScopedUnit s(materializr::LengthUnit::Ft);
+        const float mm = static_cast<float>(materializr::toMm(1.0));
+        EXPECT_NEAR(304.8f, mm, 1e-3) << "a stored 1 under feet is a foot of grid";
+        // and a 40-unit view over it draws a readable number of lines, not 12192.
+        const float linesAcross = static_cast<float>(materializr::toMm(40.0)) / mm;
+        EXPECT_NEAR(40.0f, linesAcross, 0.5f);
+    }
+    // Round trip: what is saved is what comes back, in every unit.
+    for (auto u : { materializr::LengthUnit::Mm, materializr::LengthUnit::Cm,
+                    materializr::LengthUnit::M,  materializr::LengthUnit::In,
+                    materializr::LengthUnit::Ft }) {
+        materializr::ScopedUnit s(u);
+        const double stored = 0.5;
+        EXPECT_NEAR(stored, materializr::toDisplay(materializr::toMm(stored)), 1e-6);
+    }
 }

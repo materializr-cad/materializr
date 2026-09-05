@@ -1874,7 +1874,14 @@ AppSettings Application::currentSettings() const {
     s.includePrereleases = m_includePrereleases;
     s.supporter = m_supporter;
     s.snapToGrid = m_snapToGrid;
-    s.sketchGridStep = m_sketchGridStep;
+    // Stored as the DISPLAY NUMBER, not millimetres. The step is chosen from
+    // presets labelled 0.1 / 0.5 / 1 / 10, and "1" means one of whatever unit
+    // is showing. Saved as millimetres, picking "1" under feet wrote 304.8 —
+    // or, from before the presets converted, wrote 1 and reloaded as a 1 mm
+    // grid inside a 40 ft view: 12192 lines, which the renderer fades to
+    // nothing, so the grid simply vanished. Millimetre users are unaffected;
+    // 1 means 1 mm either way.
+    s.sketchGridStep = static_cast<float>(materializr::toDisplay(m_sketchGridStep));
     // Mirror the live sketch-tool inference level back into the saved settings
     // so cycling the toolbar Full→Reduced→Off button persists across launches.
     s.inferenceLevel = m_sketchTool
@@ -1965,7 +1972,9 @@ void Application::applyAppSettings(const AppSettings& s) {
     m_includePrereleases = s.includePrereleases;
     m_supporter = s.supporter;
     m_snapToGrid = s.snapToGrid;
-    m_sketchGridStep = s.sketchGridStep;
+    // Display number -> millimetres. Safe here because the display unit is
+    // applied above (applyDisplayUnitChange) before this runs.
+    m_sketchGridStep = static_cast<float>(materializr::toMm(s.sketchGridStep));
     m_showInferenceToolbarToggle = s.showInferenceToolbarToggle;
     m_stlImportAccuracy = s.stlImportAccuracy;
     m_meshShowWireframe = s.meshShowWireframe;
@@ -1983,7 +1992,7 @@ void Application::applyAppSettings(const AppSettings& s) {
     // values right away rather than waiting for the first frame's sync.
     if (m_toolbar) {
         m_toolbar->setSnapToGrid(s.snapToGrid);
-        m_toolbar->setGridStep(s.sketchGridStep);
+        m_toolbar->setGridStep(m_sketchGridStep);   // millimetres, not the stored number
         m_toolbar->setShowInferenceToggle(s.showInferenceToolbarToggle);
     }
 }
