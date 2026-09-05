@@ -59,6 +59,7 @@ add_library(materializr_core STATIC
     ${CMAKE_SOURCE_DIR}/src/modeling/GuidedLoftOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/BoundaryFillOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/PatchOp.cpp
+    ${CMAKE_SOURCE_DIR}/src/modeling/FaceTweak.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/SweepOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/ConstructionPlaneOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/ConstructionAxisOp.cpp
@@ -762,6 +763,11 @@ add_test(NAME test_airfoil_import COMMAND test_airfoil_import)
 add_executable(test_patch test_patch.cpp)
 target_link_libraries(test_patch PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_patch COMMAND test_patch)
+
+# Local face tweak: move a face, rebuild only its neighbourhood.
+add_executable(test_face_tweak test_face_tweak.cpp)
+target_link_libraries(test_face_tweak PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_face_tweak COMMAND test_face_tweak)
 
 # ─── Loader path for a source-built OCCT ─────────────────────────────────────
 # With MZR_OCCT_PREFIX the kernel lives outside the loader's default search
