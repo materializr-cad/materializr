@@ -4496,28 +4496,12 @@ void Application::applyDisplayUnitChange(int unit) {
     // Guarded: settings are applied before the ImGui context exists.
     if (ImGui::GetCurrentContext()) ImGui::ClearActiveID();
 
-    // Carry the grid step's DISPLAYED NUMBER across, not its millimetres.
-    // The step is stored in mm and drives both the snap lattice and the
-    // initial sketch framing (orthoSize = gridStep * 40), so a 1 mm grid
-    // left a ~40 mm working area. Switch that to feet and the whole visible
-    // sketch is 0.13 ft: every number on screen becomes a fraction, and the
-    // snap lattice is 1/300th of a sensible one. Working "in feet" means a
-    // grid of one foot, not a grid of one millimetre relabelled.
-    //
-    // The number is what the user chose (the presets are 0.1 / 0.5 / 1 / 10),
-    // so a step sitting on a preset stays on the same preset in the new unit.
-    // Skipped when the unit is unchanged, so re-applying settings is inert.
-    const auto next = static_cast<materializr::LengthUnit>(unit);
-    if (next != materializr::currentUnit() && m_sketchGridStep > 0.0f) {
-        const double shownStep = materializr::toDisplay(m_sketchGridStep);
-        materializr::setCurrentUnit(next);
-        m_sketchGridStep = static_cast<float>(materializr::toMm(shownStep));
-        if (m_toolbar) m_toolbar->setGridStep(m_sketchGridStep);
-        if (m_sketchTool) m_sketchTool->setGridStep(m_sketchGridStep);
-    } else {
-        materializr::setCurrentUnit(next);
-    }
     m_displayUnit = unit;
+    materializr::setCurrentUnit(static_cast<materializr::LengthUnit>(unit));
+    // NOTE: the sketch grid step is deliberately NOT rescaled here. See
+    // frameSketchView below for what fixes the working-scale complaint, and
+    // why rescaling the step cannot until interaction tolerances stop deriving
+    // from it.
 }
 
 void Application::markDirty() {
@@ -6382,7 +6366,19 @@ void Application::alignCameraToActiveSketch() {
     // alone left off-face or off-origin drawings shoved into a corner; framing
     // the plane origin (the no-source-face case) was worse — the origin sits
     // at a corner of the drawing, so the whole sketch landed in one quadrant.
-    float orthoSize = std::max(20.0f, m_sketchGridStep * 40.0f);
+    // Frame a sensible number of DISPLAY UNITS, not a fixed number of
+    // millimetres. 40 mm is a reasonable first view in millimetres and an
+    // absurd one in feet, where it makes the whole visible sketch 0.13 ft and
+    // every number on screen a fraction. Reported from testing: a line most of
+    // the way across the screen measured 0.24 ft.
+    //
+    // Only the FRAMING is unit-aware. The grid step is deliberately left alone
+    // — SketchTool derives trim, pick, inference, release and hover tolerances
+    // from it (45 uses), so scaling it for feet would take the trim threshold
+    // from 0.5 mm to 152 mm and let a click on empty space cut geometry 15 cm
+    // away. Decoupling those is its own change.
+    const float unitSpan = static_cast<float>(materializr::toMm(40.0));
+    float orthoSize = std::max({20.0f, unitSpan, m_sketchGridStep * 40.0f});
     glm::vec3 lookAt = planeOrigin;
     {
         glm::vec3 bmin( std::numeric_limits<float>::max());
