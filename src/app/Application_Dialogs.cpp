@@ -2621,6 +2621,15 @@ void Application::renderSnapSettingsPopup() {
             if (ImGui::Combo(materializr::tr("Display unit"), &unit, unitNames, 5)) {
                 applyDisplayUnitChange(unit);
                 saveAppSettings();
+                // Close, for the same reason the step presets below do — and
+                // here it is not just convenience. m_snapWidgetHovered is held
+                // true for as long as this popup is open, and that flag gates
+                // the WHOLE sketch input block (onMouseMove, onMouseDown,
+                // onMouseUp alike). Leaving it open froze the rubber-band
+                // preview and swallowed every canvas click, so after picking a
+                // unit mid-sketch the only thing that still responded was the
+                // dimension field — "I can only click and input".
+                ImGui::CloseCurrentPopup();
             }
         }
 
