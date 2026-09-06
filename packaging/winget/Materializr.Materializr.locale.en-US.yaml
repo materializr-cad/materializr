@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.12.0.schema.json
 
 PackageIdentifier: Materializr.Materializr
-PackageVersion: 1.6.0
+PackageVersion: 1.6.4
 PackageLocale: en-US
 Publisher: Materializr
 PublisherUrl: https://github.com/materializr-cad
@@ -33,18 +33,20 @@ Tags:
 - opencascade
 - svg
 ReleaseNotes: |-
-  Materializr 1.5.1
+  Materializr 1.6.4
   Added
-  - Sketch dimension tool (D or toolbar): measure or drive line lengths, circle diameters, arc radii, point/line distances, angles and gaps; reference by default, driving when you type a value
-  - Four new thread profiles: trapezoidal (ACME), square, buttress and rounded, plus a fit clearance for 3D-printed bolt+nut pairs
-  - Polygon tool live radius readout
+  - Repair tools grouped in one place: Patch (fit a surface across picked edges, optionally tangent or curvature-continuous), Sew (join loose surfaces into a solid and report how many edges are still open), Merge Faces, and Remove Feature (formerly "Repair Geometry" — the old name promised a general fixer and only ever deleted a face and healed the gap)
+  - Move Face > Rotate can rebuild only the faces that touch the moved one instead of shearing the whole body, so a bore keeps its axis
+  - Aerofoil import: Selig and Lednicer coordinate files become sketch splines, placed by leading edge, quarter chord or centre
+  - Offset a sketch chain at a fixed distance, including splines
+  - Corner guides in sketching (bisector and smooth tangent at a vertex)
+  - Reference images attach to any construction plane from the plane dialog, with live preview, stepper offset and absolute X/Y/Z rotation
   Fixed
-  - Parts showing through walls on complex assemblies (depth-tie rendering fix)
-  - Multi-body move/rotate/scale now reloads as an editable history step
-  - Fillets drifting after push/pull edits
-  - Threads cut correctly on unioned bodies and through end chamfers; stepped-rod resize confinement; internal rounded threads keep a smooth bore at any length
-  - Section view no longer stalls on threaded bodies; thread re-cuts are cancellable
-  - Malformed BREP files are rejected instantly instead of hanging the importer
-ReleaseNotesUrl: https://github.com/materializr-cad/materializr/releases/tag/v1.5.1
+  - Opening a large project on a modest machine no longer stops answering the desktop: a 52-step project went from 24.4s to 14.6s, with the longest unresponsive stretch down from 24.5s to 1.4s
+  - Orbit and pan could stay dead for the rest of the session after tilting a face and switching projects
+  - Recovered in-progress sketches return to the tab they were drawn in; two running copies no longer overwrite each other's draft
+  - A malformed length in a shared project file could hang the loader and grow without bound; every length-prefixed field is now bounded and over-budget input is refused
+  - A startup failure with no usable OpenGL driver now reports the reason instead of exiting silently (exit 0xE06D7363 on Windows)
+ReleaseNotesUrl: https://github.com/materializr-cad/materializr/releases/tag/v1.6.4
 ManifestType: defaultLocale
 ManifestVersion: 1.12.0
