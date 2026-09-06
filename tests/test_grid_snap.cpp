@@ -329,3 +329,62 @@ TEST(GridSnap, ToleranceStepIsCappedWhileTheLatticeIsNot) {
     EXPECT_FLOAT_EQ(304.8f, t.getGridStep())
         << "the grid must still be a foot even though tolerances are not";
 }
+
+// Closing a loop welds the last click onto the first point, and the ONLY thing
+// that welds is findCoincidentPoint's radius. That radius is a fixed 0.3 mm in
+// MODEL space, so it shrinks on screen as you zoom out: at a metre-scale view
+// it is a fraction of a pixel and no human click can hit it.
+//
+// It stayed hidden because grid snap papered over it — with a stable lattice
+// the closing click lands EXACTLY on the first vertex (distance 0) and welds.
+// Change the lattice underfoot and that stops: switching feet -> mm makes the
+// new lattice incommensurable with where the first vertex sits (it was placed
+// on a 304.8-based lattice, the new one is 1-based), so the closing click
+// snaps somewhere else and 0.3 mm cannot bridge the gap. Reported as "I can't
+// close out a sketch to extrude" after a mid-sketch unit switch.
+//
+// A weld radius is a SCREEN distance, exactly like the pointing tolerance in
+// fa6df14. Asserted here as: a click a few pixels from an existing point must
+// weld, at any zoom.
+TEST(GridSnap, WeldRadiusIsAScreenDistanceNotAFixedModelDistance) {
+    struct Case { const char* name; float mmPerPx; };
+    const Case cases[] = {
+        {"millimetre view",  0.02f},   // 0.3 mm = 15 px: the old radius is fine here
+        {"centimetre view",  0.2f},    // 0.3 mm = 1.5 px
+        {"metre view",       1.5f},    // 0.3 mm = 0.2 px — unhittable
+        {"feet-scale view",  3.0f},    // 0.3 mm = 0.1 px
+    };
+    for (const Case& cs : cases) {
+        Sketch sk;
+        SketchTool t;
+        t.setSketch(&sk);
+        t.setPixelScale(cs.mmPerPx);
+
+        const glm::vec2 first(10.0f, 10.0f);
+        const int firstId = sk.addPoint(first);
+
+        // A click three pixels away — visually on top of the point.
+        const glm::vec2 click = first + glm::vec2(3.0f * cs.mmPerPx, 0.0f);
+        EXPECT_EQ(firstId, t.coincidentPoint(click, -1))
+            << cs.name << ": a click 3 px from a point must weld to it "
+            << "(mmPerPx=" << cs.mmPerPx << ", gap="
+            << (3.0f * cs.mmPerPx) << " mm)";
+    }
+}
+
+// The other half of the contract: the radius must not swallow points that are
+// genuinely far apart on screen, or a zoomed-out click would weld unrelated
+// geometry. Distinct-on-screen stays distinct.
+TEST(GridSnap, WeldRadiusStillRefusesPointsThatAreFarApartOnScreen) {
+    for (float mmPerPx : {0.02f, 0.2f, 1.5f, 3.0f}) {
+        Sketch sk;
+        SketchTool t;
+        t.setSketch(&sk);
+        t.setPixelScale(mmPerPx);
+        sk.addPoint(glm::vec2(10.0f, 10.0f));
+        // 40 px away: clearly a different place to the eye.
+        const glm::vec2 far(10.0f + 40.0f * mmPerPx, 10.0f);
+        EXPECT_EQ(-1, t.coincidentPoint(far, -1))
+            << "mmPerPx=" << mmPerPx << ": 40 px apart must NOT weld";
+    }
+}

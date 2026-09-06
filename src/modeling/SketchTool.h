@@ -300,6 +300,11 @@ public:
     // the lattice started following the zoom, capping THAT would have pinned
     // the pick radius at 10 mm the moment a 1 mm grid coarsened — see tolStep.
     static constexpr float kToleranceStepCapMm = 10.0f;
+    // How many SCREEN PIXELS a click may be from an existing point and still
+    // WELD onto it. Deliberately tighter than the pointing radius below:
+    // welding joins topology (it is what closes a loop into an extrudable
+    // region), so it should ask for a more deliberate aim than a mere pick.
+    static constexpr float kWeldRadiusPx = 6.0f;
     // How many SCREEN PIXELS of slop a pointing gesture gets. Tuned so that at
     // the default millimetre framing this lands on the 0.3-1 mm the tolerances
     // have always used.

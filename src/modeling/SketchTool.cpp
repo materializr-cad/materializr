@@ -2176,7 +2176,21 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
 int SketchTool::findCoincidentPoint(glm::vec2 pos, int excludeId) const {
     if (!m_sketch) return -1;
 
-    const float threshold = 0.3f * snapScale(); // point snap (wider on touch)
+    // A weld radius is a SCREEN distance. As a fixed 0.3 mm it shrank with the
+    // zoom — 15 px in a millimetre view but a fifth of a pixel in a metre one —
+    // and welding is the ONLY thing that closes a loop into an extrudable
+    // region. Grid snap hid that for years: with a stable lattice the closing
+    // click lands EXACTLY on the first vertex, so a radius of nearly zero still
+    // welded. Change the lattice underfoot and it stops — switching feet -> mm
+    // makes the new lattice incommensurable with a vertex placed on the old one
+    // (304.8-based vs 1-based), the closing click snaps elsewhere, and 0.3 mm
+    // cannot bridge the gap: "I can't close out a sketch to extrude."
+    //
+    // Same shape as tolStep()'s screen term, and the 0.3 mm stays as a floor so
+    // a deeply zoomed-in view keeps its old precision (and so the radius is
+    // still sane on the first frame, before the viewport has pushed a scale).
+    const float threshold =
+        std::max(0.3f, kWeldRadiusPx * m_mmPerPixel) * snapScale();
     // Return the NEAREST point within the radius, not the first one found. On
     // dense or small-scale geometry (e.g. an SVG imported small, whose spline
     // control points sit within the weld radius of each other) "first in range"
