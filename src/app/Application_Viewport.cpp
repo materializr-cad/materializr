@@ -1088,6 +1088,13 @@ void Application::renderViewport() {
             // moment the grid stepped up.
             m_sketchTool->setGridStep(m_effectiveGridStepMm);
             m_sketchTool->setToleranceStep(m_sketchGridStep);
+            // The TOGGLE belongs here for the same reason the step does: its
+            // only other writer was the classic-toolbar branch, which modern
+            // and im-touch never run. So in those layouts the badge said
+            // "Snap off" while SketchTool sat on its own default of true and
+            // kept snapping — the setting was honoured on screen and ignored
+            // in the geometry, from launch, with no way to correct it.
+            m_sketchTool->setSnapToGridEnabled(m_snapToGrid);
             // Sketch millimetres per screen pixel, measured by unprojecting two
             // points one pixel apart — exact for any camera and any plane
             // orientation. Pointing tolerances are a screen distance, so they

@@ -7631,12 +7631,10 @@ void Application::run() {
                 action = m_toolbar->render();
                 m_sketchGridStep = m_toolbar->getGridStep();
                 m_snapToGrid = m_toolbar->getSnapToGrid();
-                // Only the snap TOGGLE, not the step: this runs after
-                // renderViewport, so pushing the raw base here undid the
-                // zoom-scaled lattice the grid had just been drawn with and
-                // left the tool disagreeing with the screen for the rest of
-                // the frame. renderViewport owns the step (see 4541).
-                if (m_sketchTool) m_sketchTool->setSnapToGridEnabled(m_snapToGrid);
+                // The toolbar owns neither the step nor the toggle any more —
+                // renderViewport pushes both, for every layout. It still READS
+                // the toolbar's widgets above, which is what makes a classic
+                // user's click take effect.
             }
             if (action != ToolAction::None) {
                 handleToolAction(static_cast<int>(action));
