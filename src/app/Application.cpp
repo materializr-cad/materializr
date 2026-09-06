@@ -175,6 +175,9 @@ namespace materializr { namespace force_link { void linkAll(); } }
 #include <windows.h> // GetModuleFileNameA for exe dir (font path lookup)
 #elif defined(__APPLE__)
 #include <mach-o/dyld.h> // _NSGetExecutablePath for exe dir (no /proc on macOS)
+#elif defined(__FreeBSD__)
+#include <sys/types.h>
+#include <sys/sysctl.h> // sysctl(KERN_PROC_PATHNAME) for exe dir (no /proc by default on FreeBSD)
 #else
 #include <unistd.h>  // readlink for resolving /proc/self/exe → exe dir (font path lookup)
 #endif
@@ -814,6 +817,14 @@ std::string Application::resolveBundledFont(const std::string& fname) const {
     // generously; _NSGetExecutablePath fills it and NUL-terminates on success.
     uint32_t n = sizeof(exePath);
     if (_NSGetExecutablePath(exePath, &n) == 0) {
+        std::string p(exePath);
+        auto slash = p.find_last_of('/');
+        if (slash != std::string::npos) exeDir = p.substr(0, slash);
+    }
+#elif defined(__FreeBSD__)
+    int mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, -1};
+    size_t len = sizeof(exePath);
+    if (sysctl(mib, 4, exePath, &len, nullptr, 0) == 0) {
         std::string p(exePath);
         auto slash = p.find_last_of('/');
         if (slash != std::string::npos) exeDir = p.substr(0, slash);

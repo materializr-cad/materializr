@@ -83,6 +83,37 @@ targets **macOS 14+**; it is built, the bundle is launch-tested,
 and the artifact uploaded on pushes to `main` (`.github/workflows/macos.yml`).
 Not yet wired up: Intel/universal binaries and Developer-ID signing/notarization.
 
+## FreeBSD (desktop, unofficial)
+
+Not part of CI or the release matrix — no official FreeBSD binaries are
+published, just a community build path. Builds clean on FreeBSD 15 with
+system packages:
+
+```sh
+pkg install cmake sdl2 opencascade curl git
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j$(sysctl -n hw.ncpu)
+./build/materializr
+```
+
+`opencascade` pulls in a large dependency tree (Qt5, VTK) via the port's
+default build options; there's no slimmer flavor at time of writing. GLM and
+Dear ImGui are fetched by CMake as usual, same as every other desktop target.
+
+Three portability gaps had to be closed to get a clean build here, all fixed
+in-tree (nothing FreeBSD-specific needed at the command line beyond the
+`pkg install` above):
+- OpenCASCADE detection now also takes the clean `find_package(OpenCASCADE
+  CONFIG REQUIRED)` path on FreeBSD — previously only Windows/macOS did;
+  Linux assumed a Debian `/usr/lib/<multiarch>` layout that doesn't exist here,
+  since the port installs its CMake config under `/usr/local` like Homebrew.
+- `std::thread` needs `Threads::Threads` linked explicitly — implicit via
+  glibc on Linux, not on FreeBSD's libthr.
+- Bundled-font path resolution (`Application::resolveBundledFont`) gained a
+  `sysctl(KERN_PROC_PATHNAME)` branch alongside the Linux `/proc/self/exe`
+  read: FreeBSD doesn't mount `/proc` by default, so the icon font (and every
+  other bundled font) silently failed to resolve without it.
+
 ## Android (arm64-v8a)
 
 Prerequisites: JDK 17, Android SDK + NDK r26.x, cmake, curl on the host.

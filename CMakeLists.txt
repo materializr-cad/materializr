@@ -130,7 +130,7 @@ set(OpenGL_GL_PREFERENCE LEGACY)
 find_package(OpenGL REQUIRED)
 
 # OpenCASCADE
-if(WIN32 OR APPLE)
+if(WIN32 OR APPLE OR CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
     # Windows (vcpkg) and macOS (Homebrew: `brew install opencascade`) both ship a
     # clean OpenCASCADE CMake config that exports the TK* targets and sets
     # OpenCASCADE_INCLUDE_DIR directly — no path patching needed (unlike the Debian
@@ -457,6 +457,11 @@ endif()
 # read). System zlib on Linux; vcpkg ships one on Windows.
 find_package(ZLIB REQUIRED)
 target_link_libraries(materializr PRIVATE ZLIB::ZLIB)
+
+# std::thread backend: implicit on glibc (pthread symbols live in libc since
+# 2.34) but FreeBSD/libthr requires linking it explicitly.
+find_package(Threads REQUIRED)
+target_link_libraries(materializr PRIVATE Threads::Threads)
 
 # ─── Windows specifics ───────────────────────────────────────────────────────
 # Everything here is gated on Windows/MSVC, so the Linux build is unaffected.
