@@ -454,3 +454,107 @@ TEST(GridSnap, WeldRadiusSurvivesTheFirstFrameWithNoPixelScale) {
     EXPECT_EQ(-1, t.coincidentPoint(p + glm::vec2(1.0f, 0.0f), -1))
         << "and must not weld a millimetre away";
 }
+
+// The helper tests above pass whichever finder a call site is wired to, so they
+// cannot see a site wired to the wrong one — proven: reverting commitMirror to
+// the interactive radius left all of them green. These drive the call sites.
+//
+// Geometry: a source vertex, and a decoy 5 mm from where its reflection lands.
+// At 3 mm/px the interactive radius is 6 px = 18 mm, capped to 10 mm, so 5 mm
+// is inside it; the exact radius is 0.3 mm, so 5 mm is outside at every zoom.
+// A zoom-dependent weld therefore shows up as the mirror silently swallowing
+// the decoy when the camera happens to be pulled back.
+TEST(GridSnap, MirrorTopologyDoesNotDependOnTheCamera) {
+    auto pointCountAfterMirror = [](float mmPerPx) {
+        Sketch sk;
+        SketchTool t;
+        t.setSketch(&sk);
+        t.setPixelScale(mmPerPx);
+        sk.addPoint(glm::vec2(-20.0f, 0.0f));   // reflects to +20
+        sk.addPoint(glm::vec2(25.0f, 0.0f));    // decoy, 5 mm from that
+        t.selectAll();
+        if (!t.beginMirror()) return static_cast<size_t>(0);
+        t.setMirrorAnchor(glm::vec2(0.0f, 0.0f));
+        t.setMirrorAngle(static_cast<float>(M_PI) * 0.5f);   // vertical line
+        std::set<int> pts, lines;
+        t.commitMirror(pts, lines);
+        return sk.getPoints().size();
+    };
+
+    const size_t fine   = pointCountAfterMirror(0.02f);
+    const size_t coarse = pointCountAfterMirror(3.0f);
+    ASSERT_EQ(4u, fine) << "setup: mirroring two points must add two more";
+    EXPECT_EQ(fine, coarse)
+        << "mirroring the same sketch gave " << fine << " points zoomed in and "
+        << coarse << " zoomed out — the camera changed the model";
+}
+
+// Same contract for offset, the other generated-geometry caller. An offset
+// chain committed at two zooms must produce the same number of points.
+TEST(GridSnap, OffsetTopologyDoesNotDependOnTheCamera) {
+    auto pointCountAfterOffset = [](float mmPerPx) -> size_t {
+        Sketch sk;
+        SketchTool t;
+        t.setSketch(&sk);
+        t.setPixelScale(mmPerPx);
+        const int a = sk.addPoint(glm::vec2(0.0f, 0.0f));
+        const int b = sk.addPoint(glm::vec2(60.0f, 0.0f));
+        sk.addLine(a, b);
+        // A decoy 5 mm from where the offset endpoint will land (y = -8).
+        sk.addPoint(glm::vec2(0.0f, -3.0f));
+
+        t.setMode(SketchToolMode::Offset);
+        t.onMouseMove(glm::vec2(30.0f, 0.0f));         // hover the chain
+        t.onMouseDown(glm::vec2(30.0f, 0.0f), false);  // Pick -> Distance
+        if (!t.hasOffsetChain()) return 0;             // setup guard
+        t.setOffsetDistance(-8.0f);                    // 8 mm to the -y side
+        if (!t.offsetReady()) return 0;                // setup guard
+        std::set<int> outPts, outEls;
+        t.commitOffset(outPts, outEls);
+        return sk.getPoints().size();
+    };
+
+    const size_t fine   = pointCountAfterOffset(0.02f);
+    const size_t coarse = pointCountAfterOffset(3.0f);
+    ASSERT_GT(fine, 3u) << "setup: the offset must have produced geometry";
+    EXPECT_EQ(fine, coarse)
+        << "offsetting the same chain gave " << fine << " points zoomed in and "
+        << coarse << " zoomed out — the camera changed the model";
+}
+
+// The third generated-geometry site. In TwoPoint mode the circle's centre is
+// the DERIVED midpoint of two clicks — the user aimed at the rim, not at it.
+// Welding it to a neighbour moves the centre while `radius` stays measured from
+// the original midpoint, so the rim stops passing through the clicks. Centre
+// mode is deliberately different: there the centre IS the click, so the
+// interactive radius is correct and this test does not constrain it.
+TEST(GridSnap, TwoPointCircleCentreIsNotPulledAboutByTheCamera) {
+    auto centreOf = [](float mmPerPx) {
+        Sketch sk;
+        SketchTool t;
+        t.setSketch(&sk);
+        t.setPixelScale(mmPerPx);
+        t.setSnapToGridEnabled(false);          // isolate the weld from snapping
+        t.setMode(SketchToolMode::Circle);
+        t.setCircleMode(SketchTool::CircleMode::TwoPoint);
+
+        // Diameter ends at x = 0 and x = 40, so the derived centre is (20, 0).
+        // Decoy 5 mm away: inside the interactive radius at 3 mm/px, far
+        // outside the 0.3 mm exact radius at any zoom.
+        sk.addPoint(glm::vec2(25.0f, 0.0f));
+        t.onMouseDown(glm::vec2(0.0f, 0.0f), false);
+        t.onMouseDown(glm::vec2(40.0f, 0.0f), false);
+
+        const auto& circles = sk.getCircles();
+        if (circles.empty()) return glm::vec2(-999.0f, -999.0f);
+        const materializr::SketchPoint* c = sk.getPoint(circles.front().centerPointId);
+        return c ? c->pos : glm::vec2(-999.0f, -999.0f);
+    };
+
+    const glm::vec2 fine   = centreOf(0.02f);
+    const glm::vec2 coarse = centreOf(3.0f);
+    ASSERT_NEAR(20.0f, fine.x, 1e-3f) << "setup: the derived centre is the midpoint";
+    EXPECT_NEAR(fine.x, coarse.x, 1e-3f)
+        << "the derived centre moved from " << fine.x << " to " << coarse.x
+        << " purely because the camera pulled back";
+}
