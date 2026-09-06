@@ -2549,7 +2549,7 @@ void Application::renderSnapWidget() {
     bool rightClicked = hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right);
     if (hovered) {
         ImGui::BeginTooltip();
-        ImGui::TextUnformatted(materializr::trFormat("Snap step: %s   |   %s", materializr::fmtLength(m_sketchGridStep), m_snapToGrid ? "Snap ON" : "Snap off").c_str());
+        ImGui::TextUnformatted(materializr::trFormat("Snap step: %s   |   %s", materializr::fmtLength(m_effectiveGridStepMm), m_snapToGrid ? "Snap ON" : "Snap off").c_str());
         ImGui::TextDisabled("%s", materializr::tr("Click: open snap settings"));
         ImGui::TextDisabled("%s", materializr::tr("Right-click: toggle snap"));
         ImGui::EndTooltip();
@@ -2580,8 +2580,11 @@ void Application::renderSnapWidget() {
     // and print a literal, so choosing "1" under centimetres stored 10 mm and
     // the badge then read "10" — the widget contradicting the popup that had
     // just set it. %.3g so a converted step stays short enough for the square.
+    // The EFFECTIVE step, which is what the cursor snaps to at this zoom —
+    // not the base preset. A badge naming a step the cursor ignores is the
+    // same contradiction the display-unit conversion already fixed here once.
     char buf[16];
-    std::snprintf(buf, sizeof(buf), "%.3g", materializr::toDisplay(m_sketchGridStep));
+    std::snprintf(buf, sizeof(buf), "%.3g", materializr::toDisplay(m_effectiveGridStepMm));
     ImGui::PushFont(nullptr);
     ImVec2 ts = ImGui::CalcTextSize(buf);
     ImVec2 tp(widgetPos.x + (size - ts.x) * 0.5f,
@@ -4062,8 +4065,8 @@ void Application::renderTextToolPanel() {
         if (materializr::lengthSlider(materializr::trFormat("Height (%s)", materializr::unitSuffix()).c_str(), &h, 1.0f, 50.0f)) {
             // Snap the height to the sketch grid increment when snap-to-grid is
             // on, so text sizes land on the same lattice as everything else.
-            if (m_snapToGrid && m_sketchGridStep > 0.0f)
-                h = std::round(h / m_sketchGridStep) * m_sketchGridStep;
+            if (m_snapToGrid && m_effectiveGridStepMm > 0.0f)
+                h = std::round(h / m_effectiveGridStepMm) * m_effectiveGridStepMm;
             if (h < 1.0f) h = 1.0f; // keep within the slider's lower bound
             m_sketchTool->setTextHeight(h);
         }

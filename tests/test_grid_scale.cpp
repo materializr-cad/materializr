@@ -1,103 +1,109 @@
-// The sketch grid draws a lattice that may be coarser than the snap step.
-// The invariant under test: it is NEVER finer, and it is always a whole-decade
-// multiple, so every line drawn is a place the cursor can actually land.
+// The sketch grid scales the user's BASE step by whole decades so the cell
+// stays legible at the current zoom, and the same number drives both the drawn
+// lines and the snap lattice. Two invariants carry the whole design:
+//
+//   1. the step is base x 10^n for an integer n, so every drawn line is a
+//      snap point and the lattice reads as a 1/10/100 of the unit; and
+//   2. the resulting cell is at least kGridMinPx and under ten times that, at
+//      every zoom and every unit.
 #include "viewport/GridScale.h"
 
 #include <gtest/gtest.h>
 #include <cmath>
 #include <limits>
 
-using materializr::gridDrawStep;
+using materializr::gridStepForZoom;
 
 namespace {
 constexpr float kMinPx = 8.0f;
-// A drawn step is only legitimate if it is step x 10^n for a whole n >= 0.
-bool isDecadeMultiple(float drawn, float step) {
-    if (drawn < step * 0.999f) return false;
-    const double n = std::log10(static_cast<double>(drawn) / step);
+
+// Legitimate only if step is base x 10^n for a whole n — positive, zero or
+// negative. Checked in log space because the ratio spans 40 decades.
+bool isDecadeMultiple(float step, float base) {
+    const double n = std::log10(static_cast<double>(step) / base);
     return std::abs(n - std::round(n)) < 1e-4;
 }
 } // namespace
 
-// The reported symptom: switch feet -> mm and the grid vanishes. The step
-// became 1 mm while the camera still framed roughly 40 ft, so a cell was a
-// fraction of a pixel.
-TEST(GridScale, ZoomedOutMillimetreGridCoarsensUntilVisible) {
-    const float mmPerPx = 15.0f;                  // ~12 m across an 800 px view
-    const float drawn = gridDrawStep(1.0f, mmPerPx, kMinPx);
-    EXPECT_GE(drawn / mmPerPx, kMinPx) << "a cell must be at least kGridMinPx wide";
-    EXPECT_TRUE(isDecadeMultiple(drawn, 1.0f)) << "drawn = " << drawn;
+// The reported symptom in each direction. Same base, same function, opposite
+// ends: mm zoomed out gave a lattice too fine to see, feet zoomed in gave one
+// cell wider than the viewport.
+TEST(GridScale, RescuesBothAnInvisibleAndAnAbsentGrid) {
+    // 1 mm base in a view ~12 m across: was 12192 lines, greyed to nothing.
+    const float coarsened = gridStepForZoom(1.0f, 15.0f, kMinPx);
+    EXPECT_GT(coarsened, 1.0f) << "must step UP to be visible";
+    EXPECT_GE(coarsened / 15.0f, kMinPx);
+
+    // 1 ft base in a view ~100 mm across: was one cell every 3200 px.
+    const float refined = gridStepForZoom(304.8f, 0.095238f, kMinPx);
+    EXPECT_LT(refined, 304.8f) << "must step DOWN to be present at all";
+    EXPECT_GE(refined / 0.095238f, kMinPx);
+    EXPECT_TRUE(isDecadeMultiple(refined, 304.8f)) << "refined = " << refined;
 }
 
-// The rule that makes coarsening safe. Swept across four decades of zoom and
-// a range of steps rather than checked at the one value that motivated it.
-TEST(GridScale, NeverFinerThanTheSnapStepAndAlwaysADecadeMultiple) {
-    for (float step : {0.1f, 0.5f, 1.0f, 10.0f, 25.4f, 304.8f}) {
-        for (float mmPerPx = 0.001f; mmPerPx < 100.0f; mmPerPx *= 1.7f) {
-            const float drawn = gridDrawStep(step, mmPerPx, kMinPx);
-            EXPECT_GE(drawn, step * 0.999f)
-                << "finer than the snap step: step=" << step << " mmPerPx=" << mmPerPx;
-            EXPECT_TRUE(isDecadeMultiple(drawn, step))
-                << "not a decade multiple: step=" << step
-                << " mmPerPx=" << mmPerPx << " drawn=" << drawn;
+// The two invariants, swept rather than sampled: six bases across four orders
+// of magnitude, against zooms spanning six.
+TEST(GridScale, CellStaysLegibleAndTheStepStaysADecadeMultiple) {
+    for (float base : {0.1f, 0.5f, 1.0f, 10.0f, 25.4f, 304.8f}) {
+        for (float mmPerPx = 0.0001f; mmPerPx < 1000.0f; mmPerPx *= 1.7f) {
+            const float step = gridStepForZoom(base, mmPerPx, kMinPx);
+            const float cellPx = step / mmPerPx;
+            EXPECT_GE(cellPx, kMinPx * 0.999f)
+                << "cell too small: base=" << base << " mmPerPx=" << mmPerPx;
+            EXPECT_LT(cellPx, kMinPx * 10.0f * 1.001f)
+                << "cell too large: base=" << base << " mmPerPx=" << mmPerPx
+                << " step=" << step;
+            EXPECT_TRUE(isDecadeMultiple(step, base))
+                << "not a decade multiple: base=" << base
+                << " mmPerPx=" << mmPerPx << " step=" << step;
         }
     }
 }
 
-// Zooming IN must not subdivide. At that zoom the lattice really is that
-// coarse, and inventing intermediate lines would invent snap points.
-TEST(GridScale, ZoomedInLeavesTheStepAlone) {
-    EXPECT_FLOAT_EQ(1.0f, gridDrawStep(1.0f, 0.01f, kMinPx));
-    EXPECT_FLOAT_EQ(304.8f, gridDrawStep(304.8f, 0.5f, kMinPx));
-    // Exactly at the threshold is already legible — no step-up.
-    EXPECT_FLOAT_EQ(8.0f, gridDrawStep(8.0f, 1.0f, kMinPx));
+// A base already sized for the zoom is left exactly alone — no drift, and no
+// cosmetic rescaling of a step the user deliberately chose.
+TEST(GridScale, LeavesAWellSizedBaseUntouched) {
+    // cell = 1.0 / 0.05 = 20 px, inside [8, 80).
+    EXPECT_FLOAT_EQ(1.0f, gridStepForZoom(1.0f, 0.05f, kMinPx));
+    // Exactly at the threshold counts as legible: cell = 8 px.
+    EXPECT_FLOAT_EQ(8.0f, gridStepForZoom(8.0f, 1.0f, kMinPx));
 }
 
-// A one-decade step-up is enough whenever the shortfall is under 10x, and it
-// does not overshoot to two. This is what pins ceil() as the right rounding:
-// floor() would return a still-invisible lattice.
-TEST(GridScale, StepsUpByTheSmallestSufficientDecade) {
-    // 1 mm step, cell wants 8 * 0.5 = 4 mm -> one decade (10 mm), not two.
-    EXPECT_FLOAT_EQ(10.0f, gridDrawStep(1.0f, 0.5f, kMinPx));
-    // Wants 80 mm -> two decades (100 mm).
-    EXPECT_FLOAT_EQ(100.0f, gridDrawStep(1.0f, 10.0f, kMinPx));
+// ceil, not round. A cell 3x under the floor is the illegible case the whole
+// function exists to prevent, and round() would happily return it.
+TEST(GridScale, PicksTheSmallestDecadeThatClearsTheFloor) {
+    // wants 4 mm; one decade up is 10 (cell 20 px), zero decades is 1 (5 px).
+    EXPECT_FLOAT_EQ(10.0f, gridStepForZoom(1.0f, 0.5f, kMinPx));
+    // wants 80 mm -> two decades, not one (10 mm would be 1 px).
+    EXPECT_FLOAT_EQ(100.0f, gridStepForZoom(1.0f, 10.0f, kMinPx));
+    // Stepping DOWN obeys the same rule: 0.1 would be 10x smaller than needed.
+    EXPECT_FLOAT_EQ(1.0f, gridStepForZoom(1000.0f, 0.05f, kMinPx));
 }
 
 // Garbage in is handed straight back rather than coerced into a lattice that
-// looks plausible. NaN matters: it reaches a float-to-int conversion downstream.
+// looks plausible. The step both divides (renderer) and modulos (snapping), so
+// a zero or NaN is not a cosmetic problem.
 TEST(GridScale, RejectsNonFiniteAndNonPositiveInputs) {
     const float nan = std::nanf("");
     const float inf = std::numeric_limits<float>::infinity();
-    EXPECT_FLOAT_EQ(1.0f, gridDrawStep(1.0f, nan, kMinPx));
-    EXPECT_FLOAT_EQ(1.0f, gridDrawStep(1.0f, inf, kMinPx));
-    EXPECT_FLOAT_EQ(1.0f, gridDrawStep(1.0f, 0.0f, kMinPx));
-    EXPECT_FLOAT_EQ(1.0f, gridDrawStep(1.0f, -3.0f, kMinPx));
-    EXPECT_FLOAT_EQ(1.0f, gridDrawStep(1.0f, 15.0f, 0.0f));
-    EXPECT_TRUE(std::isnan(gridDrawStep(nan, 15.0f, kMinPx)));
-    EXPECT_FLOAT_EQ(0.0f, gridDrawStep(0.0f, 15.0f, kMinPx));
+    EXPECT_FLOAT_EQ(1.0f, gridStepForZoom(1.0f, nan, kMinPx));
+    EXPECT_FLOAT_EQ(1.0f, gridStepForZoom(1.0f, inf, kMinPx));
+    EXPECT_FLOAT_EQ(1.0f, gridStepForZoom(1.0f, 0.0f, kMinPx));
+    EXPECT_FLOAT_EQ(1.0f, gridStepForZoom(1.0f, -3.0f, kMinPx));
+    EXPECT_FLOAT_EQ(1.0f, gridStepForZoom(1.0f, 15.0f, 0.0f));
+    EXPECT_TRUE(std::isnan(gridStepForZoom(nan, 15.0f, kMinPx)));
+    EXPECT_FLOAT_EQ(0.0f, gridStepForZoom(0.0f, 15.0f, kMinPx));
 }
 
-// An absurd zoom-out must not overflow the float or hand the shader a scale
-// of zero — the renderer DIVIDES by the step. Three separate overflow points,
-// each reached by a different input, because guarding only the arguments
-// leaves the two intermediate products unguarded.
-TEST(GridScale, ExtremeZoomStaysFiniteAndPositive) {
-    // 1. Ordinary huge zoom: the arithmetic all stays in range.
-    for (float mmPerPx : {1.0e6f, 1.0e18f, 1.0e30f, 1.0e37f}) {
-        const float drawn = gridDrawStep(0.1f, mmPerPx, kMinPx);
-        EXPECT_TRUE(std::isfinite(drawn)) << "mmPerPx=" << mmPerPx;
-        EXPECT_GT(drawn, 0.0f) << "mmPerPx=" << mmPerPx;
-        EXPECT_TRUE(isDecadeMultiple(drawn, 0.1f)) << "mmPerPx=" << mmPerPx;
+// Extreme zooms must stay finite and positive at both ends — the step is
+// divided by AND modulo'd by, so neither an infinity nor a zero may escape.
+TEST(GridScale, ExtremeZoomsStayFiniteAndPositive) {
+    for (float mmPerPx : {1.0e-30f, 1.0e-10f, 1.0e10f, 1.0e30f, 1.0e37f}) {
+        const float step = gridStepForZoom(1.0f, mmPerPx, kMinPx);
+        EXPECT_TRUE(std::isfinite(step)) << "mmPerPx=" << mmPerPx;
+        EXPECT_GT(step, 0.0f) << "mmPerPx=" << mmPerPx;
     }
-    // 2. A step so tiny it needs forty decades. minPx * mmPerPx and the ratio
-    //    both leave float range here; the computation is done in double so
-    //    they do not overflow, and the answer is an ordinary decade multiple.
-    const float tiny = gridDrawStep(1.0e-30f, 1.0e9f, kMinPx);
-    EXPECT_TRUE(std::isfinite(tiny));
-    EXPECT_TRUE(isDecadeMultiple(tiny, 1.0e-30f)) << "tiny = " << tiny;
-    EXPECT_GE(tiny / 1.0e9f, kMinPx);
-    // 3. The one case that genuinely cannot be served: the visible lattice
-    //    would not fit in a float. The renderer divides by the step, so an
-    //    infinite one is refused and the snap lattice is drawn unchanged.
-    EXPECT_FLOAT_EQ(1.0f, gridDrawStep(1.0f, 1.0e38f, kMinPx));
+    // The one case that cannot be served: the legible step would not fit in a
+    // float, so the base is returned rather than an infinity.
+    EXPECT_FLOAT_EQ(1.0f, gridStepForZoom(1.0f, 1.0e38f, kMinPx));
 }

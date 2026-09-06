@@ -595,19 +595,21 @@ void Application::renderViewport() {
             // depthBias: + draws the grid ON the coplanar sketch face; - lets a
             // coplanar body face (e.g. a body sitting on the XZ ground) occlude
             // the ground grid instead of it bleeding through.
-            // The DRAWN lattice may be coarser than the snap step, never
-            // finer — see GridScale.h for why decades-only keeps every drawn
-            // line on a snap point. Without this, switching feet -> mm leaves a
-            // 1 mm grid in a view framing 40 ft and the grid reads as gone.
-            float gridDrawStepMm = std::max(m_sketchGridStep, 0.01f);
+            // The step the user picked is a BASE; what the sketch actually
+            // uses is that base scaled by whole decades to suit this zoom (see
+            // GridScale.h). Computed HERE, before anything reads it, and stored
+            // so the snap lattice and the badge take the same number — a grid
+            // you can see but not land on, or a badge naming a step the cursor
+            // ignores, are both worse than either problem alone.
+            m_effectiveGridStepMm = std::max(m_sketchGridStep, 0.01f);
             if (sketching) {
                 const glm::vec2 g0 = screenToSketch(0.0f, 0.0f, contentSize.x, contentSize.y);
                 const glm::vec2 g1 = screenToSketch(1.0f, 0.0f, contentSize.x, contentSize.y);
-                gridDrawStepMm = gridDrawStep(gridDrawStepMm,
-                                              glm::length(g1 - g0), kGridMinPx);
+                m_effectiveGridStepMm = gridStepForZoom(
+                    m_effectiveGridStepMm, glm::length(g1 - g0), kGridMinPx);
             }
             m_grid->render(view, proj, fadeCenter, gridFade,
-                           gp, gridDrawStepMm,
+                           gp, m_effectiveGridStepMm,
                            minorAlpha, worldGridAlpha /*globalAlpha*/,
                            sketching ? 1.0f : 0.0f /*sketchGrid: uniform single tier*/,
                            sketching ? 0.0005f : -0.0005f /*depthBias*/,
@@ -1058,7 +1060,9 @@ void Application::renderViewport() {
             // grid itself is the infinite world grid above (now aligned to the
             // sketch plane), so face sketches no longer need a separate per-face
             // grid — drawing across to neighbouring faces just works.
-            m_sketchTool->setGridStep(m_sketchGridStep);
+            // The EFFECTIVE step, not the base: the cursor must land on the
+            // lines actually drawn (computed above, same frame).
+            m_sketchTool->setGridStep(m_effectiveGridStepMm);
             // Sketch millimetres per screen pixel, measured by unprojecting two
             // points one pixel apart — exact for any camera and any plane
             // orientation. Pointing tolerances are a screen distance, so they

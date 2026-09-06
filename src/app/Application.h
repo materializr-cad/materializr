@@ -881,8 +881,15 @@ private:
     // the Dimension tool's click routing must not treat it as a fresh pick.
     bool m_dimPopupSwallowClick = false;
 
-    // Sketch grid step in mm (drives both the visual face grid and snap-to-line)
+    // Sketch grid step in mm. This is the BASE the user chose (a display
+    // number: "1" means one of whatever unit is showing). It is what persists.
     float m_sketchGridStep = 1.0f;
+    // The base scaled by whole decades to suit the CURRENT zoom, recomputed
+    // every sketch frame — see viewport/GridScale.h. This, not the base, is
+    // what the grid draws, what the cursor snaps to and what the badge reads,
+    // so those three can never disagree. Equal to the base outside sketch mode
+    // and whenever the base already suits the zoom.
+    float m_effectiveGridStepMm = 1.0f;
     // World-aligned anchor used as the sketch grid origin and the camera
     // target. Computed at sketch entry from the face centre snapped to the
     // nearest grid intersection projected onto the sketch plane. Preserved
