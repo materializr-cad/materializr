@@ -897,6 +897,12 @@ private:
     //   which is what the user actually chose;
     //   world-space gizmo/plane snapping outside sketch mode -> the base (the
     //   world grid is not zoom-scaled; the two are equal there anyway).
+    //
+    // renderViewport is the SINGLE WRITER of SketchTool's snap step, since only
+    // it knows the zoom. Anywhere else that changes the base (the toolbar, a
+    // unit switch) updates the base and lets the next frame follow; calling
+    // SketchTool::setGridStep from those sites clobbers the scaled lattice and
+    // leaves the cursor snapping somewhere the grid is not drawn.
     float m_effectiveGridStepMm = 1.0f;
     // World-aligned anchor used as the sketch grid origin and the camera
     // target. Computed at sketch entry from the face centre snapped to the

@@ -4539,7 +4539,11 @@ void Application::applyDisplayUnitChange(int unit) {
         materializr::setCurrentUnit(next);
         m_sketchGridStep = static_cast<float>(materializr::toMm(shownStep));
         if (m_toolbar)    m_toolbar->setGridStep(m_sketchGridStep);
-        if (m_sketchTool) m_sketchTool->setGridStep(m_sketchGridStep);
+        // NOT m_sketchTool->setGridStep here. renderViewport is the single
+        // writer of the tool's snap lattice, because that lattice is the BASE
+        // SCALED BY ZOOM and only the viewport knows the zoom. Pushing the raw
+        // base from here would leave the cursor snapping to a lattice the grid
+        // is not drawing until the next frame corrected it.
     } else {
         materializr::setCurrentUnit(next);
     }
@@ -7627,10 +7631,12 @@ void Application::run() {
                 action = m_toolbar->render();
                 m_sketchGridStep = m_toolbar->getGridStep();
                 m_snapToGrid = m_toolbar->getSnapToGrid();
-                if (m_sketchTool) {
-                    m_sketchTool->setGridStep(m_sketchGridStep);
-                    m_sketchTool->setSnapToGridEnabled(m_snapToGrid);
-                }
+                // Only the snap TOGGLE, not the step: this runs after
+                // renderViewport, so pushing the raw base here undid the
+                // zoom-scaled lattice the grid had just been drawn with and
+                // left the tool disagreeing with the screen for the rest of
+                // the frame. renderViewport owns the step (see 4541).
+                if (m_sketchTool) m_sketchTool->setSnapToGridEnabled(m_snapToGrid);
             }
             if (action != ToolAction::None) {
                 handleToolAction(static_cast<int>(action));
