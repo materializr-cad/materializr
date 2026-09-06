@@ -113,6 +113,10 @@ public:
     int coincidentPoint(glm::vec2 pos, int excludeId = -1) const {
         return findCoincidentPoint(pos, excludeId);
     }
+    // The generated-geometry counterpart (fixed model radius, zoom-independent).
+    int exactCoincidentPoint(glm::vec2 pos, int excludeId = -1) const {
+        return findExactCoincidentPoint(pos, excludeId);
+    }
     // Select every element in the active sketch (used by Ctrl+A / double-click).
     void selectAll();
     // Replace the current selection with the given ids.
@@ -305,6 +309,13 @@ public:
     // welding joins topology (it is what closes a loop into an extrudable
     // region), so it should ask for a more deliberate aim than a mere pick.
     static constexpr float kWeldRadiusPx = 6.0f;
+    // Ceiling on the screen-derived weld radius, in millimetres. Six pixels is
+    // an aim radius; at 3 mm/px it is an 18 mm topological merge and it grows
+    // without bound as the view pulls back. Nearest-wins picks the best of
+    // several candidates, it does not stop two deliberately distinct vertices
+    // merging. At the zooms sketching actually happens (under ~1.7 mm/px) this
+    // never engages; it is a rail against the absurd end.
+    static constexpr float kWeldRadiusCapMm = 10.0f;
     // How many SCREEN PIXELS of slop a pointing gesture gets. Tuned so that at
     // the default millimetre framing this lands on the 0.3-1 mm the tolerances
     // have always used.
@@ -560,8 +571,20 @@ private:
     // Snap to grid/points
     glm::vec2 snap(glm::vec2 pos) const;
 
-    // Find an existing point near the given position (returns -1 if none)
+    // Find an existing point near the given position (returns -1 if none).
+    // INTERACTIVE: the radius is a screen distance, because this answers "did
+    // the user aim at that point". Only for positions the user actually
+    // clicked. Generated geometry must use findExactCoincidentPoint.
     int findCoincidentPoint(glm::vec2 pos, int excludeId = -1) const;
+
+    // Coincidence for GENERATED geometry — a mirrored vertex, an offset
+    // endpoint, a derived circle centre. Fixed model-space radius, so the same
+    // operation on the same sketch produces the same topology no matter where
+    // the camera is. A screen radius here would make the model a function of
+    // the view: mirroring while zoomed out would weld vertices that mirroring
+    // while zoomed in leaves separate. Same reasoning the arc circumcentre
+    // already documents (see handleArcTool).
+    int findExactCoincidentPoint(glm::vec2 pos, int excludeId = -1) const;
 
     void handleLineTool(glm::vec2 pos);
     // exact = the position came from a typed value; skip the grid rounding.

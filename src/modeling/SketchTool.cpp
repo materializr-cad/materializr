@@ -2173,6 +2173,23 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     return result;
 }
 
+// Generated geometry: fixed model-space radius, never the camera. See the
+// declaration for why. 0.3 mm is the radius every caller here used before the
+// interactive one became screen-aware, so this preserves their behaviour
+// exactly rather than inventing a new number.
+int SketchTool::findExactCoincidentPoint(glm::vec2 pos, int excludeId) const {
+    if (!m_sketch) return -1;
+    int best = -1;
+    float bestD = 0.3f;
+    for (const auto& pt : m_sketch->getPoints()) {
+        if (pt.id == excludeId) continue;
+        if (pt.fromText) continue;
+        const float d = glm::length(pos - pt.pos);
+        if (d < bestD) { bestD = d; best = pt.id; }
+    }
+    return best;
+}
+
 int SketchTool::findCoincidentPoint(glm::vec2 pos, int excludeId) const {
     if (!m_sketch) return -1;
 
@@ -2190,7 +2207,8 @@ int SketchTool::findCoincidentPoint(glm::vec2 pos, int excludeId) const {
     // a deeply zoomed-in view keeps its old precision (and so the radius is
     // still sane on the first frame, before the viewport has pushed a scale).
     const float threshold =
-        std::max(0.3f, kWeldRadiusPx * m_mmPerPixel) * snapScale();
+        std::max(0.3f, std::min(kWeldRadiusPx * m_mmPerPixel,
+                                kWeldRadiusCapMm)) * snapScale();
     // Return the NEAREST point within the radius, not the first one found. On
     // dense or small-scale geometry (e.g. an SVG imported small, whose spline
     // control points sit within the weld radius of each other) "first in range"
@@ -2450,7 +2468,17 @@ void SketchTool::handleCircleTool(glm::vec2 pos, bool exact) {
         if (radius > 1e-6f) {
             // Reuse the existing point at this position if there is one
             // (this is how concentric circles share a center).
-            int existing = findCoincidentPoint(center, -1);
+            //
+            // Centre mode: the centre IS the user's first click, so the
+            // interactive aim radius is right. TwoPoint mode: the centre is
+            // the DERIVED midpoint of two clicks — nothing was aimed at it, and
+            // welding it to a neighbour up to 6 px away would move the centre
+            // while `radius` stays measured from the original midpoint, so the
+            // rim would no longer pass through the clicks. Same rule the arc
+            // circumcentre documents below.
+            int existing = (m_circleMode == CircleMode::TwoPoint)
+                             ? findExactCoincidentPoint(center, -1)
+                             : findCoincidentPoint(center, -1);
             int centerId = (existing >= 0) ? existing : m_sketch->addPoint(center);
             m_sketch->addCircle(centerId, static_cast<double>(radius));
         }
@@ -3757,7 +3785,9 @@ void SketchTool::commitMirror(std::set<int>& outPoints, std::set<int>& outLines)
         glm::vec2 np = mirrorReflect(p->pos);
         // Weld a reflected vertex onto an existing coincident one (a point on
         // the mirror line maps to itself) — same as the one-shot mirror did.
-        int existing = findCoincidentPoint(np, -1);
+        // EXACT, not the interactive radius: a reflected vertex is generated,
+        // so which existing point it welds to must not depend on the zoom.
+        int existing = findExactCoincidentPoint(np, -1);
         int nid = (existing >= 0) ? existing : m_sketch->addPoint(np);
         remap[oldId] = nid;
         return nid;
@@ -3864,7 +3894,9 @@ void SketchTool::commitOffset(std::set<int>& outPoints, std::set<int>& outElemen
     m_offsetCommitRequested = false;
     if (!m_sketch || !m_offsetResult.valid) return;
     applyOffset(*m_sketch, m_offsetResult,
-                [this](glm::vec2 p) { return findCoincidentPoint(p, -1); },
+                // EXACT: offset endpoints are generated, so committing the
+                // same preview must give the same connectivity at any zoom.
+                [this](glm::vec2 p) { return findExactCoincidentPoint(p, -1); },
                 outPoints, outElements);
     // Back to Pick, tool still active: offsetting several chains in a row is
     // the normal way to use this (Trim likewise stays active after a click).

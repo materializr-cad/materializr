@@ -43,6 +43,7 @@
 #include "modeling/TextSketchOp.h"
 
 #include <gtest/gtest.h>
+#include <cstdio>
 #include <utility>
 #include <gp_Ax3.hxx>
 #include <gp_Dir.hxx>
@@ -387,4 +388,69 @@ TEST(GridSnap, WeldRadiusStillRefusesPointsThatAreFarApartOnScreen) {
         EXPECT_EQ(-1, t.coincidentPoint(far, -1))
             << "mmPerPx=" << mmPerPx << ": 40 px apart must NOT weld";
     }
+}
+
+// The screen term is an AIM radius, and aim is interactive. Generated geometry
+// — a mirrored vertex, an offset endpoint, a derived circle centre — must weld
+// by a fixed model distance, or the same operation on the same sketch produces
+// different TOPOLOGY depending only on where the camera happens to be. That is
+// a correctness bug, not a UX one: the model becomes a function of the view.
+TEST(GridSnap, GeneratedGeometryWeldsByModelDistanceNotByZoom) {
+    // 5 mm apart: inside the interactive radius at a coarse zoom (6 px x 3
+    // mm/px = 18 mm), far outside the 0.3 mm exact radius at every zoom.
+    const glm::vec2 a(10.0f, 10.0f);
+    const glm::vec2 b = a + glm::vec2(5.0f, 0.0f);
+
+    for (float mmPerPx : {0.02f, 0.2f, 1.5f, 3.0f}) {
+        Sketch sk;
+        SketchTool t;
+        t.setSketch(&sk);
+        t.setPixelScale(mmPerPx);
+        const int aId = sk.addPoint(a);
+
+        EXPECT_EQ(-1, t.exactCoincidentPoint(b, -1))
+            << "mmPerPx=" << mmPerPx
+            << ": generated geometry must NOT weld 5 mm away at any zoom";
+        // Genuinely coincident still welds, at every zoom.
+        EXPECT_EQ(aId, t.exactCoincidentPoint(a + glm::vec2(0.05f, 0.0f), -1))
+            << "mmPerPx=" << mmPerPx << ": 0.05 mm apart must still weld";
+    }
+}
+
+// The interactive radius grows with the view, so it needs a ceiling: six pixels
+// at 3 mm/px is already an 18 mm merge and it has no upper bound as you keep
+// pulling back. Nearest-wins chooses among candidates; it does not stop two
+// deliberately distinct vertices merging.
+TEST(GridSnap, InteractiveWeldRadiusIsCapped) {
+    Sketch sk;
+    SketchTool t;
+    t.setSketch(&sk);
+    const glm::vec2 p(10.0f, 10.0f);
+    sk.addPoint(p);
+
+    // Absurd zoom-out: 6 px would be 600 mm; the cap holds it to 10 mm.
+    t.setPixelScale(100.0f);
+    EXPECT_EQ(-1, t.coincidentPoint(p + glm::vec2(50.0f, 0.0f), -1))
+        << "50 mm away must not weld however far out the camera is";
+
+    // Below the cap the screen term still governs: at 1.0 mm/px, 6 px = 6 mm.
+    t.setPixelScale(1.0f);
+    EXPECT_GE(t.coincidentPoint(p + glm::vec2(5.0f, 0.0f), -1), 0)
+        << "5 mm at 1 mm/px is 5 px — inside the aim radius, must weld";
+    EXPECT_EQ(-1, t.coincidentPoint(p + glm::vec2(9.0f, 0.0f), -1))
+        << "9 mm at 1 mm/px is 9 px — outside the aim radius";
+}
+
+// Before the viewport has pushed a scale, m_mmPerPixel is 0. The floor is what
+// keeps the radius sane on that first frame rather than collapsing to zero.
+TEST(GridSnap, WeldRadiusSurvivesTheFirstFrameWithNoPixelScale) {
+    Sketch sk;
+    SketchTool t;
+    t.setSketch(&sk);           // setPixelScale deliberately NOT called
+    const glm::vec2 p(10.0f, 10.0f);
+    const int id = sk.addPoint(p);
+    EXPECT_EQ(id, t.coincidentPoint(p + glm::vec2(0.1f, 0.0f), -1))
+        << "with no pixel scale the 0.3 mm floor must still weld";
+    EXPECT_EQ(-1, t.coincidentPoint(p + glm::vec2(1.0f, 0.0f), -1))
+        << "and must not weld a millimetre away";
 }
