@@ -75,6 +75,7 @@ inline void resetFpuForOcct() {
 #include "ui/MeasureTool.h"
 #include "ui/UpdateChecker.h"
 #include "modeling/Sketch.h"
+#include "viewport/GridScale.h"
 #include "modeling/ThreadOp.h"
 #include "modeling/CopyOp.h"
 #include "modeling/SketchSolver.h"
@@ -6423,8 +6424,12 @@ void Application::alignCameraToActiveSketch() {
     // SketchTool takes the zoom-scaled step for SNAPPING (setGridStep) and the
     // base for TOLERANCES (setToleranceStep) — but the base is still the value
     // the user chose, and framing has no business rewriting it.
+    // Bounded — see openingSketchSpanMm. 40 of a large unit is a twelve-metre
+    // opening view, which is how geometry ended up drawn metres from the plane
+    // origin and floating above the ground grid on exit.
     const float unitSpan = static_cast<float>(materializr::toMm(40.0));
-    float orthoSize = std::max({20.0f, unitSpan, m_sketchGridStep * 40.0f});
+    float orthoSize = materializr::openingSketchSpanMm(
+        unitSpan, m_sketchGridStep, 20.0f, kOpeningSketchSpanCapMm);
     glm::vec3 lookAt = planeOrigin;
     {
         glm::vec3 bmin( std::numeric_limits<float>::max());

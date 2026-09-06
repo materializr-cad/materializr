@@ -107,3 +107,51 @@ TEST(GridScale, ExtremeZoomsStayFiniteAndPositive) {
     // float, so the base is returned rather than an infinity.
     EXPECT_FLOAT_EQ(1.0f, gridStepForZoom(1.0f, 1.0e38f, kMinPx));
 }
+
+// The opening view of an EMPTY sketch. Framing a fixed count of DISPLAY units
+// keeps the numbers on screen sensible, but 40 of a large unit is enormous: at
+// 40 ft the view is twelve metres, so a shape drawn at screen centre lands
+// metres from the plane origin and hangs above the ground grid on exit.
+TEST(GridScale, OpeningSketchViewStaysHumanScaleInEveryUnit) {
+    constexpr float kMin = 20.0f, kCap = 1000.0f;
+    struct Case { const char* unit; float unitSpanMm; };
+    // 40 display units expressed in millimetres, per unit.
+    const Case cases[] = {
+        {"mm", 40.0f}, {"cm", 400.0f}, {"m", 40000.0f},
+        {"in", 1016.0f}, {"ft", 12192.0f},
+    };
+    for (const Case& cs : cases) {
+        const float span = materializr::openingSketchSpanMm(
+            cs.unitSpanMm, /*baseStepMm=*/1.0f, kMin, kCap);
+        EXPECT_GE(span, kMin) << cs.unit;
+        EXPECT_LE(span, kCap) << cs.unit << ": a first view must stay human scale";
+    }
+
+    // Millimetres are untouched — the whole point is that the common case does
+    // not move. 40 mm in, 40 mm out.
+    EXPECT_FLOAT_EQ(40.0f,
+        materializr::openingSketchSpanMm(40.0f, 1.0f, kMin, kCap));
+
+    // Feet: was 12192 mm (twelve metres), now the cap.
+    EXPECT_FLOAT_EQ(kCap,
+        materializr::openingSketchSpanMm(12192.0f, 1.0f, kMin, kCap));
+}
+
+// The grid term has to be INSIDE the bound. A 1 ft base makes baseStep*40 =
+// 12192 mm by itself, so bounding only the unit span would have left the
+// reported bug exactly where it was.
+TEST(GridScale, TheGridTermIsBoundedToo) {
+    constexpr float kMin = 20.0f, kCap = 1000.0f;
+    // Millimetre unit span, but a one-foot base step.
+    EXPECT_FLOAT_EQ(kCap,
+        materializr::openingSketchSpanMm(40.0f, /*baseStepMm=*/304.8f, kMin, kCap));
+    // A coarse-but-reasonable base still widens the view, below the cap.
+    EXPECT_FLOAT_EQ(400.0f,
+        materializr::openingSketchSpanMm(40.0f, /*baseStepMm=*/10.0f, kMin, kCap));
+}
+
+// The floor still applies: a tiny unit span must not open a sub-millimetre view.
+TEST(GridScale, OpeningViewKeepsItsFloor) {
+    EXPECT_FLOAT_EQ(20.0f,
+        materializr::openingSketchSpanMm(1.0f, 0.1f, 20.0f, 1000.0f));
+}

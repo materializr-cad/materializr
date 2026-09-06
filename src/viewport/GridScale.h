@@ -48,4 +48,32 @@ inline float gridStepForZoom(float baseStepMm, float mmPerPx, float minPx) {
     return (std::isfinite(step) && step > 0.0f) ? step : baseStepMm;
 }
 
+// The opening view for an EMPTY sketch, in millimetres of half-span.
+//
+// Framing a fixed count of DISPLAY units is right in spirit — 40 mm is a fine
+// first view in millimetres and 0.13 ft is an absurd one in feet, which is why
+// the count is unit-aware. But 40 of a large unit is enormous: 40 ft is a
+// twelve-metre view, so a shape drawn at screen centre lands metres from the
+// plane origin, and on leaving the sketch it hangs metres above the ground
+// grid. Reported as "the models now float way above the grid".
+//
+// So the count is bounded. The ceiling is a human-scale first view: big enough
+// that feet and inches read as whole-ish numbers rather than fractions, small
+// enough that a casual drawing stays near the origin it was framed on.
+//
+// The grid term is inside the bound deliberately. It exists so the opening view
+// shows a sensible number of cells, but a 1 ft base makes it 12192 mm on its
+// own, so bounding only the unit span would leave the problem untouched.
+//
+// Only for the empty case: once a sketch has geometry, or sits on a host face,
+// the caller frames THAT instead and none of this applies.
+inline float openingSketchSpanMm(float unitSpanMm, float baseStepMm,
+                                 float minSpanMm, float maxSpanMm) {
+    float span = unitSpanMm;
+    if (baseStepMm * 40.0f > span) span = baseStepMm * 40.0f;
+    if (span < minSpanMm) span = minSpanMm;
+    if (span > maxSpanMm) span = maxSpanMm;
+    return span;
+}
+
 } // namespace materializr
