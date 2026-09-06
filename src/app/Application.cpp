@@ -4505,6 +4505,23 @@ void Application::applyDisplayUnitChange(int unit) {
     // Guarded: settings are applied before the ImGui context exists.
     if (ImGui::GetCurrentContext()) ImGui::ClearActiveID();
 
+    // ClearActiveID drops FOCUS, and the sketch dimension field only ever
+    // grabs focus once per placement — m_sketchDimWasShown latches true on the
+    // first frame and is cleared only on commit or on leaving placement. So
+    // switching units mid-placement left that popup on screen with an input
+    // nothing could type into, and no way to finish the shape by keyboard.
+    // Whoever clears the active ID has to clear the latch that guards
+    // re-focusing, or the two disagree about whether a field is live.
+    //
+    // The buffer goes too, and not just for tidiness: it still holds digits
+    // meant as the OLD unit. Clearing the active ID stops THIS frame's commit,
+    // but the characters survive, so clicking back into the field and pressing
+    // Enter would commit them as the new unit — the exact misreading the
+    // ClearActiveID above exists to prevent.
+    m_sketchDimBuf[0] = '\0';
+    m_sketchDimValue = 0.0f;
+    m_sketchDimWasShown = false;   // re-seeds and re-grabs focus next frame
+
     // Carry the grid step's DISPLAYED NUMBER across, not its millimetres. The
     // step is the snap lattice and the visible grid, so leaving it at 1 mm
     // while the view frames 40 ft draws 12192 lines (the renderer fades them
