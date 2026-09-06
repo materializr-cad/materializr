@@ -258,7 +258,7 @@ void Application::renderImTouchLayout() {
             // Display unit, like the presets that set it and like the desktop
             // badge. Raw mm here read "10" after picking the "1" preset under cm.
             std::snprintf(snapLbl, sizeof(snapLbl), "%.3g",
-                          materializr::toDisplay(m_sketchGridStep));
+                          materializr::toDisplay(m_effectiveGridStepMm));
             if (touchui::pillButton("snap", MZ_ICON_GUIDES, snapLbl,
                                     m_snapToGrid))
                 ImGui::OpenPopup("SnapSettings");

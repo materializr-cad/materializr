@@ -885,10 +885,18 @@ private:
     // number: "1" means one of whatever unit is showing). It is what persists.
     float m_sketchGridStep = 1.0f;
     // The base scaled by whole decades to suit the CURRENT zoom, recomputed
-    // every sketch frame — see viewport/GridScale.h. This, not the base, is
-    // what the grid draws, what the cursor snaps to and what the badge reads,
-    // so those three can never disagree. Equal to the base outside sketch mode
-    // and whenever the base already suits the zoom.
+    // every frame in renderViewport's drawGrid (which both branches call, so
+    // it is never stale) — see viewport/GridScale.h. Equal to the base outside
+    // sketch mode and whenever the base already suits the zoom.
+    //
+    // WHICH STEP A SITE WANTS:
+    //   anything snapping a point ON THE SKETCH PLANE, drawing the sketch grid,
+    //   or LABELLING the step for the user -> this one, so the lines drawn, the
+    //   points reachable and the number displayed can never disagree;
+    //   the Settings presets, persistence and the unit carry-over -> the base,
+    //   which is what the user actually chose;
+    //   world-space gizmo/plane snapping outside sketch mode -> the base (the
+    //   world grid is not zoom-scaled; the two are equal there anyway).
     float m_effectiveGridStepMm = 1.0f;
     // World-aligned anchor used as the sketch grid origin and the camera
     // target. Computed at sketch entry from the face centre snapped to the

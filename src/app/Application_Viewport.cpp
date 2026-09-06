@@ -5524,7 +5524,12 @@ void Application::renderViewport() {
                 // instead of going through SketchTool's normal input.
                 bool patternPickingNow = m_sketchPatternActive && m_sketchPatternPickingOrigin;
                 if (patternPickingNow) {
-                    float step = std::max(m_sketchGridStep, 0.01f);
+                    // The EFFECTIVE step, like the grid being drawn under this
+                    // cursor and like SketchTool's own snapping. This picker
+                    // places a point ON THE SKETCH PLANE, so the base would put
+                    // the origin between the lines the user can see whenever the
+                    // zoom has scaled the lattice.
+                    float step = std::max(m_effectiveGridStepMm, 0.01f);
                     glm::vec2 snapped(std::round(sketchCoord.x / step) * step,
                                       std::round(sketchCoord.y / step) * step);
                     ImVec2 sp(mousePos.x, mousePos.y);
