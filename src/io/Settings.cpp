@@ -193,10 +193,6 @@ void applyKv(const std::map<std::string, std::string>& kv, AppSettings& s) {
     readIntClamped(kv, "inferenceLevel", s.inferenceLevel, 0, 3);
     // -1 is meaningful here ("never chosen"), so the floor is -1, not 0.
     readIntClamped(kv, "language", s.language, -1, 5);
-    // Not readIntClamped: clamping a corrupt "9" to the range edge would silently
-    // select Feet. An invalid unit means "back to millimetres", the same rule
-    // Application::applyDisplayUnitChange enforces at the other end.
-
     readBool(kv, "showInferenceToolbarToggle", s.showInferenceToolbarToggle);
     readIntClamped(kv, "angleSnapDeg",   s.angleSnapDeg, 1, 90);
     readFloat(kv, "stlImportAccuracy",   s.stlImportAccuracy);

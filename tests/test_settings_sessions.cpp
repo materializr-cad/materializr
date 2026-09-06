@@ -219,8 +219,7 @@ TEST(SettingsSessions, LegacyGridStepMigratesByKey) {
 // The migration reads two keys, a unit index and a float from a file anyone
 // can hand-edit. Each of those is an input, so each gets a boundary.
 TEST(SettingsSessions, GridStepMigrationBoundaries) {
-    const std::string path = std::string(std::getenv("TMPDIR") ?
-                             std::getenv("TMPDIR") : "/tmp") + "/mz_grid_bounds.cfg";
+    const std::string path = tmpCfg("gridbounds");
     auto load = [&](const std::string& body) {
         { std::ofstream o(path); o << body; }
         AppSettings s = SettingsIO::load(path);
@@ -249,13 +248,13 @@ TEST(SettingsSessions, GridStepMigrationBoundaries) {
     // Values that are not a usable grid step are refused, not clamped. NaN
     // matters most: it survives every `< 0.1` and `<= 0` guard and then
     // reaches a float-to-int conversion in the grid renderer.
-    for (const char* bad : {"0", "-5", "nan", "inf", "1e30"}) {
+    for (const char* badValue : {"0", "-5", "nan", "inf", "1e30"}) {
         EXPECT_FLOAT_EQ(kDefault,
-            load(std::string("sketchGridStepUnits = ") + bad + "\n").sketchGridStep)
-            << "new key: " << bad;
+            load(std::string("sketchGridStepUnits = ") + badValue + "\n").sketchGridStep)
+            << "new key: " << badValue;
         EXPECT_FLOAT_EQ(kDefault,
-            load(std::string("sketchGridStep = ") + bad + "\n").sketchGridStep)
-            << "legacy key: " << bad;
+            load(std::string("sketchGridStep = ") + badValue + "\n").sketchGridStep)
+            << "legacy key: " << badValue;
     }
 
     // Under millimetres a deliberate 0.05 mm grid is a real choice. The

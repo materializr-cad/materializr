@@ -43,6 +43,7 @@
 #include "modeling/TextSketchOp.h"
 
 #include <gtest/gtest.h>
+#include <utility>
 #include <gp_Ax3.hxx>
 #include <gp_Dir.hxx>
 #include <gp_Pln.hxx>
@@ -175,6 +176,50 @@ TEST(GridSnap, ContactWithAnEdgeStaysOnTheEdge) {
 }
 
 // ─── 2. the drawn grid is the same lattice ───────────────────────────────────
+// The grid the user SEES is laid from the anchor, every effective step. The
+// cursor snaps to multiples of the effective step from the PLANE ORIGIN. Those
+// coincide only while the anchor is itself a multiple of the EFFECTIVE step —
+// so once zoom scales the step, re-anchoring on the base is not enough.
+//
+// This is the case the test above structurally cannot reach: it uses one step
+// for both roles, so it stays green whichever step the anchor was built from.
+TEST(GridSnap, AnchorFollowsTheZoomScaledStepNotTheBase) {
+    const gp_Ax3 ax(gp_Pnt(12.37, 5.02, 3.5), gp_Dir(0, 0, 1), gp_Dir(1, 0, 0));
+    const gp_Pln pln(ax);
+    const gp_Pnt lookAt(20.0, 9.0, 3.5);
+
+    auto uvOf = [&](const gp_Pnt& p) {
+        const gp_Vec rel(ax.Location(), p);
+        return std::pair<double, double>{rel.Dot(gp_Vec(ax.XDirection())),
+                                         rel.Dot(gp_Vec(ax.YDirection()))};
+    };
+
+    const double base = 1.0;
+    for (double effective : {10.0, 100.0}) {   // the zoomed-OUT direction
+        // What the code used to do: anchor on the base, draw every effective.
+        const auto onBase = uvOf(Sketch::latticeAnchor(pln, lookAt, base));
+        EXPECT_GT(std::max(offLattice(onBase.first,  effective),
+                           offLattice(onBase.second, effective)), 1e-6)
+            << "a base-built anchor is expected to sit OFF the effective "
+               "lattice at effective=" << effective
+            << " — if this ever passes, the case being guarded is gone";
+
+        // What it does now: anchor on the effective step, so every drawn line
+        // lands exactly where the cursor can.
+        const auto onEff = uvOf(Sketch::latticeAnchor(pln, lookAt, effective));
+        EXPECT_LE(offLattice(onEff.first,  effective), 1e-6)
+            << "effective=" << effective << " u=" << onEff.first;
+        EXPECT_LE(offLattice(onEff.second, effective), 1e-6)
+            << "effective=" << effective << " v=" << onEff.second;
+    }
+
+    // The zoomed-IN direction was always safe — a finer effective step divides
+    // the base — but it is asserted so the claim is checked, not assumed.
+    const auto fine = uvOf(Sketch::latticeAnchor(pln, lookAt, base));
+    EXPECT_LE(offLattice(fine.first,  0.1), 1e-6);
+    EXPECT_LE(offLattice(fine.second, 0.1), 1e-6);
+}
+
 TEST(GridSnap, LatticeAnchorSitsOnTheSnapLattice) {
     struct Case { const char* name; gp_Ax3 ax; gp_Pnt lookAt; };
     // A sketch started on a face gets whatever plane origin the geometry has —

@@ -466,6 +466,19 @@ void Application::renderViewport() {
         // Deferred into a lambda and invoked AFTER the solid geometry below, so
         // the grid (which no longer writes depth) blends over bodies instead of
         // punching through coplanar faces.
+        // The step the user picked is a BASE; what the sketch actually uses is
+        // that base scaled by whole decades to suit this zoom (GridScale.h).
+        // Computed HERE as a plain statement rather than inside drawGrid,
+        // because six later sites read it and a value assigned as a side
+        // effect of "draw the grid" makes that dependency invisible.
+        m_effectiveGridStepMm = std::max(m_sketchGridStep, 0.01f);
+        if (m_inSketchMode && m_activeSketch) {
+            const glm::vec2 g0 = screenToSketch(0.0f, 0.0f, contentSize.x, contentSize.y);
+            const glm::vec2 g1 = screenToSketch(1.0f, 0.0f, contentSize.x, contentSize.y);
+            m_effectiveGridStepMm = gridStepForZoom(
+                m_effectiveGridStepMm, glm::length(g1 - g0), kGridMinPx);
+        }
+
         auto drawGrid = [&]() {
             Grid::Plane gp; // defaults to the XZ ground
             bool sketching = m_inSketchMode && m_activeSketch;
@@ -476,7 +489,28 @@ void Application::renderViewport() {
                 // the grid origin so grid lines pass through whole world-grid
                 // intersections on the sketch plane instead of being shifted
                 // by the face's off-grid centre.
-                gp.origin = m_sketchSnappedAnchor;
+                //
+                // Re-snapped to the EFFECTIVE step every frame. The anchor was
+                // laid on the BASE lattice at sketch entry, while the shader
+                // draws lines every effective step FROM it and SketchTool::snap
+                // rounds to multiples of the effective step from the PLANE
+                // origin. Those two agree only when the anchor is itself a
+                // multiple of the effective step — so as soon as zoom coarsened
+                // the step (base 1 mm -> 10 mm) the drawn grid sat up to a full
+                // cell off the lattice the cursor actually lands on. That is
+                // "I can't draw a line on the snap grid" again, and it is the
+                // precise thing this commit's invariant claims cannot happen.
+                gp.origin = glm::vec3(0.0f);
+                {
+                    const gp_Pnt a = Sketch::latticeAnchor(
+                        m_activeSketch->getPlane(),
+                        gp_Pnt(m_sketchSnappedAnchor.x, m_sketchSnappedAnchor.y,
+                               m_sketchSnappedAnchor.z),
+                        static_cast<double>(m_effectiveGridStepMm));
+                    gp.origin = glm::vec3(static_cast<float>(a.X()),
+                                          static_cast<float>(a.Y()),
+                                          static_cast<float>(a.Z()));
+                }
                 gp.u = v3(ax.XDirection());
                 gp.v = v3(ax.YDirection());
                 gp.normal = v3(ax.Direction());
@@ -595,19 +629,6 @@ void Application::renderViewport() {
             // depthBias: + draws the grid ON the coplanar sketch face; - lets a
             // coplanar body face (e.g. a body sitting on the XZ ground) occlude
             // the ground grid instead of it bleeding through.
-            // The step the user picked is a BASE; what the sketch actually
-            // uses is that base scaled by whole decades to suit this zoom (see
-            // GridScale.h). Computed HERE, before anything reads it, and stored
-            // so the snap lattice and the badge take the same number — a grid
-            // you can see but not land on, or a badge naming a step the cursor
-            // ignores, are both worse than either problem alone.
-            m_effectiveGridStepMm = std::max(m_sketchGridStep, 0.01f);
-            if (sketching) {
-                const glm::vec2 g0 = screenToSketch(0.0f, 0.0f, contentSize.x, contentSize.y);
-                const glm::vec2 g1 = screenToSketch(1.0f, 0.0f, contentSize.x, contentSize.y);
-                m_effectiveGridStepMm = gridStepForZoom(
-                    m_effectiveGridStepMm, glm::length(g1 - g0), kGridMinPx);
-            }
             m_grid->render(view, proj, fadeCenter, gridFade,
                            gp, m_effectiveGridStepMm,
                            minorAlpha, worldGridAlpha /*globalAlpha*/,
@@ -1060,9 +1081,13 @@ void Application::renderViewport() {
             // grid itself is the infinite world grid above (now aligned to the
             // sketch plane), so face sketches no longer need a separate per-face
             // grid — drawing across to neighbouring faces just works.
-            // The EFFECTIVE step, not the base: the cursor must land on the
-            // lines actually drawn (computed above, same frame).
+            // Snapping takes the EFFECTIVE step — the cursor must land on the
+            // lines actually drawn. Pointing tolerances keep taking the BASE:
+            // they are a precision preference, not a lattice, and letting zoom
+            // coarsen them pinned the trim/pick radius at its 10 mm cap the
+            // moment the grid stepped up.
             m_sketchTool->setGridStep(m_effectiveGridStepMm);
+            m_sketchTool->setToleranceStep(m_sketchGridStep);
             // Sketch millimetres per screen pixel, measured by unprojecting two
             // points one pixel apart — exact for any camera and any plane
             // orientation. Pointing tolerances are a screen distance, so they

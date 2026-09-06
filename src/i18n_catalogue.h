@@ -668,6 +668,7 @@ inline const TrEntry kEsCatalogue[] = {
     { "Slide (%s)", "Deslizamiento (%s)" },
     { "Snap 1 deg", "Ajuste de 1\xc2""\xb0""" },
     { "Snap step: %s   |   %s", "Paso de ajuste: %s   |   %s" },
+    { "Snap step: %s (base %s)   |   %s", "Paso de ajuste: %s (base %s)   |   %s" },
     { "Snap the camera to look straight down the sketch plane (orthographic).", "Ajusta la c\xc3""\xa1""mara para mirar directamente hacia el plano del boceto (ortogr\xc3""\xa1""fica)." },
     { "Solid", "S\xc3""\xb3""lido" },
     { "Source Point", "Punto de origen" },
@@ -1174,7 +1175,7 @@ inline const TrEntry kEsCatalogue[] = {
     { "Appearance", "Apariencia" },
     { "Interface language", "Idioma de la interfaz" },
 };
-inline constexpr int kEsCount = 1162;
+inline constexpr int kEsCount = 1163;
 
 // --- Portuguese ---
 inline const TrEntry kPtCatalogue[] = {
@@ -1835,6 +1836,7 @@ inline const TrEntry kPtCatalogue[] = {
     { "Slide (%s)", "Deslizamento (%s)" },
     { "Snap 1 deg", "Ajuste de 1\xc2""\xb0""" },
     { "Snap step: %s   |   %s", "Passo de ajuste: %s   |   %s" },
+    { "Snap step: %s (base %s)   |   %s", "Passo de ajuste: %s (base %s)   |   %s" },
     { "Snap the camera to look straight down the sketch plane (orthographic).", "Ajuste a c\xc3""\xa2""mera para olhar diretamente para o plano do esbo\xc3""\xa7""o (ortogr\xc3""\xa1""fica)." },
     { "Solid", "S\xc3""\xb3""lido" },
     { "Source Point", "Ponto de origem" },
@@ -2341,7 +2343,7 @@ inline const TrEntry kPtCatalogue[] = {
     { "Appearance", "Apar\xc3""\xaa""ncia" },
     { "Interface language", "Idioma da interface" },
 };
-inline constexpr int kPtCount = 1162;
+inline constexpr int kPtCount = 1163;
 
 // --- French ---
 inline const TrEntry kFrCatalogue[] = {
@@ -3002,6 +3004,7 @@ inline const TrEntry kFrCatalogue[] = {
     { "Slide (%s)", "Glissement (%s)" },
     { "Snap 1 deg", "Alignement \xc3""\xa0"" 1\xc2""\xb0""" },
     { "Snap step: %s   |   %s", "Pas d'alignement : %s   |   %s" },
+    { "Snap step: %s (base %s)   |   %s", "Pas d'alignement : %s (base %s)   |   %s" },
     { "Snap the camera to look straight down the sketch plane (orthographic).", "Aligner la cam\xc3""\xa9""ra pour regarder droit dans l'axe du plan de l'esquisse (orthographique)." },
     { "Solid", "Solide" },
     { "Source Point", "Point source" },
@@ -3508,7 +3511,7 @@ inline const TrEntry kFrCatalogue[] = {
     { "Appearance", "Apparence" },
     { "Interface language", "Langue de l'interface" },
 };
-inline constexpr int kFrCount = 1162;
+inline constexpr int kFrCount = 1163;
 
 // --- German ---
 inline const TrEntry kDeCatalogue[] = {
@@ -4169,6 +4172,7 @@ inline const TrEntry kDeCatalogue[] = {
     { "Slide (%s)", "Schieben (%s)" },
     { "Snap 1 deg", "Fang: 1\xc2""\xb0""" },
     { "Snap step: %s   |   %s", "Fangschritt: %s   |   %s" },
+    { "Snap step: %s (base %s)   |   %s", "Fangschritt: %s (Basis %s)   |   %s" },
     { "Snap the camera to look straight down the sketch plane (orthographic).", "Kamera senkrecht auf die Skizzenebene ausrichten (orthografisch)." },
     { "Solid", "Volumenk\xc3""\xb6""rper" },
     { "Source Point", "Quellpunkt" },
@@ -4675,7 +4679,7 @@ inline const TrEntry kDeCatalogue[] = {
     { "Appearance", "Darstellung" },
     { "Interface language", "Sprache der Oberfl\xc3""\xa4""che" },
 };
-inline constexpr int kDeCount = 1162;
+inline constexpr int kDeCount = 1163;
 
 // --- Italian ---
 inline const TrEntry kItCatalogue[] = {
@@ -5336,6 +5340,7 @@ inline const TrEntry kItCatalogue[] = {
     { "Slide (%s)", "Scorrimento (%s)" },
     { "Snap 1 deg", "Aggancio a 1\xc2""\xb0""" },
     { "Snap step: %s   |   %s", "Passo di aggancio: %s   |   %s" },
+    { "Snap step: %s (base %s)   |   %s", "Passo di aggancio: %s (base %s)   |   %s" },
     { "Snap the camera to look straight down the sketch plane (orthographic).", "Allinea la camera per guardare dritto lungo il piano dello schizzo (ortografica)." },
     { "Solid", "Solido" },
     { "Source Point", "Punto di origine" },
@@ -5842,6 +5847,6 @@ inline const TrEntry kItCatalogue[] = {
     { "Appearance", "Aspetto" },
     { "Interface language", "Lingua dell'interfaccia" },
 };
-inline constexpr int kItCount = 1162;
+inline constexpr int kItCount = 1163;
 
 } // namespace materializr

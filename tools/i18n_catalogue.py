@@ -751,6 +751,7 @@ CAT = [
     E("Slide (%s)","Deslizamiento (%s)","Deslizamento (%s)","Glissement (%s)","Schieben (%s)","Scorrimento (%s)"),
     E("Snap 1 deg","Ajuste de 1°","Ajuste de 1°","Alignement à 1°","Fang: 1°","Aggancio a 1°"),
     E("Snap step: %s   |   %s","Paso de ajuste: %s   |   %s","Passo de ajuste: %s   |   %s","Pas d'alignement : %s   |   %s","Fangschritt: %s   |   %s","Passo di aggancio: %s   |   %s"),
+    E("Snap step: %s (base %s)   |   %s","Paso de ajuste: %s (base %s)   |   %s","Passo de ajuste: %s (base %s)   |   %s","Pas d'alignement : %s (base %s)   |   %s","Fangschritt: %s (Basis %s)   |   %s","Passo di aggancio: %s (base %s)   |   %s"),
     E("Snap the camera to look straight down the sketch plane (orthographic).","Ajusta la cámara para mirar directamente hacia el plano del boceto (ortográfica).","Ajuste a câmera para olhar diretamente para o plano do esboço (ortográfica).","Aligner la caméra pour regarder droit dans l'axe du plan de l'esquisse (orthographique).","Kamera senkrecht auf die Skizzenebene ausrichten (orthografisch).","Allinea la camera per guardare dritto lungo il piano dello schizzo (ortografica)."),
     E("Solid","Sólido","Sólido","Solide","Volumenkörper","Solido"),
     E("Source Point","Punto de origen","Ponto de origem","Point source","Quellpunkt","Punto di origine"),

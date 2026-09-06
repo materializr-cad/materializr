@@ -289,12 +289,16 @@ public:
     // Grid step (in sketch-plane mm). Used for both visual grid and snap-to-line.
     // 0 disables grid snap entirely.
     // POINTING precision, not grid coarseness. Trim, pick, inference and hover
-    // distances track the grid so a fine grid gives fine picking — but they
-    // must not grow without bound when the grid is coarse. With the step
-    // following the display unit, a 1 ft grid put the trim threshold at
-    // 152 mm: a click on empty space could cut geometry 15 cm away, with grid
-    // snapping OFF. The cap is the largest step the presets ever offered in
-    // millimetres, so every mm and cm grid behaves exactly as it always has.
+    // distances track the user's chosen step so a fine grid gives fine picking
+    // — but they must not grow without bound when that step is coarse. With
+    // the step following the display unit, a 1 ft grid put the trim threshold
+    // at 152 mm: a click on empty space could cut geometry 15 cm away, with
+    // grid snapping OFF. The cap is the largest step the presets ever offered
+    // in millimetres.
+    //
+    // It is m_toleranceStep that is capped here, not the snap lattice. Since
+    // the lattice started following the zoom, capping THAT would have pinned
+    // the pick radius at 10 mm the moment a 1 mm grid coarsened — see tolStep.
     static constexpr float kToleranceStepCapMm = 10.0f;
     // How many SCREEN PIXELS of slop a pointing gesture gets. Tuned so that at
     // the default millimetre framing this lands on the 0.3-1 mm the tolerances
@@ -317,12 +321,28 @@ public:
     // a floor, so a fine grid still gives fine picking and every existing
     // millimetre sketch behaves exactly as it did.
     float tolStep() const {
-        const float fromGrid   = std::min(m_gridStep, kToleranceStepCapMm);
+        // m_toleranceStep, NOT m_gridStep. The snap lattice now follows the
+        // ZOOM (it is the user's base scaled by decades), and a tolerance that
+        // followed it with it would grow every time the view pulled back: a
+        // 1 mm base coarsening to 10 mm pins this at the cap below, turning a
+        // ~1.5 mm pick radius into 10 mm — an 80-pixel grab — for no reason
+        // the user expressed. The base is the precision they actually chose.
+        const float fromGrid   = std::min(m_toleranceStep, kToleranceStepCapMm);
         const float fromScreen = kPointingRadiusPx * m_mmPerPixel;
         return std::max(fromGrid, fromScreen);
     }
 
-    void setGridStep(float step) { m_gridStep = step; }
+    // The lattice points snap to — scaled by zoom, so it changes as you zoom.
+    // Also moves the tolerance step, so a caller that only ever sets this one
+    // behaves exactly as this class did before the two were separated. The
+    // viewport calls setToleranceStep straight after, to pin tolerances to the
+    // user's base while snapping follows the zoom.
+    void setGridStep(float step) { m_gridStep = step; m_toleranceStep = step; }
+    // The user's chosen step, which zoom does NOT scale. Only tolerances read
+    // it. Must be called AFTER setGridStep, which resets it.
+    void setToleranceStep(float step) {
+        if (step > 0.0f) m_toleranceStep = step;
+    }
     float getGridStep() const { return m_gridStep; }
     // Mirrors the toolbar "Snap to grid" checkbox. When on (default), placed
     // points always round to the nearest grid increment; when off, only
@@ -651,7 +671,8 @@ private:
     int   m_rectDimStage = 0;
     float m_rectDimH = 0.0f;
 
-    float m_gridStep = 1.0f; // default 1 mm grid
+    float m_gridStep = 1.0f; // default 1 mm grid (zoom-scaled; snapping)
+    float m_toleranceStep = 1.0f; // the user's base step (pointing tolerances)
     float m_mmPerPixel = 0.0f;   // set per frame; see setPixelScale
     bool  m_snapToGridEnabled = true; // toolbar checkbox, see setSnapToGridEnabled
 

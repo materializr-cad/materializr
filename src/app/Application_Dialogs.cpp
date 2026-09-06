@@ -2549,7 +2549,19 @@ void Application::renderSnapWidget() {
     bool rightClicked = hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right);
     if (hovered) {
         ImGui::BeginTooltip();
-        ImGui::TextUnformatted(materializr::trFormat("Snap step: %s   |   %s", materializr::fmtLength(m_effectiveGridStepMm), m_snapToGrid ? "Snap ON" : "Snap off").c_str());
+        // Both numbers: the badge and this line show what the cursor SNAPS to,
+        // while the popup highlights the preset that was chosen. Showing only
+        // the effective step made the highlighted preset look wrong whenever
+        // zoom had scaled it.
+        ImGui::TextUnformatted(
+            std::abs(m_effectiveGridStepMm - m_sketchGridStep) < 1e-4f
+              ? materializr::trFormat("Snap step: %s   |   %s",
+                    materializr::fmtLength(m_effectiveGridStepMm),
+                    m_snapToGrid ? "Snap ON" : "Snap off").c_str()
+              : materializr::trFormat("Snap step: %s (base %s)   |   %s",
+                    materializr::fmtLength(m_effectiveGridStepMm),
+                    materializr::fmtLength(m_sketchGridStep),
+                    m_snapToGrid ? "Snap ON" : "Snap off").c_str());
         ImGui::TextDisabled("%s", materializr::tr("Click: open snap settings"));
         ImGui::TextDisabled("%s", materializr::tr("Right-click: toggle snap"));
         ImGui::EndTooltip();
@@ -4065,8 +4077,12 @@ void Application::renderTextToolPanel() {
         if (materializr::lengthSlider(materializr::trFormat("Height (%s)", materializr::unitSuffix()).c_str(), &h, 1.0f, 50.0f)) {
             // Snap the height to the sketch grid increment when snap-to-grid is
             // on, so text sizes land on the same lattice as everything else.
-            if (m_snapToGrid && m_effectiveGridStepMm > 0.0f)
-                h = std::round(h / m_effectiveGridStepMm) * m_effectiveGridStepMm;
+            // The BASE step, not the zoom-scaled one: this quantises a model
+            // dimension, and a text height that came out 1 mm or 100 mm
+            // depending on how far the camera happened to be pulled back would
+            // make the model a function of the view.
+            if (m_snapToGrid && m_sketchGridStep > 0.0f)
+                h = std::round(h / m_sketchGridStep) * m_sketchGridStep;
             if (h < 1.0f) h = 1.0f; // keep within the slider's lower bound
             m_sketchTool->setTextHeight(h);
         }

@@ -1879,8 +1879,9 @@ AppSettings Application::currentSettings() const {
     // is showing. Saved as millimetres, picking "1" under feet wrote 304.8 —
     // or, from before the presets converted, wrote 1 and reloaded as a 1 mm
     // grid inside a 40 ft view: 12192 lines, which the renderer fades to
-    // nothing, so the grid simply vanished. Millimetre users are unaffected;
-    // 1 means 1 mm either way.
+    // nothing, so the grid simply vanished. What persists is this BASE; the
+    // step the sketch actually draws and snaps to is the base scaled by zoom
+    // (Application.h m_effectiveGridStepMm), and only the base round-trips.
     s.sketchGridStep = static_cast<float>(materializr::toDisplay(m_sketchGridStep));
     // Mirror the live sketch-tool inference level back into the saved settings
     // so cycling the toolbar Full→Reduced→Off button persists across launches.
@@ -6413,11 +6414,11 @@ void Application::alignCameraToActiveSketch() {
     // every number on screen a fraction. Reported from testing: a line most of
     // the way across the screen measured 0.24 ft.
     //
-    // Only the FRAMING is unit-aware. The grid step is deliberately left alone
-    // — SketchTool derives trim, pick, inference, release and hover tolerances
-    // from it (45 uses), so scaling it for feet would take the trim threshold
-    // from 0.5 mm to 152 mm and let a click on empty space cut geometry 15 cm
-    // away. Decoupling those is its own change.
+    // Only the FRAMING is unit-aware here. The BASE step is left alone: the
+    // tolerance decoupling this comment used to defer has since happened —
+    // SketchTool takes the zoom-scaled step for SNAPPING (setGridStep) and the
+    // base for TOLERANCES (setToleranceStep) — but the base is still the value
+    // the user chose, and framing has no business rewriting it.
     const float unitSpan = static_cast<float>(materializr::toMm(40.0));
     float orthoSize = std::max({20.0f, unitSpan, m_sketchGridStep * 40.0f});
     glm::vec3 lookAt = planeOrigin;
