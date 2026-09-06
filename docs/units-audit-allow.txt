@@ -268,6 +268,8 @@ src/modeling/SketchTool.cpp:2196:
 src/modeling/SketchTool.cpp:2201:
 src/modeling/SketchTool.cpp:2203:
 src/modeling/SketchTool.cpp:2206:
+src/modeling/SketchTool.cpp:2387:
+src/modeling/SketchTool.cpp:2394:
 src/modeling/PushPullOp.cpp:333:
 src/modeling/PushPullOp.cpp:509:
 src/modeling/SketchOffset.cpp:796:

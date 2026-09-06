@@ -558,3 +558,72 @@ TEST(GridSnap, TwoPointCircleCentreIsNotPulledAboutByTheCamera) {
         << "the derived centre moved from " << fine.x << " to " << coarse.x
         << " purely because the camera pulled back";
 }
+
+// Closing a line loop by clicking back on the start vertex. This is the
+// reported bug — "I can't close any sketches" — and it is NOT the weld radius
+// in findCoincidentPoint: handleLineTool never calls it. It has its own
+// coincidence test at 1e-4 mm, which is exact equality for any practical
+// purpose, so the loop only closes when grid snap happens to place the click
+// precisely on the start point. With snap OFF it can never close at all; with
+// snap ON it stops closing the moment the lattice moves (a unit switch, or the
+// zoom-scaled step), because the start vertex is no longer a lattice point.
+//
+// Closing is an AIM, exactly like welding: within a few pixels of the start
+// vertex should close.
+TEST(GridSnap, ALineLoopClosesByAimNotByExactEquality) {
+    for (bool snapOn : {false, true}) {
+        for (float mmPerPx : {0.02f, 0.2f, 1.5f}) {
+            Sketch sk;
+            SketchTool t;
+            t.setSketch(&sk);
+            t.setPixelScale(mmPerPx);
+            t.setSnapToGridEnabled(snapOn);
+            t.setMode(SketchToolMode::Line);
+
+            // A triangle. The closing click lands 2 px from the start vertex —
+            // visually on top of it, but never exactly on it.
+            const glm::vec2 p0(0.0f, 0.0f);
+            const glm::vec2 p1(50.0f, 0.0f);
+            const glm::vec2 p2(25.0f, 40.0f);
+            t.onMouseDown(p0, false);
+            t.onMouseDown(p1, false);
+            t.onMouseDown(p2, false);
+            t.onMouseDown(p0 + glm::vec2(2.0f * mmPerPx, 0.0f), false);
+
+            // Closed means: three vertices, three lines, and the chain ended.
+            EXPECT_EQ(3u, sk.getPoints().size())
+                << "snap=" << snapOn << " mmPerPx=" << mmPerPx
+                << ": the closing click must reuse the start vertex, not add a 4th";
+            EXPECT_EQ(3u, sk.getLines().size())
+                << "snap=" << snapOn << " mmPerPx=" << mmPerPx
+                << ": a closed triangle has three segments";
+            EXPECT_FALSE(t.isPlacing())
+                << "snap=" << snapOn << " mmPerPx=" << mmPerPx
+                << ": closing the loop must end the chain";
+        }
+    }
+}
+
+// The anchor — the vertex the current segment is being drawn FROM — is excluded
+// from that lookup. Without the exclusion a click a few pixels from the anchor
+// welds onto it and builds a line from a point to itself. The pre-existing
+// zero-length guard only rejects clicks within 1e-4 mm, so it does not cover
+// the several millimetres the weld radius spans at a coarse zoom.
+TEST(GridSnap, AClickNearTheAnchorDoesNotBuildADegenerateSegment) {
+    for (float mmPerPx : {0.2f, 1.5f}) {
+        Sketch sk;
+        SketchTool t;
+        t.setSketch(&sk);
+        t.setPixelScale(mmPerPx);
+        t.setSnapToGridEnabled(false);
+        t.setMode(SketchToolMode::Line);
+
+        t.onMouseDown(glm::vec2(0.0f, 0.0f), false);                  // anchor
+        t.onMouseDown(glm::vec2(3.0f * mmPerPx, 0.0f), false);        // 3 px away
+
+        for (const auto& l : sk.getLines())
+            EXPECT_NE(l.startPointId, l.endPointId)
+                << "mmPerPx=" << mmPerPx
+                << ": a segment must not start and end on the same vertex";
+    }
+}

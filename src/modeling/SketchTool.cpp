@@ -2381,16 +2381,25 @@ void SketchTool::handleLineTool(glm::vec2 pos) {
         const SketchPoint* anchorPt = m_sketch->getPoint(m_lastPointId);
         if (anchorPt && glm::length(pos - anchorPt->pos) < 1e-4f)
             return;
-        int endPointId = -1;
-
-        // Check if snapping to existing point
-        const auto& points = m_sketch->getPoints();
-        for (const auto& pt : points) {
-            if (pt.id != m_lastPointId && glm::length(pos - pt.pos) < 1e-4f) {
-                endPointId = pt.id;
-                break;
-            }
-        }
+        // Reuse an existing vertex when the click lands on one — this is what
+        // CLOSES a loop, by landing the last click on the chain's start.
+        //
+        // It used to be a hand-rolled scan at 1e-4 mm, which is exact equality
+        // for any practical purpose: the loop only closed when grid snap
+        // happened to place the click precisely on the start vertex. With snap
+        // OFF that never happens, so no loop could be closed by clicking at
+        // all; with snap ON it stopped happening the moment the lattice moved
+        // under a unit switch or the zoom-scaled step, because the start vertex
+        // was no longer a lattice point. Reported first as "I can't close out a
+        // sketch to extrude" after switching feet -> mm, then as "I can't close
+        // any sketches".
+        //
+        // Closing is an AIM, so it takes the interactive weld radius like every
+        // other aimed click. m_lastPointId is excluded because that is the
+        // anchor we are drawing FROM; welding onto it would be the degenerate
+        // segment the guard above already rejects.
+        const int endPointId0 = findCoincidentPoint(pos, m_lastPointId);
+        int endPointId = endPointId0;
 
         if (endPointId == -1) {
             endPointId = m_sketch->addPoint(pos);

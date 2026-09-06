@@ -250,7 +250,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 
 - CONVERTED: 1
 - allowed-by-hand: 13
-- comment: 256
+- comment: 258
 - diagnostic: 9
 - identifier/other: 9
 
@@ -477,6 +477,8 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | comment | src/modeling/SketchTool.cpp:2201 | `// welded. Change the lattice underfoot and it stops — switching feet -> mm` |
 | comment | src/modeling/SketchTool.cpp:2203 | `// (304.8-based vs 1-based), the closing click snaps elsewhere, and 0.3 mm` |
 | comment | src/modeling/SketchTool.cpp:2206 | `// Same shape as tolStep()'s screen term, and the 0.3 mm stays as a floor so` |
+| comment | src/modeling/SketchTool.cpp:2387 | `// It used to be a hand-rolled scan at 1e-4 mm, which is exact equality` |
+| comment | src/modeling/SketchTool.cpp:2394 | `// sketch to extrude" after switching feet -> mm, then as "I can't close` |
 | comment | src/modeling/SketchTool.h:26 | `// current geometry value: mm for distances, RADIUS in mm for Radius (UI` |
 | comment | src/modeling/SketchTool.h:172 | `// Unrotated text extents relative to the anchor (mm), pushed by the app` |
 | comment | src/modeling/SketchTool.h:182 | `// Actual glyph contours (anchor-relative, unrotated mm — same space as the` |
