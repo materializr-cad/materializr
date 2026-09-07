@@ -1,3 +1,4 @@
+#include "ui/LengthField.h"
 #include "SplitController.h"
 
 #include "../core/Document.h"
@@ -162,17 +163,16 @@ void SplitController::panelBody(const IopContext& ctx, bool& changed) {
     // cutting, and SplitBodyOp then hands back the body unchanged with nothing
     // to show for the step.
     const float lim = std::max(half * 0.98f, 0.0f);
-    ImGui::TextDisabled(materializr::tr("Offset from centre: %.2f mm"), m_offset);
-    if (materializr::stepperRow("splitOffset", &m_offset, /*allowNegative=*/true,
+    ImGui::TextDisabled("%s", materializr::trFormat("Offset from centre: %s", materializr::fmtLength(m_offset)).c_str());
+    if (materializr::lengthStepperRow("splitOffset", &m_offset, /*allowNegative=*/true,
                                 -lim, lim))
         changed = true;
     if (ctx.cornerCommitUi &&
-        touchui::amountField("splitOffsetAmt", nullptr, &m_offset, "mm", 2,
-                             /*allowSign=*/true, -lim, lim))
+        materializr::amountLengthField("splitOffsetAmt", nullptr, &m_offset, /*allowSign=*/true, -lim, lim))
         changed = true;
     m_offset = std::min(lim, std::max(-lim, m_offset));
 
-    ImGui::TextDisabled(materializr::tr("Body spans %.2f mm on %s."), half * 2.0f, axisName(m_axis));
+    ImGui::TextDisabled("%s", materializr::trFormat("Body spans %s on %s.", materializr::fmtLength(half * 2.0f), axisName(m_axis)).c_str());
 }
 
 void SplitController::drawOverlay(const IopOverlay& ov) const {

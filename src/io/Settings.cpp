@@ -1,3 +1,5 @@
+#include "core/Units.h"
+#include <cmath>
 #include "Settings.h"
 
 #include <cctype>
@@ -112,6 +114,7 @@ void applyKv(const std::map<std::string, std::string>& kv, AppSettings& s) {
     readIntClamped(kv, "autosaveIntervalSec", s.autosaveIntervalSec, 5, 86400);
     readBool(kv, "invertCubeDrag",       s.invertCubeDrag);
     readFloat(kv, "doubleClickTimeSec",  s.doubleClickTimeSec);
+    readFloat(kv, "filletProbeSeconds",  s.filletProbeSeconds);
     readFloat(kv, "lightAmbient",        s.lightAmbient);
     readBool(kv, "lightHeadlight",       s.lightHeadlight);
     readBool(kv, "lightFill",            s.lightFill);
@@ -141,7 +144,52 @@ void applyKv(const std::map<std::string, std::string>& kv, AppSettings& s) {
     readBool(kv, "includePrereleases",   s.includePrereleases);
     readBool(kv, "supporter",            s.supporter);
     readBool(kv, "snapToGrid",           s.snapToGrid);
-    readFloat(kv, "sketchGridStep",      s.sketchGridStep); // was written but never read back
+    // Normalised HERE, before anything reads it. An out-of-range value means
+    // millimetres, never a clamp to the nearest legal index — clamping made 99
+    // mean Feet during the grid-step migration below while the same 99 meant
+    // millimetres for the setting itself, so one file was read two ways.
+    { int v = s.displayUnit; readInt(kv, "displayUnit", v);
+      s.displayUnit = (v >= 0 && v < materializr::kLengthUnitCount) ? v : 0; }
+
+    // The grid step changed MEANING, so it changed KEY. "sketchGridStep" was
+    // always millimetres; "sketchGridStepUnits" is a display number, because
+    // the presets are labelled 0.1 / 0.5 / 1 / 10 and "1" means one of
+    // whatever unit is showing. Two keys rather than a version counter: a file
+    // says which it carries, and no counter has to be kept in step.
+    //
+    // Anything that reaches m_sketchGridStep divides the snap lattice and
+    // sizes the grid renderer, so a non-finite or non-positive value is not a
+    // small cosmetic problem: NaN passes every `<= 0` guard and then reaches
+    // an int conversion in SketchRenderer. Validated before it is accepted.
+    {
+        auto usable = [](float v) {
+            return std::isfinite(v) && v > 0.0f && v <= AppSettings::kMaxGridStepUnits;
+        };
+        if (kv.count("sketchGridStepUnits")) {
+            float v = s.sketchGridStep;
+            readFloat(kv, "sketchGridStepUnits", v);
+            if (usable(v)) s.sketchGridStep = v;      // else keep the default
+        } else if (kv.count("sketchGridStep")) {
+            float legacyMm = 1.0f;
+            readFloat(kv, "sketchGridStep", legacyMm);
+            const double toMm = materializr::unitInfo(
+                static_cast<materializr::LengthUnit>(s.displayUnit)).toMm;
+            const float shown = static_cast<float>(legacyMm / toMm);
+            if (usable(shown)) {
+                s.sketchGridStep = shown;
+                // A millimetre grid carried into FEET migrates to 0.0033 of a
+                // foot: finer than the smallest preset and a lattice the
+                // renderer fades to nothing. The presets are labelled with bare
+                // numbers, so someone who picked "1" meant one of something.
+                // Only where a CONVERSION made it impractical — never under
+                // millimetres, where a deliberate 0.05 mm grid is a real choice
+                // and not something to overwrite.
+                if (s.displayUnit != 0 && s.sketchGridStep < 0.1f)
+                    s.sketchGridStep = 1.0f;
+            }
+        }
+    }
+
     readIntClamped(kv, "inferenceLevel", s.inferenceLevel, 0, 3);
     // -1 is meaningful here ("never chosen"), so the floor is -1, not 0.
     readIntClamped(kv, "language", s.language, -1, 5);
@@ -340,6 +388,12 @@ bool SettingsIO::save(const std::string& path, const AppSettings& s) {
         oldKv.erase("imTouchLite");
         oldKv.erase("imTouchLiteTree");
         oldKv.erase("imTouchLiteTimeline");
+        // Same reason, different migration: superseded by sketchGridStepUnits.
+        // Left in place the legacy key round-trips forever, so a downgrade
+        // would edit it while the stale new key silently won on the next
+        // upgrade. The first save by this build completes the migration.
+        oldKv.erase("sketchGridStep");
+
     }
 
     ensureParentDir(path);
@@ -364,6 +418,7 @@ bool SettingsIO::save(const std::string& path, const AppSettings& s) {
     ofs << "autosaveIntervalSec = " << s.autosaveIntervalSec << "\n";
     ofs << "invertCubeDrag = "      << (s.invertCubeDrag ? "true" : "false") << "\n";
     ofs << "doubleClickTimeSec = "  << s.doubleClickTimeSec  << "\n";
+    ofs << "filletProbeSeconds = "  << s.filletProbeSeconds  << "\n";
     ofs << "lightAmbient = "        << s.lightAmbient        << "\n";
     ofs << "lightHeadlight = "      << (s.lightHeadlight ? "true" : "false") << "\n";
     ofs << "lightFill = "           << (s.lightFill ? "true" : "false") << "\n";
@@ -400,9 +455,10 @@ bool SettingsIO::save(const std::string& path, const AppSettings& s) {
     ofs << "includePrereleases = "      << (s.includePrereleases ? "true" : "false") << "\n";
     ofs << "supporter = "               << (s.supporter ? "true" : "false") << "\n";
     ofs << "snapToGrid = "              << (s.snapToGrid ? "true" : "false") << "\n";
-    ofs << "sketchGridStep = "          << s.sketchGridStep      << "\n";
+    ofs << "sketchGridStepUnits = "     << s.sketchGridStep      << "\n";
     ofs << "inferenceLevel = "          << s.inferenceLevel      << "\n";
     ofs << "language = "                << s.language            << "\n";
+    ofs << "displayUnit = "             << s.displayUnit         << "\n";
     ofs << "showInferenceToolbarToggle = "
         << (s.showInferenceToolbarToggle ? "true" : "false") << "\n";
     ofs << "angleSnapDeg = "             << s.angleSnapDeg        << "\n";
@@ -474,6 +530,7 @@ bool SettingsIO::exportJson(const std::string& path, const AppSettings& s) {
     ofs << "  \"autosaveIntervalSec\": "     << s.autosaveIntervalSec   << ",\n";
     ofs << "  \"invertCubeDrag\": "          << b(s.invertCubeDrag)     << ",\n";
     ofs << "  \"doubleClickTimeSec\": "      << s.doubleClickTimeSec    << ",\n";
+    ofs << "  \"filletProbeSeconds\": "      << s.filletProbeSeconds    << ",\n";
     ofs << "  \"lightAmbient\": "            << s.lightAmbient          << ",\n";
     ofs << "  \"lightHeadlight\": "          << b(s.lightHeadlight)     << ",\n";
     ofs << "  \"lightFill\": "               << b(s.lightFill)          << ",\n";
@@ -501,9 +558,10 @@ bool SettingsIO::exportJson(const std::string& path, const AppSettings& s) {
     ofs << "  \"includePrereleases\": " << b(s.includePrereleases) << ",\n";
     ofs << "  \"supporter\": "               << b(s.supporter)          << ",\n";
     ofs << "  \"snapToGrid\": "              << b(s.snapToGrid)         << ",\n";
-    ofs << "  \"sketchGridStep\": "          << s.sketchGridStep        << ",\n";
+    ofs << "  \"sketchGridStepUnits\": "     << s.sketchGridStep        << ",\n";
     ofs << "  \"inferenceLevel\": "          << s.inferenceLevel        << ",\n";
     ofs << "  \"language\": "                << s.language              << ",\n";
+    ofs << "  \"displayUnit\": "             << s.displayUnit           << ",\n";
     ofs << "  \"showInferenceToolbarToggle\": "
         << b(s.showInferenceToolbarToggle) << ",\n";
     ofs << "  \"angleSnapDeg\": "             << s.angleSnapDeg          << ",\n";

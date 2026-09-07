@@ -11,6 +11,7 @@
 #include "viewport/Camera.h"
 #include "viewport/ShapeRenderer.h"
 #include "core/Document.h"
+#include "core/LengthEdit.h"
 #include "core/MeshGuard.h"
 #include "core/PlaneAxes.h"
 #include "core/History.h"
@@ -183,8 +184,8 @@ void Application::beginThread(const materializr::CylindricalPick& p) {
     // Likewise a groove width from the last part would silently override the
     // ISO proportions this dialog just computed.
     m_threadGrooveWidth = 0.0f;
-    std::snprintf(m_threadPitchBuf, sizeof(m_threadPitchBuf), "%.2f", m_threadPitch);
-    std::snprintf(m_threadDepthBuf, sizeof(m_threadDepthBuf), "%.2f", m_threadDepth);
+    materializr::formatLengthDigits(m_threadPitchBuf, sizeof(m_threadPitchBuf), m_threadPitch);
+    materializr::formatLengthDigits(m_threadDepthBuf, sizeof(m_threadDepthBuf), m_threadDepth);
 
     // Name the picked cylinder face topologically so the committed thread
     // FOLLOWS an upstream edit (the cylinder moving or its diameter changing)
@@ -642,7 +643,7 @@ void Application::beginPattern(PatternKind kind) {
     m_patternPreview.clear(*m_document);
     m_patternInputFocus    = true;
     std::snprintf(m_patternCountBuf,    sizeof(m_patternCountBuf),    "%d", m_patternCount);
-    std::snprintf(m_patternDistanceBuf, sizeof(m_patternDistanceBuf), "%.2f", m_patternDistance);
+    materializr::formatLengthDigits(m_patternDistanceBuf, sizeof(m_patternDistanceBuf), m_patternDistance);
     std::snprintf(m_patternAngleBuf,    sizeof(m_patternAngleBuf),    "%.1f", m_patternAngle);
     m_patternActive = true;
 
@@ -1673,8 +1674,7 @@ void Application::beginConstructionPlane() {
     else if (m_planeOpHaveAxis)      m_planeOpKindIdx = 5;
     else                             m_planeOpKindIdx = 0;
     m_planeOpOffset = 0.0;
-    std::snprintf(m_planeOpOffsetBuf, sizeof(m_planeOpOffsetBuf), "%.2f",
-                  m_planeOpOffset);
+    materializr::formatLengthDigits(m_planeOpOffsetBuf, sizeof(m_planeOpOffsetBuf), m_planeOpOffset);
     m_planeOpPreview.clear(*m_document);
     m_planeOpActive = true;
 
@@ -2022,8 +2022,7 @@ void Application::beginConstructionAxis() {
     m_axisOpActive = true;
     m_axisOpOrigin[0] = m_axisOpOrigin[1] = m_axisOpOrigin[2] = 0.0;
     for (int i = 0; i < 3; ++i) {
-        std::snprintf(m_axisOpOriginBuf[i], sizeof(m_axisOpOriginBuf[i]),
-                      "%.2f", m_axisOpOrigin[i]);
+        materializr::formatLengthDigits(m_axisOpOriginBuf[i], sizeof(m_axisOpOriginBuf[i]), m_axisOpOrigin[i]);
     }
 
     // Gather selection-derived inputs (cylinder centreline, straight edge,
@@ -2250,7 +2249,7 @@ void Application::beginSketchPattern(PatternKind kind) {
     m_sketchPatternOriginX  = 0.0f;
     m_sketchPatternOriginY  = 0.0f;
     std::snprintf(m_sketchPatternCountBuf,    sizeof(m_sketchPatternCountBuf),    "%d", m_sketchPatternCount);
-    std::snprintf(m_sketchPatternDistanceBuf, sizeof(m_sketchPatternDistanceBuf), "%.2f", m_sketchPatternDistance);
+    materializr::formatLengthDigits(m_sketchPatternDistanceBuf, sizeof(m_sketchPatternDistanceBuf), m_sketchPatternDistance);
     std::snprintf(m_sketchPatternAngleBuf,    sizeof(m_sketchPatternAngleBuf),    "%.1f", m_sketchPatternAngle);
     std::snprintf(m_sketchPatternOXBuf, sizeof(m_sketchPatternOXBuf), "%.2f", m_sketchPatternOriginX);
     std::snprintf(m_sketchPatternOYBuf, sizeof(m_sketchPatternOYBuf), "%.2f", m_sketchPatternOriginY);

@@ -1,3 +1,4 @@
+#include "ui/LengthField.h"
 #include "PatternOp.h"
 #include <BRepBuilderAPI_Transform.hxx>
 #include <gp_Trsf.hxx>
@@ -222,9 +223,9 @@ void PatternOp::renderProperties() {
     ImGui::Text(materializr::tr("Body ID: %d"), m_bodyId);
 
     if (m_type == PatternType::Linear) {
-        materializr::inputNumber(materializr::tr("Spacing X"), &m_spacingX, 0.1, 1.0, "%g");
-        materializr::inputNumber(materializr::tr("Spacing Y"), &m_spacingY, 0.1, 1.0, "%g");
-        materializr::inputNumber(materializr::tr("Spacing Z"), &m_spacingZ, 0.1, 1.0, "%g");
+        materializr::lengthField(materializr::tr("Spacing X"), &m_spacingX);
+        materializr::lengthField(materializr::tr("Spacing Y"), &m_spacingY);
+        materializr::lengthField(materializr::tr("Spacing Z"), &m_spacingZ);
     } else {
         materializr::inputNumber(materializr::tr("Axis X"), &m_axisX, 0.1, 1.0, "%g");
         materializr::inputNumber(materializr::tr("Axis Y"), &m_axisY, 0.1, 1.0, "%g");

@@ -1,3 +1,4 @@
+#include "ui/LengthField.h"
 #include "UiTheme.h"
 #include "ui_scale.h"
 #include "MeasureTool.h"
@@ -230,24 +231,24 @@ void MeasureTool::renderPanel() {
         ImGui::Separator();
         switch (r.type) {
             case MeasureResult::Distance:
-                ImGui::Text(materializr::tr("Distance: %.3f mm"), r.value);
-                ImGui::Text("  ΔX %.3f   ΔY %.3f   ΔZ %.3f", r.dimX, r.dimY, r.dimZ);
-                ImGui::Text(materializr::tr("  From: (%.2f, %.2f, %.2f)"), r.pointA.x, r.pointA.y, r.pointA.z);
-                ImGui::Text(materializr::tr("  To:   (%.2f, %.2f, %.2f)"), r.pointB.x, r.pointB.y, r.pointB.z);
+                ImGui::TextUnformatted(materializr::trFormat("Distance: %s", materializr::fmtLength(r.value)).c_str());
+                ImGui::TextUnformatted(materializr::trFormat("  \xCE\x94 %s", materializr::fmtVec3(r.dimX, r.dimY, r.dimZ)).c_str());
+                ImGui::TextUnformatted(materializr::trFormat("  From: %s", materializr::fmtVec3(r.pointA.x, r.pointA.y, r.pointA.z)).c_str());
+                ImGui::TextUnformatted(materializr::trFormat("  To:   %s", materializr::fmtVec3(r.pointB.x, r.pointB.y, r.pointB.z)).c_str());
                 break;
             case MeasureResult::EdgeLength:
-                ImGui::Text(materializr::tr("%s: %.3f mm"), r.label.c_str(), r.value);
+                ImGui::TextUnformatted(materializr::trFormat("%s: %s", r.label.c_str(), materializr::fmtLength(r.value)).c_str());
                 break;
             case MeasureResult::FaceArea:
-                ImGui::Text(materializr::tr("Area: %.3f mm\xC2\xB2"), r.value);
+                ImGui::TextUnformatted(materializr::trFormat("Area: %s", materializr::fmtArea(r.value)).c_str());
                 break;
             case MeasureResult::BoundingBox:
                 ImGui::Text("%s", r.label.c_str());
-                ImGui::Text(materializr::tr("  X: %.3f mm"), r.dimX);
-                ImGui::Text(materializr::tr("  Y: %.3f mm"), r.dimY);
-                ImGui::Text(materializr::tr("  Z: %.3f mm"), r.dimZ);
-                ImGui::Text(materializr::tr("  Min: (%.2f, %.2f, %.2f)"), r.pointA.x, r.pointA.y, r.pointA.z);
-                ImGui::Text(materializr::tr("  Max: (%.2f, %.2f, %.2f)"), r.pointB.x, r.pointB.y, r.pointB.z);
+                ImGui::TextUnformatted(materializr::trFormat("  X: %s", materializr::fmtLength(r.dimX)).c_str());
+                ImGui::TextUnformatted(materializr::trFormat("  Y: %s", materializr::fmtLength(r.dimY)).c_str());
+                ImGui::TextUnformatted(materializr::trFormat("  Z: %s", materializr::fmtLength(r.dimZ)).c_str());
+                ImGui::TextUnformatted(materializr::trFormat("  Min: %s", materializr::fmtVec3(r.pointA.x, r.pointA.y, r.pointA.z)).c_str());
+                ImGui::TextUnformatted(materializr::trFormat("  Max: %s", materializr::fmtVec3(r.pointB.x, r.pointB.y, r.pointB.z)).c_str());
                 break;
             default: break;
         }

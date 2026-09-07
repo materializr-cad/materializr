@@ -113,6 +113,10 @@ public:
     int coincidentPoint(glm::vec2 pos, int excludeId = -1) const {
         return findCoincidentPoint(pos, excludeId);
     }
+    // The generated-geometry counterpart (fixed model radius, zoom-independent).
+    int exactCoincidentPoint(glm::vec2 pos, int excludeId = -1) const {
+        return findExactCoincidentPoint(pos, excludeId);
+    }
     // Select every element in the active sketch (used by Ctrl+A / double-click).
     void selectAll();
     // Replace the current selection with the given ids.
@@ -288,7 +292,73 @@ public:
 
     // Grid step (in sketch-plane mm). Used for both visual grid and snap-to-line.
     // 0 disables grid snap entirely.
-    void setGridStep(float step) { m_gridStep = step; }
+    // POINTING precision, not grid coarseness. Trim, pick, inference and hover
+    // distances track the user's chosen step so a fine grid gives fine picking
+    // — but they must not grow without bound when that step is coarse. With
+    // the step following the display unit, a 1 ft grid put the trim threshold
+    // at 152 mm: a click on empty space could cut geometry 15 cm away, with
+    // grid snapping OFF. The cap is the largest step the presets ever offered
+    // in millimetres.
+    //
+    // It is m_toleranceStep that is capped here, not the snap lattice. Since
+    // the lattice started following the zoom, capping THAT would have pinned
+    // the pick radius at 10 mm the moment a 1 mm grid coarsened — see tolStep.
+    static constexpr float kToleranceStepCapMm = 10.0f;
+    // How many SCREEN PIXELS a click may be from an existing point and still
+    // WELD onto it. Deliberately tighter than the pointing radius below:
+    // welding joins topology (it is what closes a loop into an extrudable
+    // region), so it should ask for a more deliberate aim than a mere pick.
+    static constexpr float kWeldRadiusPx = 6.0f;
+    // Ceiling on the screen-derived weld radius, in millimetres. Six pixels is
+    // an aim radius; at 3 mm/px it is an 18 mm topological merge and it grows
+    // without bound as the view pulls back. Nearest-wins picks the best of
+    // several candidates, it does not stop two deliberately distinct vertices
+    // merging. At the zooms sketching actually happens (under ~1.7 mm/px) this
+    // never engages; it is a rail against the absurd end.
+    static constexpr float kWeldRadiusCapMm = 10.0f;
+    // How many SCREEN PIXELS of slop a pointing gesture gets. Tuned so that at
+    // the default millimetre framing this lands on the 0.3-1 mm the tolerances
+    // have always used.
+    static constexpr float kPointingRadiusPx = 12.0f;
+
+    // Sketch millimetres per screen pixel, pushed in each frame by the
+    // viewport. 0 until the first frame, which falls back to the grid.
+    void setPixelScale(float mmPerPx) { m_mmPerPixel = mmPerPx > 0.0f ? mmPerPx : 0.0f; }
+
+    // Pointing tolerance, in sketch millimetres. A tolerance is a SCREEN
+    // distance — how near the cursor is in pixels — not a property of the
+    // model. Deriving it from the grid alone gave 152 mm under a foot grid
+    // (a click on empty space cut distant geometry) and, once capped at 10 mm,
+    // gave 5 mm in a view where one pixel is 8 mm: sub-pixel, so nothing could
+    // be picked at all. Both failures are the same mistake in opposite
+    // directions.
+    //
+    // The screen term is what makes this usable at any zoom; the grid term is
+    // a floor, so a fine grid still gives fine picking and every existing
+    // millimetre sketch behaves exactly as it did.
+    float tolStep() const {
+        // m_toleranceStep, NOT m_gridStep. The snap lattice now follows the
+        // ZOOM (it is the user's base scaled by decades), and a tolerance that
+        // followed it with it would grow every time the view pulled back: a
+        // 1 mm base coarsening to 10 mm pins this at the cap below, turning a
+        // ~1.5 mm pick radius into 10 mm — an 80-pixel grab — for no reason
+        // the user expressed. The base is the precision they actually chose.
+        const float fromGrid   = std::min(m_toleranceStep, kToleranceStepCapMm);
+        const float fromScreen = kPointingRadiusPx * m_mmPerPixel;
+        return std::max(fromGrid, fromScreen);
+    }
+
+    // The lattice points snap to — scaled by zoom, so it changes as you zoom.
+    // Also moves the tolerance step, so a caller that only ever sets this one
+    // behaves exactly as this class did before the two were separated. The
+    // viewport calls setToleranceStep straight after, to pin tolerances to the
+    // user's base while snapping follows the zoom.
+    void setGridStep(float step) { m_gridStep = step; m_toleranceStep = step; }
+    // The user's chosen step, which zoom does NOT scale. Only tolerances read
+    // it. Must be called AFTER setGridStep, which resets it.
+    void setToleranceStep(float step) {
+        if (step > 0.0f) m_toleranceStep = step;
+    }
     float getGridStep() const { return m_gridStep; }
     // Mirrors the toolbar "Snap to grid" checkbox. When on (default), placed
     // points always round to the nearest grid increment; when off, only
@@ -331,6 +401,19 @@ public:
     // side of the chord still decides which way the arc bows: that is a
     // direction, not a dimension, so no number can express it.
     enum class ArcDimMode { Sweep, Radius };
+    // Is the value applyDimension() expects right now a LENGTH? Not always:
+    // an arc's second click in Sweep mode takes DEGREES (clamped 0.1..359.9),
+    // and a polygon's first takes a SIDE COUNT. Both were being converted
+    // display->mm on the way in, so under inches a typed 180 deg arrived as
+    // 4572 and a typed 6 sides as 152. Callers that convert must ask first;
+    // this lives here because applyDimension's own switch is the only place
+    // that knows.
+    bool dimensionValueIsLength() const {
+        if (m_mode == SketchToolMode::Polygon && m_clickCount == 0) return false;
+        if (m_mode == SketchToolMode::Arc && m_clickCount == 2 &&
+            m_arcDimMode == ArcDimMode::Sweep) return false;
+        return true;
+    }
     void setArcDimMode(ArcDimMode m) { m_arcDimMode = m; }
     ArcDimMode getArcDimMode() const { return m_arcDimMode; }
     // Half the chord — the smallest radius any arc through these two endpoints
@@ -488,8 +571,20 @@ private:
     // Snap to grid/points
     glm::vec2 snap(glm::vec2 pos) const;
 
-    // Find an existing point near the given position (returns -1 if none)
+    // Find an existing point near the given position (returns -1 if none).
+    // INTERACTIVE: the radius is a screen distance, because this answers "did
+    // the user aim at that point". Only for positions the user actually
+    // clicked. Generated geometry must use findExactCoincidentPoint.
     int findCoincidentPoint(glm::vec2 pos, int excludeId = -1) const;
+
+    // Coincidence for GENERATED geometry — a mirrored vertex, an offset
+    // endpoint, a derived circle centre. Fixed model-space radius, so the same
+    // operation on the same sketch produces the same topology no matter where
+    // the camera is. A screen radius here would make the model a function of
+    // the view: mirroring while zoomed out would weld vertices that mirroring
+    // while zoomed in leaves separate. Same reasoning the arc circumcentre
+    // already documents (see handleArcTool).
+    int findExactCoincidentPoint(glm::vec2 pos, int excludeId = -1) const;
 
     void handleLineTool(glm::vec2 pos);
     // exact = the position came from a typed value; skip the grid rounding.
@@ -604,7 +699,9 @@ private:
     int   m_rectDimStage = 0;
     float m_rectDimH = 0.0f;
 
-    float m_gridStep = 1.0f; // default 1 mm grid
+    float m_gridStep = 1.0f; // default 1 mm grid (zoom-scaled; snapping)
+    float m_toleranceStep = 1.0f; // the user's base step (pointing tolerances)
+    float m_mmPerPixel = 0.0f;   // set per frame; see setPixelScale
     bool  m_snapToGridEnabled = true; // toolbar checkbox, see setSnapToGridEnabled
 
     // Updated each frame in Trim mode so the renderer can outline the segment

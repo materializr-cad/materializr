@@ -86,6 +86,10 @@ struct AppSettings {
     // two single clicks (which would cycle-select past the body to the sketch
     // behind it).
     float doubleClickTimeSec = 0.30f;
+    // Seconds a fillet may spend proving it terminates before it is refused.
+    // OCCT's blend cannot be interrupted, so this is the only bound on it —
+    // raise it for heavy bodies, lower it if a stalled fillet feels sluggish.
+    float filletProbeSeconds = 2.5f;
 
     // --- Rendering ---
     float lightAmbient   = 0.40f; // 0..1 base illumination; higher = softer shadows
@@ -167,6 +171,13 @@ struct AppSettings {
     // body/sketch gizmo translate. Persisting these means the user doesn't
     // have to re-enable snap and re-pick a 1 mm step every launch.
     bool  snapToGrid    = true;
+    // Largest grid step accepted from a file, in display units. A huge finite
+    // value makes framing unusable and a NaN reaches an int conversion in the
+    // renderer, so both are rejected rather than clamped.
+    static constexpr float kMaxGridStepUnits = 10000.0f;
+    // In DISPLAY UNITS, not millimetres: "1" means one of whatever unit is
+    // showing, which is what the presets (0.1 / 0.5 / 1 / 10) offer. Converted
+    // to mm on load, after the display unit is applied.
     float sketchGridStep = 1.0f;
 
     // --- Sketch inferences ---
@@ -190,6 +201,11 @@ struct AppSettings {
     // not depend on i18n.h. -1 means "never chosen", which is what makes the
     // setup wizard ask on first run.
     int  language = -1;
+    // Display unit for every length readout and input: materializr::LengthUnit
+    // (0 mm, 1 cm, 2 m, 3 in, 4 ft). An int for the same reason language is —
+    // this header stays free of core/Units.h. The model is always mm; this only
+    // changes what the user sees and types.
+    int  displayUnit = 0;
 
     // --- STL import ---
     // Default fidelity for STL import, 0..1 (coarse/fast .. faithful/slow). Pre-

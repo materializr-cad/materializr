@@ -80,4 +80,36 @@ inline bool constraintSupportsReference(ConstraintType t) {
            t == ConstraintType::CircleGap;
 }
 
+// How far a press must travel, in pixels, before it counts as dragging a
+// dimension label rather than clicking it. Pixels rather than sketch mm because
+// this is a property of the hand, not of the model's scale.
+inline constexpr float kDimDragThresholdPx = 3.0f;
+
+// Whether a press that has moved (dx, dy) pixels is a drag yet.
+//
+// Load-bearing for more than feel: the caller must store NOTHING until this
+// turns true. A label's stored offset doubles as the "user placed this" flag,
+// so writing one on a plain click converts an automatically positioned label
+// into a fixed one — it gains a leader line and stops tracking automatic
+// placement, without the user having asked for either.
+inline bool dimDragExceedsThreshold(float dx, float dy) {
+    return dx * dx + dy * dy > kDimDragThresholdPx * kDimDragThresholdPx;
+}
+
+// Label offset for a dimension tag dropped at `want`, measured from its
+// geometric anchor.
+//
+// (0,0) is overloaded: it is also the sentinel for "never placed", which the
+// renderer reads as "use the automatic position". A tag dropped exactly on its
+// anchor would therefore snap back to auto placement and look like the drag was
+// ignored. Nudging by a tenth of a micron is invisible at any usable zoom and
+// keeps the placement.
+inline void dimLabelOffset(double wantX, double wantY,
+                           double anchorX, double anchorY,
+                           double& outX, double& outY) {
+    outX = wantX - anchorX;
+    outY = wantY - anchorY;
+    if (outX == 0.0 && outY == 0.0) outX = 1e-4;
+}
+
 } // namespace materializr

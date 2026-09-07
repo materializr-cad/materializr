@@ -1,3 +1,5 @@
+#include "ui/LengthField.h"
+#include "core/Units.h"
 #include "PrimitiveOp.h"
 
 #include <BRepPrimAPI_MakeBox.hxx>
@@ -116,19 +118,15 @@ std::string PrimitiveOp::description() const {
     char buf[96];
     switch (m_kind) {
         case Kind::Box:
-            std::snprintf(buf, sizeof(buf), " %.1fx%.1fx%.1f mm",
-                          m_x, m_y, m_z); break;
+            std::snprintf(buf, sizeof(buf), " %sx%sx%s", materializr::fmtLength(m_x).c_str(), materializr::fmtLength(m_y).c_str(), materializr::fmtLength(m_z).c_str()); break;
         case Kind::Cylinder:
-            std::snprintf(buf, sizeof(buf), " R%.1f x H%.1f mm",
-                          m_radius, m_height); break;
+            std::snprintf(buf, sizeof(buf), " R%s x H%s", materializr::fmtLength(m_radius).c_str(), materializr::fmtLength(m_height).c_str()); break;
         case Kind::Sphere:
-            std::snprintf(buf, sizeof(buf), " R%.1f mm", m_radius); break;
+            std::snprintf(buf, sizeof(buf), " R%s", materializr::fmtLength(m_radius).c_str()); break;
         case Kind::Cone:
-            std::snprintf(buf, sizeof(buf), " R%.1f→%.1f x H%.1f mm",
-                          m_radius, m_topRadius, m_height); break;
+            std::snprintf(buf, sizeof(buf), " R%s→%s x H%s", materializr::fmtLength(m_radius).c_str(), materializr::fmtLength(m_topRadius).c_str(), materializr::fmtLength(m_height).c_str()); break;
         case Kind::Torus:
-            std::snprintf(buf, sizeof(buf), " R%.1f r%.1f mm",
-                          m_radius, m_minorRadius); break;
+            std::snprintf(buf, sizeof(buf), " R%s r%s", materializr::fmtLength(m_radius).c_str(), materializr::fmtLength(m_minorRadius).c_str()); break;
     }
     return lbl + std::string(buf);
 }
@@ -138,32 +136,32 @@ void PrimitiveOp::renderProperties() {
     ImGui::Separator();
     switch (m_kind) {
         case Kind::Box:
-            materializr::inputNumber(materializr::tr("Width (X)"),  &m_x, 0.1, 1.0, "%g");
-            materializr::inputNumber(materializr::tr("Depth (Y)"),  &m_y, 0.1, 1.0, "%g");
-            materializr::inputNumber(materializr::tr("Height (Z)"), &m_z, 0.1, 1.0, "%g");
+            materializr::lengthField(materializr::tr("Width (X)"), &m_x);
+            materializr::lengthField(materializr::tr("Depth (Y)"), &m_y);
+            materializr::lengthField(materializr::tr("Height (Z)"), &m_z);
             break;
         case Kind::Cylinder:
-            materializr::inputNumber(materializr::tr("Radius"),     &m_radius, 0.1, 1.0, "%g");
-            materializr::inputNumber(materializr::tr("Height"),     &m_height, 0.1, 1.0, "%g");
+            materializr::lengthField(materializr::tr("Radius"), &m_radius);
+            materializr::lengthField(materializr::tr("Height"), &m_height);
             break;
         case Kind::Sphere:
-            materializr::inputNumber(materializr::tr("Radius"),     &m_radius, 0.1, 1.0, "%g");
+            materializr::lengthField(materializr::tr("Radius"), &m_radius);
             break;
         case Kind::Cone:
-            materializr::inputNumber(materializr::tr("Bottom radius"), &m_radius,    0.1, 1.0, "%g");
-            materializr::inputNumber(materializr::tr("Top radius"),    &m_topRadius, 0.1, 1.0, "%g");
-            materializr::inputNumber(materializr::tr("Height"),        &m_height,    0.1, 1.0, "%g");
+            materializr::lengthField(materializr::tr("Bottom radius"), &m_radius);
+            materializr::lengthField(materializr::tr("Top radius"), &m_topRadius);
+            materializr::lengthField(materializr::tr("Height"), &m_height);
             break;
         case Kind::Torus:
-            materializr::inputNumber(materializr::tr("Major radius"),  &m_radius,      0.1, 1.0, "%g");
-            materializr::inputNumber(materializr::tr("Minor radius"),  &m_minorRadius, 0.1, 1.0, "%g");
+            materializr::lengthField(materializr::tr("Major radius"), &m_radius);
+            materializr::lengthField(materializr::tr("Minor radius"), &m_minorRadius);
             break;
     }
     ImGui::Spacing();
     ImGui::Text("%s", materializr::tr("Origin"));
-    materializr::inputNumber("X", &m_ox, 0.1, 1.0, "%g");
-    materializr::inputNumber("Y", &m_oy, 0.1, 1.0, "%g");
-    materializr::inputNumber("Z", &m_oz, 0.1, 1.0, "%g");
+    materializr::lengthField("X", &m_ox);
+    materializr::lengthField("Y", &m_oy);
+    materializr::lengthField("Z", &m_oz);
     ImGui::Text(materializr::tr("Body ID: %d"), m_createdBodyId);
 
     // Same validation feedback the create popup shows — Apply Changes runs

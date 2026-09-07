@@ -75,6 +75,7 @@ inline void resetFpuForOcct() {
 #include "ui/MeasureTool.h"
 #include "ui/UpdateChecker.h"
 #include "modeling/Sketch.h"
+#include "viewport/GridScale.h"
 #include "modeling/ThreadOp.h"
 #include "modeling/CopyOp.h"
 #include "modeling/SketchSolver.h"
@@ -89,6 +90,9 @@ inline void resetFpuForOcct() {
 #include "modeling/CombineSketchesOp.h"
 #include "modeling/DuplicateSketchOp.h"
 #include "modeling/TransformOp.h"
+#include "core/Units.h"
+#include "core/LengthEdit.h"
+#include "modeling/FilletProbe.h"
 #include "modeling/MirrorOp.h"
 #include "modeling/FilletOp.h"
 #include "modeling/ChamferOp.h"
@@ -1828,6 +1832,7 @@ AppSettings Application::currentSettings() const {
     s.touchMode = m_touchMode;
     s.uiLayout = m_uiLayout;
     s.language = m_language;
+    s.displayUnit = m_displayUnit;
     s.imTouchTree = m_imTouchTree;
     s.imTouchTimeline = m_imTouchTimeline;
     s.touchRightTab = m_touchRightTab;
@@ -1841,6 +1846,7 @@ AppSettings Application::currentSettings() const {
     s.autosaveIntervalSec = static_cast<int>(m_autosaveIntervalSec);
     s.invertCubeDrag = m_invertCubeDrag;
     s.doubleClickTimeSec = m_doubleClickTime;
+    s.filletProbeSeconds = m_filletProbeSeconds;
     s.lightAmbient = m_lightAmbient;
     s.lightHeadlight = m_lightHeadlight;
     s.lightFill = m_lightFill;
@@ -1880,7 +1886,15 @@ AppSettings Application::currentSettings() const {
     s.includePrereleases = m_includePrereleases;
     s.supporter = m_supporter;
     s.snapToGrid = m_snapToGrid;
-    s.sketchGridStep = m_sketchGridStep;
+    // Stored as the DISPLAY NUMBER, not millimetres. The step is chosen from
+    // presets labelled 0.1 / 0.5 / 1 / 10, and "1" means one of whatever unit
+    // is showing. Saved as millimetres, picking "1" under feet wrote 304.8 —
+    // or, from before the presets converted, wrote 1 and reloaded as a 1 mm
+    // grid inside a 40 ft view: 12192 lines, which the renderer fades to
+    // nothing, so the grid simply vanished. What persists is this BASE; the
+    // step the sketch actually draws and snaps to is the base scaled by zoom
+    // (Application.h m_effectiveGridStepMm), and only the base round-trips.
+    s.sketchGridStep = static_cast<float>(materializr::toDisplay(m_sketchGridStep));
     // Mirror the live sketch-tool inference level back into the saved settings
     // so cycling the toolbar Full→Reduced→Off button persists across launches.
     s.inferenceLevel = m_sketchTool
@@ -1912,6 +1926,7 @@ void Application::applyAppSettings(const AppSettings& s) {
     setLanguage((s.language > 0 && s.language < languageCount())
                     ? static_cast<Lang>(s.language)
                     : Lang::English);
+    applyDisplayUnitChange(s.displayUnit);
     m_imTouchTree = s.imTouchTree;
     m_imTouchTimeline = s.imTouchTimeline;
     m_showFps = s.showFps;
@@ -1939,6 +1954,10 @@ void Application::applyAppSettings(const AppSettings& s) {
     m_doubleClickTime = s.doubleClickTimeSec;
     if (ImGui::GetCurrentContext())
         ImGui::GetIO().MouseDoubleClickTime = m_doubleClickTime;
+    m_filletProbeSeconds = s.filletProbeSeconds;
+    // The only bound on an uninterruptible OCCT blend, so it must reach the
+    // probe on every apply — not just at construction.
+    materializr::fillet::setProbeBudget(m_filletProbeSeconds);
     m_lightAmbient = s.lightAmbient;
     m_lightHeadlight = s.lightHeadlight;
     m_lightFill = s.lightFill;
@@ -1966,7 +1985,9 @@ void Application::applyAppSettings(const AppSettings& s) {
     m_includePrereleases = s.includePrereleases;
     m_supporter = s.supporter;
     m_snapToGrid = s.snapToGrid;
-    m_sketchGridStep = s.sketchGridStep;
+    // Display number -> millimetres. Safe here because the display unit is
+    // applied above (applyDisplayUnitChange) before this runs.
+    m_sketchGridStep = static_cast<float>(materializr::toMm(s.sketchGridStep));
     m_showInferenceToolbarToggle = s.showInferenceToolbarToggle;
     m_stlImportAccuracy = s.stlImportAccuracy;
     m_meshShowWireframe = s.meshShowWireframe;
@@ -1984,7 +2005,7 @@ void Application::applyAppSettings(const AppSettings& s) {
     // values right away rather than waiting for the first frame's sync.
     if (m_toolbar) {
         m_toolbar->setSnapToGrid(s.snapToGrid);
-        m_toolbar->setGridStep(s.sketchGridStep);
+        m_toolbar->setGridStep(m_sketchGridStep);   // millimetres, not the stored number
         m_toolbar->setShowInferenceToggle(s.showInferenceToolbarToggle);
     }
 }
@@ -3781,6 +3802,13 @@ ProjectHistory Application::captureProjectHistory(bool cancelPreviews) {
     // Walk the steps backward, reading each op's stored before-shapes. This is
     // non-destructive (unlike undo()) and never recomputes geometry.
     std::vector<ProjectHistoryStep> steps(n);
+    // Descriptions go INTO THE FILE (ProjectIO writes them as DESC), and
+    // Operation::description() now formats lengths in the display unit. Saved
+    // under inches, a step read "Extrude 2.000 in" forever after — on any
+    // machine, whatever its unit setting — because a step that reloads as a
+    // baked ReplayOp returns the stored string verbatim. Capture in
+    // millimetres so what reaches disk is canonical and portable.
+    const materializr::ScopedUnit canonicalForFile(materializr::LengthUnit::Mm);
     for (int i = n - 1; i >= 0; --i) {
         const Operation* op = m_history->getStep(i);
         if (!op) continue;
@@ -4479,6 +4507,59 @@ void Application::doCloseProject() {
 bool Application::isDirty() const {
     return (m_history && m_history->currentStep() != m_savedAtHistoryStep)
         || m_unsavedNonHistoryChanges;
+}
+
+void Application::applyDisplayUnitChange(int unit) {
+    // Clamp here too: Settings clamps on load, but the combo and any future
+    // caller should not be able to hand the table an index it cannot serve.
+    if (unit < 0 || unit >= materializr::kLengthUnitCount) unit = 0;
+    // A text field mid-edit was showing the OLD unit; letting it commit after
+    // the switch would interpret those digits in the NEW one. Drop the edit.
+    // Guarded: settings are applied before the ImGui context exists.
+    if (ImGui::GetCurrentContext()) ImGui::ClearActiveID();
+
+    // ClearActiveID drops FOCUS, and the sketch dimension field only ever
+    // grabs focus once per placement — m_sketchDimWasShown latches true on the
+    // first frame and is cleared only on commit or on leaving placement. So
+    // switching units mid-placement left that popup on screen with an input
+    // nothing could type into, and no way to finish the shape by keyboard.
+    // Whoever clears the active ID has to clear the latch that guards
+    // re-focusing, or the two disagree about whether a field is live.
+    //
+    // The buffer goes too, and not just for tidiness: it still holds digits
+    // meant as the OLD unit. Clearing the active ID stops THIS frame's commit,
+    // but the characters survive, so clicking back into the field and pressing
+    // Enter would commit them as the new unit — the exact misreading the
+    // ClearActiveID above exists to prevent.
+    m_sketchDimBuf[0] = '\0';
+    m_sketchDimValue = 0.0f;
+    m_sketchDimWasShown = false;   // re-seeds and re-grabs focus next frame
+
+    // Carry the grid step's DISPLAYED NUMBER across, not its millimetres. The
+    // step is the snap lattice and the visible grid, so leaving it at 1 mm
+    // while the view frames 40 ft draws 12192 lines (the renderer fades them
+    // to nothing: the grid vanishes) and offers a lattice 1/300th of a usable
+    // one. Working "in feet" means a grid of one foot.
+    //
+    // Safe only because SketchTool::tolStep() now caps what POINTING
+    // tolerances take from the step. Rescaling it while trim, pick, inference
+    // and hover distances derived from it directly put the trim threshold at
+    // 152 mm — see 0733a59, which reverted exactly that.
+    const auto next = static_cast<materializr::LengthUnit>(unit);
+    if (next != materializr::currentUnit() && m_sketchGridStep > 0.0f) {
+        const double shownStep = materializr::toDisplay(m_sketchGridStep);
+        materializr::setCurrentUnit(next);
+        m_sketchGridStep = static_cast<float>(materializr::toMm(shownStep));
+        if (m_toolbar)    m_toolbar->setGridStep(m_sketchGridStep);
+        // NOT m_sketchTool->setGridStep here. renderViewport is the single
+        // writer of the tool's snap lattice, because that lattice is the BASE
+        // SCALED BY ZOOM and only the viewport knows the zoom. Pushing the raw
+        // base from here would leave the cursor snapping to a lattice the grid
+        // is not drawing until the next frame corrected it.
+    } else {
+        materializr::setCurrentUnit(next);
+    }
+    m_displayUnit = unit;
 }
 
 void Application::markDirty() {
@@ -5966,14 +6047,22 @@ void Application::applyPendingDimension() {
     // geometry, Esc keeps the prefilled value.
     if (editId >= 0) {
         m_dimEditingId = editId;
-        if (pd.type == ConstraintType::Angle)
-            std::snprintf(m_dimEditingBuf, sizeof(m_dimEditingBuf), "%.2f",
-                          prefillValue * 180.0 / M_PI);
-        else if (pd.type == ConstraintType::Radius)
-            std::snprintf(m_dimEditingBuf, sizeof(m_dimEditingBuf), "%.2f",
-                          prefillValue * 2.0); // edited as diameter
-        else
-            std::snprintf(m_dimEditingBuf, sizeof(m_dimEditingBuf), "%.2f", prefillValue);
+        // Seed through the SAME helper the click-to-edit path uses. These three
+        // lines wrote raw millimetres: placing a dimension under any non-mm unit
+        // showed the millimetre number in the popup while the label beside it
+        // read the display unit — 29.70 in the field against "O 2.970 cm".
+        const auto dimKind = pd.type == ConstraintType::Angle  ? materializr::DimKind::Angle
+                           : pd.type == ConstraintType::Radius ? materializr::DimKind::Radius
+                                                               : materializr::DimKind::Length;
+        bool dimIsArc = false;
+        if (dimKind == materializr::DimKind::Radius && m_activeSketch)
+            for (const auto& c : m_activeSketch->getConstraints())
+                if (c.id == editId) {
+                    dimIsArc = materializr::constraintIsArcRadius(*m_activeSketch, c);
+                    break;
+                }
+        materializr::seedDimensionText(m_dimEditingBuf, sizeof(m_dimEditingBuf),
+                                       dimKind, dimIsArc, prefillValue);
         m_dimEditingFocus = true;
         m_dimOpenEditRequested = true; // viewport calls OpenPopup("##DimEdit") next frame
         // No m_meshesDirty here: for a new dimension pd.measured is the
@@ -6335,7 +6424,23 @@ void Application::alignCameraToActiveSketch() {
     // alone left off-face or off-origin drawings shoved into a corner; framing
     // the plane origin (the no-source-face case) was worse — the origin sits
     // at a corner of the drawing, so the whole sketch landed in one quadrant.
-    float orthoSize = std::max(20.0f, m_sketchGridStep * 40.0f);
+    // Frame a sensible number of DISPLAY UNITS, not a fixed number of
+    // millimetres. 40 mm is a reasonable first view in millimetres and an
+    // absurd one in feet, where it makes the whole visible sketch 0.13 ft and
+    // every number on screen a fraction. Reported from testing: a line most of
+    // the way across the screen measured 0.24 ft.
+    //
+    // Only the FRAMING is unit-aware here. The BASE step is left alone: the
+    // tolerance decoupling this comment used to defer has since happened —
+    // SketchTool takes the zoom-scaled step for SNAPPING (setGridStep) and the
+    // base for TOLERANCES (setToleranceStep) — but the base is still the value
+    // the user chose, and framing has no business rewriting it.
+    // Bounded — see openingSketchSpanMm. 40 of a large unit is a twelve-metre
+    // opening view, which is how geometry ended up drawn metres from the plane
+    // origin and floating above the ground grid on exit.
+    const float unitSpan = static_cast<float>(materializr::toMm(40.0));
+    float orthoSize = materializr::openingSketchSpanMm(
+        unitSpan, m_sketchGridStep, 20.0f, kOpeningSketchSpanCapMm);
     glm::vec3 lookAt = planeOrigin;
     {
         glm::vec3 bmin( std::numeric_limits<float>::max());
@@ -7542,10 +7647,10 @@ void Application::run() {
                 action = m_toolbar->render();
                 m_sketchGridStep = m_toolbar->getGridStep();
                 m_snapToGrid = m_toolbar->getSnapToGrid();
-                if (m_sketchTool) {
-                    m_sketchTool->setGridStep(m_sketchGridStep);
-                    m_sketchTool->setSnapToGridEnabled(m_snapToGrid);
-                }
+                // The toolbar owns neither the step nor the toggle any more —
+                // renderViewport pushes both, for every layout. It still READS
+                // the toolbar's widgets above, which is what makes a classic
+                // user's click take effect.
             }
             if (action != ToolAction::None) {
                 handleToolAction(static_cast<int>(action));

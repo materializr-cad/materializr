@@ -1,3 +1,4 @@
+#include "ui/LengthField.h"
 #include "RevolveOp.h"
 #include "Sketch.h"
 #include <Bnd_Box.hxx>
@@ -280,9 +281,9 @@ void RevolveOp::renderProperties() {
 
     ImGui::Separator();
     ImGui::Text("%s", materializr::tr("Axis Origin"));
-    materializr::inputNumber(materializr::tr("Origin X"), &m_axisOriginX, 0.1, 1.0, "%g");
-    materializr::inputNumber(materializr::tr("Origin Y"), &m_axisOriginY, 0.1, 1.0, "%g");
-    materializr::inputNumber(materializr::tr("Origin Z"), &m_axisOriginZ, 0.1, 1.0, "%g");
+    materializr::lengthField(materializr::tr("Origin X"), &m_axisOriginX);
+    materializr::lengthField(materializr::tr("Origin Y"), &m_axisOriginY);
+    materializr::lengthField(materializr::tr("Origin Z"), &m_axisOriginZ);
 
     ImGui::Separator();
     ImGui::Text("%s", materializr::tr("Axis Direction"));

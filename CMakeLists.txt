@@ -289,6 +289,7 @@ add_executable(materializr
     src/modeling/FaceLineage.cpp
     src/modeling/ThreadOp.cpp
     src/modeling/FilletOp.cpp
+    src/modeling/FilletProbe.cpp
     src/modeling/ChamferOp.cpp
     src/modeling/BlendCut.cpp
     src/modeling/ResizeCylindricalOp.cpp

@@ -1,3 +1,4 @@
+#include "ui/LengthField.h"
 #include "SectionPanel.h"
 #include "../viewport/SectionView.h"
 
@@ -47,7 +48,12 @@ bool SectionPanel::render() {
     }
 
     // Offset slider
-    if (ImGui::SliderFloat(materializr::tr("Offset"), &m_offset, -100.0f, 100.0f, "%.2f")) {
+    // The label carries the unit, like the equivalent control in
+    // Application_Dialogs. The value converted correctly; only the label
+    // failed to say which unit the number was in.
+    if (materializr::lengthSlider(
+            materializr::trFormat("Offset (%s)", materializr::unitSuffix()).c_str(),
+            &m_offset, -100.0f, 100.0f)) {
         m_sectionView->setOffset(m_offset);
         needsUpdate = true;
     }

@@ -1,3 +1,4 @@
+#include "ui/LengthField.h"
 #include "ui/StepperRow.h"
 #include "ui/UiTheme.h"
 #include "ui_scale.h"
@@ -70,7 +71,7 @@ public:
         if (m_targets.empty()) { m_done = true; return; }
 
         m_distance = 5.0f;
-        std::snprintf(m_inputBuf, sizeof(m_inputBuf), "%.1f", m_distance);
+        materializr::formatLengthDigits(m_inputBuf, sizeof(m_inputBuf), m_distance);
         m_inputFocus = true;
 
         updatePreview(ctx);
@@ -121,7 +122,7 @@ public:
             ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
             ImGuiWindowFlags_AlwaysAutoResize);
 
-        ImGui::Text("%s", materializr::tr("Distance (mm)"));
+        ImGui::Text("%s", materializr::trFormat("Distance (%s)", materializr::unitSuffix()).c_str());
         ImGui::Separator();
 
         if (m_inputFocus) {
@@ -131,14 +132,16 @@ public:
 
         // parseFinite: reject garbage / non-finite input ("1e999" -> inf
         // used to flow straight into the extrude) — the previous value stays.
+        // The member is the truth; the buffer follows unless being typed in.
+        materializr::reseedLengthBufferIfIdle("##dist", m_inputBuf, sizeof(m_inputBuf), m_distance);
         if (ImGui::InputText("##dist", m_inputBuf, sizeof(m_inputBuf),
                              ImGuiInputTextFlags_EnterReturnsTrue)) {
-            (void)materializr::parseFinite(m_inputBuf, m_distance);
+            (void)materializr::parseLength(m_inputBuf, m_distance);
             updatePreview(ctx);
             commit(ctx);
-        } else {
+        } else if (materializr::lengthBufferIsActive("##dist")) {
             float parsed = m_distance;
-            if (materializr::parseFinite(m_inputBuf, parsed) &&
+            if (materializr::parseLength(m_inputBuf, parsed) &&
                 std::abs(parsed - m_distance) > 0.01f) {
                 m_distance = parsed;
                 updatePreview(ctx);
@@ -146,11 +149,11 @@ public:
         }
 
         ImGui::SameLine();
-        ImGui::Text("%s", materializr::tr("mm"));
+        ImGui::Text("%s", materializr::unitSuffix());
 
-        if (materializr::stepperRow("ppStep", &m_distance,
+        if (materializr::lengthStepperRow("ppStep", &m_distance,
                                     /*allowNegative=*/true, -50.0f, 50.0f)) {
-            std::snprintf(m_inputBuf, sizeof(m_inputBuf), "%.1f", m_distance);
+            materializr::formatLengthDigits(m_inputBuf, sizeof(m_inputBuf), m_distance);
             updatePreview(ctx);
         }
 

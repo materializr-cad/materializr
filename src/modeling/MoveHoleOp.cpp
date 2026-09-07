@@ -1,3 +1,4 @@
+#include "core/Units.h"
 #include "MoveHoleOp.h"
 #include "SubShapeIndex.h"
 #include "../core/Verbose.h"
@@ -653,6 +654,6 @@ bool MoveHoleOp::rehydrateFromReload(const ReloadState& state, Document& /*doc*/
 std::string MoveHoleOp::description() const {
     double mag = m_move.Magnitude();
     char buf[48];
-    std::snprintf(buf, sizeof(buf), "Move hole %.1f mm", mag);
+    std::snprintf(buf, sizeof(buf), "Move hole %s", materializr::fmtLength(mag).c_str());
     return buf;
 }

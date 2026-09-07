@@ -1,3 +1,4 @@
+#include "ui/LengthField.h"
 #include "MoveFaceOp.h"
 #include "SubShapeIndex.h"
 #include "Sketch.h"
@@ -583,7 +584,7 @@ void MoveFaceOp::renderProperties() {
     ImGui::Text("%s", materializr::tr("Move Face"));
     ImGui::Separator();
     ImGui::Text(materializr::tr("Body ID: %d"), m_bodyId);
-    ImGui::Text(materializr::tr("Move: (%.2f, %.2f, %.2f) mm"), m_move.X(), m_move.Y(), m_move.Z());
+    ImGui::TextUnformatted(materializr::trFormat("Move: %s", materializr::fmtVec3(m_move.X(), m_move.Y(), m_move.Z())).c_str());
 }
 
 OperationDiff MoveFaceOp::captureDiff() const {

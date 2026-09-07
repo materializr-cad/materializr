@@ -8,6 +8,7 @@
 // Everything fundamental (menus, tool catalogue, history editing) is shared
 // code — see layout/LayoutCommon.h for the keep-in-lockstep contract.
 
+#include "core/Units.h"
 #include "app/Application.h"
 #include "app/layout/LayoutCommon.h"
 #include <algorithm>   // std::min — viewport-capped popup height
@@ -254,7 +255,10 @@ void Application::renderImTouchLayout() {
         // fill while snap is on; tap opens the shared settings popup.
         {
             char snapLbl[16];
-            std::snprintf(snapLbl, sizeof(snapLbl), "%.3g", m_sketchGridStep);
+            // Display unit, like the presets that set it and like the desktop
+            // badge. Raw mm here read "10" after picking the "1" preset under cm.
+            std::snprintf(snapLbl, sizeof(snapLbl), "%.3g",
+                          materializr::toDisplay(m_effectiveGridStepMm));
             if (touchui::pillButton("snap", MZ_ICON_GUIDES, snapLbl,
                                     m_snapToGrid))
                 ImGui::OpenPopup("SnapSettings");

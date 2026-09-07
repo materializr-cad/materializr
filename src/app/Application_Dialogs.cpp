@@ -68,6 +68,8 @@
 #include "modeling/SketchTransformOp.h"
 #include <gp_Quaternion.hxx>
 #include "modeling/PlaneTransformOp.h"
+#include "modeling/FilletProbe.h"
+#include "ui/LengthField.h"
 #include "modeling/MirrorOp.h"
 #include "modeling/RevolveOp.h"
 #include "modeling/FilletOp.h"
@@ -228,6 +230,28 @@ void Application::renderSettings() {
                     }
                     ImGui::Spacing();
 
+                    ImGui::SeparatorText(materializr::tr("Units"));
+                    // ONE mutually-exclusive choice, so a dropdown; order
+                    // matches materializr::LengthUnit and the Settings int.
+                    // The model stays millimetres — this changes what every
+                    // length readout shows and what typed lengths mean.
+                    {
+                        int unit = m_displayUnit;
+                        const char* unitNames[] = {
+                            materializr::tr("Millimetres"), materializr::tr("Centimetres"),
+                            materializr::tr("Metres"),      materializr::tr("Inches"),
+                            materializr::tr("Feet") };
+                        if (ImGui::Combo(materializr::tr("Display unit"), &unit, unitNames, 5)) {
+                            applyDisplayUnitChange(unit);
+                            changed = true;
+                        }
+                        ImGui::SetItemTooltip("%s", materializr::tr(
+                            "Unit for every length you see and type. Geometry is "
+                            "stored in millimetres regardless; a typed value may "
+                            "also carry its own unit, e.g. 2in or 50mm."));
+                    }
+                    ImGui::Spacing();
+
                     ImGui::SeparatorText(materializr::tr("Layout"));
                     // Interface layout is ONE mutually-exclusive choice
                     // (UiLayout in io/Settings.h) — a dropdown so the modes
@@ -286,6 +310,29 @@ void Application::renderSettings() {
                         changed = true;
                     }
                     ImGui::TextWrapped("%s", materializr::tr("Show a small frames-per-second readout at the top of the screen (im-touch layout). Turn off to hide it entirely."));
+
+                    ImGui::Spacing();
+                    ImGui::SeparatorText(materializr::tr("Modelling"));
+                    // Fillet probe budget. OCCT's blend cannot be interrupted
+                    // once entered, so every fillet is first proven to
+                    // terminate on a worker within this window; exceeding it is
+                    // the only way a bad radius can be refused instead of
+                    // hanging the app.
+                    if (ImGui::SliderFloat(materializr::tr("Fillet time limit"),
+                                           &m_filletProbeSeconds, 0.25f, 30.0f,
+                                           "%.2f s")) {
+                        // setProbeBudget clamps authoritatively; no second
+                        // copy of the range to drift out of sync with it.
+                        materializr::fillet::setProbeBudget(m_filletProbeSeconds);
+                        changed = true;
+                    }
+                    ImGui::SetItemTooltip("%s", materializr::tr(
+                        "How long a fillet may take before it is refused. OCCT's "
+                        "blend cannot be cancelled once started, so a fillet is "
+                        "first run on a background copy and abandoned if it "
+                        "exceeds this. Raise it for large or heavy bodies where "
+                        "fillets legitimately take longer; lower it if a fillet "
+                        "that cannot be built keeps you waiting."));
 
                     ImGui::Spacing();
                     ImGui::SeparatorText(materializr::tr("Selection"));
@@ -903,8 +950,15 @@ void Application::renderScalePanel() {
         ImGuiWindowFlags_AlwaysAutoResize);
 
     const bool mm = (m_scaleUnitMode == ScaleUnitMode::Millimeter);
-    ImGui::TextColored(materializr::accentText(),
-                       mm ? "Scale (target mm)" : "Scale (%% of current)");
+    // Two calls, not one format string with a conditional: TextColored is
+    // printf-style, and the mm branch takes an argument the other does not.
+    // Sharing one call left "%s" with nothing to consume it — undefined
+    // behaviour, and the compiler said so (-Wformat-insufficient-args).
+    if (mm)
+        ImGui::TextColored(materializr::accentText(), "Scale (target %s)",
+                           materializr::unitSuffix());
+    else
+        ImGui::TextColored(materializr::accentText(), "Scale (%% of current)");
     ImGui::Separator();
 
     // Unit toggle. mm disabled when multi-body so we don't mislead — there's
@@ -912,7 +966,7 @@ void Application::renderScalePanel() {
     ImGui::BeginDisabled(!singleBody);
     if (ImGui::RadioButton("%", !mm))  m_scaleUnitMode = ScaleUnitMode::Percent;
     ImGui::SameLine();
-    if (ImGui::RadioButton(materializr::tr("mm"), mm))  m_scaleUnitMode = ScaleUnitMode::Millimeter;
+    if (ImGui::RadioButton(materializr::unitSuffix(), mm))  m_scaleUnitMode = ScaleUnitMode::Millimeter;
     ImGui::EndDisabled();
 
     ImGui::SameLine(0.0f, 20.0f);
@@ -953,22 +1007,21 @@ void Application::renderScalePanel() {
         for (int i = 0; i < 3; ++i) {
             auto& edit = m_scaleMmEdit[i];
             if (haveBbox && (!edit.focused || edit.bodyId != targetBodyId)) {
-                std::snprintf(edit.buf, sizeof(edit.buf), "%.3f", userExtents[i]);
+                materializr::formatLengthDigits(edit.buf, sizeof(edit.buf), userExtents[i]);
             }
             ImGui::PushID(100 + i);
             ImGui::TextColored(axisColors[i], "%s", axisLabels[i]);
             ImGui::SameLine(28);
             ImGui::SetNextItemWidth(95.0f);
             ImGui::InputText("##mm", edit.buf, sizeof(edit.buf),
-                             ImGuiInputTextFlags_CharsDecimal |
-                             ImGuiInputTextFlags_AutoSelectAll);
+                             ImGuiInputTextFlags_AutoSelectAll);   // letters: "2in"
             if (ImGui::IsItemActivated()) {
                 edit.focused = true;
                 edit.bodyId = targetBodyId;
                 edit.initialExtent = userExtents[i];
             }
             if (ImGui::IsItemDeactivatedAfterEdit()) edit.focused = false;
-            ImGui::SameLine(); ImGui::Text("%s", materializr::tr("mm"));
+            ImGui::SameLine(); ImGui::Text("%s", materializr::unitSuffix());
             ImGui::PopID();
         }
     }
@@ -1004,7 +1057,7 @@ void Application::renderScalePanel() {
                             // below and exploded the body; garbage input now
                             // means "no scale on this axis" (ratio stays 1).
                             targetUser[i] = 0.0;
-                            (void)materializr::parseFinite(m_scaleMmEdit[i].buf,
+                            (void)materializr::parseLength(m_scaleMmEdit[i].buf,
                                                            targetUser[i]);
                         }
                         // Uniform mode: derive ratio from whichever axis the
@@ -1182,27 +1235,29 @@ void Application::renderSketchPatternPopup() {
         ImGui::SetNextItemWidth(100);
         ImGui::InputText("##spdist", m_sketchPatternDistanceBuf,
                          sizeof(m_sketchPatternDistanceBuf),
-                         ImGuiInputTextFlags_CharsDecimal);
-        ImGui::SameLine(); ImGui::Text("%s", materializr::tr("mm"));
-        float newDist = m_sketchPatternDistance;
-        if (materializr::parseFinite(m_sketchPatternDistanceBuf, newDist) &&
-            std::abs(newDist - m_sketchPatternDistance) > 1e-4f) {
-            m_sketchPatternDistance = newDist; changed = true;
+                         0 /* letters allowed: parseLength accepts a typed "2in" */);
+        ImGui::SameLine(); ImGui::Text("%s", materializr::unitSuffix());
+        // Only while typing. An idle re-parse rewrote the model from the
+        // buffer's rounded text and, after a unit switch, reinterpreted the old
+        // unit's digits in the new one.
+        if (materializr::lengthBufferIsActive("##spdist")) {
+            float newDist = m_sketchPatternDistance;
+            if (materializr::parseLength(m_sketchPatternDistanceBuf, newDist) &&
+                std::abs(newDist - m_sketchPatternDistance) > 1e-4f) {
+                m_sketchPatternDistance = newDist; changed = true;
+            }
+        } else {
+            materializr::formatLengthDigits(m_sketchPatternDistanceBuf,
+                                            sizeof(m_sketchPatternDistanceBuf),
+                                            m_sketchPatternDistance);
         }
-        if (ImGui::SliderFloat("##spdistslider", &m_sketchPatternDistance,
-                               0.1f, 100.0f, "%.2f mm")) {
-            std::snprintf(m_sketchPatternDistanceBuf,
-                          sizeof(m_sketchPatternDistanceBuf),
-                          "%.2f", m_sketchPatternDistance);
+        if (materializr::lengthSlider("##spdistslider", &m_sketchPatternDistance, 0.1f, 100.0f)) {
+            materializr::formatLengthDigits(m_sketchPatternDistanceBuf, sizeof(m_sketchPatternDistanceBuf), m_sketchPatternDistance);
             changed = true;
         }
         if (imTouchLayout() &&
-            touchui::amountField("spDistAmt", nullptr,
-                                 &m_sketchPatternDistance, "mm", 2,
-                                 /*allowSign=*/false, 0.1f, 100.0f)) {
-            std::snprintf(m_sketchPatternDistanceBuf,
-                          sizeof(m_sketchPatternDistanceBuf),
-                          "%.2f", m_sketchPatternDistance);
+            materializr::amountLengthField("spDistAmt", nullptr, &m_sketchPatternDistance, /*allowSign=*/false, 0.1f, 100.0f)) {
+            materializr::formatLengthDigits(m_sketchPatternDistanceBuf, sizeof(m_sketchPatternDistanceBuf), m_sketchPatternDistance);
             changed = true;
         }
     } else {
@@ -1356,24 +1411,26 @@ void Application::renderPatternPanel() {
         ImGui::SetNextItemWidth(100);
         ImGui::InputText("##patdist", m_patternDistanceBuf,
                          sizeof(m_patternDistanceBuf),
-                         ImGuiInputTextFlags_CharsDecimal);
-        ImGui::SameLine(); ImGui::Text("%s", materializr::tr("mm"));
-        float parsed = m_patternDistance;
-        if (materializr::parseFinite(m_patternDistanceBuf, parsed) &&
-            std::abs(parsed - m_patternDistance) > 1e-4f) {
-            m_patternDistance = parsed; distChanged = true;
+                         0 /* letters allowed: parseLength accepts a typed "2in" */);
+        ImGui::SameLine(); ImGui::Text("%s", materializr::unitSuffix());
+        if (materializr::lengthBufferIsActive("##patdist")) {
+            float parsed = m_patternDistance;
+            if (materializr::parseLength(m_patternDistanceBuf, parsed) &&
+                std::abs(parsed - m_patternDistance) > 1e-4f) {
+                m_patternDistance = parsed; distChanged = true;
+            }
+        } else {
+            materializr::formatLengthDigits(m_patternDistanceBuf,
+                                            sizeof(m_patternDistanceBuf), m_patternDistance);
         }
         // Slider that mirrors the text field — quick sweep without retyping.
-        if (ImGui::SliderFloat("##patdistslider", &m_patternDistance, 0.1f, 100.0f, "%.2f mm")) {
-            std::snprintf(m_patternDistanceBuf, sizeof(m_patternDistanceBuf),
-                          "%.2f", m_patternDistance);
+        if (materializr::lengthSlider("##patdistslider", &m_patternDistance, 0.1f, 100.0f)) {
+            materializr::formatLengthDigits(m_patternDistanceBuf, sizeof(m_patternDistanceBuf), m_patternDistance);
             distChanged = true;
         }
         if (imTouchLayout() &&
-            touchui::amountField("patDistAmt", nullptr, &m_patternDistance,
-                                 "mm", 2, /*allowSign=*/false, 0.1f, 100.0f)) {
-            std::snprintf(m_patternDistanceBuf, sizeof(m_patternDistanceBuf),
-                          "%.2f", m_patternDistance);
+            materializr::amountLengthField("patDistAmt", nullptr, &m_patternDistance, /*allowSign=*/false, 0.1f, 100.0f)) {
+            materializr::formatLengthDigits(m_patternDistanceBuf, sizeof(m_patternDistanceBuf), m_patternDistance);
             distChanged = true;
         }
     } else {
@@ -1549,43 +1606,38 @@ void Application::renderThreadPanel() {
 
     ImGui::TextColored(materializr::accentText(), materializr::tr("%s thread"),
                        m_threadIsHole ? "Internal" : "External");
-    ImGui::Text(materializr::tr("Diameter %.2f mm, length %.2f mm"),
-                m_threadRadius * 2.0, m_threadLength);
+    ImGui::TextUnformatted(materializr::trFormat("Diameter %s, length %s", materializr::fmtLength(m_threadRadius * 2.0), materializr::fmtLength(m_threadLength)).c_str());
     ImGui::Separator();
 
     if (imTouchLayout()) {
         // im-touch: number-pad amount fields (native keyboard froze iOS).
-        if (touchui::amountField("thrPitchAmt", materializr::tr("Pitch"), &m_threadPitch,
-                                 "mm", 2, /*allowSign=*/false, 0.1f, 50.0f))
-            std::snprintf(m_threadPitchBuf, sizeof(m_threadPitchBuf), "%.2f",
-                          m_threadPitch);
+        if (materializr::amountLengthField("thrPitchAmt", materializr::tr("Pitch"), &m_threadPitch, /*allowSign=*/false, 0.1f, 50.0f))
+            materializr::formatLengthDigits(m_threadPitchBuf, sizeof(m_threadPitchBuf), m_threadPitch);
     } else {
     ImGui::Text("%s", materializr::tr("Pitch")); ImGui::SameLine();
     ImGui::SetNextItemWidth(90);
     if (ImGui::InputText("##thrPitch", m_threadPitchBuf, sizeof(m_threadPitchBuf),
-                         ImGuiInputTextFlags_CharsDecimal)) {
+                         0 /* letters allowed: parseLength accepts a typed "2in" */)) {
         float v = 0.0f; // parseFinite: inf would pass the >= 0.1 guard
-        if (materializr::parseFinite(m_threadPitchBuf, v) && v >= 0.1f)
+        if (materializr::parseLength(m_threadPitchBuf, v) && v >= 0.1f)
             m_threadPitch = v;
     }
-    ImGui::SameLine(); ImGui::Text("%s", materializr::tr("mm"));
+    ImGui::SameLine(); ImGui::Text("%s", materializr::unitSuffix());
     }
 
     if (imTouchLayout()) {
-        if (touchui::amountField("thrDepthAmt", materializr::tr("Depth"), &m_threadDepth,
-                                 "mm", 2, /*allowSign=*/false, 0.05f, 50.0f))
-            std::snprintf(m_threadDepthBuf, sizeof(m_threadDepthBuf), "%.2f",
-                          m_threadDepth);
+        if (materializr::amountLengthField("thrDepthAmt", materializr::tr("Depth"), &m_threadDepth, /*allowSign=*/false, 0.05f, 50.0f))
+            materializr::formatLengthDigits(m_threadDepthBuf, sizeof(m_threadDepthBuf), m_threadDepth);
     } else {
     ImGui::Text("%s", materializr::tr("Depth")); ImGui::SameLine();
     ImGui::SetNextItemWidth(90);
     if (ImGui::InputText("##thrDepth", m_threadDepthBuf, sizeof(m_threadDepthBuf),
-                         ImGuiInputTextFlags_CharsDecimal)) {
+                         0 /* letters allowed: parseLength accepts a typed "2in" */)) {
         float v = 0.0f;
-        if (materializr::parseFinite(m_threadDepthBuf, v) && v >= 0.05f)
+        if (materializr::parseLength(m_threadDepthBuf, v) && v >= 0.05f)
             m_threadDepth = v;
     }
-    ImGui::SameLine(); ImGui::Text("%s", materializr::tr("mm"));
+    ImGui::SameLine(); ImGui::Text("%s", materializr::unitSuffix());
     }
     // Depth beyond ~0.65·pitch merges grooves into floating helical fins;
     // beyond ~45% of the radius it eats the core. Multi-start Rounded cuts
@@ -1600,8 +1652,7 @@ void Application::renderThreadPanel() {
             (ropeCap ? 0.45 : 0.65) * m_threadPitch, 0.45 * m_threadRadius));
         if (m_threadDepth > maxDepth) {
             m_threadDepth = maxDepth;
-            std::snprintf(m_threadDepthBuf, sizeof(m_threadDepthBuf), "%.2f",
-                          m_threadDepth);
+            materializr::formatLengthDigits(m_threadDepthBuf, sizeof(m_threadDepthBuf), m_threadDepth);
         }
         ImGui::TextDisabled(ropeCap
             ? "Depth caps at 0.45 \xC3\x97 pitch (multi-start rounded)."
@@ -1620,9 +1671,9 @@ void Application::renderThreadPanel() {
         if (m_threadProfile != 0) {
             ImGui::Text("%s", materializr::tr("Fit clearance")); ImGui::SameLine();
             ImGui::SetNextItemWidth(90);
-            materializr::inputNumber("##thrClr", &m_threadClearance, 0.05f, 0.1f, "%.2f");
+            materializr::lengthField("##thrClr", &m_threadClearance);
             if (m_threadClearance < 0.0f) m_threadClearance = 0.0f;
-            ImGui::SameLine(); ImGui::Text("%s", materializr::tr("mm"));
+            ImGui::SameLine(); ImGui::Text("%s", materializr::unitSuffix());
             ImGui::SetItemTooltip("%s", materializr::tr("Radial gap so a PRINTED thread fits its mate (0.2\xE2\x80\x93""0.4mm typical). 0 = exact."));
         }
         // Groove width: normally a fixed fraction of the pitch, so a coarse
@@ -1634,20 +1685,18 @@ void Application::renderThreadPanel() {
                 static_cast<ThreadProfile>(m_threadProfile))) {
             ImGui::Text("%s", materializr::tr("Groove width")); ImGui::SameLine();
             ImGui::SetNextItemWidth(90);
-            materializr::inputNumber("##thrGWidth", &m_threadGrooveWidth, 0.1f, 0.5f,
-                              "%.2f");
+            materializr::lengthField("##thrGWidth", &m_threadGrooveWidth);
             if (m_threadGrooveWidth < 0.0f) m_threadGrooveWidth = 0.0f;
-            ImGui::SameLine(); ImGui::Text("%s", materializr::tr("mm"));
+            ImGui::SameLine(); ImGui::Text("%s", materializr::unitSuffix());
             ImGui::SetItemTooltip("%s", materializr::tr("Width of the cut at the surface. 0 = automatic (a set fraction of the pitch, which is how threads are normally proportioned)."));
             const float autoW = static_cast<float>(
                 ThreadOp::profileOpenFraction(
                     static_cast<ThreadProfile>(m_threadProfile))) *
                 std::max(0.1f, m_threadPitch);
             if (m_threadGrooveWidth <= 0.0f)
-                ImGui::TextDisabled(materializr::tr("automatic: %.2f mm at this pitch"), autoW);
+                ImGui::TextDisabled("%s", materializr::trFormat("automatic: %s at this pitch", materializr::fmtLength(autoW)).c_str());
             else if (m_threadGrooveWidth > 0.9f * m_threadPitch)
-                ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.3f, 1.0f),
-                                   materializr::tr("Capped at %.2f mm — a crest must survive between turns."), 0.9f * m_threadPitch);
+                ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.3f, 1.0f), "%s", materializr::trFormat("Capped at %s — a crest must survive between turns.", materializr::fmtLength(0.9f * m_threadPitch)).c_str());
         }
     }
 
@@ -1674,8 +1723,8 @@ void Application::renderThreadPanel() {
                                   m_threadStarts, m_threadStarts);
     }
     if (m_threadStarts > 1) {
-        ImGui::TextDisabled(materializr::tr("lead %.2f mm/turn"), m_threadStarts *
-                            std::max(0.1f, m_threadPitch));
+        ImGui::TextDisabled("%s", materializr::trFormat("lead %s/turn", materializr::fmtLength(m_threadStarts *
+                            std::max(0.1f, m_threadPitch))).c_str());
         // The single-start sweep shortcuts don't apply to interleaved
         // helixes — every multi-start thread is a boolean cut.
         if (m_threadProfile == 0 || m_threadProfile == 4)
@@ -2000,8 +2049,7 @@ void Application::renderRefImagePanel() {
     double heightMM = img->pixW > 0
         ? img->widthMM * static_cast<double>(img->pixH) / img->pixW
         : img->widthMM;
-    ImGui::TextDisabled(materializr::tr("%d x %d px  ·  %.1f x %.1f mm"), img->pixW, img->pixH,
-                        img->widthMM, heightMM);
+    ImGui::TextDisabled("%s", materializr::trFormat("%d x %d px  ·  %s x %s", img->pixW, img->pixH, materializr::fmtLength(img->widthMM), materializr::fmtLength(heightMM)).c_str());
 
     renderRefImageControls(planeId);
 
@@ -2027,7 +2075,7 @@ void Application::renderRefImageControls(int planeId) {
 
     float widthMM = static_cast<float>(img->widthMM);
     ImGui::SetNextItemWidth(uiSz(120, 0).x);
-    if (materializr::inputNumber(materializr::tr("Width (mm)"), &widthMM, 0, 0, "%.2f",
+    if (materializr::lengthField(materializr::trFormat("Width (%s)", materializr::unitSuffix()).c_str(), &widthMM,
                           ImGuiInputTextFlags_EnterReturnsTrue)) {
         if (widthMM > 0.01f) {
             m_document->setRefImageWidthMM(planeId, widthMM);
@@ -2246,10 +2294,12 @@ void Application::renderRefImageCalibrationPopup(int planeId) {
     if (ImGui::SmallButton(materializr::tr("Reset points"))) m_refImgPickCount = 0;
 
     ImGui::SetNextItemWidth(uiSz(120, 0).x);
-    ImGui::InputText(materializr::tr("Distance between points (mm)"), m_refImgDistBuf,
-                     sizeof(m_refImgDistBuf), ImGuiInputTextFlags_CharsDecimal);
+    ImGui::InputText(materializr::trFormat("Distance between points (%s)", materializr::unitSuffix()).c_str(),
+                     m_refImgDistBuf, sizeof(m_refImgDistBuf), 0);   // letters: "2in"
 
-    float distMM = static_cast<float>(std::atof(m_refImgDistBuf));
+    // Typed in the display unit (or with its own suffix); the model wants mm.
+    float distMM = 0.0f;
+    (void)materializr::parseLength(m_refImgDistBuf, distMM);
     bool canApply = m_refImgPickCount == 2 && distMM > 0.0f;
     ImGui::BeginDisabled(!canApply);
     if (ImGui::Button(materializr::tr("Apply"), materializr::uiSz(120, 0))) {
@@ -2562,17 +2612,21 @@ void Application::renderSketchMovePanel() {
         ImGui::SameLine();
         ImGui::SetNextItemWidth(110);
         ImGui::InputText("##input", m_sketchMoveBuf[i], sizeof(m_sketchMoveBuf[i]),
-                         ImGuiInputTextFlags_CharsDecimal |
+                         0 |
                          ImGuiInputTextFlags_CharsNoBlank |
                          ImGuiInputTextFlags_AutoSelectAll);
-        ImGui::SameLine(); ImGui::Text("%s", materializr::tr("mm"));
-        { float mv = m_sketchMove[i];
-          if (materializr::parseFinite(m_sketchMoveBuf[i], mv)) m_sketchMove[i] = mv; }
+        ImGui::SameLine(); ImGui::Text("%s", materializr::unitSuffix());
+        if (materializr::lengthBufferIsActive("##input")) {
+            float mv = m_sketchMove[i];
+            if (materializr::parseLength(m_sketchMoveBuf[i], mv)) m_sketchMove[i] = mv;
+        } else {
+            materializr::formatLengthDigits(m_sketchMoveBuf[i],
+                                            sizeof(m_sketchMoveBuf[i]), m_sketchMove[i]);
+        }
         ImGui::SameLine();
         ImGui::SetNextItemWidth(130);
-        if (ImGui::SliderFloat("##slider", &m_sketchMove[i], -100.0f, 100.0f, "%.2f")) {
-            std::snprintf(m_sketchMoveBuf[i], sizeof(m_sketchMoveBuf[i]),
-                          "%.3f", m_sketchMove[i]);
+        if (materializr::lengthSlider("##slider", &m_sketchMove[i], -100.0f, 100.0f)) {
+            materializr::formatLengthDigits(m_sketchMoveBuf[i], sizeof(m_sketchMoveBuf[i]), m_sketchMove[i]);
         }
         ImGui::PopID();
     }
@@ -2687,8 +2741,19 @@ void Application::renderSnapWidget() {
     bool rightClicked = hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right);
     if (hovered) {
         ImGui::BeginTooltip();
-        ImGui::Text(materializr::tr("Snap step: %.3g mm   |   %s"), m_sketchGridStep,
-                    m_snapToGrid ? "Snap ON" : "Snap off");
+        // Both numbers: the badge and this line show what the cursor SNAPS to,
+        // while the popup highlights the preset that was chosen. Showing only
+        // the effective step made the highlighted preset look wrong whenever
+        // zoom had scaled it.
+        ImGui::TextUnformatted(
+            std::abs(m_effectiveGridStepMm - m_sketchGridStep) < 1e-4f
+              ? materializr::trFormat("Snap step: %s   |   %s",
+                    materializr::fmtLength(m_effectiveGridStepMm),
+                    m_snapToGrid ? "Snap ON" : "Snap off").c_str()
+              : materializr::trFormat("Snap step: %s (base %s)   |   %s",
+                    materializr::fmtLength(m_effectiveGridStepMm),
+                    materializr::fmtLength(m_sketchGridStep),
+                    m_snapToGrid ? "Snap ON" : "Snap off").c_str());
         ImGui::TextDisabled("%s", materializr::tr("Click: open snap settings"));
         ImGui::TextDisabled("%s", materializr::tr("Right-click: toggle snap"));
         ImGui::EndTooltip();
@@ -2714,11 +2779,16 @@ void Application::renderSnapWidget() {
     } else {
         dl->AddRect(widgetPos, widgetEnd, IM_COL32(120, 120, 130, 200), 5.0f, 0, 1.0f);
     }
-    char buf[8];
-    if      (m_sketchGridStep < 0.3f)  std::snprintf(buf, sizeof(buf), "0.1");
-    else if (m_sketchGridStep < 0.75f) std::snprintf(buf, sizeof(buf), "0.5");
-    else if (m_sketchGridStep < 5.0f)  std::snprintf(buf, sizeof(buf), "1");
-    else                               std::snprintf(buf, sizeof(buf), "10");
+    // The badge shows the step in the DISPLAY unit, like the presets that set
+    // it. It used to bucket the raw millimetre value against fixed thresholds
+    // and print a literal, so choosing "1" under centimetres stored 10 mm and
+    // the badge then read "10" — the widget contradicting the popup that had
+    // just set it. %.3g so a converted step stays short enough for the square.
+    // The EFFECTIVE step, which is what the cursor snaps to at this zoom —
+    // not the base preset. A badge naming a step the cursor ignores is the
+    // same contradiction the display-unit conversion already fixed here once.
+    char buf[16];
+    std::snprintf(buf, sizeof(buf), "%.3g", materializr::toDisplay(m_effectiveGridStepMm));
     ImGui::PushFont(nullptr);
     ImVec2 ts = ImGui::CalcTextSize(buf);
     ImVec2 tp(widgetPos.x + (size - ts.x) * 0.5f,
@@ -2744,15 +2814,48 @@ void Application::renderSnapSettingsPopup() {
             saveAppSettings();
         }
         ImGui::Spacing();
-        ImGui::Text("%s", materializr::tr("Step (mm)"));
-        const float steps[] = { 0.1f, 0.5f, 1.0f, 10.0f };
+
+        // The same dropdown as Settings, here because this is where step size
+        // is chosen and the two are meaningless apart. Changing it rewrites the
+        // presets below and every readout in the app.
+        {
+            int unit = m_displayUnit;
+            const char* unitNames[] = {
+                materializr::tr("Millimetres"), materializr::tr("Centimetres"),
+                materializr::tr("Metres"),      materializr::tr("Inches"),
+                materializr::tr("Feet") };
+            ImGui::SetNextItemWidth(materializr::uiSz(150, 0).x);
+            if (ImGui::Combo(materializr::tr("Display unit"), &unit, unitNames, 5)) {
+                applyDisplayUnitChange(unit);
+                saveAppSettings();
+                // Close, for the same reason the step presets below do — and
+                // here it is not just convenience. m_snapWidgetHovered is held
+                // true for as long as this popup is open, and that flag gates
+                // the WHOLE sketch input block (onMouseMove, onMouseDown,
+                // onMouseUp alike). Leaving it open froze the rubber-band
+                // preview and swallowed every canvas click, so after picking a
+                // unit mid-sketch the only thing that still responded was the
+                // dimension field — "I can only click and input".
+                ImGui::CloseCurrentPopup();
+            }
+        }
+
+        ImGui::Spacing();
+        ImGui::Text("%s", materializr::trFormat("Step (%s)", materializr::unitSuffix()).c_str());
+        // The presets are in the DISPLAY unit, not millimetres. They used to be
+        // literal mm under a header that already said "(cm)" or "(in)", so the
+        // label named one unit while the button set another — 1 meant 1 mm while
+        // the popup claimed centimetres. m_sketchGridStep stays mm; only the
+        // choice offered is converted.
+        const float stepsDisp[] = { 0.1f, 0.5f, 1.0f, 10.0f };
         const char* labels[] = { "0.1", "0.5", "1", "10" };
         for (int i = 0; i < 4; ++i) {
             if (i > 0) ImGui::SameLine();
-            bool active = std::abs(m_sketchGridStep - steps[i]) < 1e-4f;
+            const float stepMm = static_cast<float>(materializr::toMm(stepsDisp[i]));
+            bool active = std::abs(m_sketchGridStep - stepMm) < 1e-4f;
             if (active) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.45f, 0.85f, 1.0f));
             if (ImGui::Button(labels[i], materializr::uiSz(46, 26))) {
-                m_sketchGridStep = steps[i];
+                m_sketchGridStep = stepMm;
                 if (m_toolbar) m_toolbar->setGridStep(m_sketchGridStep);
                 saveAppSettings();
                 // Picking a step is the task — close the popup so drawing
@@ -2846,8 +2949,7 @@ void Application::renderConstructionPlanePanel() {
                 if (!ImGui::IsItemActive() &&
                     std::abs(along - m_planeOpOffset) > 1e-4) {
                     m_planeOpOffset = along;
-                    std::snprintf(m_planeOpOffsetBuf, sizeof(m_planeOpOffsetBuf),
-                                  "%.2f", m_planeOpOffset);
+                    materializr::formatLengthDigits(m_planeOpOffsetBuf, sizeof(m_planeOpOffsetBuf), m_planeOpOffset);
                 }
             }
         }
@@ -2856,23 +2958,23 @@ void Application::renderConstructionPlanePanel() {
     ImGui::SetNextItemWidth(100);
     bool offsetChanged = false;
     if (ImGui::InputText("##planeoffset", m_planeOpOffsetBuf, sizeof(m_planeOpOffsetBuf),
-                         ImGuiInputTextFlags_CharsDecimal)) {
+                         0 /* letters allowed: parseLength accepts a typed "2in" */)) {
         double parsed = m_planeOpOffset;
-        if (materializr::parseFinite(m_planeOpOffsetBuf, parsed) &&
+        if (materializr::parseLength(m_planeOpOffsetBuf, parsed) &&
             std::abs(parsed - m_planeOpOffset) > 1e-4) {
             m_planeOpOffset = parsed;
             offsetChanged = true;
         }
     }
-    ImGui::SameLine(); ImGui::Text("%s", materializr::tr("mm"));
+    ImGui::SameLine(); ImGui::Text("%s", materializr::unitSuffix());
     // Relative nudges rather than a slider: an offset is a distance you dial
     // in, and dragging a -100..100 slider cannot land on 12.5 mm. Same row the
     // push/pull dialog uses, so the gesture is identical across ops.
     float offsetF = static_cast<float>(m_planeOpOffset);
-    if (materializr::stepperRow("planeOffsetStep", &offsetF, /*allowNegative=*/true,
+    if (materializr::lengthStepperRow("planeOffsetStep", &offsetF, /*allowNegative=*/true,
                                 -1000.0f, 1000.0f)) {
         m_planeOpOffset = offsetF;
-        std::snprintf(m_planeOpOffsetBuf, sizeof(m_planeOpOffsetBuf), "%.2f", m_planeOpOffset);
+        materializr::formatLengthDigits(m_planeOpOffsetBuf, sizeof(m_planeOpOffsetBuf), m_planeOpOffset);
         offsetChanged = true;
     }
     ImGui::TextDisabled("%s", materializr::tr("Pushes the plane along its normal. Negative for the opposite side."));
@@ -2973,10 +3075,7 @@ void Application::renderConstructionPlanePanel() {
                 const double hMM = m_planeOpPendingImage.widthMM *
                                    static_cast<double>(m_planeOpPendingImage.pixH) /
                                    m_planeOpPendingImage.pixW;
-                ImGui::TextDisabled(materializr::tr("%d x %d px  \xc2\xb7  %.1f x %.1f mm"),
-                                    m_planeOpPendingImage.pixW,
-                                    m_planeOpPendingImage.pixH,
-                                    m_planeOpPendingImage.widthMM, hMM);
+                ImGui::TextDisabled("%s", materializr::trFormat("%d x %d px  \xc2\xb7  %s x %s", m_planeOpPendingImage.pixW, m_planeOpPendingImage.pixH, materializr::fmtLength(m_planeOpPendingImage.widthMM), materializr::fmtLength(hMM)).c_str());
             }
             renderRefImageControls(previewPlane);
             // Keep the staged copy in step, so the next preview rebuild
@@ -3448,12 +3547,12 @@ void Application::renderAlignFacePopup() {
     ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Offset from plane"));
     ImGui::SetNextItemWidth(100);
     if (ImGui::InputText("##alignOff", m_alignOffsetBuf, sizeof(m_alignOffsetBuf),
-                         ImGuiInputTextFlags_CharsDecimal)) {
+                         0 /* letters allowed: parseLength accepts a typed "2in" */)) {
         float a = m_alignOffset;
-        if (materializr::parseFinite(m_alignOffsetBuf, a)) m_alignOffset = a;
+        if (materializr::parseLength(m_alignOffsetBuf, a)) m_alignOffset = a;
         changed = true;
     }
-    ImGui::SameLine(); ImGui::Text("%s", materializr::tr("mm"));
+    ImGui::SameLine(); ImGui::Text("%s", materializr::unitSuffix());
 
     ImGui::Separator();
     if (ImGui::Checkbox(materializr::tr("Set position on plane"), &m_alignSetPos)) {
@@ -3467,8 +3566,8 @@ void Application::renderAlignFacePopup() {
                 const gp_Vec w(o, c);
                 m_alignU = (float)w.Dot(gp_Vec(u));
                 m_alignV = (float)w.Dot(gp_Vec(v));
-                std::snprintf(m_alignUBuf, sizeof(m_alignUBuf), "%.2f", m_alignU);
-                std::snprintf(m_alignVBuf, sizeof(m_alignVBuf), "%.2f", m_alignV);
+                materializr::formatLengthDigits(m_alignUBuf, sizeof(m_alignUBuf), m_alignU);
+                materializr::formatLengthDigits(m_alignVBuf, sizeof(m_alignVBuf), m_alignV);
             }
         }
         changed = true;
@@ -3477,17 +3576,17 @@ void Application::renderAlignFacePopup() {
         ImGui::TextDisabled("%s", materializr::tr("Face centre, along the plane's own axes"));
         ImGui::SetNextItemWidth(90);
         if (ImGui::InputText("U##alignU", m_alignUBuf, sizeof(m_alignUBuf),
-                             ImGuiInputTextFlags_CharsDecimal)) {
+                             0 /* letters allowed: parseLength accepts a typed "2in" */)) {
             float a = m_alignU;
-            if (materializr::parseFinite(m_alignUBuf, a)) m_alignU = a;
+            if (materializr::parseLength(m_alignUBuf, a)) m_alignU = a;
             changed = true;
         }
         ImGui::SameLine();
         ImGui::SetNextItemWidth(90);
         if (ImGui::InputText("V##alignV", m_alignVBuf, sizeof(m_alignVBuf),
-                             ImGuiInputTextFlags_CharsDecimal)) {
+                             0 /* letters allowed: parseLength accepts a typed "2in" */)) {
             float a = m_alignV;
-            if (materializr::parseFinite(m_alignVBuf, a)) m_alignV = a;
+            if (materializr::parseLength(m_alignVBuf, a)) m_alignV = a;
             changed = true;
         }
     }
@@ -3944,7 +4043,7 @@ void Application::renderConstructionAxisPanel() {
     ImGui::TextDisabled("%s", materializr::tr("Labels are user-Z-up: Z is the floor-up axis."));
 
     ImGui::Separator();
-    ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Origin (mm)"));
+    ImGui::TextColored(materializr::accentText(), "%s", materializr::trFormat("Origin (%s)", materializr::unitSuffix()).c_str());
     bool originChanged = false;
     const char* axisLetters[3] = {"X", "Y", "Z"};
     for (int i = 0; i < 3; ++i) {
@@ -3952,10 +4051,9 @@ void Application::renderConstructionAxisPanel() {
         ImGui::Text("%s", axisLetters[i]); ImGui::SameLine();
         ImGui::SetNextItemWidth(80);
         if (ImGui::InputText("##axisOrig", m_axisOpOriginBuf[i],
-                             sizeof(m_axisOpOriginBuf[i]),
-                             ImGuiInputTextFlags_CharsDecimal)) {
+                             sizeof(m_axisOpOriginBuf[i]), 0)) {   // letters: "2in"
             double parsed = m_axisOpOrigin[i];
-            if (materializr::parseFinite(m_axisOpOriginBuf[i], parsed) &&
+            if (materializr::parseLength(m_axisOpOriginBuf[i], parsed) &&
                 std::abs(parsed - m_axisOpOrigin[i]) > 1e-4) {
                 m_axisOpOrigin[i] = parsed;
                 originChanged = true;
@@ -4090,8 +4188,7 @@ void Application::renderSectionPanel() {
             s_secNextCheck = secNow + 0.5;
         }
         ImGui::SetNextItemWidth(200.0f);
-        if (ImGui::SliderFloat(materializr::tr("Offset (mm)"), &m_sectionOffset,
-                               -s_secRange, s_secRange, "%.1f"))
+        if (materializr::lengthSlider(materializr::trFormat("Offset (%s)", materializr::unitSuffix()).c_str(), &m_sectionOffset, -s_secRange, s_secRange))
             m_sectionDirty = true; // Ctrl+click still types exact values past the range
         if (ImGui::Checkbox(materializr::tr("Flip side"), &m_sectionFlip))
             m_sectionDirty = true;
@@ -4169,10 +4266,13 @@ void Application::renderTextToolPanel() {
 
         float h = m_sketchTool->getTextHeight();
         ImGui::SetNextItemWidth(220.0f);
-        if (ImGui::SliderFloat(materializr::tr("Height (mm)"), &h, 1.0f, 50.0f, "%.1f",
-                               ImGuiSliderFlags_Logarithmic)) {
+        if (materializr::lengthSlider(materializr::trFormat("Height (%s)", materializr::unitSuffix()).c_str(), &h, 1.0f, 50.0f)) {
             // Snap the height to the sketch grid increment when snap-to-grid is
             // on, so text sizes land on the same lattice as everything else.
+            // The BASE step, not the zoom-scaled one: this quantises a model
+            // dimension, and a text height that came out 1 mm or 100 mm
+            // depending on how far the camera happened to be pulled back would
+            // make the model a function of the view.
             if (m_snapToGrid && m_sketchGridStep > 0.0f)
                 h = std::round(h / m_sketchGridStep) * m_sketchGridStep;
             if (h < 1.0f) h = 1.0f; // keep within the slider's lower bound
@@ -4270,8 +4370,7 @@ void Application::renderAirfoilToolPanel() {
 
         float chord = m_sketchTool->getAirfoilChord();
         ImGui::SetNextItemWidth(220.0f);
-        if (ImGui::SliderFloat(materializr::tr("Chord (mm)"), &chord, 5.0f, 1000.0f,
-                               "%.1f", ImGuiSliderFlags_Logarithmic))
+        if (materializr::lengthSlider(materializr::trFormat("Chord (%s)", materializr::unitSuffix()).c_str(), &chord, 5.0f, 1000.0f))
             m_sketchTool->setAirfoilChord(chord);
         ImGui::SetItemTooltip("%s", materializr::tr(
             "Chord length: the straight distance from the leading edge to the "
@@ -4395,8 +4494,7 @@ void Application::renderSvgToolPanel() {
 
         float w = m_sketchTool->getSvgWidth();
         ImGui::SetNextItemWidth(220.0f);
-        if (ImGui::SliderFloat(materializr::tr("Width (mm)"), &w, 1.0f, 300.0f, "%.1f",
-                               ImGuiSliderFlags_Logarithmic))
+        if (materializr::lengthSlider(materializr::trFormat("Width (%s)", materializr::unitSuffix()).c_str(), &w, 1.0f, 300.0f))
             m_sketchTool->setSvgWidth(w);
 
         int ang = m_sketchTool->getTextAngle();
@@ -4566,7 +4664,7 @@ void Application::renderOffsetToolPanel() {
             // Edited as a magnitude — the sign is a direction, and Flip owns it.
             float mag = std::abs(m_sketchTool->getOffsetDistance());
             ImGui::SetNextItemWidth(120.0f);
-            if (materializr::inputNumber("##offsetDist", &mag, 0.5f, 5.0f, "%.3f mm",
+            if (materializr::lengthField("##offsetDist", &mag,
                                          ImGuiInputTextFlags_EnterReturnsTrue)) {
                 if (mag < 0.0f) mag = 0.0f;
                 m_sketchTool->setOffsetDistance(
@@ -4638,9 +4736,9 @@ void Application::renderPrimitivePopup() {
     // other layouts keep the typed InputDouble spinners.
     auto dimField = [&](const char* label, double* v) {
         if (imTouchLayout())
-            touchui::amountField(label, label, v, "mm", 3);
+            materializr::amountLengthField(label, label, v);
         else
-            materializr::inputNumber(label, v, 0.1, 1.0, "%.3f");
+            materializr::lengthField(label, v);
     };
     switch (k) {
     case 0: // Box
@@ -4668,10 +4766,10 @@ void Application::renderPrimitivePopup() {
     }
 
     ImGui::Spacing();
-    ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Origin (mm)"));
-    materializr::inputNumber("X", &m_primitivePopupOrigin[0], 0.1, 1.0, "%.3f");
-    materializr::inputNumber("Y", &m_primitivePopupOrigin[1], 0.1, 1.0, "%.3f");
-    materializr::inputNumber("Z", &m_primitivePopupOrigin[2], 0.1, 1.0, "%.3f");
+    ImGui::TextColored(materializr::accentText(), "%s", materializr::trFormat("Origin (%s)", materializr::unitSuffix()).c_str());
+    materializr::lengthField("X", &m_primitivePopupOrigin[0]);
+    materializr::lengthField("Y", &m_primitivePopupOrigin[1]);
+    materializr::lengthField("Z", &m_primitivePopupOrigin[2]);
     ImGui::TextDisabled("%s", materializr::tr("Box origin = corner; the rest use it as the axis base / centre."));
 
     // Geometric validity check — must mirror the bounds in PrimitiveOp::
@@ -5343,7 +5441,7 @@ void Application::renderUnfoldDialog() {
     // Thickness sets the bevel/mitre setback; irrelevant for pliable (boundary only).
     if (fm != materializr::FoldMode::None) {
         ImGui::SetNextItemWidth(120.0f);
-        if (materializr::inputNumber(materializr::tr("Thickness (mm)"), &m_unfoldThicknessMm, 0.5f, 1.0f, "%.1f")) {
+        if (materializr::lengthField(materializr::trFormat("Thickness (%s)", materializr::unitSuffix()).c_str(), &m_unfoldThicknessMm)) {
             m_unfoldThicknessMm = std::clamp(m_unfoldThicknessMm, 0.1f, 50.0f);
             persistSheet();
         }

@@ -11,6 +11,7 @@
 // via putBody so an editStep replay can re-run them).
 
 #include "core/Document.h"
+#include "core/Units.h"
 #include "core/History.h"
 #include "core/Operation.h"
 #include "io/ProjectIO.h"
@@ -510,18 +511,30 @@ TEST(SketchHistory, MeaningfulDescriptions) {
         build(*after);
         return SketchEditOp(after, before, after).description();
     };
+    // Every quantity carries its own unit suffix (fmtLength), so a caption reads
+    // correctly whatever display unit is active — it is formatted at render
+    // time from mm, never stored. Expectations are built the same way rather
+    // than spelled out, so they hold in any unit.
+    using materializr::fmtLength;
     EXPECT_EQ(desc([](Sketch& s){
         int p0 = s.addPoint({0,0}),  p1 = s.addPoint({80,0});
         int p2 = s.addPoint({80,45}), p3 = s.addPoint({0,45});
         s.addLine(p0,p1); s.addLine(p1,p2); s.addLine(p2,p3); s.addLine(p3,p0);
-    }), "Rectangle 80.0 \xC3\x97 45.0 mm");
+    }), "Rectangle " + fmtLength(80) + " \xC3\x97 " + fmtLength(45));
     EXPECT_EQ(desc([](Sketch& s){ int c = s.addPoint({5,5}); s.addCircle(c, 10.0); }),
-              "Circle \xC3\x98""20.0 mm");
+              "Circle \xC3\x98" + fmtLength(20));
     EXPECT_EQ(desc([](Sketch& s){ int a = s.addPoint({0,0}), b = s.addPoint({30,40});
-                                  s.addLine(a,b); }), "Line 50.0 mm");
+                                  s.addLine(a,b); }), "Line " + fmtLength(50));
     EXPECT_EQ(desc([](Sketch& s){ int c = s.addPoint({0,0}), a = s.addPoint({8,0}),
                                   b = s.addPoint({0,8}); s.addArc(c,a,b,8.0); }),
-              "Arc R8.0 mm");
+              "Arc R" + fmtLength(8));
+
+    // And the same caption re-renders in the new unit after a switch — nothing
+    // is cached in mm text.
+    materializr::setCurrentUnit(materializr::LengthUnit::In);
+    EXPECT_EQ(desc([](Sketch& s){ int a = s.addPoint({0,0}), b = s.addPoint({25.4f,0});
+                                  s.addLine(a,b); }), "Line 1.000 in");
+    materializr::setCurrentUnit(materializr::LengthUnit::Mm);
 }
 
 // A transactional editStep whose replay fails must restore the model to its

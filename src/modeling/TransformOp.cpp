@@ -1,3 +1,4 @@
+#include "ui/LengthField.h"
 #include "TransformOp.h"
 #include "Sketch.h"
 #include <BRepBuilderAPI_Transform.hxx>
@@ -266,9 +267,9 @@ void TransformOp::renderProperties() {
 
     switch (m_type) {
         case TransformType::Translate:
-            materializr::inputNumber("X", &m_dx, 0.1, 1.0, "%g");
-            materializr::inputNumber("Y", &m_dy, 0.1, 1.0, "%g");
-            materializr::inputNumber("Z", &m_dz, 0.1, 1.0, "%g");
+            materializr::lengthField("X", &m_dx);
+            materializr::lengthField("Y", &m_dy);
+            materializr::lengthField("Z", &m_dz);
             break;
         case TransformType::Rotate:
             materializr::inputNumber(materializr::tr("Axis X"), &m_ax, 0.1, 1.0, "%g");

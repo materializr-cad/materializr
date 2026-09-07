@@ -754,6 +754,15 @@ void Sketch::clear() {
     m_nextConstraintId = 1;
 }
 
+bool constraintIsArcRadius(const Sketch& sk, const Constraint& c) {
+    if (c.type != ConstraintType::Radius) return false;
+    for (const auto& circ : sk.getCircles())
+        if (circ.id == c.entityA) return false;   // a circle wins
+    for (const auto& arc : sk.getArcs())
+        if (arc.id == c.entityA) return true;
+    return false;
+}
+
 int Sketch::addConstraint(const Constraint& c) {
     Constraint copy = c;
     copy.id = m_nextConstraintId++;

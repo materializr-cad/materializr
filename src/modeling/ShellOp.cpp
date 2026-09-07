@@ -1,3 +1,4 @@
+#include "ui/LengthField.h"
 #include "ShellOp.h"
 #include "SubShapeIndex.h"
 #include <cstdio>
@@ -322,7 +323,7 @@ void ShellOp::renderProperties() {
     ImGui::Text("%s", materializr::tr("Shell"));
     ImGui::Separator();
 
-    materializr::inputNumber(materializr::tr("Thickness"), &m_thickness, 0.1, 1.0, "%g");
+    materializr::lengthField(materializr::tr("Thickness"), &m_thickness);
 
     int faceCount = m_facesToRemove.Size();
     ImGui::Text(materializr::tr("Open faces: %d selected"), faceCount);

@@ -1,3 +1,4 @@
+#include "ui/LengthField.h"
 #include "../ui/UiTheme.h"
 #include "ui_scale.h"
 #include "../touch_mode.h"
@@ -123,10 +124,16 @@ public:
             ImGui::Begin("##SketchDim", nullptr,
                 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
-            if (ImGui::InputText(materializr::tr("mm"), m_dimBuf, sizeof(m_dimBuf),
+            if (ImGui::InputText(materializr::unitSuffix(), m_dimBuf, sizeof(m_dimBuf),
                                  ImGuiInputTextFlags_EnterReturnsTrue)) {
                 float v = 0.0f;
-                if (materializr::parseFinite(m_dimBuf, v) && v > 0.0f) {
+                // Only a LENGTH is converted. An arc's sweep is degrees and a
+                // polygon's first value is a side count; running those through
+                // parseLength made a typed 6 sides arrive as 152 under inches.
+                const bool dimIsLen = m_sketchTool->dimensionValueIsLength();
+                const bool dimOk = dimIsLen ? materializr::parseLength(m_dimBuf, v)
+                                            : materializr::parseFinite(m_dimBuf, v);
+                if (dimOk && v > 0.0f) {
                     recordMutation(ctx, [&]{ m_sketchTool->applyDimension(v); });
                 }
                 m_dimBuf[0] = '\0';

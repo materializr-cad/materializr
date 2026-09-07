@@ -495,6 +495,10 @@ private:
     // Dirty tracking + unsaved-changes prompt
     bool isDirty() const;
     void markDirty();           // for changes that don't go through History
+    // The single caller of materializr::setCurrentUnit. Guards the ImGui side
+    // effect so it is safe during settings-apply, which runs before a context
+    // exists.
+    void applyDisplayUnitChange(int unit);
     void markSaved();
     void renderSavePrompt();
     void requestClose();        // called when the user clicks the window X
@@ -878,8 +882,44 @@ private:
     // the Dimension tool's click routing must not treat it as a fresh pick.
     bool m_dimPopupSwallowClick = false;
 
-    // Sketch grid step in mm (drives both the visual face grid and snap-to-line)
+    // Ceiling on the opening view of an EMPTY sketch, in mm of half-span.
+    //
+    // 300 mm because it reads as a round number in the units that needed
+    // bounding: about one foot, twelve inches, thirty centimetres. Under feet
+    // the unit-aware 40-unit span is 12192 mm — a twelve-metre view, which put
+    // a shape drawn at screen centre metres from the plane origin and left it
+    // hanging above the ground grid on exit. Under millimetres the span is
+    // 40 mm and this never engages, so the common case does not move.
+    //
+    // Metres are the unit this serves least well: a 300 mm view makes every
+    // reading 0.x m. Bounding is still the right call there — a 40 m opening
+    // view is worse — but if metre work becomes common this is the number to
+    // revisit.
+    static constexpr float kOpeningSketchSpanCapMm = 300.0f;
+
+    // Sketch grid step in mm. This is the BASE the user chose (a display
+    // number: "1" means one of whatever unit is showing). It is what persists.
     float m_sketchGridStep = 1.0f;
+    // The base scaled by whole decades to suit the CURRENT zoom, recomputed
+    // every frame in renderViewport's drawGrid (which both branches call, so
+    // it is never stale) — see viewport/GridScale.h. Equal to the base outside
+    // sketch mode and whenever the base already suits the zoom.
+    //
+    // WHICH STEP A SITE WANTS:
+    //   anything snapping a point ON THE SKETCH PLANE, drawing the sketch grid,
+    //   or LABELLING the step for the user -> this one, so the lines drawn, the
+    //   points reachable and the number displayed can never disagree;
+    //   the Settings presets, persistence and the unit carry-over -> the base,
+    //   which is what the user actually chose;
+    //   world-space gizmo/plane snapping outside sketch mode -> the base (the
+    //   world grid is not zoom-scaled; the two are equal there anyway).
+    //
+    // renderViewport is the SINGLE WRITER of SketchTool's snap step, since only
+    // it knows the zoom. Anywhere else that changes the base (the toolbar, a
+    // unit switch) updates the base and lets the next frame follow; calling
+    // SketchTool::setGridStep from those sites clobbers the scaled lattice and
+    // leaves the cursor snapping somewhere the grid is not drawn.
+    float m_effectiveGridStepMm = 1.0f;
     // World-aligned anchor used as the sketch grid origin and the camera
     // target. Computed at sketch entry from the face centre snapped to the
     // nearest grid intersection projected onto the sketch plane. Preserved
@@ -968,6 +1008,10 @@ private:
     // UI language index, mirroring materializr::Lang. -1 = never chosen, which
     // is what makes the setup wizard open with the language question.
     int m_language = -1;
+    // Mirrors Settings::displayUnit. Change it ONLY through
+    // applyDisplayUnitChange, which also drops any active text edit so a field
+    // cannot commit in a different unit from the one it was showing.
+    int m_displayUnit = 0;
     bool classicLayout() const { return m_uiLayout == UiLayout::Classic; }
     bool modernLayout()  const { return m_uiLayout == UiLayout::Modern;  }
     bool imTouchLayout() const { return m_uiLayout == UiLayout::ImTouch; }
@@ -1041,6 +1085,22 @@ private:
     // Double-click window (s), applied to ImGuiIO::MouseDoubleClickTime. Higher
     // suits trackpads (slower double-taps). Persisted; default = ImGui's 0.30.
     float m_doubleClickTime = 0.30f;
+    // Seconds a fillet may spend proving it terminates before being refused.
+    // Mirrors Settings::filletProbeSeconds; pushed into FilletProbe on apply.
+    float m_filletProbeSeconds = 2.5f;
+
+    // Dimension label being dragged to a new spot, -1 when none. A press on a
+    // label starts a drag rather than opening its edit popup; the popup opens
+    // on RELEASE, and only if the pointer never really moved. Without this the
+    // label is unmovable — every attempt to reposition it fires the editor.
+    int       m_dimDragId = -1;
+    // Label position minus cursor position at the moment of the press, in
+    // sketch mm, so the tag keeps its grab point instead of snapping its centre
+    // to the cursor.
+    glm::vec2 m_dimDragGrab{0.0f};
+    // Whether this press has travelled far enough to count as a drag. Below the
+    // threshold it stays a click, so a slightly shaky press still edits.
+    bool      m_dimDragMoved = false;
 
     // Rendering preferences (File > Settings → Rendering). Persisted.
     float m_lightAmbient = 0.40f;   // base illumination; higher = softer shadows

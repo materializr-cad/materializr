@@ -1,3 +1,4 @@
+#include "ui/LengthField.h"
 #include "../core/NumFormat.h"
 #include "ChamferOp.h"
 #include "BlendCut.h"
@@ -796,12 +797,12 @@ void ChamferOp::renderProperties() {
     ImGui::Text("%s", materializr::tr("Chamfer"));
     ImGui::Separator();
 
-    materializr::inputNumber(materializr::tr("Distance"), &m_distance, 0.1, 1.0, "%g");
+    materializr::lengthField(materializr::tr("Distance"), &m_distance);
     bool asym = (m_distance2 > 0.0);
     if (ImGui::Checkbox(materializr::tr("Two distances"), &asym))
         m_distance2 = asym ? m_distance : -1.0;
     if (m_distance2 > 0.0)
-        materializr::inputNumber(materializr::tr("Distance 2"), &m_distance2, 0.1, 1.0, "%g");
+        materializr::lengthField(materializr::tr("Distance 2"), &m_distance2);
 
     ImGui::Text(materializr::tr("Edges: %d selected"), static_cast<int>(m_edges.size()));
     ImGui::Text(materializr::tr("Body ID: %d"), m_bodyId);

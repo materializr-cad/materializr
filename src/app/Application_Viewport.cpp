@@ -3,6 +3,8 @@
 #include "ui_scale.h"
 #include "touch_mode.h"
 #include "gl_common.h"
+#include "viewport/GridScale.h"
+#include <cmath>
 #include <chrono>
 #include <cstdio>
 
@@ -70,6 +72,8 @@
 #include "modeling/AxisTransformOp.h"
 #include "modeling/MirrorOp.h"
 #include "modeling/FilletOp.h"
+#include "ui/LengthField.h"
+#include <cstring>
 #include "modeling/ChamferOp.h"
 #include "modeling/DeleteOp.h"
 #include "modeling/SeparateBodyOp.h"
@@ -118,6 +122,11 @@ namespace materializr { namespace force_link { void linkAll(); } }
 // Implementations split out of Application.cpp — the giant 3D viewport
 // renderer plus its drag-projection helper.
 namespace materializr {
+
+// Smallest on-screen cell, in pixels, the sketch grid will draw. Below this
+// the shader's density fade greys the lines out anyway, so a finer lattice
+// costs fill rate and shows nothing.
+constexpr float kGridMinPx = 8.0f;
 
 // opDialogDragGrip moved to ui/OpDialogGrip.h — Move Face's panel (in
 // FaceOpControllers.cpp) uses it too.
@@ -196,14 +205,6 @@ void Application::gizmoPreviewApply(const glm::mat4& m) {
 // both, so the label, the edit-popup prefill, and the popup's commit all have
 // to agree on which convention applies — hence one helper rather than three
 // copies of the scan. Non-Radius types are never arc radii.
-static bool constraintIsArcRadiusIn(const Sketch& sk, const Constraint& c) {
-    if (c.type != ConstraintType::Radius) return false;
-    for (const auto& circ : sk.getCircles())
-        if (circ.id == c.entityA) return false; // a circle wins
-    for (const auto& arc : sk.getArcs())
-        if (arc.id == c.entityA) return true;
-    return false;
-}
 
 // Recover the two comparable entities behind a dimension, so the edit popup
 // can offer "Make equal" (equal length for two lines, equal radius for two
@@ -465,6 +466,19 @@ void Application::renderViewport() {
         // Deferred into a lambda and invoked AFTER the solid geometry below, so
         // the grid (which no longer writes depth) blends over bodies instead of
         // punching through coplanar faces.
+        // The step the user picked is a BASE; what the sketch actually uses is
+        // that base scaled by whole decades to suit this zoom (GridScale.h).
+        // Computed HERE as a plain statement rather than inside drawGrid,
+        // because six later sites read it and a value assigned as a side
+        // effect of "draw the grid" makes that dependency invisible.
+        m_effectiveGridStepMm = std::max(m_sketchGridStep, 0.01f);
+        if (m_inSketchMode && m_activeSketch) {
+            const glm::vec2 g0 = screenToSketch(0.0f, 0.0f, contentSize.x, contentSize.y);
+            const glm::vec2 g1 = screenToSketch(1.0f, 0.0f, contentSize.x, contentSize.y);
+            m_effectiveGridStepMm = gridStepForZoom(
+                m_effectiveGridStepMm, glm::length(g1 - g0), kGridMinPx);
+        }
+
         auto drawGrid = [&]() {
             Grid::Plane gp; // defaults to the XZ ground
             bool sketching = m_inSketchMode && m_activeSketch;
@@ -475,7 +489,28 @@ void Application::renderViewport() {
                 // the grid origin so grid lines pass through whole world-grid
                 // intersections on the sketch plane instead of being shifted
                 // by the face's off-grid centre.
-                gp.origin = m_sketchSnappedAnchor;
+                //
+                // Re-snapped to the EFFECTIVE step every frame. The anchor was
+                // laid on the BASE lattice at sketch entry, while the shader
+                // draws lines every effective step FROM it and SketchTool::snap
+                // rounds to multiples of the effective step from the PLANE
+                // origin. Those two agree only when the anchor is itself a
+                // multiple of the effective step — so as soon as zoom coarsened
+                // the step (base 1 mm -> 10 mm) the drawn grid sat up to a full
+                // cell off the lattice the cursor actually lands on. That is
+                // "I can't draw a line on the snap grid" again, and it is the
+                // precise thing this commit's invariant claims cannot happen.
+                gp.origin = glm::vec3(0.0f);
+                {
+                    const gp_Pnt a = Sketch::latticeAnchor(
+                        m_activeSketch->getPlane(),
+                        gp_Pnt(m_sketchSnappedAnchor.x, m_sketchSnappedAnchor.y,
+                               m_sketchSnappedAnchor.z),
+                        static_cast<double>(m_effectiveGridStepMm));
+                    gp.origin = glm::vec3(static_cast<float>(a.X()),
+                                          static_cast<float>(a.Y()),
+                                          static_cast<float>(a.Z()));
+                }
                 gp.u = v3(ax.XDirection());
                 gp.v = v3(ax.YDirection());
                 gp.normal = v3(ax.Direction());
@@ -595,7 +630,7 @@ void Application::renderViewport() {
             // coplanar body face (e.g. a body sitting on the XZ ground) occlude
             // the ground grid instead of it bleeding through.
             m_grid->render(view, proj, fadeCenter, gridFade,
-                           gp, std::max(m_sketchGridStep, 0.01f),
+                           gp, m_effectiveGridStepMm,
                            minorAlpha, worldGridAlpha /*globalAlpha*/,
                            sketching ? 1.0f : 0.0f /*sketchGrid: uniform single tier*/,
                            sketching ? 0.0005f : -0.0005f /*depthBias*/,
@@ -1046,7 +1081,29 @@ void Application::renderViewport() {
             // grid itself is the infinite world grid above (now aligned to the
             // sketch plane), so face sketches no longer need a separate per-face
             // grid — drawing across to neighbouring faces just works.
-            m_sketchTool->setGridStep(m_sketchGridStep);
+            // Snapping takes the EFFECTIVE step — the cursor must land on the
+            // lines actually drawn. Pointing tolerances keep taking the BASE:
+            // they are a precision preference, not a lattice, and letting zoom
+            // coarsen them pinned the trim/pick radius at its 10 mm cap the
+            // moment the grid stepped up.
+            m_sketchTool->setGridStep(m_effectiveGridStepMm);
+            m_sketchTool->setToleranceStep(m_sketchGridStep);
+            // The TOGGLE belongs here for the same reason the step does: its
+            // only other writer was the classic-toolbar branch, which modern
+            // and im-touch never run. So in those layouts the badge said
+            // "Snap off" while SketchTool sat on its own default of true and
+            // kept snapping — the setting was honoured on screen and ignored
+            // in the geometry, from launch, with no way to correct it.
+            m_sketchTool->setSnapToGridEnabled(m_snapToGrid);
+            // Sketch millimetres per screen pixel, measured by unprojecting two
+            // points one pixel apart — exact for any camera and any plane
+            // orientation. Pointing tolerances are a screen distance, so they
+            // need the zoom, not just the grid.
+            {
+                const glm::vec2 p0 = screenToSketch(0.0f, 0.0f, contentSize.x, contentSize.y);
+                const glm::vec2 p1 = screenToSketch(1.0f, 0.0f, contentSize.x, contentSize.y);
+                m_sketchTool->setPixelScale(glm::length(p1 - p0));
+            }
             m_sketchRenderer->render(m_activeSketch.get(), m_sketchTool.get(), view, proj,
                                      m_sketchSolver.get());
         }
@@ -1582,7 +1639,7 @@ void Application::renderViewport() {
                 }
             }
             if (m_extrudeCtl.active()) {
-                std::snprintf(dbuf, sizeof(dbuf), "%.1f mm", std::abs(m_extrudeCtl.distance()));
+                std::snprintf(dbuf, sizeof(dbuf), "%s", materializr::fmtLength(std::abs(m_extrudeCtl.distance())).c_str());
                 drawDim(m_extrudeCtl.origin(),
                         m_extrudeCtl.origin() + m_extrudeCtl.normal() * m_extrudeCtl.distance(), dbuf,
                         DimStyle::Bold);
@@ -1595,7 +1652,7 @@ void Application::renderViewport() {
                 // STARTER handle instead: a double-headed arrow through the
                 // face centre along ±normal, in the Bold palette.
                 if (std::abs(m_ppCtl.distance()) > 0.05f) {
-                    std::snprintf(dbuf, sizeof(dbuf), "%.1f mm", m_ppCtl.distance());
+                    std::snprintf(dbuf, sizeof(dbuf), "%s", materializr::fmtLength(m_ppCtl.distance()).c_str());
                     drawDim(m_ppCtl.origin(),
                             m_ppCtl.origin() + m_ppCtl.normal() * m_ppCtl.distance(), dbuf,
                             DimStyle::Bold);
@@ -1629,7 +1686,7 @@ void Application::renderViewport() {
                         };
                         head(b,  1.0f);
                         head(a, -1.0f);
-                        const char* hint = "0 mm — drag";
+                        const std::string hintS = materializr::fmtLength(0.0) + " — drag"; const char* hint = hintS.c_str();
                         ImVec2 ts = ImGui::CalcTextSize(hint);
                         ImVec2 tp(so.x + perp.x * 18.0f * s3 - ts.x * 0.5f,
                                   so.y + perp.y * 18.0f * s3 - ts.y * 0.5f);
@@ -1668,8 +1725,9 @@ void Application::renderViewport() {
                         absAfter = std::round(absAfter / step) * step;
                     }
                     std::snprintf(dbuf, sizeof(dbuf),
-                                  "\xCE\x94 %.2f mm   |   Origin %.2f mm",
-                                  delta, absAfter);
+                                  "\xCE\x94 %s   |   Origin %s",
+                                  materializr::fmtLength(delta).c_str(),
+                                  materializr::fmtLength(absAfter).c_str());
                 } else if (m_gizmo->getMode() == GizmoMode::Rotate) {
                     char axL = '?';
                     if (std::abs(m_gizmoRotAxis.x) > 0.5f)      axL = 'X';
@@ -1774,9 +1832,11 @@ void Application::renderViewport() {
                 // values stay clean (0.90 -> 0.9, 1.00 -> 1). The old tenths
                 // format hid everything under 0.1 mm. (No <cstring> needed —
                 // trim over the fixed buffer by index.)
-                auto fmtLen = [](char* out, size_t n, float v, const char* suffix) {
+                auto fmtLen = [](char* out, size_t n, float v) {   // v is mm; prints display unit
                     char num[32];
-                    int m = std::snprintf(num, sizeof(num), "%.2f", v);
+                    int m = std::snprintf(num, sizeof(num), "%.*f",
+                                          materializr::unitInfo(materializr::currentUnit()).decimals,
+                                          materializr::toDisplay(v));
                     if (m > 0) {
                         bool hasDot = false;
                         for (int k = 0; k < m; ++k) if (num[k] == '.') { hasDot = true; break; }
@@ -1786,7 +1846,7 @@ void Application::renderViewport() {
                             if (e >= 0 && num[e] == '.') num[e] = '\0';
                         }
                     }
-                    std::snprintf(out, n, "%s %s", num, suffix);
+                    std::snprintf(out, n, "%s %s", num, materializr::unitSuffix());
                 };
 
                 SketchToolMode pm = m_sketchTool->getPreviewType();
@@ -1796,7 +1856,7 @@ void Application::renderViewport() {
                 if (pm == SketchToolMode::Line) {
                     float length = glm::length(pe - ps);
                     if (length > 1e-3f) {
-                        fmtLen(dbuf, sizeof(dbuf), length, "mm");
+                        fmtLen(dbuf, sizeof(dbuf), length);
                         drawDim(sketch2world(ps), sketch2world(pe), dbuf);
                     }
                 } else if (pm == SketchToolMode::Circle) {
@@ -1804,7 +1864,8 @@ void Application::renderViewport() {
                     glm::vec2 rvec = pe - ps;
                     float dia = 2.0f * glm::length(rvec);
                     if (dia > 1e-3f) {
-                        fmtLen(dbuf, sizeof(dbuf), dia, "mm dia");
+                        fmtLen(dbuf, sizeof(dbuf), dia);
+                        { const size_t l = std::strlen(dbuf); std::snprintf(dbuf + l, sizeof(dbuf) - l, " dia"); }
                         drawDim(sketch2world(ps - rvec), sketch2world(pe), dbuf);
                     }
                 } else if (pm == SketchToolMode::Rectangle) {
@@ -1812,11 +1873,11 @@ void Application::renderViewport() {
                     glm::vec2 bl(ps.x, ps.y), br(pe.x, ps.y), tr(pe.x, pe.y);
                     float w = std::abs(pe.x - ps.x), h = std::abs(pe.y - ps.y);
                     if (w > 1e-3f) {
-                        fmtLen(dbuf, sizeof(dbuf), w, "mm");
+                        fmtLen(dbuf, sizeof(dbuf), w);
                         drawDim(sketch2world(bl), sketch2world(br), dbuf);
                     }
                     if (h > 1e-3f) {
-                        fmtLen(dbuf, sizeof(dbuf), h, "mm");
+                        fmtLen(dbuf, sizeof(dbuf), h);
                         drawDim(sketch2world(br), sketch2world(tr), dbuf);
                     }
                 } else if (pm == SketchToolMode::Arc) {
@@ -1831,7 +1892,7 @@ void Application::renderViewport() {
                     if (clicks == 1) {
                         float length = glm::length(pe - ps);
                         if (length > 1e-3f) {
-                            fmtLen(dbuf, sizeof(dbuf), length, "mm");
+                            fmtLen(dbuf, sizeof(dbuf), length);
                             drawDim(sketch2world(ps), sketch2world(pe), dbuf);
                         }
                     } else if (clicks == 2) {
@@ -1911,7 +1972,7 @@ void Application::renderViewport() {
                     float r = glm::length(rvec);
                     if (r > 1e-3f) {
                         char num[40];
-                        fmtLen(num, sizeof(num), r, "mm");
+                        fmtLen(num, sizeof(num), r);
                         std::snprintf(dbuf, sizeof(dbuf), "R %s \xC2\xB7 %d-gon",
                                       num, m_sketchTool->getPolygonSides());
                         drawDim(sketch2world(ps), sketch2world(pe), dbuf);
@@ -1988,7 +2049,7 @@ void Application::renderViewport() {
                             // matches Modern. The placeholder shows the dragged
                             // diameter until you type an exact value; empty
                             // buffer = keep the drag (handled at commit).
-                            ImGui::TextDisabled("%s", materializr::tr("Diameter (mm)"));
+                            ImGui::TextDisabled("%s", materializr::trFormat("Diameter (%s)", materializr::unitSuffix()).c_str());
                             char hint[32];
                             std::snprintf(hint, sizeof(hint), "%.1f (drag)", diaNow);
                             ImGui::SetNextItemWidth(touchui::numberPadWidth(keySide));
@@ -2003,7 +2064,7 @@ void Application::renderViewport() {
                             (void)materializr::parseFinite(m_sketchShapeDimBuf,
                                                            diaPadV);
                             if (touchui::numberField("##bubbleDia", nullptr,
-                                                     &diaPadV, "%.2f",
+                                                     &diaPadV, materializr::lengthFormat(),
                                                      nullptr, hint)) {
                                 if (diaPadV > 0.0)
                                     std::snprintf(m_sketchShapeDimBuf,
@@ -2021,14 +2082,12 @@ void Application::renderViewport() {
                             const float fieldW = touchui::numberPadWidth(keySide);
                             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
                                                 ImVec2(uiW(10.0f), uiW(10.0f)));
-                            ImGui::TextDisabled("%s", materializr::tr("Width (mm)"));
+                            ImGui::TextDisabled("%s", materializr::trFormat("Width (%s)", materializr::unitSuffix()).c_str());
                             ImGui::SetNextItemWidth(fieldW);
-                            materializr::inputNumber("##bubbleW", &m_sketchShapeDimW,
-                                              0.0f, 0.0f, "%.2f");
-                            ImGui::TextDisabled("%s", materializr::tr("Height (mm)"));
+                            materializr::lengthField("##bubbleW", &m_sketchShapeDimW);
+                            ImGui::TextDisabled("%s", materializr::trFormat("Height (%s)", materializr::unitSuffix()).c_str());
                             ImGui::SetNextItemWidth(fieldW);
-                            materializr::inputNumber("##bubbleH", &m_sketchShapeDimH,
-                                              0.0f, 0.0f, "%.2f");
+                            materializr::lengthField("##bubbleH", &m_sketchShapeDimH);
                             ImGui::PopStyleVar();
                             if (m_sketchShapeDimW < 0.01f) m_sketchShapeDimW = 0.01f;
                             if (m_sketchShapeDimH < 0.01f) m_sketchShapeDimH = 0.01f;
@@ -2046,9 +2105,12 @@ void Application::renderViewport() {
                         if (commit && m_sketchShapeConfirmPending) {
                             if (holdMode == SketchToolMode::Circle) {
                                 float v = 0.0f;
-                                const bool useTyped =
-                                    materializr::parseFinite(m_sketchShapeDimBuf, v) &&
-                                    v > 0.0f;
+                                const bool useTyped = [&] {
+                                    double mm = 0.0;   // "2in" honoured; bare = display unit
+                                    if (!materializr::parseLength(m_sketchShapeDimBuf, mm) || mm <= 0.0) return false;
+                                    v = static_cast<float>(mm);
+                                    return true;
+                                }();
                                 recordSketchMutation([&] {
                                     if (useTyped)
                                         m_sketchTool->applyDimension(v);
@@ -2547,8 +2609,31 @@ void Application::renderViewport() {
                     ImGui::OpenPopup("##DimEdit");
                     m_dimOpenEditRequested = false;
                 }
+                // Cursor in sketch mm — the space labelOffX/Y lives in, so a
+                // drag can be expressed as an offset directly.
+                const ImVec2 dimMp = ImGui::GetMousePos();
+                const glm::vec2 dimCursor = screenToSketch(
+                    dimMp.x - imgMin.x, dimMp.y - imgMin.y, imgSize.x, imgSize.y);
+                // Opens the value editor for a constraint. Called on RELEASE
+                // of a press that did not turn into a drag — see the label
+                // press/drag handling below.
+                auto openDimEdit = [&](const Constraint& c) {
+                    m_dimEditingId = c.id;
+                    // Seed what the label shows: degrees for an angle; the
+                    // DIAMETER for a circle's Radius constraint (Ø), the
+                    // radius for an arc's (R); lengths in the display unit.
+                    const auto kind = c.type == ConstraintType::Angle  ? materializr::DimKind::Angle
+                                    : c.type == ConstraintType::Radius ? materializr::DimKind::Radius
+                                                                       : materializr::DimKind::Length;
+                    materializr::seedDimensionText(m_dimEditingBuf, sizeof(m_dimEditingBuf), kind,
+                        kind == materializr::DimKind::Radius && materializr::constraintIsArcRadius(*m_activeSketch, c),
+                        c.value);
+                    m_dimEditingFocus = true;
+                    m_dimEditingClickedThisFrame = true;
+                    ImGui::OpenPopup("##DimEdit");
+                };
                 auto drawLabel = [&](glm::vec2 pos, const char* text,
-                                     const Constraint& c) {
+                                     const Constraint& c, glm::vec2 anchor) {
                     ImVec2 sp;
                     if (!toImg(dim2world(pos), sp)) return;
                     ImVec2 ts = ImGui::CalcTextSize(text);
@@ -2565,28 +2650,51 @@ void Application::renderViewport() {
                     // the shape" from "this number just reports it".
                     dl->AddText(tp, c.isDriving ? IM_COL32(255, 235, 120, 255)
                                                 : IM_COL32(170, 178, 190, 255), text);
-                    // Click → open edit popup. Skipped if we're already
-                    // editing this same constraint to avoid re-triggering
-                    // the open every frame the popup is up.
+                    // A press LATCHES the label for dragging. The edit popup
+                    // is deferred to release (below, after the loop) and only
+                    // fires if the pointer stayed put — otherwise the tag can
+                    // never be repositioned, because every attempt to move it
+                    // opens the value editor instead.
                     if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
-                        m_dimEditingId != c.id) {
-                        m_dimEditingId = c.id;
-                        if (c.type == ConstraintType::Angle) {
-                            std::snprintf(m_dimEditingBuf, sizeof(m_dimEditingBuf),
-                                          "%.2f", c.value * 180.0 / M_PI);
-                        } else if (c.type == ConstraintType::Radius) {
-                            // Edited in whatever unit the label shows: radius
-                            // for an arc (R), diameter for a circle (Ø).
-                            std::snprintf(m_dimEditingBuf, sizeof(m_dimEditingBuf), "%.2f",
-                                          constraintIsArcRadiusIn(*m_activeSketch, c)
-                                              ? c.value : c.value * 2.0);
-                        } else {
-                            std::snprintf(m_dimEditingBuf, sizeof(m_dimEditingBuf),
-                                          "%.2f", c.value);
+                        m_dimDragId < 0 && m_dimEditingId != c.id) {
+                        m_dimDragId    = c.id;
+                        m_dimDragMoved = false;
+                        m_dimDragGrab  = pos - dimCursor;
+                    }
+                    // Live drag: rewrite this constraint's stored offset so the
+                    // label tracks the cursor. Offsets are relative to the
+                    // type's geometric anchor, so the tag keeps its place when
+                    // the solver later moves the geometry under it.
+                    if (m_dimDragId == c.id &&
+                        ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                        // Threshold FIRST, and write nothing until it is
+                        // crossed. IsMouseDown is already true on the press
+                        // frame, so writing unconditionally would store an
+                        // offset for a plain click — and since `want` equals
+                        // the label's current position, that offset is the
+                        // AUTO one. The label would silently become
+                        // user-placed: it grows a leader line and stops
+                        // tracking automatic positioning (Distance's auto
+                        // offset scales with segment length, so a frozen one
+                        // no longer rescales). Clicking to edit must leave the
+                        // stored offset exactly as it found it.
+                        const ImVec2 d = ImGui::GetMouseDragDelta(ImGuiMouseButton_Left);
+                        if (materializr::dimDragExceedsThreshold(d.x, d.y))
+                            m_dimDragMoved = true;
+                        if (m_dimDragMoved) {
+                            const glm::vec2 want = dimCursor + m_dimDragGrab;
+                            double offX = 0.0, offY = 0.0;
+                            materializr::dimLabelOffset(want.x, want.y,
+                                                        anchor.x, anchor.y,
+                                                        offX, offY);
+                            for (auto& mc : m_activeSketch->getMutableConstraints()) {
+                                if (mc.id != c.id) continue;
+                                mc.labelOffX = offX;
+                                mc.labelOffY = offY;
+                                break;
+                            }
                         }
-                        m_dimEditingFocus = true;
-                        m_dimEditingClickedThisFrame = true;
-                        ImGui::OpenPopup("##DimEdit");
+                        m_dimEditingClickedThisFrame = true;  // don't also pick
                     }
                 };
                 // Resolves a constraint's label position from its stored
@@ -2622,9 +2730,9 @@ void Application::renderViewport() {
                     if (!c.isDriving) {
                         char ref[48];
                         std::snprintf(ref, sizeof(ref), "[%s]", text);
-                        drawLabel(lpos, ref, c);
+                        drawLabel(lpos, ref, c, anchor);
                     } else {
-                        drawLabel(lpos, text, c);
+                        drawLabel(lpos, text, c, anchor);
                     }
                 };
                 char lbl[40];
@@ -2646,7 +2754,7 @@ void Application::renderViewport() {
                             float off = std::max(3.0f, segLen * 0.18f);
                             perp = perp / pl * off;
                         }
-                        std::snprintf(lbl, sizeof(lbl), "%.2f mm", c.value);
+                        std::snprintf(lbl, sizeof(lbl), "%s", materializr::fmtLength(c.value).c_str());
                         placeLabel(mid, perp, lbl, c);
                     } else if (c.type == ConstraintType::Radius) {
                         glm::vec2 center(0.0f);
@@ -2684,11 +2792,11 @@ void Application::renderViewport() {
                         glm::vec2 autoOff =
                             glm::vec2(0.7071f, 0.7071f) * (radius + 1.2f);
                         // Drafting convention: arcs read as R, circles as Ø.
-                        if (constraintIsArcRadiusIn(*m_activeSketch, c))
-                            std::snprintf(lbl, sizeof(lbl), "R %.2f mm", c.value);
+                        if (materializr::constraintIsArcRadius(*m_activeSketch, c))
+                            std::snprintf(lbl, sizeof(lbl), "R %s", materializr::fmtLength(c.value).c_str());
                         else
-                            std::snprintf(lbl, sizeof(lbl), "\xC3\x98 %.2f mm",
-                                          c.value * 2.0);
+                            std::snprintf(lbl, sizeof(lbl), "\xC3\x98 %s",
+                                          materializr::fmtLength(c.value * 2.0).c_str());
                         placeLabel(center, autoOff, lbl, c);
                     } else if (c.type == ConstraintType::Angle) {
                         // SolidWorks-style angle dim: find the vertex where the
@@ -2831,7 +2939,7 @@ void Application::renderViewport() {
                             dl->AddLine(pA, pB, IM_COL32(20, 20, 28, 200), 3.0f);
                             dl->AddLine(pA, pB, IM_COL32(255, 235, 120, 230), 1.5f);
                         }
-                        std::snprintf(lbl, sizeof(lbl), "%.2f mm", c.value);
+                        std::snprintf(lbl, sizeof(lbl), "%s", materializr::fmtLength(c.value).c_str());
                         glm::vec2 midDim = 0.5f * (baseA + baseB);
                         placeLabel(anchor, midDim - anchor, lbl, c, &midDim);
                     } else if (c.type == ConstraintType::CircleGap) {
@@ -2867,9 +2975,27 @@ void Application::renderViewport() {
                         pd.type = c.type; pd.entityA = c.entityA;
                         pd.entityB = c.entityB; pd.valid = true;
                         glm::vec2 anchor = dimensionAutoAnchor(pd);
-                        std::snprintf(lbl, sizeof(lbl), "%.2f mm", c.value);
+                        std::snprintf(lbl, sizeof(lbl), "%s", materializr::fmtLength(c.value).c_str());
                         placeLabel(anchor, glm::vec2(0.0f), lbl, c, &anchor);
                     }
+                }
+
+                // Release ends a label drag. A press that never really moved is
+                // a click, and opens the editor — so tapping a tag still edits
+                // it, while dragging one repositions it.
+                if (m_dimDragId >= 0 &&
+                    ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+                    if (!m_dimDragMoved) {
+                        for (const auto& c : m_activeSketch->getConstraints())
+                            if (c.id == m_dimDragId) { openDimEdit(c); break; }
+                    } else {
+                        // The offset was written live during the drag, so the
+                        // sketch already holds the new position; just mark the
+                        // project dirty so it is saved.
+                        markDirty();
+                    }
+                    m_dimDragId    = -1;
+                    m_dimDragMoved = false;
                 }
 
                 // Dimension tool feedback: highlight the hovered pickable
@@ -2948,10 +3074,10 @@ void Application::renderViewport() {
                             std::snprintf(gbuf, sizeof(gbuf), "%.1f\xC2\xB0",
                                           std::abs(pend.measured) * 180.0 / M_PI);
                         else if (pend.type == ConstraintType::Radius)
-                            std::snprintf(gbuf, sizeof(gbuf), "\xC3\x98%.2f",
-                                          pend.measured * 2.0);
+                            std::snprintf(gbuf, sizeof(gbuf), "\xC3\x98 %s",
+                                          materializr::fmtLength(pend.measured * 2.0).c_str());
                         else
-                            std::snprintf(gbuf, sizeof(gbuf), "%.2f mm", pend.measured);
+                            std::snprintf(gbuf, sizeof(gbuf), "%s", materializr::fmtLength(pend.measured).c_str());
                         glm::vec2 ganchor = dimensionAutoAnchor(pend);
                         // Pending point-to-line / parallel-line dims preview
                         // the same CAD-style perpendicular dimension line the
@@ -3082,48 +3208,65 @@ void Application::renderViewport() {
                             m_dimEditingFocus = false;
                         }
                         ImGui::SetNextItemWidth(120.0f);
-                        // Number wearing a text coat (see the pad sweep): the
-                        // buffer stays authoritative — every seed site writes
-                        // it — so parse it in, let inputNumber edit the value
-                        // (pad on touch, InputDouble otherwise), and write the
-                        // commit back for the parse below.
-                        double dimPadV = 0.0;
-                        (void)materializr::parseFinite(m_dimEditingBuf, dimPadV);
-                        if (materializr::inputNumber(
-                                "##dimval", &dimPadV, 0.0, 0.0, "%.2f",
-                                ImGuiInputTextFlags_EnterReturnsTrue)) {
-                            std::snprintf(m_dimEditingBuf,
-                                          sizeof(m_dimEditingBuf), "%.6g",
-                                          dimPadV);
-                            // parseFinite: CharsDecimal blocks "nan" but not
-                            // "1e999" → inf, which passed the v > 0 guards
-                            // below into the constraint solver.
-                            double v = 0.0;
-                            (void)materializr::parseFinite(m_dimEditingBuf, v);
+                        // What is being edited decides the widget. Angles are
+                        // degrees and never see a unit. Lengths take a TEXT
+                        // field on desktop so "2in" / "50mm" can be typed;
+                        // under touch the number pad edits the value in the
+                        // display unit (the pad has no letters).
+                        materializr::DimKind dimKind = materializr::DimKind::Length;
+                        bool dimIsArc = false;
+                        for (const auto& cc : m_activeSketch->getConstraints()) {
+                            if (cc.id != m_dimEditingId) continue;
+                            dimKind = cc.type == ConstraintType::Angle  ? materializr::DimKind::Angle
+                                    : cc.type == ConstraintType::Radius ? materializr::DimKind::Radius
+                                                                        : materializr::DimKind::Length;
+                            dimIsArc = dimKind == materializr::DimKind::Radius &&
+                                       materializr::constraintIsArcRadius(*m_activeSketch, cc);
+                            break;
+                        }
+                        bool dimCommitted = false;
+                        if (dimKind == materializr::DimKind::Angle || materializr::touchMode()) {
+                            // Buffer stays authoritative — every seed site
+                            // writes it — so parse it in, let the numeric
+                            // widget edit it, and write the commit back.
+                            double dimPadV = 0.0;
+                            (void)materializr::parseFinite(m_dimEditingBuf, dimPadV);
+                            char padFmt[8] = "%.2f";
+                            if (dimKind != materializr::DimKind::Angle)
+                                std::snprintf(padFmt, sizeof(padFmt), "%%.%df",
+                                              materializr::unitInfo(materializr::currentUnit()).decimals);
+                            if (materializr::inputNumber("##dimval", &dimPadV, 0.0, 0.0, padFmt,
+                                                         ImGuiInputTextFlags_EnterReturnsTrue)) {
+                                std::snprintf(m_dimEditingBuf, sizeof(m_dimEditingBuf), "%.6g", dimPadV);
+                                dimCommitted = true;
+                            }
+                        } else {
+                            // Enter, or focus leaving after an edit, commits.
+                            if (ImGui::InputText("##dimval", m_dimEditingBuf, sizeof(m_dimEditingBuf),
+                                                 ImGuiInputTextFlags_EnterReturnsTrue) ||
+                                ImGui::IsItemDeactivatedAfterEdit())
+                                dimCommitted = true;
+                            ImGui::SetItemTooltip("%s", materializr::tr(
+                                "A bare number is in the display unit; add a unit to "
+                                "override it, e.g. 2in or 50mm."));
+                        }
+                        if (dimCommitted) {
                             // recordSketchMutation snapshots before/after and
                             // pushes a SketchEditOp so the dimension edit is
                             // Ctrl-Z-able and visible in the History panel.
                             recordSketchMutation([&]{
                                 for (auto& cn : m_activeSketch->getMutableConstraints()) {
                                     if (cn.id != m_dimEditingId) continue;
-                                    if (cn.type == ConstraintType::Angle) {
-                                        cn.value = v * M_PI / 180.0;
-                                    } else if (cn.type == ConstraintType::Radius) {
-                                        // Circles are typed as diameter; arcs
-                                        // as radius, matching the R/Ø label.
-                                        if (v > 0.0)
-                                            cn.value = constraintIsArcRadiusIn(*m_activeSketch, cn)
-                                                           ? v : v * 0.5;
-                                    } else if (v > 0.0) {
-                                        cn.value = v;
-                                    }
-                                    // Typing a number is an explicit statement
-                                    // that this measurement should CONTROL the
+                                    // Convert to mm FIRST, then halve a circle's
+                                    // typed diameter — applyDimensionEdit owns
+                                    // that order. A refusal (garbage, <= 0)
+                                    // leaves the value alone. Typing a number
+                                    // says this measurement should CONTROL the
                                     // geometry, so it promotes a reference
-                                    // dimension to driving. Placing a dimension
-                                    // stays a pure measurement; committing a
-                                    // value is what opts into driving.
-                                    if (constraintSupportsReference(cn.type))
+                                    // dimension to driving.
+                                    if (materializr::applyDimensionEdit(dimKind, dimIsArc,
+                                                                        m_dimEditingBuf, cn.value) &&
+                                        constraintSupportsReference(cn.type))
                                         cn.isDriving = true;
                                     break;
                                 }
@@ -3253,7 +3396,7 @@ void Application::renderViewport() {
                     const auto& results = m_measureTool->getResults();
                     if (!results.empty()) {
                         char lbl[40];
-                        std::snprintf(lbl, sizeof(lbl), "%.2f mm", results[0].value);
+                        std::snprintf(lbl, sizeof(lbl), "%s", materializr::fmtLength(results[0].value).c_str());
                         ImVec2 ts = ImGui::CalcTextSize(lbl);
                         ImVec2 mid((sp1.x + sp2.x) * 0.5f - ts.x * 0.5f,
                                    (sp1.y + sp2.y) * 0.5f - ts.y - 6.0f);
@@ -4436,8 +4579,7 @@ void Application::renderViewport() {
                                 if (gm == GizmoMode::Translate) {
                                     label = "Move (" + std::to_string(nBodies) + " bodies)";
                                     char buf[96];
-                                    std::snprintf(buf, sizeof(buf), "Move %d bodies by (%.2f, %.2f, %.2f) mm",
-                                                  (int)nBodies, d.x, d.y, d.z);
+                                    std::snprintf(buf, sizeof(buf), "Move %d bodies by %s", (int)nBodies, materializr::fmtVec3(d.x, d.y, d.z).c_str());
                                     desc = buf;
                                 } else if (gm == GizmoMode::Rotate) {
                                     label = "Rotate (" + std::to_string(nBodies) + " bodies)";
@@ -5414,7 +5556,12 @@ void Application::renderViewport() {
                 // instead of going through SketchTool's normal input.
                 bool patternPickingNow = m_sketchPatternActive && m_sketchPatternPickingOrigin;
                 if (patternPickingNow) {
-                    float step = std::max(m_sketchGridStep, 0.01f);
+                    // The EFFECTIVE step, like the grid being drawn under this
+                    // cursor and like SketchTool's own snapping. This picker
+                    // places a point ON THE SKETCH PLANE, so the base would put
+                    // the origin between the lines the user can see whenever the
+                    // zoom has scaled the lattice.
+                    float step = std::max(m_effectiveGridStepMm, 0.01f);
                     glm::vec2 snapped(std::round(sketchCoord.x / step) * step,
                                       std::round(sketchCoord.y / step) * step);
                     ImVec2 sp(mousePos.x, mousePos.y);
@@ -7058,8 +7205,8 @@ void Application::renderViewport() {
             "Type a value and press Enter. The shape extends from your first click toward the cursor.";
         if (!bubbleOwnsInput)
         switch (mode) {
-            case SketchToolMode::Line:      dimLabel = "Length (mm)"; break;
-            case SketchToolMode::Circle:    dimLabel = "Diameter (mm)"; break;
+            case SketchToolMode::Line:      dimLabel = "Length (%s)"; break;
+            case SketchToolMode::Circle:    dimLabel = "Diameter (%s)"; break;
             // Polygon side count is picked from the toolbar popout now, and
             // radius/rotation come from the drag — so no typed dialog (it was
             // the one that clipped). dimLabel stays null → no input window.
@@ -7067,9 +7214,9 @@ void Application::renderViewport() {
                 // Touch shows BOTH Width and Height fields at once (below);
                 // desktop keeps its two-stage single field.
                 dimLabel = materializr::touchMode()
-                             ? "Rectangle (mm)"
+                             ? "Rectangle (%s)"
                              : (m_sketchTool->getRectDimStage() == 0
-                                    ? "Width (mm)" : "Height (mm)");
+                                    ? "Width (%s)" : "Height (%s)");
                 dimHint  = materializr::touchMode()
                   ? "Type Width and Height, then Apply."
                   : (m_sketchTool->getRectDimStage() == 0
@@ -7082,13 +7229,13 @@ void Application::renderViewport() {
                 // number for the bow. Click 3 has no input until the chord
                 // exists, so clickCount drives which is on offer.
                 if (m_sketchTool->getClickCount() == 1) {
-                    dimLabel = "Chord (mm)";
+                    dimLabel = "Chord (%s)";
                     dimHint  = "Type the straight-line distance between the arc's "
                                "two ends and press Enter — or just click the end.";
                 } else if (m_sketchTool->getClickCount() == 2) {
                     const bool sweep = m_sketchTool->getArcDimMode() ==
                                        SketchTool::ArcDimMode::Sweep;
-                    dimLabel = sweep ? "Sweep (deg)" : "Radius (mm)";
+                    dimLabel = sweep ? "Sweep (deg)" : "Radius (%s)";
                     dimHint  = sweep
                       ? "Type the swept angle and Enter. 180 is a semicircle. "
                         "Move the cursor across the chord to flip which way it bows."
@@ -7126,7 +7273,10 @@ void Application::renderViewport() {
                 ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking);
             opDialogDragGrip(uiScale());
 
-            ImGui::TextColored(materializr::accentText(), "%s", materializr::tr(dimLabel));
+            ImGui::TextColored(materializr::accentText(), "%s",
+                               std::strstr(dimLabel, "%s")
+                                   ? materializr::trFormat(dimLabel, materializr::unitSuffix()).c_str()
+                                   : materializr::tr(dimLabel));
             ImGui::Separator();
             // Window width is fixed now, so wrapping at the window edge is safe
             // (no feedback loop).
@@ -7152,8 +7302,7 @@ void Application::renderViewport() {
                 if (!sweep) {
                     // The chord's half-length is a hard floor; say so rather
                     // than let a too-small radius be silently refused.
-                    ImGui::TextDisabled(materializr::tr("min %.2f mm (half the chord)"),
-                                        m_sketchTool->arcMinRadius());
+                    ImGui::TextDisabled("%s", materializr::trFormat("min %s (half the chord)", materializr::fmtLength(m_sketchTool->arcMinRadius())).c_str());
                 }
                 ImGui::Spacing();
             }
@@ -7176,12 +7325,12 @@ void Application::renderViewport() {
                     }
                     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
                                         ImVec2(uiW(10.0f), uiW(10.0f)));
-                    ImGui::TextDisabled("%s", materializr::tr("Width (mm)"));
+                    ImGui::TextDisabled("%s", materializr::trFormat("Width (%s)", materializr::unitSuffix()).c_str());
                     ImGui::SetNextItemWidth(-1.0f);
-                    materializr::inputNumber("##dimW", &m_sketchShapeDimW, 0.0f, 0.0f, "%.2f");
-                    ImGui::TextDisabled("%s", materializr::tr("Height (mm)"));
+                    materializr::lengthField("##dimW", &m_sketchShapeDimW);
+                    ImGui::TextDisabled("%s", materializr::trFormat("Height (%s)", materializr::unitSuffix()).c_str());
                     ImGui::SetNextItemWidth(-1.0f);
-                    materializr::inputNumber("##dimH", &m_sketchShapeDimH, 0.0f, 0.0f, "%.2f");
+                    materializr::lengthField("##dimH", &m_sketchShapeDimH);
                     ImGui::PopStyleVar();
                     if (m_sketchShapeDimW < 0.01f) m_sketchShapeDimW = 0.01f;
                     if (m_sketchShapeDimH < 0.01f) m_sketchShapeDimH = 0.01f;
@@ -7213,8 +7362,13 @@ void Application::renderViewport() {
                     // keyboard. Enter (pad or hardware) and Apply both commit;
                     // Apply stays for the finger route, since the pad's own
                     // Enter is the only way digits reach us on a tablet.
+                    // The same predicate the commit uses: this field holds a
+                    // length, an arc's sweep in DEGREES, or a polygon's SIDE
+                    // COUNT. Only a length takes the unit's decimals.
+                    const bool dimIsLen = m_sketchTool->dimensionValueIsLength();
                     const bool entered = materializr::inputNumber(
-                        "##sketchDimT", &m_sketchDimValue, 0.0f, 0.0f, "%.2f",
+                        "##sketchDimT", &m_sketchDimValue, 0.0f, 0.0f,
+                        dimIsLen ? materializr::lengthFormat() : "%.2f",
                         ImGuiInputTextFlags_EnterReturnsTrue);
                     ImGui::PopStyleVar();
                     ImGui::Spacing();
@@ -7227,13 +7381,18 @@ void Application::renderViewport() {
                          m_sketchTool->getArcDimMode() ==
                              SketchTool::ArcDimMode::Radius)
                             ? m_sketchTool->arcMinRadius() : 0.0f;
+                    // The pad edits in the display unit; the floor is mm.
+                    // Same rule as the desktop path: only convert a LENGTH.
+                    auto dimToModel = [&](double shown) {
+                        return dimIsLen ? materializr::lengthFieldCommit(shown) : shown;
+                    };
                     ImGui::BeginDisabled(m_sketchDimValue <= 0.0f ||
-                                         m_sketchDimValue < dimFloor);
+                                         dimToModel(m_sketchDimValue) < dimFloor);
                     const bool applied =
                         ImGui::Button(materializr::tr("Apply"), ImVec2(-1.0f, uiW(44.0f)));
                     ImGui::EndDisabled();
                     if ((entered || applied) && m_sketchDimValue > 0.0f) {
-                        const float v = m_sketchDimValue;
+                        const float v = static_cast<float>(dimToModel(m_sketchDimValue));
                         recordSketchMutation([&]{ m_sketchTool->applyDimension(v); });
                         m_sketchDimValue = 0.0f;
                         m_sketchDimBuf[0] = '\0';
@@ -7248,12 +7407,22 @@ void Application::renderViewport() {
                 }
 
                 ImGui::SetNextItemWidth(winW - uiW(16.0f)); // fill the fixed width, minus padding
+                // No CharsDecimal: a typed unit ("2in") needs letters. parseLength
+                // is the gate instead, and it refuses anything but one number
+                // with an optional unit.
                 if (ImGui::InputText("##sketchDim", m_sketchDimBuf, sizeof(m_sketchDimBuf),
                                      ImGuiInputTextFlags_EnterReturnsTrue |
-                                     ImGuiInputTextFlags_CharsDecimal |
                                      ImGuiInputTextFlags_AutoSelectAll)) {
-                    float v = 0.0f;
-                    if (materializr::parseFinite(m_sketchDimBuf, v) && v > 0.0f) {
+                    // Not every typed dimension is a length: an arc's sweep is
+                    // DEGREES and a polygon's first value is a SIDE COUNT.
+                    // Converting those display->mm made a typed 180 deg arrive
+                    // as 4572 (clamped to 359.9) and 6 sides arrive as 152.
+                    double v0 = 0.0;
+                    const bool isLen = m_sketchTool->dimensionValueIsLength();
+                    const bool ok = isLen ? materializr::parseLength(m_sketchDimBuf, v0)
+                                          : materializr::parseFinite(m_sketchDimBuf, v0);
+                    if (ok && v0 > 0.0) {
+                        const float v = static_cast<float>(v0);
                         recordSketchMutation([&]{ m_sketchTool->applyDimension(v); });
                     }
                     m_sketchDimBuf[0] = '\0';

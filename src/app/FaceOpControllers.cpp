@@ -1,3 +1,4 @@
+#include "ui/LengthField.h"
 #include "ui/StepperRow.h"
 #include "FaceOpControllers.h"
 #include "../ui/UiTheme.h"      // viewportBanner
@@ -97,8 +98,7 @@ int ShellController::onBegin(const IopContext& ctx) {
             !e.shape.IsNull()) {
             m_face = TopoDS::Face(e.shape);
             m_thickness = 1.0f;
-            std::snprintf(m_inputBuf, sizeof(m_inputBuf), "%.2f",
-                          m_thickness);
+            materializr::formatLengthDigits(m_inputBuf, sizeof(m_inputBuf), m_thickness);
             m_inputFocus = true;
             return e.bodyId;
         }
@@ -121,9 +121,8 @@ void ShellController::panelBody(const IopContext& ctx, bool& changed) {
     if (ctx.cornerCommitUi) {
         // im-touch: number-pad amount field — no InputText, no native
         // keyboard (which froze the app on iOS).
-        if (touchui::amountField("shellAmt", nullptr, &m_thickness, "mm", 2,
-                                 /*allowSign=*/false, 0.1f, 20.0f)) {
-            std::snprintf(m_inputBuf, sizeof(m_inputBuf), "%.2f", m_thickness);
+        if (materializr::amountLengthField("shellAmt", nullptr, &m_thickness, /*allowSign=*/false, 0.1f, 20.0f)) {
+            materializr::formatLengthDigits(m_inputBuf, sizeof(m_inputBuf), m_thickness);
             changed = true;
         }
     } else {
@@ -134,29 +133,33 @@ void ShellController::panelBody(const IopContext& ctx, bool& changed) {
     ImGui::SetNextItemWidth(140);
     // parseFinite: non-finite input keeps the previous thickness rather
     // than feeding inf into MakeThickSolid.
+    // The member is the truth; the buffer follows it unless being typed in.
+    materializr::reseedLengthBufferIfIdle("##shellThickness", m_inputBuf, sizeof(m_inputBuf), m_thickness);
     if (ImGui::InputText("##shellThickness", m_inputBuf, sizeof(m_inputBuf),
-                         ImGuiInputTextFlags_EnterReturnsTrue |
-                         ImGuiInputTextFlags_CharsDecimal)) {
-        (void)materializr::parseFinite(m_inputBuf, m_thickness);
+                         ImGuiInputTextFlags_EnterReturnsTrue)) {
+        (void)materializr::parseLength(m_inputBuf, m_thickness);
         requestCommit();
-    } else {
+    } else if (materializr::lengthBufferIsActive("##shellThickness")) {
+        // Only while the user is typing. Parsing an IDLE buffer wrote the
+        // buffer's rounded text back over a more precise member — a value was
+        // truncated to the display decimals just by opening the tool.
         float parsed = m_thickness;
-        if (materializr::parseFinite(m_inputBuf, parsed) &&
+        if (materializr::parseLength(m_inputBuf, parsed) &&
             std::abs(parsed - m_thickness) > 0.001f) {
             m_thickness = parsed;
             changed = true;
         }
     }
     ImGui::SameLine();
-    ImGui::Text("%s", materializr::tr("mm"));
+    ImGui::Text("%s", materializr::unitSuffix());
     }
 
-    if (materializr::stepperRow("shellStep", &m_thickness,
+    if (materializr::lengthStepperRow("shellStep", &m_thickness,
                                 /*allowNegative=*/false, 0.1f, 20.0f)) {
         // Snap to 0.1 mm — wall thicknesses are almost always in tenths, and a
         // free-floating 3.47 mm slider value is just noise.
         m_thickness = std::round(m_thickness * 10.0f) / 10.0f;
-        std::snprintf(m_inputBuf, sizeof(m_inputBuf), "%.2f", m_thickness);
+        materializr::formatLengthDigits(m_inputBuf, sizeof(m_inputBuf), m_thickness);
         changed = true;
     }
 
@@ -579,14 +582,13 @@ void ProjectSketchController::panelBody(const IopContext& ctx,
     ImGui::SameLine();
     if (ImGui::RadioButton(materializr::tr("Emboss"), &m_mode, 1)) changed = true;
 
-    ImGui::TextDisabled(materializr::tr("Depth: %.2f mm"), m_depth);
-    if (materializr::stepperRow("projDepthStep", &m_depth,
+    ImGui::TextDisabled("%s", materializr::trFormat("Depth: %s", materializr::fmtLength(m_depth)).c_str());
+    if (materializr::lengthStepperRow("projDepthStep", &m_depth,
                                 /*allowNegative=*/false, 0.1f, 10.0f)) {
         changed = true;
     }
     if (ctx.cornerCommitUi &&
-        touchui::amountField("projAmt", nullptr, &m_depth, "mm", 2,
-                             /*allowSign=*/false, 0.1f, 10.0f))
+        materializr::amountLengthField("projAmt", nullptr, &m_depth, /*allowSign=*/false, 0.1f, 10.0f))
         changed = true;
 
     if (!previewOk()) {
@@ -807,9 +809,7 @@ void ScaleFaceController::panelBody(const IopContext& ctx, bool& changed) {
     ImGui::Separator();
 
     if (previewOk()) {
-        ImGui::TextColored(ImVec4(0.4f, 0.9f, 0.5f, 1.0f),
-                           materializr::tr("Previewing %.0f%% x %.0f%% over %.1f mm"),
-                           m_pctU, m_pctV, m_len);
+        ImGui::TextColored(ImVec4(0.4f, 0.9f, 0.5f, 1.0f), "%s", materializr::trFormat("Previewing %.0f%% x %.0f%% over %s", m_pctU, m_pctV, materializr::fmtLength(m_len)).c_str());
     } else {
         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 240.0f);
         ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f), "%s", materializr::tr("No preview: needs a FLAT end face (and 100%% is a no-op). Try another face or tweak values."));
@@ -863,14 +863,13 @@ void ScaleFaceController::panelBody(const IopContext& ctx, bool& changed) {
             changed = true;
     }
     ImGui::TextDisabled("%s", materializr::tr("Or drag the two arrows on the face."));
-    ImGui::TextDisabled(materializr::tr("Length: %.1f mm"), m_len);
-    if (materializr::stepperRow("lenStep", &m_len,
+    ImGui::TextDisabled("%s", materializr::trFormat("Length: %s", materializr::fmtLength(m_len)).c_str());
+    if (materializr::lengthStepperRow("lenStep", &m_len,
                                 /*allowNegative=*/false, 0.5f,
                                 std::max(m_lenMax, 1.0f)))
         changed = true;
     if (ctx.cornerCommitUi &&
-        touchui::amountField("lenAmt", nullptr, &m_len, "mm", 1,
-                             /*allowSign=*/false, 0.5f, std::max(m_lenMax, 1.0f)))
+        materializr::amountLengthField("lenAmt", nullptr, &m_len, /*allowSign=*/false, 0.5f, std::max(m_lenMax, 1.0f)))
         changed = true;
 }
 
@@ -894,8 +893,8 @@ int ResizeCylindricalController::onBegin(const IopContext& ctx) {
     m_deferred = ctx.history.isBodyThreaded(m_pick.bodyId);
     m_newBottomDiameter = m_pick.bottomR * 2.0;
     m_newTopDiameter    = m_pick.topR    * 2.0;
-    std::snprintf(m_botBuf, sizeof(m_botBuf), "%.2f", m_newBottomDiameter);
-    std::snprintf(m_topBuf, sizeof(m_topBuf), "%.2f", m_newTopDiameter);
+    materializr::formatLengthDigits(m_botBuf, sizeof(m_botBuf), m_newBottomDiameter);
+    materializr::formatLengthDigits(m_topBuf, sizeof(m_topBuf), m_newTopDiameter);
     m_inputFocus = true;
     return m_pick.bodyId;
 }
@@ -938,15 +937,13 @@ void ResizeCylindricalController::panelBody(const IopContext& ctx,
                         m_pick.isHole ? "hole" : "outer face");
 
     if (bothEnds) {
-        ImGui::Text(materializr::tr("Original: %.2f mm"), m_pick.topR * 2.0);
+        ImGui::TextUnformatted(materializr::trFormat("Original: %s", materializr::fmtLength(m_pick.topR * 2.0)).c_str());
     } else if (m_pick.editBottom) {
-        ImGui::Text(materializr::tr("Original: %.2f mm"), m_pick.bottomR * 2.0);
-        ImGui::TextDisabled(materializr::tr("Top stays at %.2f mm — drag this end to make a cone."),
-                            m_pick.topR * 2.0);
+        ImGui::TextUnformatted(materializr::trFormat("Original: %s", materializr::fmtLength(m_pick.bottomR * 2.0)).c_str());
+        ImGui::TextDisabled("%s", materializr::trFormat("Top stays at %s — drag this end to make a cone.", materializr::fmtLength(m_pick.topR * 2.0)).c_str());
     } else {
-        ImGui::Text(materializr::tr("Original: %.2f mm"), m_pick.topR * 2.0);
-        ImGui::TextDisabled(materializr::tr("Bottom stays at %.2f mm — drag this end to make a cone."),
-                            m_pick.bottomR * 2.0);
+        ImGui::TextUnformatted(materializr::trFormat("Original: %s", materializr::fmtLength(m_pick.topR * 2.0)).c_str());
+        ImGui::TextDisabled("%s", materializr::trFormat("Bottom stays at %s — drag this end to make a cone.", materializr::fmtLength(m_pick.bottomR * 2.0)).c_str());
     }
 
     if (m_inputFocus) {
@@ -964,31 +961,37 @@ void ResizeCylindricalController::panelBody(const IopContext& ctx,
         // im-touch: number-pad amount field — no InputText, no native keyboard
         // (which froze the app on iOS).
         double v = *val;
-        if (touchui::amountField("rcylAmt", nullptr, &v, "mm", 2,
-                                 /*allowSign=*/false)) {
+        if (materializr::amountLengthField("rcylAmt", nullptr, &v, /*allowSign=*/false)) {
             parsed = v;
             edited = std::abs(parsed - *val) > 0.001;
-            std::snprintf(buf, 32, "%.2f", v);
+            // v is millimetres; this buffer is read back with parseLength, i.e.
+            // in DISPLAY units. "%.2f" wrote mm into it and also fixed the
+            // precision at two decimals, quantising metres to 10 mm. Its
+            // sibling ten lines down already used formatLengthDigits.
+            materializr::formatLengthDigits(buf, 32, v);
         }
     } else {
         ImGui::SetNextItemWidth(140);
+        // The member is the truth; the buffer follows unless being typed in.
+        materializr::reseedLengthBufferIfIdle("##rcyldia", buf, 32, *val);
         if (ImGui::InputText("##rcyldia", buf, 32,
-                             ImGuiInputTextFlags_EnterReturnsTrue |
-                             ImGuiInputTextFlags_CharsDecimal))
+                             ImGuiInputTextFlags_EnterReturnsTrue))
             requestCommit();   // Enter in the field = Confirm
-        // parseFinite: garbage/inf keeps the previous value.
-        edited = materializr::parseFinite(buf, parsed) &&
+        // Only re-read while typing: an idle re-parse rewrote the model from
+        // the buffer's rounded text, and reinterpreted stale text after a unit
+        // switch. CharsDecimal dropped so a typed "2in" can reach parseLength.
+        edited = materializr::lengthBufferIsActive("##rcyldia") &&
+                 materializr::parseLength(buf, parsed) &&
                  std::abs(parsed - *val) > 0.001;
         ImGui::SameLine();
-        ImGui::Text("%s", materializr::tr("mm"));
+        ImGui::Text("%s", materializr::unitSuffix());
     }
     if (edited) {
         *val = parsed;
         if (bothEnds) {
             m_newBottomDiameter = parsed;
             m_newTopDiameter    = parsed;
-            std::snprintf(m_pick.editBottom ? m_topBuf : m_botBuf, 32, "%.2f",
-                          parsed);
+            materializr::formatLengthDigits(m_pick.editBottom ? m_topBuf : m_botBuf, 32, parsed);
         }
         changed = true;
     }
@@ -2176,7 +2179,7 @@ void MoveFaceController::renderMoveFacePanel(const IopContext& ctx,
         }
         if (ch) updateMoveFace(ctx);
     } else {
-        ImGui::Text("%s", materializr::tr("Slide (mm)")); ImGui::Separator();
+        ImGui::Text("%s", materializr::trFormat("Slide (%s)", materializr::unitSuffix()).c_str()); ImGui::Separator();
         ImGui::Text("(%.1f, %.1f, %.1f)  |%.1f|",
                     m_st.moveFaceVec.x, m_st.moveFaceVec.y, m_st.moveFaceVec.z,
                     glm::length(m_st.moveFaceVec));

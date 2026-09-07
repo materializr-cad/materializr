@@ -1,6 +1,8 @@
+#include "ui/LengthField.h"
 #include "../core/NumFormat.h"
 #include "FilletOp.h"
 #include "BlendCut.h"
+#include "FilletProbe.h"
 #include "SubShapeIndex.h"
 #include "EdgeAnchor.h"
 #include "FaceSurfSig.h"
@@ -11,6 +13,7 @@
 #include <cstdio>
 #include <memory>
 #include <cstdlib>
+#include <chrono>
 #include <cmath>
 #include <BRepFilletAPI_MakeFillet.hxx>
 #include <TopoDS.hxx>
@@ -400,9 +403,33 @@ bool FilletOp::execute(Document& doc) {
         // step off the degenerate point. Smaller is tried first, so a radius near
         // a GENUINE geometric limit is not nudged past it.
         const double kNudge[] = {0.0, -1e-3, 1e-3, -5e-3, 5e-3};
+        // ONE budget for the whole ladder, not one per rung. Each probe blocks
+        // this thread — the render thread, during an interactive preview — so
+        // five rungs at the full budget each would stall for five times as long
+        // as the user asked to wait. That is still a freeze, just a bounded one.
+        const auto  ladderStart  = std::chrono::steady_clock::now();
+        const double ladderBudget = materializr::fillet::probeBudget();
         for (double rel : kNudge) {
             const double r = m_radius * (1.0 + rel);
             if (r <= 0.0) continue;
+            const double spent = std::chrono::duration<double>(
+                std::chrono::steady_clock::now() - ladderStart).count();
+            const double left = ladderBudget - spent;
+            if (left <= 0.0) {
+                std::fprintf(stderr,
+                    "[Fillet] %.1fs budget spent across %zu radii — giving up "
+                    "rather than stalling further.\n",
+                    ladderBudget, m_edges.size());
+                break;
+            }
+            // Never enter Build() blind. OCCT's blend cannot be interrupted
+            // (ChFi3d_Builder::Compute takes no ProgressRange), so a radius it
+            // cannot resolve hangs this thread forever — and this runs from the
+            // render loop during an interactive preview, which is precisely how
+            // FOB.mzr froze the app. probe() runs the same build on a detached
+            // worker against a copy and gives up after a budget; reaching the
+            // line below means this radius is known to converge.
+            if (!materializr::fillet::probe(m_previousShape, m_edges, r, left)) continue;
             auto attempt = std::make_unique<BRepFilletAPI_MakeFillet>(m_previousShape);
             for (const auto& edge : m_edges) attempt->Add(r, edge);
             try { attempt->Build(); } catch (...) { continue; }
@@ -645,7 +672,7 @@ void FilletOp::renderProperties() {
     ImGui::Text("%s", materializr::tr("Fillet"));
     ImGui::Separator();
 
-    materializr::inputNumber(materializr::tr("Radius"), &m_radius, 0.1, 1.0, "%g");
+    materializr::lengthField(materializr::tr("Radius"), &m_radius);
 
     ImGui::Text(materializr::tr("Edges: %d selected"), static_cast<int>(m_edges.size()));
     ImGui::Text(materializr::tr("Body ID: %d"), m_bodyId);

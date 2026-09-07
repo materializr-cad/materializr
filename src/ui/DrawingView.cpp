@@ -1,3 +1,4 @@
+#include "core/Units.h"
 #include "DrawingView.h"
 #include "../core/Document.h"
 
@@ -312,8 +313,7 @@ void DrawingView::render() {
 
     // View count info
     char info[128];
-    std::snprintf(info, sizeof(info), "Views: %d | Sheet: %.0f x %.0f mm",
-                  static_cast<int>(m_views.size()), m_sheetWidth, m_sheetHeight);
+    std::snprintf(info, sizeof(info), "Views: %d | Sheet: %s x %s", static_cast<int>(m_views.size()), materializr::fmtLength(m_sheetWidth).c_str(), materializr::fmtLength(m_sheetHeight).c_str());
     ImGui::Text("%s", info);
 
     ImGui::Separator();

@@ -1,3 +1,5 @@
+#include "ui/LengthField.h"
+#include "core/Units.h"
 #include "ScaleFaceOp.h"
 #include "SubShapeIndex.h"
 #include <cstdio>
@@ -312,19 +314,20 @@ bool ScaleFaceOp::undo(Document& doc) {
 
 std::string ScaleFaceOp::description() const {
     char buf[96];
-    std::snprintf(buf, sizeof(buf),
-                  "Scale face to %.0f%%/%.0f%% over %.1f mm (%s)",
-                  m_scaleU, m_scaleV, m_length,
-                  m_mode == Mode::Extend ? "extend" : "pinch");
+    std::snprintf(buf, sizeof(buf), "Scale face to %.0f%%/%.0f%% over %s (%s)", m_scaleU, m_scaleV, materializr::fmtLength(m_length).c_str(), m_mode == Mode::Extend ? "extend" : "pinch");
     return buf;
 }
 
 void ScaleFaceOp::renderProperties() {
     ImGui::Text("%s", materializr::tr("Scale Face"));
     ImGui::Separator();
+    // PERCENTAGES, not lengths — the header says "percent along the face
+    // plane's XDirection" and the labels say (%). Routed through lengthField
+    // they were converted display->mm on commit, so typing 100 under inches
+    // stored 2540%.
     materializr::inputNumber(materializr::tr("Scale U (%)"), &m_scaleU, 1.0, 10.0, "%.1f");
     materializr::inputNumber(materializr::tr("Scale V (%)"), &m_scaleV, 1.0, 10.0, "%.1f");
-    materializr::inputNumber(materializr::tr("Length (mm)"), &m_length, 0.5, 5.0, "%.2f");
+    materializr::lengthField(materializr::trFormat("Length (%s)", materializr::unitSuffix()).c_str(), &m_length);
     ImGui::Text(materializr::tr("Mode: %s"), m_mode == Mode::Extend ? "Extend" : "Pinch");
     ImGui::Text(materializr::tr("Body ID: %d"), m_bodyId);
 }

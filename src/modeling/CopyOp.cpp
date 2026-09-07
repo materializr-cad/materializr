@@ -1,3 +1,4 @@
+#include "ui/LengthField.h"
 #include "CopyOp.h"
 #include <BRepBuilderAPI_Transform.hxx>
 #include <gp_Trsf.hxx>
@@ -75,9 +76,9 @@ void CopyOp::renderProperties() {
     materializr::inputNumberInt("Source Body ID", &m_sourceBodyId);
 
     ImGui::Text("%s", materializr::tr("Offset"));
-    materializr::inputNumber("X", &m_dx, 0.1, 1.0, "%g");
-    materializr::inputNumber("Y", &m_dy, 0.1, 1.0, "%g");
-    materializr::inputNumber("Z", &m_dz, 0.1, 1.0, "%g");
+    materializr::lengthField("X", &m_dx);
+    materializr::lengthField("Y", &m_dy);
+    materializr::lengthField("Z", &m_dz);
 
     if (m_createdBodyId >= 0) {
         ImGui::Text(materializr::tr("Created body ID: %d"), m_createdBodyId);

@@ -1,3 +1,5 @@
+#include "ui/LengthField.h"
+#include "core/Units.h"
 #include "../core/NumFormat.h"
 #include "../core/UiKeepAlive.h"
 #include "ExtrudeOp.h"
@@ -788,7 +790,7 @@ bool ExtrudeOp::rehydrateFromReload(const ReloadState& state, Document& doc) {
 }
 
 std::string ExtrudeOp::description() const {
-    std::string desc = "Extrude " + materializr::numStr(m_distance) + "mm";
+    std::string desc = "Extrude " + materializr::fmtLength(m_distance);
     switch (m_mode) {
         case ExtrudeMode::NewBody:   desc += " (New Body)"; break;
         case ExtrudeMode::Union:     desc += " (Union)"; break;
@@ -802,7 +804,7 @@ void ExtrudeOp::renderProperties() {
     ImGui::Text("%s", materializr::tr("Extrude"));
     ImGui::Separator();
 
-    materializr::inputNumber(materializr::tr("Distance"), &m_distance, 0.1, 1.0, "%g");
+    materializr::lengthField(materializr::tr("Distance"), &m_distance);
 
     const char* modeItems[] = { materializr::tr("New Body"), materializr::tr("Union"),
                                 materializr::tr("Subtract"), materializr::tr("Intersect") };

@@ -391,4 +391,14 @@ private:
     gp_Pnt sketchToWorld(glm::vec2 pt2d) const;
 };
 
+
+// Drafting convention splits the two: an arc is called out by RADIUS ("R 10"),
+// a full circle by DIAMETER ("O 20"), while Constraint::value stores a radius
+// for both. The label, the edit-popup seed and the commit must all agree on
+// which convention applies. This was a file-static in Application_Viewport.cpp,
+// so the fourth site that needed it — applyPendingDimension, in another
+// translation unit — could not call it, open-coded the scan, and missed the
+// unit conversion with it. Shared so that cannot recur.
+bool constraintIsArcRadius(const Sketch& sk, const Constraint& c);
+
 } // namespace materializr

@@ -27,6 +27,7 @@ add_library(materializr_core STATIC
     ${CMAKE_SOURCE_DIR}/src/core/MeshGuard.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/ExtrudeOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/FilletOp.cpp
+    ${CMAKE_SOURCE_DIR}/src/modeling/FilletProbe.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/ChamferOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/BlendCut.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/BooleanOp.cpp
@@ -243,6 +244,26 @@ add_test(NAME test_sketch_edit_cascade COMMAND test_sketch_edit_cascade)
 add_executable(test_extrude_recovered_profile test_extrude_recovered_profile.cpp)
 target_link_libraries(test_extrude_recovered_profile PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_extrude_recovered_profile COMMAND test_extrude_recovered_profile)
+
+# test_length_edit - the transactions behind every length widget (no ImGui)
+add_executable(test_length_edit test_length_edit.cpp)
+target_link_libraries(test_length_edit PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_length_edit COMMAND test_length_edit)
+
+# test_units - display units: the one place a length changes unit (mm/cm/m/in/ft)
+add_executable(test_units test_units.cpp)
+target_link_libraries(test_units PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_units COMMAND test_units)
+
+# test_dim_label_offset - dimension tag placement offsets (drag to reposition)
+add_executable(test_dim_label_offset test_dim_label_offset.cpp)
+target_link_libraries(test_dim_label_offset PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_dim_label_offset COMMAND test_dim_label_offset)
+
+# test_fillet_probe - deadline guard for OCCT's uninterruptible fillet builder
+add_executable(test_fillet_probe test_fillet_probe.cpp)
+target_link_libraries(test_fillet_probe PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_fillet_probe COMMAND test_fillet_probe)
 
 # test_section_cap - section-view cross-section cap geometry (issue #15)
 add_executable(test_section_cap test_section_cap.cpp)
@@ -807,3 +828,11 @@ if(DEFINED MZR_OCCT_PREFIX)
             ENVIRONMENT "LD_LIBRARY_PATH=${MZR_OCCT_PREFIX}/lib:$ENV{LD_LIBRARY_PATH}")
     endif()
 endif()
+
+# test_grid_scale — the sketch grid's drawn lattice vs its snap lattice.
+# GridScale.h is header-only and deliberately GL-free, so this links against
+# neither the viewport nor ImGui.
+add_executable(test_grid_scale test_grid_scale.cpp)
+target_include_directories(test_grid_scale PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(test_grid_scale PRIVATE gtest gtest_main)
+add_test(NAME test_grid_scale COMMAND test_grid_scale)

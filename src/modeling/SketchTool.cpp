@@ -751,7 +751,7 @@ void SketchTool::updateHoverCharge(double tNow, glm::vec2 cursor) {
     // charged it at coarse grid steps (zoomed out) — "latching to edges I
     // never hovered". Charging is a deliberate act: tighter catch, and the
     // linger tolerance below is a small fraction of a cell.
-    const float band = std::max(0.4f, m_gridStep * 0.6f);
+    const float band = std::max(0.4f, tolStep() * 0.6f);
     ChargedRef best;
     float bestD = band;
     for (const auto& pt : m_sketch->getPoints()) {
@@ -811,7 +811,7 @@ void SketchTool::updateHoverCharge(double tNow, glm::vec2 cursor) {
     // and same sourceId; FacePoint and FaceLineMid match by position
     // since they have no id.
     const double dwell = 0.30;
-    const float  moveTol = std::max(0.25f, m_gridStep * 0.25f);
+    const float  moveTol = std::max(0.25f, tolStep() * 0.25f);
     bool sameCandidate =
         m_hoverCandidate.kind == best.kind &&
         ((best.sourceId >= 0 && m_hoverCandidate.sourceId == best.sourceId) ||
@@ -924,7 +924,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     // extension guides all derive from it, so the touch widening flows to all.
     const bool gridSnapOnForBand = m_snapToGridEnabled && m_gridStep > 0.0f;
     float pointSnapThreshold =
-        (gridSnapOnForBand ? m_gridStep * 0.6f : 0.25f) * snapScale();
+        (gridSnapOnForBand ? tolStep() * 0.6f : 0.25f) * snapScale();
     float curveSnapThreshold = pointSnapThreshold; // same band for circle/arc perimeters
 
     // Without a sketch only grid snap can apply.
@@ -1009,7 +1009,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
                  m_inferenceLevel == InferenceLevel::Max) && gridActive) {
                 glm::vec2 gc;
                 if (snapCurveToGrid(center->pos, r, pos, m_gridStep,
-                                    std::max(curveSnapThreshold, m_gridStep * 0.6f), gc))
+                                    std::max(curveSnapThreshold, tolStep() * 0.6f), gc))
                     { m_snapRimId = c.id; noteRimGuide(gc, c.id); return gc; }
             }
             // Reduced (and Full/Max fallback): grid wins ties — only land on the
@@ -1052,7 +1052,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
                  m_inferenceLevel == InferenceLevel::Max) && gridActive) {
                 glm::vec2 gc;
                 if (snapCurveToGrid(center->pos, r, pos, m_gridStep,
-                                    std::max(curveSnapThreshold, m_gridStep * 0.6f), gc)) {
+                                    std::max(curveSnapThreshold, tolStep() * 0.6f), gc)) {
                     // Accept grid crossing only when it lies on the arc.
                     float gcA = std::atan2(gc.y - center->pos.y,
                                            gc.x - center->pos.x) - startA;
@@ -1328,7 +1328,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     // snap above: with grid snap on, an absolute 0.2 mm floor would fire a
     // horizontal/vertical guide off a point within 0.2 mm on a fine grid,
     // hijacking the cursor within one increment. Tie it to the grid instead.
-    const float axisThresh   = (gridActive ? m_gridStep * 0.3f : 0.2f);
+    const float axisThresh   = (gridActive ? tolStep() * 0.3f : 0.2f);
     const float onLineThresh = pointSnapThreshold * 0.7f;
     const float extThresh    = pointSnapThreshold * 0.6f;
     // POSITIONAL cap on directional / charged inferences: fires-checks are
@@ -1341,7 +1341,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     // stopped grabbing, these took over and the preview wouldn't start until
     // ~1.3 mm out. Tie the pull to the grid so it can't reach past ~1.5
     // increments; coarse grids and grid-off keep the absolute cap.
-    const float posCap       = (gridActive ? m_gridStep * 1.5f : 1.5f);
+    const float posCap       = (gridActive ? tolStep() * 1.5f : 1.5f);
 
     // On-line: cursor's perpendicular projection lands within an existing
     // sketch segment.
@@ -2173,10 +2173,42 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     return result;
 }
 
+// Generated geometry: fixed model-space radius, never the camera. See the
+// declaration for why. 0.3 mm is the radius every caller here used before the
+// interactive one became screen-aware, so this preserves their behaviour
+// exactly rather than inventing a new number.
+int SketchTool::findExactCoincidentPoint(glm::vec2 pos, int excludeId) const {
+    if (!m_sketch) return -1;
+    int best = -1;
+    float bestD = 0.3f;
+    for (const auto& pt : m_sketch->getPoints()) {
+        if (pt.id == excludeId) continue;
+        if (pt.fromText) continue;
+        const float d = glm::length(pos - pt.pos);
+        if (d < bestD) { bestD = d; best = pt.id; }
+    }
+    return best;
+}
+
 int SketchTool::findCoincidentPoint(glm::vec2 pos, int excludeId) const {
     if (!m_sketch) return -1;
 
-    const float threshold = 0.3f * snapScale(); // point snap (wider on touch)
+    // A weld radius is a SCREEN distance. As a fixed 0.3 mm it shrank with the
+    // zoom — 15 px in a millimetre view but a fifth of a pixel in a metre one —
+    // and welding is the ONLY thing that closes a loop into an extrudable
+    // region. Grid snap hid that for years: with a stable lattice the closing
+    // click lands EXACTLY on the first vertex, so a radius of nearly zero still
+    // welded. Change the lattice underfoot and it stops — switching feet -> mm
+    // makes the new lattice incommensurable with a vertex placed on the old one
+    // (304.8-based vs 1-based), the closing click snaps elsewhere, and 0.3 mm
+    // cannot bridge the gap: "I can't close out a sketch to extrude."
+    //
+    // Same shape as tolStep()'s screen term, and the 0.3 mm stays as a floor so
+    // a deeply zoomed-in view keeps its old precision (and so the radius is
+    // still sane on the first frame, before the viewport has pushed a scale).
+    const float threshold =
+        std::max(0.3f, std::min(kWeldRadiusPx * m_mmPerPixel,
+                                kWeldRadiusCapMm)) * snapScale();
     // Return the NEAREST point within the radius, not the first one found. On
     // dense or small-scale geometry (e.g. an SVG imported small, whose spline
     // control points sit within the weld radius of each other) "first in range"
@@ -2219,7 +2251,7 @@ void SketchTool::handleSelectTool(glm::vec2 pos) {
     int nearLine = -1;
     int nearCircle = -1;
     int nearArc = -1;
-    const float tol = std::max(m_gridStep * 0.5f, 0.5f) * snapScale(); // sketch units (wider on touch)
+    const float tol = std::max(tolStep() * 0.5f, 0.5f) * snapScale(); // sketch units (wider on touch)
     if (nearPt < 0) {
         // Line segments.
         float bestD = 0.0f;
@@ -2349,16 +2381,25 @@ void SketchTool::handleLineTool(glm::vec2 pos) {
         const SketchPoint* anchorPt = m_sketch->getPoint(m_lastPointId);
         if (anchorPt && glm::length(pos - anchorPt->pos) < 1e-4f)
             return;
-        int endPointId = -1;
-
-        // Check if snapping to existing point
-        const auto& points = m_sketch->getPoints();
-        for (const auto& pt : points) {
-            if (pt.id != m_lastPointId && glm::length(pos - pt.pos) < 1e-4f) {
-                endPointId = pt.id;
-                break;
-            }
-        }
+        // Reuse an existing vertex when the click lands on one — this is what
+        // CLOSES a loop, by landing the last click on the chain's start.
+        //
+        // It used to be a hand-rolled scan at 1e-4 mm, which is exact equality
+        // for any practical purpose: the loop only closed when grid snap
+        // happened to place the click precisely on the start vertex. With snap
+        // OFF that never happens, so no loop could be closed by clicking at
+        // all; with snap ON it stopped happening the moment the lattice moved
+        // under a unit switch or the zoom-scaled step, because the start vertex
+        // was no longer a lattice point. Reported first as "I can't close out a
+        // sketch to extrude" after switching feet -> mm, then as "I can't close
+        // any sketches".
+        //
+        // Closing is an AIM, so it takes the interactive weld radius like every
+        // other aimed click. m_lastPointId is excluded because that is the
+        // anchor we are drawing FROM; welding onto it would be the degenerate
+        // segment the guard above already rejects.
+        const int endPointId0 = findCoincidentPoint(pos, m_lastPointId);
+        int endPointId = endPointId0;
 
         if (endPointId == -1) {
             endPointId = m_sketch->addPoint(pos);
@@ -2436,7 +2477,17 @@ void SketchTool::handleCircleTool(glm::vec2 pos, bool exact) {
         if (radius > 1e-6f) {
             // Reuse the existing point at this position if there is one
             // (this is how concentric circles share a center).
-            int existing = findCoincidentPoint(center, -1);
+            //
+            // Centre mode: the centre IS the user's first click, so the
+            // interactive aim radius is right. TwoPoint mode: the centre is
+            // the DERIVED midpoint of two clicks — nothing was aimed at it, and
+            // welding it to a neighbour up to 6 px away would move the centre
+            // while `radius` stays measured from the original midpoint, so the
+            // rim would no longer pass through the clicks. Same rule the arc
+            // circumcentre documents below.
+            int existing = (m_circleMode == CircleMode::TwoPoint)
+                             ? findExactCoincidentPoint(center, -1)
+                             : findCoincidentPoint(center, -1);
             int centerId = (existing >= 0) ? existing : m_sketch->addPoint(center);
             m_sketch->addCircle(centerId, static_cast<double>(radius));
         }
@@ -2477,8 +2528,8 @@ float SketchTool::rimBreakBand(bool wholeSelection) const {
     // the rim through any normal repositioning and only lets go if the line is
     // hauled somewhere else entirely. Dragging the point alone gets a tight one,
     // so a deliberate pull detaches immediately.
-    const float tight = std::max(m_gridStep * 0.75f, 0.5f) * snapScale();
-    return wholeSelection ? std::max(tight * 8.0f, 4.0f * m_gridStep) : tight;
+    const float tight = std::max(tolStep() * 0.75f, 0.5f) * snapScale();
+    return wholeSelection ? std::max(tight * 8.0f, 4.0f * tolStep()) : tight;
 }
 
 // Sticky, not locked. While the drag stays near the rim the point rides it —
@@ -3474,7 +3525,7 @@ void applyTrim(Sketch& sketch, const TrimAction& a) {
 
 void SketchTool::handleTrimTool(glm::vec2 pos) {
     if (!m_sketch) return;
-    float threshold = std::max(0.3f, m_gridStep * 0.5f);
+    float threshold = std::max(0.3f, tolStep() * 0.5f);
     TrimAction a = planTrim(*m_sketch, pos, threshold);
     if (!a.valid()) return;
     applyTrim(*m_sketch, a);
@@ -3487,7 +3538,7 @@ void SketchTool::handleTrimTool(glm::vec2 pos) {
 void SketchTool::computeTrimHover(glm::vec2 pos) {
     m_trimHoverPoints.clear();
     if (!m_sketch) return;
-    float threshold = std::max(0.3f, m_gridStep * 0.5f);
+    float threshold = std::max(0.3f, tolStep() * 0.5f);
     TrimAction a = planTrim(*m_sketch, pos, threshold);
     if (a.valid()) densifyTrimPreview(*m_sketch, a, m_trimHoverPoints);
 }
@@ -3743,7 +3794,9 @@ void SketchTool::commitMirror(std::set<int>& outPoints, std::set<int>& outLines)
         glm::vec2 np = mirrorReflect(p->pos);
         // Weld a reflected vertex onto an existing coincident one (a point on
         // the mirror line maps to itself) — same as the one-shot mirror did.
-        int existing = findCoincidentPoint(np, -1);
+        // EXACT, not the interactive radius: a reflected vertex is generated,
+        // so which existing point it welds to must not depend on the zoom.
+        int existing = findExactCoincidentPoint(np, -1);
         int nid = (existing >= 0) ? existing : m_sketch->addPoint(np);
         remap[oldId] = nid;
         return nid;
@@ -3792,12 +3845,12 @@ void SketchTool::updateOffsetHover(glm::vec2 pos) {
     m_offsetChainHover.clear();
     if (!m_sketch) return;
     if (m_offsetSuppressHover) {
-        if (glm::length(pos - m_offsetCommitPos) < std::max(1.0f, m_gridStep * 2.0f))
+        if (glm::length(pos - m_offsetCommitPos) < std::max(1.0f, tolStep() * 2.0f))
             return;
         m_offsetSuppressHover = false;
     }
     // Same catch range Trim picks with, so the two hover the same way.
-    const float threshold = std::max(0.3f, m_gridStep * 0.5f);
+    const float threshold = std::max(0.3f, tolStep() * 0.5f);
     OffsetChain ch = walkOffsetChain(*m_sketch, pos, threshold);
     if (ch.valid()) densifyChain(ch, m_offsetChainHover);
 }
@@ -3826,7 +3879,7 @@ void SketchTool::handleOffsetTool(glm::vec2 pos) {
     if (!m_sketch) return;
 
     if (m_offsetPhase == OffsetPhase::Pick) {
-        const float threshold = std::max(0.3f, m_gridStep * 0.5f);
+        const float threshold = std::max(0.3f, tolStep() * 0.5f);
         OffsetChain ch = walkOffsetChain(*m_sketch, pos, threshold);
         if (!ch.valid()) return; // missed, or landed on something unofferable
         m_offsetChain = std::move(ch);
@@ -3850,7 +3903,9 @@ void SketchTool::commitOffset(std::set<int>& outPoints, std::set<int>& outElemen
     m_offsetCommitRequested = false;
     if (!m_sketch || !m_offsetResult.valid) return;
     applyOffset(*m_sketch, m_offsetResult,
-                [this](glm::vec2 p) { return findCoincidentPoint(p, -1); },
+                // EXACT: offset endpoints are generated, so committing the
+                // same preview must give the same connectivity at any zoom.
+                [this](glm::vec2 p) { return findExactCoincidentPoint(p, -1); },
                 outPoints, outElements);
     // Back to Pick, tool still active: offsetting several chains in a row is
     // the normal way to use this (Trim likewise stays active after a click).
@@ -3911,7 +3966,7 @@ DimPick SketchTool::hitTestDimEntity(glm::vec2 pos) const {
             return {DimEntityKind::Point, nearPt};
         }
     }
-    const float tol = std::max(m_gridStep * 0.5f, 0.5f) * snapScale();
+    const float tol = std::max(tolStep() * 0.5f, 0.5f) * snapScale();
     // Lines (segment distance), skipping fromText — same math as handleSelectTool.
     float bestD = 0.0f; int bestLine = -1;
     for (const auto& l : m_sketch->getLines()) {

@@ -1,3 +1,4 @@
+#include "ui/LengthField.h"
 #include "ThreadOp.h"
 #include <Standard_ErrorHandler.hxx>  // OCC_CATCH_SIGNALS (MSVC needs it explicit)
 #include "../core/Verbose.h"
@@ -2098,18 +2099,16 @@ std::string ThreadOp::description() const {
     char starts[24] = "";
     if (m_starts > 1)
         std::snprintf(starts, sizeof(starts), "%d-start ", m_starts);
-    std::snprintf(buf, sizeof(buf), "%s %sthread Ø%.1f, pitch %.2f mm%s",
-                  m_isHole ? "Internal" : "External", starts,
-                  m_radius * 2.0, m_pitch, m_rightHanded ? "" : " (LH)");
+    std::snprintf(buf, sizeof(buf), "%s %sthread Ø%s, pitch %s%s", m_isHole ? "Internal" : "External", starts, materializr::fmtLength(m_radius * 2.0).c_str(), materializr::fmtLength(m_pitch).c_str(), m_rightHanded ? "" : " (LH)");
     return buf;
 }
 
 void ThreadOp::renderProperties() {
     ImGui::Text(materializr::tr("%s Thread"), m_isHole ? "Internal" : "External");
     ImGui::Separator();
-    materializr::inputNumber(materializr::tr("Pitch (mm)"), &m_pitch, 0.1, 0.5, "%.2f");
+    materializr::lengthField(materializr::trFormat("Pitch (%s)", materializr::unitSuffix()).c_str(), &m_pitch);
     if (m_pitch < 0.1) m_pitch = 0.1;
-    materializr::inputNumber(materializr::tr("Depth (mm)"), &m_depth, 0.05, 0.2, "%.2f");
+    materializr::lengthField(materializr::trFormat("Depth (%s)", materializr::unitSuffix()).c_str(), &m_depth);
     if (m_depth < 0.05) m_depth = 0.05;
     // Past ~0.65·pitch the grooves merge and shred the crests into floating
     // helical fins (Steve found this empirically — "it's jumping lol").
@@ -2135,15 +2134,14 @@ void ThreadOp::renderProperties() {
     if (ImGui::Combo(materializr::tr("Profile"), &prof, kProfiles, IM_ARRAYSIZE(kProfiles)))
         m_profile = static_cast<ThreadProfile>(prof);
     if (profileTakesGrooveWidth(m_profile)) {
-        materializr::inputNumber(materializr::tr("Groove width (mm)"), &m_grooveWidth, 0.1, 0.5, "%.2f");
+        materializr::lengthField(materializr::trFormat("Groove width (%s)", materializr::unitSuffix()).c_str(), &m_grooveWidth);
         if (m_grooveWidth < 0.0) m_grooveWidth = 0.0;
         ImGui::SetItemTooltip("%s", materializr::tr("Width of the cut at the surface. 0 = automatic (a set fraction of the pitch)."));
         if (m_grooveWidth <= 0.0)
-            ImGui::TextDisabled(materializr::tr("automatic: %.2f mm at this pitch"),
-                                profileOpenFraction(m_profile) * m_pitch);
+            ImGui::TextDisabled("%s", materializr::trFormat("automatic: %s at this pitch", materializr::fmtLength(profileOpenFraction(m_profile) * m_pitch)).c_str());
     }
     if (m_profile != ThreadProfile::Standard) {
-        materializr::inputNumber(materializr::tr("Fit clearance (mm)"), &m_clearance, 0.05, 0.1, "%.2f");
+        materializr::lengthField(materializr::trFormat("Fit clearance (%s)", materializr::unitSuffix()).c_str(), &m_clearance);
         if (m_clearance < 0.0) m_clearance = 0.0;
         ImGui::SetItemTooltip("%s", materializr::tr("Radial gap so a PRINTED thread fits its mate (0.2\xE2\x80\x93""0.4mm typical). 0 = geometrically exact."));
         ImGui::TextDisabled("%s", materializr::tr("Non-Standard profiles cut per-turn \xE2\x80\x94 a long thread can take a while."));
@@ -2157,9 +2155,8 @@ void ThreadOp::renderProperties() {
     materializr::inputNumberInt("Starts", &starts, 1, 1);
     m_starts = std::min(6, std::max(1, starts));
     if (m_starts > 1)
-        ImGui::TextDisabled(materializr::tr("lead %.2f mm/turn (%d interleaved helixes)"),
-                            m_starts * m_pitch, m_starts);
-    ImGui::Text(materializr::tr("Diameter: %.2f mm   Length: %.2f mm"), m_radius * 2.0, m_length);
+        ImGui::TextDisabled("%s", materializr::trFormat("lead %s/turn (%d interleaved helixes)", materializr::fmtLength(m_starts * m_pitch), m_starts).c_str());
+    ImGui::TextUnformatted(materializr::trFormat("Diameter: %s   Length: %s", materializr::fmtLength(m_radius * 2.0), materializr::fmtLength(m_length)).c_str());
 }
 
 OperationDiff ThreadOp::captureDiff() const {
