@@ -188,8 +188,7 @@ TEST(SettingsSessions, GridStepPersistsAsADisplayNumber) {
 // grid — and no version counter can tell them apart after the fact.
 TEST(SettingsSessions, LegacyGridStepMigratesByKey) {
     auto roundTrip = [](const std::string& body) {
-        const std::string path = std::string(std::getenv("TMPDIR") ?
-                                 std::getenv("TMPDIR") : "/tmp") + "/mz_grid_mig.cfg";
+        const std::string path = tmpCfg("grid_mig");
         { std::ofstream o(path); o << body; }
         materializr::AppSettings s = materializr::SettingsIO::load(path);
         std::remove(path.c_str());
