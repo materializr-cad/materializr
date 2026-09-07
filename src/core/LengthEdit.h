@@ -16,6 +16,22 @@
 
 namespace materializr {
 
+// M_PI is NOT standard C++. MSVC defines it only when <cmath> is reached with
+// _USE_MATH_DEFINES, and this header cannot assume that: the app target sets
+// it (CMakeLists.txt, MSVC branch) but materializr_core — which the tests and
+// every modeling Op build against — does not. The other M_PI users in core get
+// away with it because they include OpenCASCADE headers first, and OCCT
+// defines the macro itself; this header deliberately includes no OCCT, so in a
+// translation unit where it lands first there is nothing to supply it. Windows
+// CI caught exactly that, in eighteen Ops at once.
+//
+// A header should not depend on a macro its consumer's build happens to set.
+// tests/test_length_edit.cpp POISONS M_PI before including this, so the
+// dependency cannot come back unnoticed. It poisons rather than #undefs
+// because a bare #undef does not hold: this header includes <cmath>, which
+// defines the macro straight back.
+constexpr double kPi = 3.14159265358979323846;
+
 // A numeric field reported a change: the value the user now sees, in display
 // units, becomes the model value in mm. This is the ONLY write-back path for
 // lengthField and amountLengthField; test it, mutate it, and the widgets are
@@ -66,7 +82,7 @@ enum class DimKind { Length, Radius, Angle };
 inline bool seedDimensionText(char* buf, size_t n, DimKind kind, bool isArc, double value) {
     switch (kind) {
     case DimKind::Angle: {
-        const int w = std::snprintf(buf, n, "%.2f", value * 180.0 / M_PI);
+        const int w = std::snprintf(buf, n, "%.2f", value * 180.0 / kPi);
         return w >= 0 && static_cast<size_t>(w) < n;
     }
     case DimKind::Radius: return formatLengthDigits(buf, n, isArc ? value : value * 2.0);
@@ -90,7 +106,7 @@ inline bool applyDimensionEdit(DimKind kind, bool isArc, const char* buf, double
         if (end == buf || !std::isfinite(deg)) return false;
         while (*end == ' ' || *end == '\t') ++end;
         if (*end != '\0') return false;
-        value = deg * M_PI / 180.0;
+        value = deg * kPi / 180.0;
         return true;
     }
     double mm = 0.0;

@@ -151,8 +151,8 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | CONVERTED | src/app/PushPullController.cpp:616 | `(void)materializr::parseLength(m_st.inputBuf, m_st.distance);` |
 | CONVERTED | src/app/SplitController.cpp:167 | `if (materializr::lengthStepperRow("splitOffset", &m_offset, /*allowNegative=*/true,` |
 | CONVERTED | src/app/SplitController.cpp:171 | `materializr::amountLengthField("splitOffsetAmt", nullptr, &m_offset, /*allowSign=*/true, -lim, lim))` |
-| CONVERTED | src/core/LengthEdit.h:23 | `inline double lengthFieldCommit(double displayValue) { return toMm(displayValue); }` |
-| CONVERTED | src/core/LengthEdit.h:97 | `if (!parseLength(buf, mm) \|\| mm <= 0.0) return false;` |
+| CONVERTED | src/core/LengthEdit.h:37 | `inline double lengthFieldCommit(double displayValue) { return toMm(displayValue); }` |
+| CONVERTED | src/core/LengthEdit.h:111 | `if (!parseLength(buf, mm) \|\| mm <= 0.0) return false;` |
 | CONVERTED | src/modeling/AlignOp.cpp:86 | `if (materializr::lengthField(materializr::tr("Src X"), &sx) \|\|` |
 | CONVERTED | src/modeling/AlignOp.cpp:87 | `materializr::lengthField(materializr::tr("Src Y"), &sy) \|\|` |
 | CONVERTED | src/modeling/AlignOp.cpp:88 | `materializr::lengthField(materializr::tr("Src Z"), &sz)) {` |

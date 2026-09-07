@@ -5,7 +5,29 @@
 // drag quantisation, buffer reseeding while a field is active. Each is a pure
 // function in core/LengthEdit.h precisely so it can be pinned here.
 
+// core/LengthEdit.h must not depend on M_PI. It is not standard C++: MSVC
+// supplies it only with _USE_MATH_DEFINES, which the materializr_core target
+// does not set, and this header includes no OpenCASCADE to supply it
+// incidentally the way core's other M_PI users do. Windows CI failed in
+// eighteen Ops at once on exactly that.
+//
+// The macro is POISONED rather than #undef'd. A plain #undef does not hold:
+// LengthEdit.h includes <cmath>, which defines M_PI again on the platforms
+// that have it, so the guard silently passes. Including <cmath> here FIRST
+// sets its include guard, so the header's own include is a no-op and the
+// poison survives.
+//
+// If M_PI comes back in that header, THIS FILE STOPS COMPILING with an
+// undeclared identifier. A build error here means the dependency returned —
+// it does not mean this test is broken.
+#include <cmath>
+#undef M_PI
+#define M_PI M_PI_must_not_be_used_in_LengthEdit_h
 #include "core/LengthEdit.h"
+
+// The poison stays in force for the rest of the file: these tests use the
+// header's own constant, so nothing here depends on M_PI either.
+using materializr::kPi;
 
 #include <gtest/gtest.h>
 
@@ -55,7 +77,7 @@ TEST(LengthEdit, AngleEditIgnoresTheUnit) {
     ScopedUnit s(LengthUnit::Ft);   // the most aggressive factor
     double v = 0.0;
     ASSERT_TRUE(materializr::applyDimensionEdit(DimKind::Angle, false, "90", v));
-    EXPECT_NEAR(M_PI / 2.0, v, 1e-12);
+    EXPECT_NEAR(kPi / 2.0, v, 1e-12);
     EXPECT_FALSE(materializr::applyDimensionEdit(DimKind::Angle, false, "90in", v))
         << "an angle carrying a length suffix is garbage, not 90 * 304.8";
 }
@@ -81,7 +103,7 @@ TEST(LengthEdit, SeedDimensionTextMirrorsApply) {
     EXPECT_STREQ("1.000", b);
     ASSERT_TRUE(materializr::seedDimensionText(b, sizeof b, DimKind::Length, false, 50.8));
     EXPECT_STREQ("2.000", b);
-    ASSERT_TRUE(materializr::seedDimensionText(b, sizeof b, DimKind::Angle, false, M_PI / 4.0));
+    ASSERT_TRUE(materializr::seedDimensionText(b, sizeof b, DimKind::Angle, false, kPi / 4.0));
     EXPECT_STREQ("45.00", b);
     // Round trip: what was seeded, committed unchanged, stores the same value.
     double v = 0.0;
