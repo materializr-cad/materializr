@@ -45,6 +45,13 @@ android {
         //   -PallAbi  → single build with BOTH ABIs, for an app bundle
         //               (bundleRelease). Play splits per device, so the AAB
         //               replaces the two per-ABI APKs there.
+        // -PtargetAbi=armeabi-v7a → EXPERIMENTAL 32-bit ARM (#93). Compiles and
+        //               links clean (run `ABI=armeabi-v7a android/scripts/
+        //               setup-deps.sh` first to cross-build OCCT/FreeType for
+        //               it), but UNVERIFIED ON REAL HARDWARE — the current
+        //               Android Emulator dropped 32-bit ARM guest support
+        //               entirely, so this needs an actual armv7 device to
+        //               confirm it runs. Not part of any release channel.
         // versionCode is UNIFIED across all variants as of 1.5.0 (was
         // per-ABI 35/36/39 when the APKs themselves went to Play; the
         // sideload APKs and the AAB now share one code per release).
