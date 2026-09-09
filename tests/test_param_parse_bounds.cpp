@@ -6,13 +6,13 @@
 // Three defects are covered here, all found while hardening the deserializers:
 //
 //  1. `(size_t)std::atoll("-1")` is SIZE_MAX, and the guard that followed it,
-//     `colon + 1 + n > blob.size()`, WRAPS to `colon > blob.size()` — false — so
+//     `colon + 1 + n > blob.size()`, WRAPS to `colon > blob.size()` - false - so
 //     the bound passed and an arbitrary blob tail reached an OCCT reader.
 //
 //  2. topo::readTok used the same wrapping bound to advance its cursor. A length
 //     of "-3" lands the new cursor exactly where it started, so Ref::parse spins
 //     forever appending names: a hang plus unbounded growth. RefParseTerminates
-//     does not merely fail if that regresses — it HANGS, and CTest's timeout
+//     does not merely fail if that regresses - it HANGS, and CTest's timeout
 //     turns that into a red build, which is the intended signal.
 //
 //  3. h<N>/p<N> keys and PushPullOp's `count` were fed straight to resize()/
@@ -103,7 +103,7 @@ TEST(ParamParse, WholeIntRejectsTrailingJunk) {
     EXPECT_FALSE(parseWholeInt("12junk", v));   // std::atoi would return 12
     EXPECT_FALSE(parseWholeInt("", v));
     EXPECT_FALSE(parseWholeInt("99999999999999999999", v));
-    // A sign parses fine — the type is signed. Range-checking is the caller's
+    // A sign parses fine - the type is signed. Range-checking is the caller's
     // job, and parseIndexKey rejects negatives itself (below).
     EXPECT_TRUE(parseWholeInt("-5", v));
     EXPECT_EQ(v, -5);
@@ -152,7 +152,7 @@ TEST(TopoNameRefParse, WellFormedRefStillRoundTrips) {
 
 TEST(BoundaryFillBounds, HugeProfileIndexIsRejected) {
     BoundaryFillOp op;
-    // Pre-fix: planes.resize(2000000001) — a ~200 GB request.
+    // Pre-fix: planes.resize(2000000001) - a ~200 GB request.
     EXPECT_FALSE(op.deserializeParams(
         "created=-1;np=2;p2000000000=0,0,0,1,0,0,0,1,0"));
     EXPECT_FALSE(op.deserializeParams(
@@ -213,7 +213,7 @@ TEST(BoundaryFillBounds, RoundTripsAndIgnoresUnknownKeys) {
     EXPECT_TRUE(withUnknown.deserializeParams("phase=7;" + blob))
         << "an unknown key starting with 'p' must be ignored, not fatal";
 
-    // But a MALFORMED index key is still rejected — that is the discriminating
+    // But a MALFORMED index key is still rejected - that is the discriminating
     // half, and it is why this test is not vacuous.
     BoundaryFillOp withMalformed;
     EXPECT_FALSE(withMalformed.deserializeParams("h0junk=0;" + blob))
@@ -251,7 +251,7 @@ TEST(LoftBounds, HugeHoleIndexIsRejected) {
 TEST(PushPullBounds, HugeCountIsRejectedBeforeAllocating) {
     PushPullOp op;
     // The indexed writes below this were bounds-checked, but `count` is itself
-    // the size of five assign() calls — those ran first.
+    // the size of five assign() calls - those ran first.
     EXPECT_FALSE(op.deserializeParams("dist=1;count=2000000000"));
     EXPECT_FALSE(op.deserializeParams("dist=1;count=2147483647"));
 }
@@ -265,7 +265,7 @@ TEST(PushPullBounds, ReasonableCountStillWorks) {
 // The ops that carry a ";brep=<len>:<raw>" payload had their length parsing
 // rewritten. A brep blob is far larger than the toy strings above and contains
 // newlines and colons of its own, so it is the case most likely to be broken by
-// a stricter parser — and a break here is SILENT: the profile just goes missing
+// a stricter parser - and a break here is SILENT: the profile just goes missing
 // and the op quietly falls back to different geometry.
 TEST(ExtrudeRoundTrip, BrepProfileSurvivesSerializeDeserialize) {
     BRepBuilderAPI_MakePolygon poly;
@@ -299,7 +299,7 @@ TEST(ExtrudeRoundTrip, BrepProfileSurvivesSerializeDeserialize) {
 // ── The ref-list count budget ───────────────────────────────────────────────
 // readLenRecord bounds each RECORD's length, but nothing bounded how MANY
 // records a list could hold. "0:" is a well-formed zero-length record in two
-// bytes, so a run of them yields one Ref per two input bytes — the one
+// bytes, so a run of them yields one Ref per two input bytes - the one
 // untrusted-input path in this area that had no count budget.
 
 TEST(RefListBounds, RejectsAnUnboundedRunOfRecords) {

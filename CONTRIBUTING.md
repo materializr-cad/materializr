@@ -12,14 +12,14 @@ usage questions, prefer [Discussions](https://github.com/materializr-cad/materia
 
 ### Bug workflow (maintainers)
 
-Every bug we discover gets tracked, even the ones we fix immediately — so the
+Every bug we discover gets tracked, even the ones we fix immediately - so the
 issue history is a complete record of what broke and how it was resolved.
 
 1. **File the issue first.** Open a `bug` issue (the template above) capturing
-   the symptom, a repro, and the platform/version — *before* diving into the
+   the symptom, a repro, and the platform/version - *before* diving into the
    fix. A bug found while working on something else still gets its own issue.
 2. **Fix it, referencing the issue.** Land the fix and close the issue from the
-   commit or PR — put `Fixes #<n>` (or `Closes #<n>`) in the message. GitHub
+   commit or PR - put `Fixes #<n>` (or `Closes #<n>`) in the message. GitHub
    then links the issue to the exact commit(s) and diff, so anyone can see
    which files were touched to resolve which bug.
 3. **One issue per bug.** If a single investigation uncovers several distinct
@@ -29,7 +29,7 @@ This keeps `Fixes #<n>` → commit → changed files traceable end to end.
 
 ## Building
 
-- **Desktop (Linux/Windows):** see [`BUILD.md`](BUILD.md). In short — configure a
+- **Desktop (Linux/Windows):** see [`BUILD.md`](BUILD.md). In short - configure a
   CMake build dir, build the `materializr` target, and run `ctest` for the unit
   suites. You need OpenCASCADE, SDL2, and a C++17 compiler.
 - **Android:** see [`android/README.md`](android/README.md). `android/scripts/setup-deps.sh`
@@ -40,7 +40,7 @@ Please make sure the desktop build compiles and `ctest` passes before opening a 
 
 ## Architecture conventions
 
-A few rules keep the codebase coherent — PRs are reviewed against them:
+A few rules keep the codebase coherent - PRs are reviewed against them:
 
 - **Features live in plugins.** A new modeling operation, importer/exporter, or
   tool belongs in `src/plugins/` (see any existing `*Plugin.cpp` and
@@ -51,7 +51,7 @@ A few rules keep the codebase coherent — PRs are reviewed against them:
 - **Touch is a runtime mode, not a build flag.** Adaptations for touch screens
   go behind `materializr::touchMode()` (see `src/touch_mode.h`), never
   `#if defined(__ANDROID__)`. A tablet with a keyboard/mouse runs the desktop
-  model, and a desktop with a touchscreen can opt in — so the behavior must be a
+  model, and a desktop with a touchscreen can opt in - so the behavior must be a
   runtime decision. Reserve `#if __ANDROID__` for genuinely platform-specific
   code (JNI, SAF, GL ES differences).
 - **Don't break desktop.** Android/touch work must leave the desktop builds
@@ -61,6 +61,6 @@ A few rules keep the codebase coherent — PRs are reviewed against them:
 
 ## Pull requests
 
-Keep them focused — one logical change per PR. Fill out the PR template,
+Keep them focused - one logical change per PR. Fill out the PR template,
 including how you tested. By contributing you agree your work is licensed under
 **GPL-3.0-or-later**, the project's license.

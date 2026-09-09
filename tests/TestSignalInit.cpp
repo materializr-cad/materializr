@@ -1,5 +1,5 @@
 // Tests run the SAME modelling code the app ships, so they must run it in the
-// same signal environment — otherwise a test can "fail" in a way the app never
+// same signal environment - otherwise a test can "fail" in a way the app never
 // would.
 //
 // OCCT's modelling algorithms can fault (SIGSEGV/SIGFPE) deep inside the
@@ -25,7 +25,7 @@
 // TRADE-OFF, deliberately accepted: this also converts a genuine SIGSEGV in
 // OUR code into an exception rather than a core dump. A crash therefore
 // surfaces as a failed assertion or an unexpected throw instead of a signal.
-// That is the same deal the shipping app makes, and matching it is the point —
+// That is the same deal the shipping app makes, and matching it is the point -
 // a test that crashes where the app recovers is testing the wrong program.
 #include <OSD.hxx>
 

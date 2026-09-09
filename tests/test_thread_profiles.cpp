@@ -30,7 +30,7 @@ void configure(ThreadOp& t, double r, double len, ThreadProfile p, double clr) {
     t.setAxis(gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1), gp_Dir(1, 0, 0)));
     t.setRadius(r);
     t.setLength(len);
-    t.setPitch(3.0);       // coarse — the printed-thread case
+    t.setPitch(3.0);       // coarse - the printed-thread case
     t.setDepth(1.2);
     t.setProfile(p);
     t.setClearance(clr);
@@ -38,7 +38,7 @@ void configure(ThreadOp& t, double r, double len, ThreadProfile p, double clr) {
 } // namespace
 
 TEST(ThreadProfiles, ExternalEachProfileValid) {
-    const double R = 10.0, L = 9.0;  // 3 turns — fast
+    const double R = 10.0, L = 9.0;  // 3 turns - fast
     TopoDS_Shape cyl = BRepPrimAPI_MakeCylinder(R, L).Shape();
     for (int i = 0; i <= static_cast<int>(ThreadProfile::Rounded); ++i) {
         ThreadOp t;
@@ -48,7 +48,7 @@ TEST(ThreadProfiles, ExternalEachProfileValid) {
         ASSERT_FALSE(rod.IsNull()) << "profile " << i << " built no solid";
         EXPECT_TRUE(BRepCheck_Analyzer(rod).IsValid()) << "profile " << i;
         // A thread removes material (or, for a rounded rope groove, only a
-        // little) — never grows the body.
+        // little) - never grows the body.
         EXPECT_LT(vol(rod), vol(cyl) + 1e-3) << "profile " << i;
         EXPECT_GT(vol(rod), 0.5 * vol(cyl)) << "profile " << i;
     }
@@ -90,7 +90,7 @@ TEST(ThreadProfiles, MultiStartExternalValid) {
     // Bottle-cap style: 3 interleaved helixes, crest spacing = pitch, each
     // helix advancing 3 x pitch per turn. Same groove density per axial mm
     // as a single start (at any fixed angle a groove passes every pitch), so
-    // the removed volume lands near the single-start figure — but the shape
+    // the removed volume lands near the single-start figure - but the shape
     // must genuinely DIFFER (steeper helixes), which the asymmetric cut
     // check asserts.
     const double R = 10.0, L = 9.0;
@@ -120,13 +120,13 @@ TEST(ThreadProfiles, MultiStartExternalValid) {
         TopoDS_Shape diff = BRepAlgoAPI_Cut(one, three).Shape();
         ASSERT_FALSE(diff.IsNull());
         EXPECT_GT(vol(diff), 1e-2)
-            << "3-start result identical to single start — starts ignored?";
+            << "3-start result identical to single start - starts ignored?";
     }
 }
 
 // An explicit groove width decouples the cut from the pitch: normally the
 // groove is a fixed FRACTION of the pitch, so a coarse pitch forces a wide
-// groove. Steve's case is a 2mm-wide, 1mm-deep groove on an 11.5mm pitch —
+// groove. Steve's case is a 2mm-wide, 1mm-deep groove on an 11.5mm pitch -
 // a helical wire seat, where the automatic width would be 5.75mm.
 TEST(ThreadProfiles, ExplicitGrooveWidthIsIndependentOfPitch) {
     const double R = 7.5, L = 46.0, P = 11.5;   // 15mm rod, 4 turns
@@ -147,7 +147,7 @@ TEST(ThreadProfiles, ExplicitGrooveWidthIsIndependentOfPitch) {
     ASSERT_FALSE(autoW.IsNull());
     EXPECT_TRUE(BRepCheck_Analyzer(narrow).IsValid());
 
-    // The requested groove really is narrower — not silently snapped back to
+    // The requested groove really is narrower - not silently snapped back to
     // the profile's fraction. Removed volume scales with width, so a 2mm cut
     // must remove FAR less than the 5.75mm automatic one.
     const double vRod = vol(rod);
@@ -159,7 +159,7 @@ TEST(ThreadProfiles, ExplicitGrooveWidthIsIndependentOfPitch) {
         << " vs automatic " << removedAuto << ")";
 
     // Sanity against the analytic figure: a 2mm x 1mm square groove swept at
-    // mid-depth radius, over L/P turns. Loose band — real ends taper.
+    // mid-depth radius, over L/P turns. Loose band - real ends taper.
     const double turns = L / P;
     const double analytic = 2.0 * 1.0 * 2.0 * M_PI * (R - 0.5) * turns;
     EXPECT_GT(removedNarrow, 0.4 * analytic);
@@ -183,7 +183,7 @@ TEST(ThreadProfiles, GrooveWidthClampsToLeaveACrest) {
         t.setGrooveWidth(width);
         return t.buildResult(rod);
     };
-    TopoDS_Shape huge = build(50.0);        // absurd — 10x the pitch
+    TopoDS_Shape huge = build(50.0);        // absurd - 10x the pitch
     TopoDS_Shape atCap = build(0.9 * P);    // the cap itself
     ASSERT_FALSE(huge.IsNull()) << "over-wide groove rejected instead of clamped";
     EXPECT_TRUE(BRepCheck_Analyzer(huge).IsValid());
@@ -194,7 +194,7 @@ TEST(ThreadProfiles, GrooveWidthClampsToLeaveACrest) {
 TEST(ThreadProfiles, MultiStartRoundedDepthCap) {
     // Multi-start Rounded cuts with the rope tool, whose radius (= depth)
     // caps at 0.45·pitch. A requested depth above that cap must clamp to it
-    // — same solid as asking for the cap exactly — not get rejected by
+    // - same solid as asking for the cap exactly - not get rejected by
     // volume/probe gates measuring a deeper groove than the tool cuts.
     const double R = 10.0, L = 9.0, P = 3.0;
     TopoDS_Shape cyl = BRepPrimAPI_MakeCylinder(R, L).Shape();

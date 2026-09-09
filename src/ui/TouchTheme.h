@@ -1,13 +1,13 @@
 #pragma once
 // im-touch shell style pack (docs/im-touch-ui-plan.md, Phase 1).
 //
-// RAII scope that restyles ImGui for the modern/im-touch layouts — bigger
-// touch targets, rounded chrome, the mockup's palette — pushed around the
+// RAII scope that restyles ImGui for the modern/im-touch layouts - bigger
+// touch targets, rounded chrome, the mockup's palette - pushed around the
 // shell's windows each frame and popped before anything desktop-styled
 // renders. Header-only; geometry scales with uiScale().
 //
 // Two palettes: the mockup's near-black dark (default) and a light variant
-// driven by ThemeManager — Application calls setLightMode() each frame from
+// driven by ThemeManager - Application calls setLightMode() each frame from
 // the current Theme, so View → Theme and Settings → Appearance restyle the
 // shells live, exactly like the classic layout.
 
@@ -53,20 +53,20 @@ inline ImVec4 textDim()      { return g_lightMode ? ImVec4(0.400f, 0.424f, 0.459
                                                   : ImVec4(0.541f, 0.561f, 0.596f, 1.0f); } // #8A8F98
 inline ImVec4 onAccent()     { return g_lightMode ? ImVec4(1.0f, 1.0f, 1.0f, 1.0f)
                                                   : ImVec4(0.051f, 0.075f, 0.125f, 1.0f); } // text on accent
-// Interactive-state fills (rowBg's hover/press neighbours) — shared by
+// Interactive-state fills (rowBg's hover/press neighbours) - shared by
 // pushChrome and the widget kit's custom draws so the two can't drift.
 inline ImVec4 hoverBg()      { return g_lightMode ? ImVec4(0.855f, 0.875f, 0.902f, 1.0f)
                                                   : ImVec4(0.16f, 0.19f, 0.24f, 1.0f); }
 inline ImVec4 pressBg()      { return g_lightMode ? ImVec4(0.808f, 0.835f, 0.871f, 1.0f)
                                                   : ImVec4(0.20f, 0.24f, 0.31f, 1.0f); }
-// Subtle full-row hover (listRow) — between panelBg and rowBg.
+// Subtle full-row hover (listRow) - between panelBg and rowBg.
 inline ImVec4 rowHoverBg()   { return g_lightMode ? ImVec4(0.918f, 0.929f, 0.945f, 1.0f)
                                                   : ImVec4(0.09f, 0.10f, 0.13f, 1.0f); }
 
 // Chrome-only subset: colors + rounding + window padding, but NOT the
 // content metrics (FramePadding / ItemSpacing). This is what wraps the WHOLE
 // frame while modern/im-touch is on, so dialogs / popups / the context menu
-// pick up the rounded padded look — without inflating the metrics that
+// pick up the rounded padded look - without inflating the metrics that
 // classic dialog code sized its fixed-width buttons and windows against
 // (which clipped their labels off the right edge).
 inline void pushChrome() {
@@ -107,7 +107,7 @@ inline void popChrome() {
 }
 
 // Full shell style: the chrome plus the touch-comfy content metrics. Only
-// the shell (and its own popups) render under this — classic dialog code
+// the shell (and its own popups) render under this - classic dialog code
 // sized against classic metrics must NOT (see pushChrome).
 inline void push() {
     const float s = uiScale();

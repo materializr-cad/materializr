@@ -3,7 +3,7 @@
 #include "CylindricalPick.h"
 #include "MoveFaceState.h"
 
-// Global scope, like the other modeling ops — forward-declared for
+// Global scope, like the other modeling ops - forward-declared for
 // configureFaceOp's signature so this header stays cheap to include.
 class MoveFaceOp;
 #include <TopoDS_Face.hxx>
@@ -22,9 +22,20 @@ protected:
     const char* title() const override { return "Shell"; }
     int onBegin(const IopContext& ctx) override;
     std::unique_ptr<Operation> buildOp(const IopContext& ctx) override;
+    bool previewOffThread() const override { return true; }
     void panelBody(const IopContext& ctx, bool& changed) override;
     void onCleanup() override;
     float panelWidth() const override { return 300.0f; }
+    // The drag previews on a worker, but the commit re-runs the offset on the
+    // main thread: 2761 ms on a 300-hole plate, with no window and no way
+    // out. Once the preview has proved slow enough to go off-thread, run the
+    // commit between frames, where ShellOp's progress range keeps the window
+    // painting and Cancel aborts the offset.
+    //
+    // Never on a threaded body: the main loop applies landed thread re-cuts
+    // before it runs the deferred task, so one can land between the commit
+    // frame and the push and change the body underneath it.
+    bool wantsDeferredCommit(const IopContext& ctx) const override;
 
 private:
     TopoDS_Face m_face;
@@ -34,7 +45,7 @@ private:
 };
 
 // ─── Draft (TaperOp) ─────────────────────────────────────────────────────────
-// Tilt the picked face(s) by an angle about a fixed neutral plane — OCCT's
+// Tilt the picked face(s) by an angle about a fixed neutral plane - OCCT's
 // BRepOffsetAPI_DraftAngle, the moulding-draft operation. Named "Taper"
 // internally (class, ToolAction, typeId) because the on-disk key is "taper";
 // only the user-facing wording is "Draft", which is what the manufacturing
@@ -44,6 +55,7 @@ protected:
     const char* title() const override { return "Draft"; }
     int onBegin(const IopContext& ctx) override;
     std::unique_ptr<Operation> buildOp(const IopContext& ctx) override;
+    bool previewOffThread() const override { return true; }
     void panelBody(const IopContext& ctx, bool& changed) override;
     void onCleanup() override;
 
@@ -59,7 +71,7 @@ private:
 
 // ─── Project Sketch ──────────────────────────────────────────────────────────
 // ─── Remove Face (defeature) ─────────────────────────────────────────────────
-// Remove the picked face(s) and heal the surrounding faces back together —
+// Remove the picked face(s) and heal the surrounding faces back together -
 // e.g. take a baked fillet/chamfer back to a sharp edge so it can be re-applied,
 // or clean an unwanted round/hole off an imported part.
 class DefeatureController : public InteractiveOpController {
@@ -77,7 +89,7 @@ private:
 
 // ─── Project Sketch ──────────────────────────────────────────────────────────
 // Project a sketch onto the picked face along the sketch normal, then
-// engrave or emboss the projected regions — text wrapped onto a cylinder.
+// engrave or emboss the projected regions - text wrapped onto a cylinder.
 class ProjectSketchController : public InteractiveOpController {
 protected:
     const char* title() const override { return "Projection"; }
@@ -90,7 +102,7 @@ protected:
 
     // Past this many projected regions the live preview is dropped (the
     // per-change boolean would freeze the UI); Confirm still applies it. Set
-    // low deliberately — it got slow around ~30 regions on high-end hardware,
+    // low deliberately - it got slow around ~30 regions on high-end hardware,
     // so weaker machines need the cutoff earlier.
     static constexpr int kPreviewRegionCap = 20;
 
@@ -119,6 +131,7 @@ protected:
     void drawOverlay(const IopOverlay& ov) const override;
     int onBegin(const IopContext& ctx) override;
     std::unique_ptr<Operation> buildOp(const IopContext& ctx) override;
+    bool previewOffThread() const override { return true; }
     void panelBody(const IopContext& ctx, bool& changed) override;
     void onCleanup() override;
 
@@ -148,7 +161,7 @@ private:
 };
 
 // ─── Resize Cylindrical (Edit Diameter) ──────────────────────────────────────
-// Retarget a closed cylindrical face's diameter, or one circular END of it —
+// Retarget a closed cylindrical face's diameter, or one circular END of it -
 // editing a single end turns the cylinder into a cone, which is how funnels
 // get made. Resolves its own target from the selection via
 // detectCylindricalPick, so nothing has to hand it geometry.
@@ -171,7 +184,7 @@ protected:
     bool wantsDeferredCommit(const IopContext&) const override { return false; }
 
 private:
-    // True while editing BOTH ends (a face pick) — one field drives both.
+    // True while editing BOTH ends (a face pick) - one field drives both.
     bool both() const { return m_pick.editBottom && m_pick.editTop; }
     // Has the user asked for a size different from what was picked? Distinct
     // from previewOk(): an unchanged value builds no op, which is not an error.
@@ -206,7 +219,7 @@ public:
     const MoveFaceState& st() const { return m_st; }
 
     // The op-specific entry points (two ways in: a picked face, or a hole
-    // recognised from its rim edges). begin() itself stays unused — this
+    // recognised from its rim edges). begin() itself stays unused - this
     // controller predates the base's snapshot-preview model and keeps its
     // own lifecycle; the base-virtual overrides below route the GENERIC
     // call sites (Esc/Enter chains, single-flight) into it.
@@ -227,7 +240,7 @@ public:
     void renderMoveFacePanel(const IopContext& ctx, float uiScale);
     bool wantsViewportInput() const override { return true; }
 
-    // Gesture maths — pure functions of the state, so they moved first.
+    // Gesture maths - pure functions of the state, so they moved first.
     bool faceXformNontrivial() const;
     glm::mat3 faceRotTotal() const;
     void bakeFaceRotationDrag();          // fold a released ring drag in
@@ -242,11 +255,11 @@ public:
     // so the panel can say it.
     bool applyLocalTweak(const IopContext& ctx);
 
-    // The face gizmo (slice 3). Checks its own active flag — this controller
+    // The face gizmo (slice 3). Checks its own active flag - this controller
     // isn't in m_iops yet, so Application_Viewport calls it unconditionally.
     void drawGizmos3D(const IopGizmo3D& g) const override;
     // The drag (slice 4): ring/arrow latch on drag start, then slide / ring
-    // sweep / twist / scale tracking. Rebuild is deferred to release — only
+    // sweep / twist / scale tracking. Rebuild is deferred to release - only
     // the ghost silhouette (drawOverlay below) moves mid-drag.
     void onViewportInput(const IopViewport& vp, const IopContext& ctx) override;
     // Ghost silhouette: each moving face loop as a yellow outline under the

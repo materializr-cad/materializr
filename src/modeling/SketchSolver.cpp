@@ -31,7 +31,7 @@ bool SketchSolver::solve(Sketch& sketch, int maxIterations, double tolerance) {
     int numPoints = sketch.pointCount();
     int numEquations = 0;
     for (const auto& c : constraints) {
-        // Reference (non-driving) dimensions annotate only — they enforce
+        // Reference (non-driving) dimensions annotate only - they enforce
         // nothing, so they must not consume a degree of freedom. Counting
         // them would report a freely-movable sketch as Fully/Over-constrained
         // the moment a measurement was placed on it.
@@ -87,7 +87,7 @@ bool SketchSolver::solve(Sketch& sketch, int maxIterations, double tolerance) {
     // freedoms a circle actually has. Nothing else determines its radius, and
     // applyCorrection drives it directly through setCircleRadius, so it earns
     // a +1. Counting only points while still subtracting the Radius/CircleGap
-    // equation that pins it put every circle one degree low — a circle with a
+    // equation that pins it put every circle one degree low - a circle with a
     // locked centre and a driven radius (3 equations against 3 freedoms) read
     // Over-constrained.
     //
@@ -99,8 +99,8 @@ bool SketchSolver::solve(Sketch& sketch, int maxIterations, double tolerance) {
     // Whether those two may be SUBTRACTED depends on whether anything actually
     // holds them. A driving Radius does: its correction goes through
     // setArcRadius -> resizeArc, which slides both endpoints onto the radius.
-    // With no driving Radius nothing enforces either relation — every other
-    // correction moves arc endpoints through the generic point mover — so all
+    // With no driving Radius nothing enforces either relation - every other
+    // correction moves arc endpoints through the generic point mover - so all
     // seven stored values are independently reachable and the arc really does
     // have seven freedoms, incoherent ones included. Subtracting the relations
     // there would claim a coherence the solver does not maintain, and report a
@@ -137,7 +137,7 @@ bool SketchSolver::solve(Sketch& sketch, int maxIterations, double tolerance) {
     // place rather than collapsing the label to zero.
     //
     // Run at both exits below so a label always shows the post-solve geometry
-    // — a reference dim on a shape that a DRIVING constraint just moved has
+    // - a reference dim on a shape that a DRIVING constraint just moved has
     // to follow it, which is the whole point of an annotation.
     auto refreshReferenceValues = [&] {
         for (auto& c : constraints) {
@@ -147,7 +147,7 @@ bool SketchSolver::solve(Sketch& sketch, int maxIterations, double tolerance) {
     };
 
     // Record which way round each unsigned dimension was placed, once, from
-    // the geometry as it stands the first time it is solved — which is the
+    // the geometry as it stands the first time it is solved - which is the
     // arrangement the user drew. Everything after this reads the stored value,
     // so a dimension driven through zero is restored to the side it came from
     // rather than whichever side the last correction happened to leave it on.
@@ -173,7 +173,7 @@ bool SketchSolver::solve(Sketch& sketch, int maxIterations, double tolerance) {
     // The Distance hint is NOT sticky, and must not be: it is only ever a
     // tiebreaker for the moment the two points coincide and the geometry
     // offers no direction of its own. Frozen at first solve it goes stale the
-    // same way the old hardcoded +x did — drag a horizontal pair upright, run
+    // same way the old hardcoded +x did - drag a horizontal pair upright, run
     // the value through zero, and it separates horizontally again. Re-record
     // it every solve while it is still knowable, so the fallback always
     // describes where the pair last actually was.
@@ -198,7 +198,7 @@ bool SketchSolver::solve(Sketch& sketch, int maxIterations, double tolerance) {
         for (auto& constraint : constraints) {
             // Reference dimensions are pure annotation: never corrected, and
             // never allowed to hold up convergence. They are reported
-            // satisfied so the UI doesn't paint them as violated — a
+            // satisfied so the UI doesn't paint them as violated - a
             // measurement cannot be "unsatisfied".
             if (!constraint.isDriving) {
                 constraint.isSatisfied = true;
@@ -292,7 +292,7 @@ double SketchSolver::computeError(const Constraint& c, const Sketch& sketch) con
         }
 
         case ConstraintType::Radius: {
-            // entityA is a circle OR an arc id — the Dimension tool creates
+            // entityA is a circle OR an arc id - the Dimension tool creates
             // this type for both (see resolveDimension's Circle/Arc branches),
             // and applyCorrection below already writes back through
             // setCircleRadius / setArcRadius. Scanning circles only made an
@@ -314,7 +314,7 @@ double SketchSolver::computeError(const Constraint& c, const Sketch& sketch) con
                 // movePoint without touching the stored radius, so measuring
                 // the field alone reported "satisfied" the instant the number
                 // matched while a neighbour had already dragged the geometry
-                // off it — the setter ran once and was then silently undone.
+                // off it - the setter ran once and was then silently undone.
                 // Measure the worst of the three so the solver keeps pulling
                 // until the arc really holds its dimension.
                 //
@@ -654,7 +654,7 @@ void SketchSolver::applyCorrection(const Constraint& c, Sketch& sketch, double e
             // clamp it to 1e-6, and for an arc that clamp now drags both
             // endpoints in with it, so a value of 0 or less would grind the
             // arc down onto its own centre and take the profile around it with
-            // it — worse than the value simply not applying. Leave the geometry
+            // it - worse than the value simply not applying. Leave the geometry
             // alone; computeError still reports the constraint unsatisfied.
             if (c.value <= 0.0) return;
             for (const auto& circle : sketch.getCircles()) {
@@ -910,7 +910,7 @@ void SketchSolver::applyCorrection(const Constraint& c, Sketch& sketch, double e
                 // an older project file, or injected directly) has zero
                 // ACTUAL perpendicular distance (the point sits on the line
                 // by construction) with no correction direction to separate
-                // them along — the ~value/2 nudge below would cancel itself
+                // them along - the ~value/2 nudge below would cancel itself
                 // for the point (it's also one of the endpoints being
                 // corrected) but not for the OTHER endpoint, which gets
                 // flung outward every iteration instead of settling. Leave
@@ -927,7 +927,7 @@ void SketchSolver::applyCorrection(const Constraint& c, Sketch& sketch, double e
                 float s = glm::dot(p->pos - a->pos, n); // signed distance
                 // Which side the dimension was placed on. Re-deriving it from
                 // the live sign (flip n whenever s < 0) meant that once
-                // another correction — or a pass through zero — carried the
+                // another correction - or a pass through zero - carried the
                 // point across the line, the constraint cheerfully pinned it
                 // on the WRONG side and called it satisfied. Drive towards the
                 // recorded side instead, so crossing over is corrected rather
@@ -973,7 +973,7 @@ void SketchSolver::applyCorrection(const Constraint& c, Sketch& sketch, double e
             // The rim gap bottoms out at -(rA + rB): that is concentric, the
             // deepest two circles can overlap. A value below it implies a
             // NEGATIVE centre distance, which no arrangement of two points can
-            // satisfy — the correction then drove the centres past each other,
+            // satisfy - the correction then drove the centres past each other,
             // dir flipped, and the next pass drove them back, so the solver
             // oscillated for the full iteration budget and left the geometry
             // wherever the last pass dropped it. Clamp to the closest
@@ -986,7 +986,7 @@ void SketchSolver::applyCorrection(const Constraint& c, Sketch& sketch, double e
             float centreDist = glm::length(diff);
             if (centreDist < 1e-10f) {
                 // Coincident centres carry no direction. Only invent one when
-                // the target actually wants them apart — inventing it while
+                // the target actually wants them apart - inventing it while
                 // the target is concentric shoved them back off each other
                 // every pass, which is the same thrash by another route.
                 if (targetCentre < 1e-10f) return;

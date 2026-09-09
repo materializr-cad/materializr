@@ -89,7 +89,7 @@ TopoDS_Wire projectNearest(const TopoDS_Wire& w, const TopoDS_Face& f,
     if (best.IsNull()) {
         std::fprintf(stderr,
             "[ProjectSketch]   projection produced %d wire(s), %d closed "
-            "— need at least one closed wire to stamp.\n",
+            "- need at least one closed wire to stamp.\n",
             total, closedCount);
     }
     return best;
@@ -102,11 +102,11 @@ TopoDS_Wire projectNearest(const TopoDS_Wire& w, const TopoDS_Face& f,
 TopoDS_Face singleWireFace(const Handle(Geom_Surface)& surf, TopoDS_Wire w) {
     // On a PERIODIC surface (cylinder) a closed wire bounds two faces: the small
     // region AND its giant complement (the rest of the wrap-around). "First
-    // valid" can grab the complement — fine for the outer, fatal for a hole
+    // valid" can grab the complement - fine for the outer, fatal for a hole
     // (the cut then removes everything-but-the-hole). So on periodic surfaces
     // keep the SMALLER of the two valid faces. The wrapped wires are clean
     // (no projection slivers), so smallest-area is safe here. Planar faces are
-    // bounded — no complement — so they keep the original first-valid behaviour.
+    // bounded - no complement - so they keep the original first-valid behaviour.
     const bool periodic = surf->IsUPeriodic() || surf->IsVPeriodic();
     TopoDS_Face best;
     double bestArea = 1e300;
@@ -132,7 +132,7 @@ TopoDS_Face singleWireFace(const Handle(Geom_Surface)& surf, TopoDS_Wire w) {
 // Wrap a sketch wire onto a CYLINDER, label-style: the flat horizontal maps to
 // arc-angle (u), the axial position to height (v). The loop is built directly in
 // the surface's (u,v) parameter space with CONTINUOUS u (no wrap into [0,2π]),
-// so it never splits at the silhouette or seam the way ray-projection does —
+// so it never splits at the silhouette or seam the way ray-projection does -
 // a wide logo wraps cleanly all the way around. `uO` is the angle of the front
 // (where the sketch faces), so the sketch origin lands centred there.
 TopoDS_Wire wrapWireOnCylinder(const TopoDS_Wire& w,
@@ -194,7 +194,7 @@ TopoDS_Wire wrapWireOnCylinder(const TopoDS_Wire& w,
 
 // Region face on the target surface: outer wire face MINUS hole wire
 // faces, via a boolean cut. Building outer+holes into one MakeFace needs
-// every wire's winding coordinated — with several projected holes the
+// every wire's winding coordinated - with several projected holes the
 // orientation search chased its tail (a six-bladed aperture logo failed
 // both flip attempts). Single-wire faces orient reliably, and the cut
 // needs no orientation reasoning at all.
@@ -255,7 +255,7 @@ bool ProjectSketchOp::execute(Document& doc) {
         // Re-resolve the target face against the (possibly rebuilt) body.
         // Mint the topo name on the first run; when the stored handle is no
         // longer a live sub-shape (an upstream edit moved/rebuilt the face),
-        // resolve the name instead — a stale handle's plane still reads, so
+        // resolve the name instead - a stale handle's plane still reads, so
         // without this the stamp lands at the OLD surface, buried or floating.
         {
             if (m_targetRef.empty()) {
@@ -277,7 +277,7 @@ bool ProjectSketchOp::execute(Document& doc) {
                 if (materializr::topo::resolve(m_targetRef, rc, f) &&
                     !f.IsNull() && f.ShapeType() == TopAbs_FACE) {
                     // Orientation sanity guard (see MoveFaceOp): a resolution
-                    // that flips the face normal is a mis-resolve — keep the
+                    // that flips the face normal is a mis-resolve - keep the
                     // stale handle's behaviour rather than stamp a wrong wall.
                     auto normalOf = [](const TopoDS_Face& fc, gp_Vec& n) -> bool {
                         try {
@@ -398,7 +398,7 @@ bool ProjectSketchOp::execute(Document& doc) {
         if (tools.IsEmpty()) {
             std::fprintf(stderr,
                          "[ProjectSketch] no region projected cleanly onto "
-                         "the face — the sketch must land fully inside it\n");
+                         "the face - the sketch must land fully inside it\n");
             return false;
         }
         if (skipped > 0) {
@@ -434,24 +434,24 @@ bool ProjectSketchOp::execute(Document& doc) {
             return r;
         };
 
-        // Run the boolean(s) on a WORKER thread — the combined cut is one
+        // Run the boolean(s) on a WORKER thread - the combined cut is one
         // monolithic OCCT call that can't report mid-run, so running it on the
         // main thread froze the UI ("not responding"). The main thread pumps an
         // INDETERMINATE bar + events while the worker computes. The worker has
         // its own FPU state too, so the main thread's GL can't corrupt the
-        // boolean. No reportProgress inside the worker — rendering is main-only.
+        // boolean. No reportProgress inside the worker - rendering is main-only.
         TopoDS_Shape result;
         std::atomic<bool> done{false};
         std::thread worker([&]() {
             try {
-                // One boolean first — cleanest and fastest when every tool's good.
+                // One boolean first - cleanest and fastest when every tool's good.
                 result = applyTools(m_previousShape, tools);
                 if (result.IsNull()) {
                     // A single bad tool sinks one combined boolean. Fall back to
                     // batches, then per-tool, so only the genuinely-degenerate
-                    // tools drop — "Select all" survives a few bad regions.
+                    // tools drop - "Select all" survives a few bad regions.
                     std::fprintf(stderr,
-                        "[ProjectSketch] combined boolean failed — batching\n");
+                        "[ProjectSketch] combined boolean failed - batching\n");
                     std::vector<TopoDS_Shape> tv;
                     for (TopTools_ListIteratorOfListOfShape it(tools); it.More(); it.Next())
                         tv.push_back(it.Value());
@@ -502,7 +502,7 @@ bool ProjectSketchOp::execute(Document& doc) {
         if (delta < -1e-6 || delta > toolVolume * 1.5 + 1e-6) {
             std::fprintf(stderr,
                          "[ProjectSketch] boolean produced a suspicious "
-                         "volume change (%.3f of %.3f tool) — refusing\n",
+                         "volume change (%.3f of %.3f tool) - refusing\n",
                          delta, toolVolume);
             return false;
         }
@@ -558,7 +558,7 @@ std::string ProjectSketchOp::serializeParams() const {
         if (!idx.empty()) blob += ";face=" + idx;
     }
     // Topological face name (see MoveFaceOp); a single length-prefixed opaque
-    // blob written LAST — read to end-of-string. Absent in old files.
+    // blob written LAST - read to end-of-string. Absent in old files.
     if (!m_targetRef.empty()) {
         std::string b = m_targetRef.serialize();
         blob += ";faceref=" + std::to_string(b.size()) + ":" + b;
@@ -575,7 +575,7 @@ bool ProjectSketchOp::deserializeParams(const std::string& blob) {
         size_t end = blob.find(';', eq);
         if (end == std::string::npos) end = blob.size();
         std::string key = blob.substr(pos, eq - pos);
-        // faceref is a length-prefixed opaque blob written last — read to end.
+        // faceref is a length-prefixed opaque blob written last - read to end.
         if (key == "faceref") {
             std::string rest = blob.substr(eq + 1);
             size_t c = rest.find(':');

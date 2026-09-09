@@ -4,7 +4,7 @@
 // Push/Pull on the ghost-preview path and turns Resize Cylindrical's live
 // preview off, because running a real boolean against a helicoid every frame
 // is unusable. Its sibling isBodyShelled() skips disabled steps; this one
-// never did — it filtered on typeId alone. So disabling a Thread step (the
+// never did - it filtered on typeId alone. So disabling a Thread step (the
 // History context menu's "Disable", right next to "Delete") left every later
 // op still treating the body as threaded and degrading its preview, for a
 // thread that is not in the model.
@@ -30,7 +30,7 @@
 using namespace materializr;
 
 namespace {
-constexpr double R = 10.0, L = 9.0; // 3 coarse turns — fast
+constexpr double R = 10.0, L = 9.0; // 3 coarse turns - fast
 
 std::unique_ptr<ThreadOp> makeThread(int bodyId) {
     auto t = std::make_unique<ThreadOp>();
@@ -67,7 +67,7 @@ TEST(DisabledThread, DisablingTheStepUnthreadsTheBody) {
     EXPECT_NEAR(vol(doc.getBody(rodId)), vRod, vRod * 1e-6);
     // ...so nothing downstream should still be treating it as threaded.
     EXPECT_FALSE(hist.isBodyThreaded(rodId));
-    // The reflow gate already agreed — pin that the two stay consistent.
+    // The reflow gate already agreed - pin that the two stay consistent.
     auto probe = makeThread(rodId);          // any op planning this body
     EXPECT_EQ(hist.reflowInsertionIndex(*probe), -1);
 
@@ -84,7 +84,7 @@ TEST(DisabledThread, ShellGateAlreadySkipsDisabledSteps) {
     TopoDS_Shape box = BRepPrimAPI_MakeBox(20.0, 20.0, 20.0).Shape();
     int boxId = doc.addBody(box, "box");
 
-    // Shell needs an open face — the +Z top.
+    // Shell needs an open face - the +Z top.
     TopoDS_Face top;
     for (TopExp_Explorer fx(box, TopAbs_FACE); fx.More(); fx.Next()) {
         GProp_GProps g; BRepGProp::SurfaceProperties(fx.Current(), g);

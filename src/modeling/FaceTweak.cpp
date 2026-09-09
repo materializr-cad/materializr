@@ -87,7 +87,7 @@ gp_Pnt midOf(const TopoDS_Edge& e) {
 // Where a curve crosses a plane, nearest `near`. This is the corner solve: the
 // edge running off the moved face keeps its geometry, so the new corner is
 // simply where that edge now meets the face's new plane. Works for a line, an
-// arc, a spline — which is the whole reason the neighbours are free to curve.
+// arc, a spline - which is the whole reason the neighbours are free to curve.
 // `nearTo`, not `near`: windows.h defines near and far as empty macros, and
 // OCCT 7.9.3 leaks windows.h into its own headers, so a parameter called `near`
 // vanishes on MSVC and takes the comma with it. Costs nothing to avoid; costs a
@@ -101,11 +101,11 @@ bool curveMeetsPlane(const Handle(Geom_Curve)& c, double f, double l,
 
     // A circle can cross a plane twice and a spline more often than that. The
     // corner we want is the one the edge already had, so pick by proximity to
-    // where the vertex sits now — not, say, the first solution the kernel
+    // where the vertex sits now - not, say, the first solution the kernel
     // happens to report.
     // Deliberately NOT clamped to the edge's own parameter range. Pushing a
     // face outward puts the new corner PAST the end of the edge it slides
-    // along — a box growing taller needs its vertical edges to lengthen, and
+    // along - a box growing taller needs its vertical edges to lengthen, and
     // they lengthen along the same carrier line. Clamping looked like a
     // sensible guard and silently broke every outward move while leaving tilts
     // working, because a tilt keeps the corners between the old ends.
@@ -170,7 +170,7 @@ Result moveFace(const TopoDS_Shape& body, const TopoDS_Face& face,
 
         // A move that leaves the plane where it was would rebuild every corner
         // onto its own position and report success having changed nothing. Say
-        // so instead — the user made a gesture and deserves to know why the
+        // so instead - the user made a gesture and deserves to know why the
         // body didn't budge.
         if (planeF.Axis().Direction().IsParallel(movedF.Axis().Direction(), 1e-9) &&
             std::abs(movedF.Distance(planeF.Location())) < Precision::Confusion()) {
@@ -201,8 +201,8 @@ Result moveFace(const TopoDS_Shape& body, const TopoDS_Face& face,
             if (!vertEdges.Contains(v)) { res.refusal = Refusal::NonManifoldCorner; return res; }
 
             // The one edge at this corner that runs INTO the body. Its geometry
-            // is untouched by the move — neither of its faces is the one being
-            // moved — so it is the fixed thing the new corner slides along.
+            // is untouched by the move - neither of its faces is the one being
+            // moved - so it is the fixed thing the new corner slides along.
             TopoDS_Edge leaving;
             int nLeaving = 0;
             for (TopTools_ListIteratorOfListOfShape it(vertEdges.FindFromKey(v));
@@ -218,7 +218,7 @@ Result moveFace(const TopoDS_Shape& body, const TopoDS_Face& face,
             }
             // Exactly one is the ordinary case: three faces at a corner, two of
             // their shared edges on the moved face and one heading away. Zero or
-            // several means the corner isn't one this can solve — a vertex
+            // several means the corner isn't one this can solve - a vertex
             // buried inside the face's own wire, or four faces meeting at a
             // point.
             if (nLeaving != 1) { res.refusal = Refusal::NonManifoldCorner; return res; }
@@ -286,7 +286,7 @@ Result moveFace(const TopoDS_Shape& body, const TopoDS_Face& face,
 
             // Curved neighbour (or a closed edge, which no straight segment can
             // be): intersect the surfaces for real. A plane through a cylinder
-            // gives a circle or an ellipse, through a cone a conic — the kernel
+            // gives a circle or an ellipse, through a cone a conic - the kernel
             // returns these analytically for quadrics, so the rebuilt edge is
             // exact rather than a sampled approximation.
             Handle(Geom_Surface) nbSurf = BRep_Tool::Surface(nb);
@@ -322,7 +322,7 @@ Result moveFace(const TopoDS_Shape& body, const TopoDS_Face& face,
 
             const double tol = std::max(BRep_Tool::Tolerance(e), 1e-5);
             if (closed) {
-                // A full loop — the lid of a cylinder, the rim of a bore. It has
+                // A full loop - the lid of a cylinder, the rim of a bore. It has
                 // ONE vertex, sitting where the neighbour's seam runs into it,
                 // and that vertex is shared with the neighbour's seam edges. So
                 // the loop has to START there: built from the bare curve instead,
@@ -380,7 +380,7 @@ Result moveFace(const TopoDS_Shape& body, const TopoDS_Face& face,
             Handle(Geom_Curve) c = BRep_Tool::Curve(e, f0, l0);
             if (c.IsNull()) { res.refusal = Refusal::BuildFailed; return res; }
 
-            // Neither of this edge's faces moved, so its curve is untouched —
+            // Neither of this edge's faces moved, so its curve is untouched -
             // only the end that sat on the moved face slides along it. The new
             // corner came OFF this curve, so it lies on it by construction; the
             // check is here for the case where it came off a different edge at a
@@ -417,7 +417,7 @@ Result moveFace(const TopoDS_Shape& body, const TopoDS_Face& face,
             if (surf.IsNull()) { res.refusal = Refusal::BuildFailed; return res; }
 
             // Wire order comes from BRepTools_WireExplorer, which walks
-            // connected — a plain TopExp_Explorer returns edges in map order and
+            // connected - a plain TopExp_Explorer returns edges in map order and
             // MakeWire then refuses the ones that don't arrive adjacent.
             std::vector<TopoDS_Wire> wires;
             bool wireOk = true;
@@ -426,7 +426,7 @@ Result moveFace(const TopoDS_Shape& body, const TopoDS_Face& face,
                 int edges = 0;
                 for (BRepTools_WireExplorer we(TopoDS::Wire(wx.Current()), f);
                      we.More(); we.Next()) {
-                    // A degenerate edge is a parametric artefact — a cone apex,
+                    // A degenerate edge is a parametric artefact - a cone apex,
                     // a sphere pole. It has no 3d curve to rebuild and carrying
                     // it into a wire of new edges only makes MakeWire refuse.
                     if (BRep_Tool::Degenerated(we.Current())) continue;
@@ -464,7 +464,7 @@ Result moveFace(const TopoDS_Shape& body, const TopoDS_Face& face,
             // neighbours need: the rebuilt edges carry 3d curves only, and a
             // face on a cylinder is meaningless to the kernel until each of its
             // edges has a pcurve in that cylinder's (u,v). The first is the
-            // long-standing one — wire winding decides which side of a face is
+            // long-standing one - wire winding decides which side of a face is
             // material and is never coordinated by hand here.
             ShapeFix_Face fix(mf.Face());
             fix.FixOrientationMode() = 1;
@@ -473,7 +473,7 @@ Result moveFace(const TopoDS_Shape& body, const TopoDS_Face& face,
             // seam is, or the face is left open in (u,v) and fails validation.
             fix.FixMissingSeamMode() = 1;
             // Adding pcurves is the WIRE fixer's job, reached through the face
-            // fixer's tool — it is on by default, but stating it keeps the
+            // fixer's tool - it is on by default, but stating it keeps the
             // dependency visible: without it a rebuilt cylindrical face has
             // edges with 3d curves and no (u,v) representation, and the sew
             // downstream quietly drops it.

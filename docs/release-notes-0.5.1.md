@@ -1,8 +1,8 @@
-## Materializr 0.5.1 — Smaller files, editable constraints across sessions
+## Materializr 0.5.1 - Smaller files, editable constraints across sessions
 
 Two big upgrades and a pile of polish:
 
-### File format v3 — projects now ~5× smaller
+### File format v3 - projects now ~5× smaller
 
 Switched the on-disk geometry to **binary BREP** (OCCT's `BinTools`, no
 display triangulation) inside a **gzip-max** wrapper, with a length-prefixed

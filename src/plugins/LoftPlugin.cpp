@@ -22,7 +22,7 @@
 //                              can render a hint popup telling the user to
 //                              Ctrl-click more sketches and click Loft again.
 //
-// We pull the outer wire of each sketch's outermost region — for the common
+// We pull the outer wire of each sketch's outermost region - for the common
 // case (one closed loop per profile sketch) that's exactly what
 // BRepOffsetAPI_ThruSections needs.
 //
@@ -33,7 +33,7 @@
 // action.
 REGISTER_PLUGIN(Loft, [](materializr::PluginContext& ctx) {
     auto action = [](materializr::PluginContext& ctx) {
-        // Count distinct sketches in the selection — Application reads the
+        // Count distinct sketches in the selection - Application reads the
         // selection itself when it begins the loft so we don't have to ship
         // wires through the plugin context.
         const auto& sel = ctx.selection().getSelection();
@@ -68,23 +68,23 @@ REGISTER_PLUGIN(Loft, [](materializr::PluginContext& ctx) {
 
         // Hand off to Application, which opens the Loft popup (section list
         // with reorder + per-section Flip, Solid/Shell, Smooth/Ruled, live
-        // preview, Apply / Cancel) — same architecture as Linear/Radial
+        // preview, Apply / Cancel) - same architecture as Linear/Radial
         // Pattern.
         ctx.requestInteractiveOp(materializr::InteractiveOp::Loft);
     };
 
     const char* tooltip =
         "Loft a solid through two or more sketch profiles. Ctrl-click each "
-        "sketch (or region) in order — first to last is the skinning order — "
+        "sketch (or region) in order - first to last is the skinning order - "
         "then click Loft. With one selected, you'll be prompted to pick more.\n\n"
         "GUIDED MODE: select ONE closed profile plus 1-2 OPEN curves and the "
-        "profile is swept up along them — draw each curve as a side "
+        "profile is swept up along them - draw each curve as a side "
         "silhouette rising from the base (a slanted line = straight taper, "
         "an arc = rounded side). Strokes past the peak are ignored.\n\n"
         "Best results when the profiles sit on PARALLEL planes with similar "
         "topology (all rectangles, all circles, etc.). Profiles on "
         "perpendicular planes or with very different vertex counts produce a "
-        "tent / pyramid surface — that's the loft algorithm being honest, not "
+        "tent / pyramid surface - that's the loft algorithm being honest, not "
         "a bug. For floor-to-vertical transitions, a Sweep along a guide curve "
         "is usually what you want instead.\n\n"
         "Sections can be SKETCHES or FACES -- pick two faces to loft straight "

@@ -2,11 +2,11 @@ apply plugin: 'com.android.application'
 
 // Release signing. Two ways to supply the key + password, both per
 // RELEASE-SIGNING.md (env wins if both are set):
-//   1. Environment variables (nothing stored at rest — export them via
+//   1. Environment variables (nothing stored at rest - export them via
 //      `read -s` right before assembleRelease):
 //        MATERIALIZR_KEYSTORE, MATERIALIZR_STORE_PASSWORD,
 //        MATERIALIZR_KEY_ALIAS (default "materializr"), MATERIALIZR_KEY_PASSWORD
-//        (defaults to the store password — PKCS12 uses one password).
+//        (defaults to the store password - PKCS12 uses one password).
 //   2. The gitignored android/keystore.properties file.
 // When neither is provided (CI, fresh clone, debug work) release builds go
 // unsigned; assembleDebug is never affected.
@@ -33,7 +33,7 @@ android {
     defaultConfig {
         // Published package name. The public/open-source default is
         // com.materializr.app; a private Play listing overrides it WITHOUT the
-        // override reaching git — set MATERIALIZR_APP_ID or applicationId= in the
+        // override reaching git - set MATERIALIZR_APP_ID or applicationId= in the
         // gitignored keystore.properties. Kept separate from `namespace` above
         // (the internal code/JNI package), so SDL/native class names never move.
         applicationId (System.getenv('MATERIALIZR_APP_ID')
@@ -105,9 +105,9 @@ android {
         // OCCT ships many large .so; don't let the build dedupe/strip break them.
         jniLibs.useLegacyPackaging true
         // AGP 8.6 / NDK r28 copy path-linked shared libs into the CMake output
-        // dir, so every OCCT toolkit reaches the merger twice — once from
+        // dir, so every OCCT toolkit reaches the merger twice - once from
         // jniLibs (our staged copies) and once from the cxx build. They're the
-        // same bytes; take the first. (Bundles dedupe this themselves — only
+        // same bytes; take the first. (Bundles dedupe this themselves - only
         // per-ABI APK builds hit the DuplicateRelativeFileException.)
         jniLibs.pickFirsts.add('lib/**/libTK*.so')
     }

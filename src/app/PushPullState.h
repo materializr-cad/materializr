@@ -8,7 +8,7 @@ namespace materializr {
 // The interactive Push/Pull gesture's parameters, owned by PushPullController.
 //
 // Was 16 loose members on Application; slice 1 grouped them here, slice 2 moved
-// the lifecycle onto InteractiveOpController's LiveOp preview model — which is
+// the lifecycle onto InteractiveOpController's LiveOp preview model - which is
 // the engine this op was hand-written with in the first place. Five of the
 // original members went with that move rather than coming along: `active`,
 // `liveOp` and `previewApplied` are the base's now, and `previewBodyIds` /
@@ -26,7 +26,7 @@ struct PushPullState {
     float distance = 5.0f;
     // Unsnapped drag accumulator. The grid snap in updatePushPull mutates
     // `distance` itself (so the readouts show the snapped value), which would
-    // erase sub-step drag motion every frame — a slow drag accumulated
+    // erase sub-step drag motion every frame - a slow drag accumulated
     // nothing, then a fast flick jumped a whole step. The drag adds into THIS
     // instead, and `distance` is derived + snapped from it. Typing/sliding a
     // value re-bases the accumulator.
@@ -44,7 +44,7 @@ struct PushPullState {
     // click in the viewport while the arrow is up enters this state, mouse
     // moves then drive the distance frame-by-frame without a button held,
     // and a second click exits. Same shape as the Sketch Circle tool's
-    // click-move-click pattern — gives users a way to "drag" the arrow
+    // click-move-click pattern - gives users a way to "drag" the arrow
     // when their primary click is already bound to orbit. While true,
     // gizmoOwnsDrag suppresses orbit so the cursor isn't fighting the
     // camera. (Steve: "let click then click act like click and hold".)
@@ -56,6 +56,11 @@ struct PushPullState {
     // volume instead of running the real boolean (which would also trigger
     // the thread reflow) every frame. The real op runs once, on commit.
     bool heavyPreview = false;
+    // Any VISIBLE body carries a thread. Wider than the target list on
+    // purpose: a cut-intersecting push/pull booleans into everything in the
+    // tool's path. Keeps the commit inline (see
+    // PushPullController::wantsDeferredCommit).
+    bool threadedPath = false;
 
     std::vector<Target> targets;
 };

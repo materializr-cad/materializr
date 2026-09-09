@@ -39,7 +39,7 @@ double sideOf(const Sketch& sk, int ptId, int lineId) {
 
 // Two holes overlapping by more than their combined radii. A negative rim gap
 // is a legal thing to dimension (intersecting bores), but the correction
-// computes a TARGET CENTRE DISTANCE of value + rA + rB — which goes negative
+// computes a TARGET CENTRE DISTANCE of value + rA + rB - which goes negative
 // here. A distance cannot be negative, so the centres are driven through each
 // other and the pair flips instead of settling.
 TEST(DimAdjust, DeeplyNegativeCircleGapDoesNotFlipCentres) {
@@ -76,7 +76,7 @@ TEST(DimAdjust, DeeplyNegativeCircleGapDoesNotFlipCentres) {
             << "gap=" << v << ": the circles swapped sides";
     }
 
-    // Exactly -(rA + rB) is concentric — the deepest legal overlap, and a
+    // Exactly -(rA + rB) is concentric - the deepest legal overlap, and a
     // perfectly good answer.
     sk.movePoint(ca, {0.0f, 0.0f});
     sk.movePoint(cb, {20.0f, 0.0f});
@@ -107,7 +107,7 @@ TEST(DimAdjust, DeeplyNegativeCircleGapDoesNotFlipCentres) {
 
 // Adjusting a Radius dimension on an ARC. The solver's radius setter used to
 // write SketchArc::radius alone, leaving start and end where they were, so the
-// stored radius disagreed with the radius the endpoints describe — and since
+// stored radius disagreed with the radius the endpoints describe - and since
 // buildWires places the arc's mid point from the stored radius, the emitted
 // curve matched neither.
 // This covers a standalone arc; the held-endpoint case is the test below.

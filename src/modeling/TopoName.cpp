@@ -102,7 +102,7 @@ std::vector<FaceAnchor::SketchRef> sketchRefs(const Document* doc) {
         // LIVE sketch is rolled back through its SketchEditOp snapshots, so it
         // holds a stale mid-replay state; the FINAL state is pinned as an
         // override. Prefer the override so anchors resolve against the geometry
-        // the body was actually rebuilt from — otherwise a face gets matched
+        // the body was actually rebuilt from - otherwise a face gets matched
         // against stale sketch elements (opening vanishes / body skews).
         // Mirrors FilletOp.cpp:68.
         if (auto ov = doc->cascadeSketchOverride(sid)) refs.push_back({ sid, ov.get() });
@@ -111,7 +111,7 @@ std::vector<FaceAnchor::SketchRef> sketchRefs(const Document* doc) {
     return refs;
 }
 
-// "sketchface" — generative naming via FaceAnchor. Robust to dimension edits
+// "sketchface" - generative naming via FaceAnchor. Robust to dimension edits
 // (re-finds the face from the sketch element's current position). Faces only.
 Strategy sketchFaceStrategy() {
     Strategy s;
@@ -150,7 +150,7 @@ Strategy sketchFaceStrategy() {
     return s;
 }
 
-// "sketchedge" — the existing (working) EdgeAnchor, hosted behind the registry.
+// "sketchedge" - the existing (working) EdgeAnchor, hosted behind the registry.
 // Single-edge mint/resolve; resolveBatch delegates to EdgeAnchor's native
 // distinct-claim over the whole edge set. FilletOp/ChamferOp keep their own
 // direct EdgeAnchor use for now; when they cut over, their on-disk `anchor=`
@@ -193,7 +193,7 @@ Strategy sketchEdgeStrategy() {
     return s;
 }
 
-// "ordinal" — the universal fallback: 1-based index into
+// "ordinal" - the universal fallback: 1-based index into
 // TopExp::MapShapes(shape, type). Always mintable, resolves reliably against
 // the SAME (BREP-roundtripped) shape; fails when upstream edits shift indices,
 // at which point a higher-priority scheme in the Ref should have carried it.
@@ -221,7 +221,7 @@ Strategy ordinalStrategy() {
     return s;
 }
 
-// "gen" — generation-map lineage. Names a sub-shape by its DERIVATION: which
+// "gen" - generation-map lineage. Names a sub-shape by its DERIVATION: which
 // input sub-shape (itself named, recursively) generated/modified it, and its
 // position in that input's output list. Stable across parameter edits because
 // the derivation structure is invariant. The most robust scheme (priority 100)
@@ -242,14 +242,14 @@ Strategy genStrategy() {
             for (int i = 1; i <= map.Extent(); ++i) {
                 const TopoDS_Shape& inSub = map.FindKey(i);
                 int idx = 0;
-                // Range-based, not TopTools_ListIteratorOfListOfShape — vcpkg
+                // Range-based, not TopTools_ListIteratorOfListOfShape - vcpkg
                 // OCCT drops that standalone header on Windows.
                 for (const TopoDS_Shape& outSub : map.FindFromIndex(i)) {
                     if (!outSub.IsSame(sub)) { ++idx; continue; }
                     const int which = ctx.gen->inputOf(inSub);
                     if (which < 0) return "";
                     // Name the INPUT sub-shape (recursively) against its own
-                    // input shape — sketch-anchored inputs are edit-stable.
+                    // input shape - sketch-anchored inputs are edit-stable.
                     Context ic;
                     ic.doc = ctx.doc;
                     ic.shape = ctx.gen->inputs[which].shape;
@@ -299,12 +299,12 @@ Strategy genStrategy() {
 } // namespace
 
 Registry::Registry() {
-    // Built-ins, lowest-to-highest doesn't matter — add() keeps them sorted.
+    // Built-ins, lowest-to-highest doesn't matter - add() keeps them sorted.
     add(ordinalStrategy());
     add(sketchFaceStrategy());
     add(sketchEdgeStrategy());
     add(genStrategy());
-    // Future: add(importIdStrategy()) — strictly additive.
+    // Future: add(importIdStrategy()) - strictly additive.
 }
 
 // ── mint / resolve ──────────────────────────────────────────────────────────
@@ -322,7 +322,7 @@ Ref mint(const TopoDS_Shape& sub, const Context& ctx) {
 bool resolve(const Ref& ref, const Context& ctx, TopoDS_Shape& out) {
     for (const auto& nm : ref.names) {
         const Strategy* s = Registry::instance().forScheme(nm.scheme);
-        if (!s || !s->resolve) continue;   // unknown scheme (newer file) — skip
+        if (!s || !s->resolve) continue;   // unknown scheme (newer file) - skip
         if (ctx.crossRebuild && !s->rebuildSafe) continue;
         TopoDS_Shape found = s->resolve(nm.payload, ctx);
         if (!found.IsNull()) { out = found; return true; }

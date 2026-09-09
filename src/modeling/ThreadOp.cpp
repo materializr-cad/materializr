@@ -64,10 +64,11 @@
 #include "../i18n.h"
 #include "../i18n.h"
 #include "../i18n.h"
+#include "BoolArgs.h"
 
 namespace {
 // Turns the per-job cancel token into an OCCT user-break, so a Cancel click
-// aborts a boolean MID-CUT (the O(N²) compound cut is one long boolean —
+// aborts a boolean MID-CUT (the O(N²) compound cut is one long boolean -
 // between-turn checks alone would never see the flag).
 class ThreadCancelBreak : public Message_ProgressIndicator {
 public:
@@ -88,7 +89,7 @@ private:
 
 // ─── Generalized cross-section spec ─────────────────────────────────────────
 // One notch's angular budget as fractions of its period, plus flank style.
-// Standard is NOT described here — it keeps its own exact arc code. These
+// Standard is NOT described here - it keeps its own exact arc code. These
 // drive the new maker/printing profiles swept by the same helix machinery.
 namespace {
 struct NotchSpec {
@@ -103,7 +104,7 @@ NotchSpec notchSpec(ThreadProfile p) {
         case ThreadProfile::Square:      return {0.47, 0.03, 0.47, 0.03, false};
         // Asymmetric: steep load flank (up), long shallow back (down).
         case ThreadProfile::Buttress:    return {0.28, 0.04, 0.30, 0.38, false};
-        // Sinusoidal-ish: tiny flats, big arc flanks — best for printing.
+        // Sinusoidal-ish: tiny flats, big arc flanks - best for printing.
         case ThreadProfile::Rounded:     return {0.10, 0.40, 0.10, 0.40, true};
         default:                         return {0.25, 0.25, 0.25, 0.25, true};
     }
@@ -147,7 +148,7 @@ GrooveSpec grooveSpec(ThreadProfile p) {
             return {0.60, {{0,1,1}, {1,1.0,0.12}}};
         // TRUE rounded: multi-band so the flanks CURVE (a 2-band loft is
         // always a straight-flanked trapezoid). Built as fused radial slabs,
-        // so the tool build is heavier on a long thread — acceptable behind
+        // so the tool build is heavier on a long thread - acceptable behind
         // the progress bar; short/coarse prints (the common case) stay quick.
         case ThreadProfile::Rounded:
             return {0.60, {{0,1,1}, {0.5,0.82,0.82}, {1,0.3,0.3}}};
@@ -156,7 +157,7 @@ GrooveSpec grooveSpec(ThreadProfile p) {
     }
 }
 // Groove cross-section area (avg total width × depth), integrated over the
-// band table — replaces the trapezoid-only analytic formula so the volume
+// band table - replaces the trapezoid-only analytic formula so the volume
 // gate is correct for any profile.
 double grooveArea(const GrooveSpec& s, double mouthHalf, double depth) {
     double a = 0.0;
@@ -168,7 +169,7 @@ double grooveArea(const GrooveSpec& s, double mouthHalf, double depth) {
     }
     return a * depth;   // rFrac spans the full depth
 }
-// Groove half-widths below/above the centreline at a given depth fraction —
+// Groove half-widths below/above the centreline at a given depth fraction -
 // for the width-probe gate. Asymmetric (buttress) profiles differ per side,
 // so a symmetric probe on the narrow flank falsely reads solid.
 void grooveHalfAt(const GrooveSpec& s, double mouthHalf, double df,
@@ -188,8 +189,8 @@ void grooveHalfAt(const GrooveSpec& s, double mouthHalf, double df,
 } // namespace
 
 // ─── Swept-rod fast path ("the twist idea") ─────────────────────────────────
-// For the most common case — an EXTERNAL thread covering a PLAIN full
-// cylinder (sketch circle → extrude → thread) — don't cut grooves with a
+// For the most common case - an EXTERNAL thread covering a PLAIN full
+// cylinder (sketch circle → extrude → thread) - don't cut grooves with a
 // boolean at all. Build the threaded rod NATIVELY: sweep the notched
 // cross-section along the axis while an auxiliary helix spine twists it
 // (BRepOffsetAPI_MakePipeShell curvilinear equivalence). One solid, ~6 smooth
@@ -203,7 +204,7 @@ void grooveHalfAt(const GrooveSpec& s, double mouthHalf, double df,
 //   flank      arc  rising to the crest edge        (0.25)
 //   crest flat arc  phi in [135, 225]  at R         (0.25)
 //   flank      arc  falling back to the root        (0.25)
-// Flanks are 3-point arcs staying in the band — a straight chord across 90°
+// Flanks are 3-point arcs staying in the band - a straight chord across 90°
 // of arc sags to ~0.7R and gouges the rod (probe-proven).
 static TopoDS_Shape sweptRodThread(const gp_Ax3& ax3, double Rin, double len,
                                    double pitch, double depth,
@@ -373,7 +374,7 @@ static TopoDS_Shape sweptRodThread(const gp_Ax3& ax3, double Rin, double len,
         rod = BRepBuilderAPI_Transform(rod, tr, Standard_True).Shape();
 
         // Guards: valid solid, volume matching the intended profile. Area is
-        // the cross-section integral 0.5·r(phi)²·dphi — Standard uses its exact
+        // the cross-section integral 0.5·r(phi)²·dphi - Standard uses its exact
         // 25/25/25/25 ramps, general profiles use the spec's r(phi). Arc flanks
         // deviate a hair from the linear integral, so the tolerance is looser
         // for the general path.
@@ -405,7 +406,7 @@ static TopoDS_Shape sweptRodThread(const gp_Ax3& ax3, double Rin, double len,
 
 // Extract the thread frame from a cylindrical face: axis at the face's V_min
 // end (origin = surface location + v0·axis, direction along the cylinder), and
-// the radius. Length is deliberately NOT taken from the face — the user's
+// the radius. Length is deliberately NOT taken from the face - the user's
 // chosen thread span is kept; only the cylinder's position and diameter follow
 // an edit. Returns false if the face isn't a plain cylinder.
 static bool cylFaceToThread(const TopoDS_Face& face, gp_Ax2& ax2, double& radius) {
@@ -454,10 +455,10 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
     // Geometric sanity: a depth beyond ~0.65·pitch merges adjacent grooves
     // and leaves paper-thin helical fins instead of crests (ISO depth is
     // 0.6134·P); beyond ~45% of the radius it eats the core. Clamp rather
-    // than fail — the UI clamps too, but reloaded files / old params must
+    // than fail - the UI clamps too, but reloaded files / old params must
     // never produce garbage solids. Multi-start Rounded always cuts with
     // the rope tool, whose radius IS the depth and caps at 0.45·pitch (a
-    // land must survive between the interleaved grooves) — fold that cap in
+    // land must survive between the interleaved grooves) - fold that cap in
     // here so the analytic volume window and the shape probes measure the
     // SAME groove the tool cuts, instead of a deeper one it silently won't.
     const bool ropeDepthCap =
@@ -468,7 +469,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
     // Multi-start: each of the N interleaved helixes advances N·P per turn
     // (the LEAD) while the groove FORM and the crest spacing stay keyed to
     // the user's pitch P. At any fixed angle the grooves still pass every P
-    // axially — which is why the crest probes, the per-P volume windows and
+    // axially - which is why the crest probes, the per-P volume windows and
     // the whole-P glue boundaries all hold unchanged for any N. Only the
     // helix PHASE formulas below use the lead.
     const double lead = m_pitch * std::max(1, m_starts);
@@ -488,8 +489,8 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
         (m_grooveWidth > 0.0 && profileTakesGrooveWidth(m_profile))
             ? 0.5 * std::min(m_grooveWidth, 0.9 * m_pitch)
             : 0.5 * gSpec.openFrac * m_pitch;
-    // Flank clearance (mm per side): widen the groove — and thus every gate
-    // that measures it — so it stays consistent between the cutter and the
+    // Flank clearance (mm per side): widen the groove - and thus every gate
+    // that measures it - so it stays consistent between the cutter and the
     // volume/width checks. Clamped to keep a crest land (mouth < 0.9·pitch).
     const double flankClear = std::min(std::max(0.0, m_clearance),
                                        std::max(0.0, 0.45 * m_pitch - baseMouthHalf));
@@ -500,7 +501,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
                      m_pitch, m_depth, m_radius, m_length, m_isHole ? 1 : 0);
 
     // PRE-FLIGHT STRATEGY CHECK. The single compound band tool only cuts
-    // reliably against FULL, CLOSED cylinders — after ~40 harness
+    // reliably against FULL, CLOSED cylinders - after ~40 harness
     // experiments, any boolean between it and a PARTIAL or INTERRUPTED
     // cylinder (the half of a lengthwise split, a rod with a cross-hole)
     // coin-flips between no-ops, inverted removal, and plausible-volume cuts
@@ -533,7 +534,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
             BRepTools::UVBounds(f, u1, u2, v1, v2);
             // A face with an inner wire (cross-hole mouth) keeps full outer
             // UV bounds, so "full 2π wrap" here really means "uninterrupted
-            // enough for the compound tool to have a chance" — the volume
+            // enough for the compound tool to have a chance" - the volume
             // guard in tryCut still arbitrates, and per-turn is the net.
             if (std::abs((u2 - u1) - 2.0 * M_PI) < 1e-3) fullCylinder = true;
         }
@@ -548,7 +549,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
 
         // ---- Swept-rod fast path: an EXTERNAL thread covering a PLAIN
         // full-cylinder body end to end builds natively (no boolean, ~200ms
-        // vs minutes; see sweptRodThread). Detection is strict — exactly one
+        // vs minutes; see sweptRodThread). Detection is strict - exactly one
         // matching full-2pi cylinder + two planar caps perpendicular to the
         // axis, and the thread span covering the body's whole axial extent.
         // Anything else falls through to the proven boolean paths.
@@ -556,7 +557,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
         // (no sharp flanks) sweep cleanly, and the sweep gives Rounded the
         // gentle continuous sine wave a boolean can't (the rope cutter made
         // deep discrete scoops, the band loft made facets). The angular
-        // profiles (trapezoidal/square/buttress) still take the boolean —
+        // profiles (trapezoidal/square/buttress) still take the boolean -
         // their sharp flanks ripple under the sweep.
         if (!m_isHole && fullCylinder && m_starts <= 1 &&
             (m_profile == ThreadProfile::Standard ||
@@ -607,7 +608,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
                         std::fprintf(stderr, "[Thread] swept-rod fast path\n");
                     return rod;
                 }
-                std::fprintf(stderr, "[Thread] swept-rod declined — falling "
+                std::fprintf(stderr, "[Thread] swept-rod declined - falling "
                                      "back to boolean cut\n");
             }
         }
@@ -621,7 +622,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
         // ---- Thread runout: extend the helix one turn past each FREE end so
         // the groove runs off the cylinder instead of stopping in a blunt
         // wall. An end is free when a probe point just beyond it (at
-        // mid-groove radius) lies outside the body — a rod tip or a hole
+        // mid-groove radius) lies outside the body - a rod tip or a hole
         // mouth extends; a boss rooted in a plate or a blind hole bottom
         // stays exact so the cutter can't gouge surrounding material.
         double probeR = m_isHole ? (m_radius + 0.5 * depth)
@@ -641,7 +642,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
         // cutting at the cylinder radius and the taper truncates the crests,
         // so the thread runs OUT along the chamfer like a real bolt lead-in
         // instead of stopping dead at the cylinder edge and leaving a smooth
-        // bevel (Steve). Detected geometrically — past the end the body's
+        // bevel (Steve). Detected geometrically - past the end the body's
         // boundary radius drops smoothly from ~R (a taper), vs vanishing
         // (flat cap) or growing (a bigger coaxial neighbour). External only;
         // a hole's chamfer is a countersink, handled by its own runout.
@@ -698,7 +699,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
         // using the canonical OCCT threading construction (the "bottle
         // tutorial"): ThruSections between two half-ellipse wires drawn in
         // UV space on coaxial cylindrical surfaces. Unlike a MakePipeShell
-        // sweep (whose helical solids the boolean classified erratically —
+        // sweep (whose helical solids the boolean classified erratically -
         // four variants, four different wrong answers), these tools cut
         // consistently, and the ellipse tips taper to nothing, giving
         // natural thread runout at both ends.
@@ -707,20 +708,20 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
         // run parallel to the helix → taper to the far tip → taper up to the
         // upper line (+off) → chunked run back → taper to the tip. Both
         // flanks of the lofted groove slant equally (a seam ON the helix
-        // lofts into a flat radial wall — Steve's "flat top, tapered
+        // lofts into a flat radial wall - Steve's "flat top, tapered
         // bottom"). All edges are straight 2D lines on the surface; long
-        // runs are CHUNKED per turn — the tame-patch segmentation that makes
+        // runs are CHUNKED per turn - the tame-patch segmentation that makes
         // the boolean cut reliably (a single 30-turn lofted spline removes
         // nothing or worse; proven via the headless volume harness).
         // `vRef` anchors the helix PHASE: u = 0 at v = vRef (shifted by whole
-        // turns so u stays near 0 within [lo, hi] — the surface is periodic
+        // turns so u stays near 0 within [lo, hi] - the surface is periodic
         // and phase mod 2π is what aligns the groove). The compound path
         // passes vRef = lo (the historical anchor); the per-turn path passes
         // the same vRef for every turn so all its tools lie on ONE helix.
         // `tlLo`/`tlHi` are the taper lengths at each end of the band; a
         // value <= 0 produces a SQUARE end (the band stops on a straight
         // axial edge instead of tapering to a tip). Interior per-turn tools
-        // use square ends — their end walls sit INSIDE the neighbouring
+        // use square ends - their end walls sit INSIDE the neighbouring
         // void, away from every existing surface. The interlocking 0.5P
         // tapers were inherited from the compound recipe's runout, and they
         // are exactly the surfaces that made every neighbouring-void
@@ -783,7 +784,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
 
         // Full-parameter cutter builder. `outClear`/`wFac`/`dJit` are the
         // per-turn variant ladder's micro-jitters (clearance, groove width
-        // factor, extra depth) — they break the exact surface coincidences
+        // factor, extra depth) - they break the exact surface coincidences
         // between a turn's tool and the surfaces the previous turn's cut
         // created, which is what makes the kernel misclassify. `nSeg` is the
         // chunk count of the long runs; one chunk PER TURN, exactly.
@@ -795,7 +796,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
                 double uSignH = m_rightHanded ? 1.0 : -1.0;
                 // ROPE/KNUCKLE cutter for Rounded: sweep a CIRCLE along the
                 // helix (centred at the surface radius). Cutting the in-material
-                // half gives a genuinely SEMICIRCULAR groove — a band loft can
+                // half gives a genuinely SEMICIRCULAR groove - a band loft can
                 // only make faceted straight flanks. One sweep + one cut, so
                 // it's fast too. Groove radius rG sets both depth and half-
                 // opening (a rope thread is inherently semicircular); capped so
@@ -855,7 +856,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
                 // Flank clearance: widen the groove by `clearance` on EACH
                 // flank (thins the ridge) so a printed thread clears its mate
                 // on the sides, not just radially (m_clearance already deepens
-                // the groove above). Same widening for external AND internal —
+                // the groove above). Same widening for external AND internal -
                 // a thinner ridge clears a nominal mate either way; the radial
                 // inversion for a hole is handled by rIn/rOut. `flankClear` is
                 // clamped at buildResult scope so the cutter and the volume /
@@ -904,7 +905,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
                 }
                 if (toolShape.IsNull()) return {};
                 // NOTE: do NOT "fix" the orientation even if GProp reports a
-                // negative volume — the integrator mis-reads the helical
+                // negative volume - the integrator mis-reads the helical
                 // seam, but the boolean classifies this solid correctly.
                 return toolShape;
             } catch (...) { return {}; }
@@ -912,7 +913,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
         // N-start wrapper: the same tool built once per start, phase-shifted
         // one PITCH of vRef each (with the helix lead = N·P, +P in vRef is
         // exactly +2π/N of phase). The starts' grooves share the crest land
-        // a single-start P-thread would have, so they never touch — a
+        // a single-start P-thread would have, so they never touch - a
         // lightweight COMPOUND (no fuse) feeds the boolean as one tool.
         // Single start returns the shipped tool bit-identically.
         auto buildCutterEx = [&](double lo, double hi, double vRef,
@@ -935,7 +936,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
             }
             return comp;
         };
-        // The historical compound-tool builder (full-cylinder fast path) —
+        // The historical compound-tool builder (full-cylinder fast path) -
         // parameters bit-identical to every shipped release. Chunks are one
         // per HELIX turn, so the lead sets the count.
         auto buildCutter = [&](double lo, double hi) -> TopoDS_Shape {
@@ -990,7 +991,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
         // ---- Shape-aware cut validation. Volume bands alone cannot tell a
         // real groove from a WRONG-MATERIAL cut at similar volume (Steve's
         // stacked-disc bodies: the boolean removes a full-circumference slab
-        // between grooves instead of the groove — comparable volume, garbage
+        // between grooves instead of the groove - comparable volume, garbage
         // shape, tessellator crash). Classifier probes can: after a turn's
         // cut, points in the GROOVE band must be void and points in the
         // CREST band must still be solid. A disc cut eats the crest; an
@@ -1013,7 +1014,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
         // `pre`: along the groove helix, the groove point must have gone
         // OUT and the crest point (half a pitch up, same angle) stayed IN.
         // The probe angle is derived from v directly (θ = uSign·2π·(v−vLo)
-        // /P), so the probes are GRID-INDEPENDENT — they follow the helix
+        // /P), so the probes are GRID-INDEPENDENT - they follow the helix
         // wherever the zone boundaries sit. Only samples where BOTH points
         // were solid in `pre` count (split-away regions and cross-holes
         // are legitimately void); taper/runout spans at the very ends are
@@ -1031,10 +1032,10 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
             for (int k = 0; k < K; ++k) {
                 double vG = lo + (hi - lo) * (k + 0.5) / K;
                 if (vG < vLo + 0.75 * m_pitch || vG > vHi - 0.75 * m_pitch)
-                    continue; // taper/runout — groove intentionally shallow
+                    continue; // taper/runout - groove intentionally shallow
                 double vC = vG + 0.5 * m_pitch;
                 // Phase follows start 0's helix (lead-pitched); the crest
-                // offset vC and the width probes stay P-form — at a fixed
+                // offset vC and the width probes stay P-form - at a fixed
                 // angle, grooves pass every P for any start count.
                 double th = uSign * 2.0 * M_PI * (vG - vLo) / lead;
                 gp_Pnt pg = cylPt(rG, th, vG), pc = cylPt(rC, th, vC);
@@ -1047,7 +1048,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
                 // TAPER-NARROWED section is still solid. The probe offset
                 // tracks the PROFILE's half-opening at quarter depth (0.85 of
                 // it, inside for any profile) instead of a fixed 0.30P tuned to
-                // the old trapezoid — else narrow-opening profiles (square,
+                // the old trapezoid - else narrow-opening profiles (square,
                 // rounded) fail the gate spuriously.
                 if (okSample && k * 10 >= 3 * K && k * 10 <= 7 * K) {
                     double hLo, hUp;
@@ -1074,7 +1075,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
             double minRemoval = std::max(1e-2, bodyVol * 1e-4);
             if (v > bodyVol - minRemoval || v < 0.0) {
                 std::fprintf(stderr, "[Thread] cut removed nothing or grew "
-                                     "(%.2f vs body %.2f) — rejecting\n",
+                                     "(%.2f vs body %.2f) - rejecting\n",
                              v, bodyVol);
                 return {};
             }
@@ -1082,7 +1083,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
             // the tessellator and SEGFAULT; classifier probes catch them.
             // Standard stays STRICT (all probes perfect); generalized profiles'
             // probe offsets are approximate, so their gate only catches GROSS
-            // errors (a majority wrong) — demoting them to per-turn is what
+            // errors (a majority wrong) - demoting them to per-turn is what
             // makes them slow, and volume + validity already backstop.
             int nTurns = static_cast<int>(std::ceil((vHi - vLo) / m_pitch));
             for (int t = 0; t < nTurns; ++t) {
@@ -1093,7 +1094,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
                                        : (sc.good * 2 < sc.considered);
                 if (sc.considered >= 5 && gross) {
                     std::fprintf(stderr, "[Thread] cut imperfect at turn %d "
-                                         "(%d/%d probes) — demoting\n",
+                                         "(%d/%d probes) - demoting\n",
                                  t, sc.good, sc.considered);
                     return {};
                 }
@@ -1110,9 +1111,9 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
             if (tool.IsNull()) return {};
             TopoDS_Shape res = cutOnce(tool);
             // A CUT must shrink the body; a helical tool's classification can
-            // invert on a partial body — retry with the reversed tool.
+            // invert on a partial body - retry with the reversed tool.
             if (!res.IsNull() && shapeVol(res) > bodyVol + 1e-3) {
-                std::fprintf(stderr, "[Thread] cut inverted (vol grew) — "
+                std::fprintf(stderr, "[Thread] cut inverted (vol grew) - "
                                      "retrying with reversed tool\n");
                 TopoDS_Shape rev = tool;
                 rev.Reverse();
@@ -1122,10 +1123,10 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
         };
 
         // SEGMENT-AND-GLUE (the sweep path's O(N) pattern applied to the
-        // boolean). Cutting all N turns as one tool — or chunking one GROWING
-        // body — is O(N²): every boolean scans the whole accumulating shape.
+        // boolean). Cutting all N turns as one tool - or chunking one GROWING
+        // body - is O(N²): every boolean scans the whole accumulating shape.
         // Instead, thread SHORT fresh cylinder segments independently (each cut
-        // is O(1) — a short rod × a short tool) and GLUE them at whole-pitch
+        // is O(1) - a short rod × a short tool) and GLUE them at whole-pitch
         // boundaries, where the notched cross-sections are identical (same
         // phase), so BOPAlgo_GlueFull skips the face-intersection machinery.
         // Total is O(N) and the seams are clean by construction. Only the true
@@ -1200,7 +1201,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
         // by removed volume against the analytic per-turn groove volume,
         // failed turns retried through a variant ladder of micro-jitters.
         // This is how partial cylinders (lengthwise split halves) and
-        // interrupted cylinders (cross-holes) get threaded — the compound
+        // interrupted cylinders (cross-holes) get threaded - the compound
         // tool coin-flips on those, but single-turn cuts with validation
         // land 20-21/21 turns in the harness, and a turn that fails every
         // variant is SKIPPED (a short groove gap), never garbage.
@@ -1257,8 +1258,8 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
             // overlapping bottom.
             //
             // CREST-ALIGNED ZONE GRID: grooves sit at v = vLo + n·P (the
-            // helix anchor), so zone boundaries go at vLo + (n±0.5)·P —
-            // mid-crest — and each square tool owns ONE whole groove. The
+            // helix anchor), so zone boundaries go at vLo + (n±0.5)·P -
+            // mid-crest - and each square tool owns ONE whole groove. The
             // original grid put boundaries exactly ON the grooves: every
             // square end wall sliced through a groove, stacking half-open
             // groove stubs at each boundary until the booleans collapsed
@@ -1268,7 +1269,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
             // the runout extension), the end zone may reach 0.5P further
             // into the air so its runout taper has somewhere to live.
             // Clamping the first zone to [vLo, vLo+0.5P] made it exactly
-            // as long as its own taper — a degenerate tool that cut
+            // as long as its own taper - a degenerate tool that cut
             // nothing, deleting the first half-turn of groove (Steve's
             // "weird non-tapered end").
             bool botFree = vLo < -1e-9;
@@ -1277,7 +1278,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
             double gridHi = topFree ? vHi + 0.5 * m_pitch : vHi;
             // Build the zone list, then MERGE face-crossing end zones into
             // their material-anchored neighbours. An end zone whose groove
-            // centre sits beyond the rod face is void-dominated — OCCT
+            // centre sits beyond the rod face is void-dominated - OCCT
             // no-ops the cut and the face-exit flank sliver never gets
             // removed (the blunt triangular pocket below the rim in
             // Steve's screenshot). Merged, the sliver rides along on a
@@ -1312,7 +1313,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
                 bool last = (zi + 1 == zones.size());
                 bool ok = false;
                 bool noMaterial = false;
-                // Per-variant failure accounting — printed when a whole
+                // Per-variant failure accounting - printed when a whole
                 // turn fails so a field log is diagnosable without a
                 // rebuild (finding the last regression cost Steve a CPU
                 // fan and me a blind guess).
@@ -1339,7 +1340,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
                         tlLo = tlHi = 0.5 * m_pitch;
                     } else {
                         // Square ends, bottom overlapping the previous
-                        // void. Real thread ends keep runout tapers —
+                        // void. Real thread ends keep runout tapers -
                         // shortened when the zone is clamped (non-free
                         // end) so the tool never degenerates to nothing.
                         toolLo = first ? zoneLo : zoneLo - va.ovl * m_pitch;
@@ -1371,7 +1372,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
                     if (removed > 2.5 * analytic) { ++rjBig; continue; }
                     // ...and a GROWN body is an inverted classification.
                     if (removed < -1e-6) { ++rjGrew; continue; }
-                    // FACE-EXIT zones legitimately remove a tiny sliver —
+                    // FACE-EXIT zones legitimately remove a tiny sliver -
                     // the runout flank wedge where the helix crosses the
                     // rod's end face (NOT necessarily the grid's first/
                     // last zone). The normal 2% floor swallowed it ("no
@@ -1384,14 +1385,14 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
                     if (removed < matFloor) {
                         // A clean boolean that removed (almost) nothing.
                         // Either this turn's groove isn't in this body
-                        // (split-away region) — or the cut no-op'd the way
+                        // (split-away region) - or the cut no-op'd the way
                         // awkward bodies do and a LATER VARIANT will land
                         // it. Remember the benign outcome but keep trying;
                         // do NOT adopt `res` (imprint edges pollute).
                         noMaterial = true;
                         continue;
                     }
-                    // Volume is in band — but at single-turn scale a
+                    // Volume is in band - but at single-turn scale a
                     // wrong-material disc cut removes a volume comparable
                     // to a real groove (Steve's stacked-disc rod). Shape
                     // probes arbitrate.
@@ -1402,7 +1403,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
                         continue;
                     }
                     // < 5 measurable samples = partial end turn, mostly
-                    // runout: probes are INCONCLUSIVE — trust the volume
+                    // runout: probes are INCONCLUSIVE - trust the volume
                     // band that already passed.
                     if (sc.good == sc.considered || sc.considered < 5) {
                         cur = res;
@@ -1427,7 +1428,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
                 }
                 if (!ok && !bestRes.IsNull()) {
                     std::fprintf(stderr, "[Thread] turn %d: best variant %d "
-                                         "imperfect (%d/%d probes) — "
+                                         "imperfect (%d/%d probes) - "
                                          "adopting\n",
                                  i, bestVar, bestScore, bestDen);
                     cur = bestRes;
@@ -1445,7 +1446,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
                                      lastGood, lastDen);
                     }
                 }
-                // Bail as soon as the failure budget is blown — each failed
+                // Bail as soon as the failure budget is blown - each failed
                 // turn burns the FULL variant ladder (9 booleans), and a
                 // body that fails this often isn't going to be saved by the
                 // remaining turns. This runs synchronously during reflow
@@ -1460,7 +1461,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
                 std::fprintf(stderr, "[Thread] per-turn: %d turns, %d skipped "
                                      "(no material), %d failed\n",
                              nT, skipped, failed);
-            // The whole pass must have removed SOMETHING — a body that no
+            // The whole pass must have removed SOMETHING - a body that no
             // groove intersects is a no-op, and no-ops suspend (same rule
             // as the compound path's volume guard).
             double minRemoval = std::max(1e-2, bodyVol * 1e-4);
@@ -1471,11 +1472,11 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
                 cur = fixer.Shape();
                 // Still broken after healing = garbage (a stale-radius cut
                 // into a resized rod landed an invalid protruding body that
-                // passed the volume gates). Fail honestly — the recut path
+                // passed the volume gates). Fail honestly - the recut path
                 // suspends the step instead of shipping the junk.
                 if (!BRepCheck_Analyzer(cur).IsValid()) {
                     std::fprintf(stderr, "[Thread] per-turn: result invalid "
-                                         "after heal — rejecting\n");
+                                         "after heal - rejecting\n");
                     return {};
                 }
             }
@@ -1483,10 +1484,10 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
         };
 
         TopoDS_Shape result;
-        // INTERNAL ROUNDED — SLAB-WISE RING SPLICE. Probe-mapped OCCT
+        // INTERNAL ROUNDED - SLAB-WISE RING SPLICE. Probe-mapped OCCT
         // reality (probe_ring_splice): the flush ring-splice unit works up
         // to ~4-5 turns and FAILS beyond (6+ turns: the seam fuse loses the
-        // body / fills the bore / inverts, in every fuse mode) — and a ring
+        // body / fills the bore / inverts, in every fuse mode) - and a ring
         // ending MID-bore breaks the fuse at any length. So slice the
         // CLEARED body into <=4-turn slabs at whole-pitch boundaries
         // (planar Common, plain tool), splice each slab's SHORT FLUSH ring
@@ -1661,35 +1662,35 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
                             }
                             std::fprintf(stderr, "[Thread] slab splice at "
                                                  "%.0f turns/slab declined "
-                                                 "— retrying\n", slabTurns);
+                                                 "- retrying\n", slabTurns);
                         }
                     }
                 }
             } catch (...) { result.Nullify(); }
             if (result.IsNull())
                 std::fprintf(stderr, "[Thread] internal ring splice declined "
-                                     "(%s) — falling back to groove tools\n",
+                                     "(%s) - falling back to groove tools\n",
                              why);
             else if (materializr::isVerbose())
                 std::fprintf(stderr, "[Thread] internal ring splice OK\n");
         }
         // ROUNDED on a body that couldn't take the direct sweep (a cross-
-        // holed / slotted rod — the reflow re-cut case): intersect the body
+        // holed / slotted rod - the reflow re-cut case): intersect the body
         // with the SWEPT threaded rod instead of falling into the rope
         // groove, whose deep discrete scoops are exactly the "stacked
         // discs" look the sweep was chosen to avoid (2026-07-21: a hole
         // cut through a Rounded-threaded rod re-threaded as poker chips).
         // body ∩ sweptRod ≡ cutting the groove ribbon out of the body, but
-        // the tool is a fat simple solid — a thin helical ribbon's in/out
+        // the tool is a fat simple solid - a thin helical ribbon's in/out
         // classification inverts (it removed 5× its own volume in the
         // probe), the same OCCT failure that killed swept cutters in the
         // per-turn work. Probe matrix (probe_derived_cutter): Rounded +
-        // exact radius + fuzzy 1e-3 is the ONLY working cell — Standard
+        // exact radius + fuzzy 1e-3 is the ONLY working cell - Standard
         // collapses to empty (sharp roots), radius bumps and larger fuzz
         // collapse too. Standard doesn't need this path anyway: the groove-
         // band tools were built for V profiles and are matrix-proven.
         // Guards: the body must LIE WITHIN the source cylinder (Common
-        // TRUNCATES anything outside — bbox pre-gate), the removal must sit
+        // TRUNCATES anything outside - bbox pre-gate), the removal must sit
         // inside the analytic groove-volume band, and the result must pass
         // the analyzer. Any miss falls through to the proven paths below.
         if (!m_isHole && m_starts <= 1 &&
@@ -1727,7 +1728,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
                             M_PI * m_radius * m_radius * span -
                             shapeVol(swept);
         // Fuzzy booleans BUMP TOLERANCES on their input
-                        // TShapes — a failed attempt must not pollute `body`
+                        // TShapes - a failed attempt must not pollute `body`
                         // for the groove-tool fallbacks (it measurably
                         // changed their cut results). Operate on a deep copy.
                         TopoDS_Shape bodyCopy =
@@ -1735,8 +1736,8 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
                         // COMPLEMENT formulation: body ∩ sweptRod, computed
                         // as sweptRod − (srcCyl − body). The direct Common
                         // works for a transverse hole but INVERTS on a
-                        // coaxial bore (it filled the bore — the recurring
-                        // helical-classification curse — so the volume gate
+                        // coaxial bore (it filled the bore - the recurring
+                        // helical-classification curse - so the volume gate
                         // declined and Steve's tube got the rope grooves).
                         // Phrased as subtraction, every boolean is "smooth
                         // solid vs SIMPLE solid": the complement is exactly
@@ -1745,7 +1746,9 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
                         why = "complement boolean failed";
                         TopoDS_Shape res;
                         {
-                            BRepAlgoAPI_Cut compCut(
+                            BRepAlgoAPI_Cut compCut;
+                            materializr::setBooleanShapes(
+                                compCut,
                                 BRepPrimAPI_MakeCylinder(
                                     gp_Ax2(segBase.Location(),
                                            segBase.Direction(),
@@ -1805,7 +1808,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
             } catch (...) { result.Nullify(); }
             if (result.IsNull())
                 std::fprintf(stderr, "[Thread] swept-common re-cut declined "
-                                     "(%s) — falling back to groove tools\n",
+                                     "(%s) - falling back to groove tools\n",
                              why);
             else if (materializr::isVerbose())
                 std::fprintf(stderr, "[Thread] swept-common re-cut OK\n");
@@ -1816,7 +1819,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
                              vLo, vHi);
             // Single compound cut for all profiles. The boolean path is
             // O(N²) here no matter how it's sliced (confirmed: chunked cut,
-            // sequential glue, and single fuse of segments all stay O(N²) —
+            // sequential glue, and single fuse of segments all stay O(N²) -
             // OCCT won't fast-path the coincident seams of independently-built
             // pieces). So the plain single-tool cut, which is the FASTEST for
             // the short coarse threads that are the common printed case, wins.
@@ -1828,10 +1831,10 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
             // with plausible-volume WRONG-MATERIAL removals (the poker-chip
             // bodies) that pass the coarse whole-body volume guard and then
             // SEGFAULT the tessellator. The per-turn fallback below retries
-            // with per-turn validation instead — garbage can't pass it.
+            // with per-turn validation instead - garbage can't pass it.
         }
         if (result.IsNull()) {
-            std::fprintf(stderr, "[Thread] %s — per-turn sequential cut\n",
+            std::fprintf(stderr, "[Thread] %s - per-turn sequential cut\n",
                          fullCylinder ? "compound cut failed"
                                       : "partial/interrupted cylinder");
             result = perTurnCut();
@@ -1840,7 +1843,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
         // inverts against a body rebuilt by an upstream boolean (e.g. a union
         // of a lofted head onto the shank) even though the body is boolean-
         // healthy for plain cuts and the SAME cylinder threads fine
-        // standalone — OCCT misclassifies the helical cut against the rebuilt
+        // standalone - OCCT misclassifies the helical cut against the rebuilt
         // shape, and no heal (copy / unify / shapefix) recovers it. So thread
         // a CLEAN synthetic segment and splice it in at the shoulder:
         //   bodyMinus = body − C(plain segment);  result = bodyMinus ∪ T.
@@ -1848,10 +1851,10 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
         // end gets a collar that OVERLAPS the parent, so the fuse is a robust
         // volumetric union (not a fragile coincident-face seam); a FREE end
         // keeps its runout (a real threaded bolt tip). The threaded segment
-        // becomes a clean cylinder — any tip chamfer on it is flattened.
+        // becomes a clean cylinder - any tip chamfer on it is flattened.
         if (m_forceGraft) result.Nullify();   // test hook
         if (result.IsNull() && !m_isHole && m_allowGraft && m_length > 1e-3) {
-            std::fprintf(stderr, "[Thread] direct cut failed — GRAFT "
+            std::fprintf(stderr, "[Thread] direct cut failed - GRAFT "
                                  "(clean segment spliced at the shoulder)\n");
             try {
                 const bool botFree = vLo < -1e-9;
@@ -1874,7 +1877,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
                 const double eLo = botFree ? tLo : -collar;
                 const double eHi = topFree ? tHi : m_length + collar;
                 // EXTRACT the real segment (cylinder + any end chamfer +
-                // shoulder collar) from the body — a Common with a plain
+                // shoulder collar) from the body - a Common with a plain
                 // cylinder, so its ACTUAL shape (incl. the taper) gets
                 // threaded, not a flat-ended stand-in.
                 TopoDS_Shape srcSeg;
@@ -1893,7 +1896,7 @@ TopoDS_Shape ThreadOp::buildResult(const TopoDS_Shape& body) const {
                 // Fall back to a plain cylinder if the extract failed.
                 if (srcSeg.IsNull() || shapeVol(srcSeg) < 1e-6)
                     srcSeg = plainCyl(eLo, eHi);
-                // Thread the segment [0, m_length] on the extracted source —
+                // Thread the segment [0, m_length] on the extracted source -
                 // direct cut (no graft recursion); the nested op runs the
                 // thread through the chamfer via its own run-through.
                 ThreadOp seg(*this);
@@ -1990,7 +1993,7 @@ bool ThreadOp::execute(Document& doc) {
         // no worker-precomputed result), re-resolve the target cylinder face
         // against the current body and adopt its new axis + radius. The stored
         // absolute params are the fallback when there's no ref or it can't
-        // resolve — today's behaviour, so nothing regresses for old files.
+        // resolve - today's behaviour, so nothing regresses for old files.
         if (m_precomputed.IsNull() && !m_faceRef.empty()) {
             materializr::topo::Context ctx;
             ctx.doc = &doc;
@@ -2013,10 +2016,10 @@ bool ThreadOp::execute(Document& doc) {
             }
             if (!adopted) {
                 // GEOMETRIC FALLBACK: the ref dies when an op that doesn't
-                // publish lineage rebuilds the body (Resize's ring-fuse —
+                // publish lineage rebuilds the body (Resize's ring-fuse -
                 // the r8 thread then per-turn-cut GARBAGE into the r10 rod,
                 // and it passed the volume gates). The thread's AXIS almost
-                // always survives such edits — only the radius changed — so
+                // always survives such edits - only the radius changed - so
                 // adopt the coaxial cylindrical face whose radius is CLOSEST
                 // to the stored one (closest disambiguates the outer wall
                 // from a coaxial bore, for external and internal threads
@@ -2044,12 +2047,12 @@ bool ThreadOp::execute(Document& doc) {
                 }
                 if (bestR > 1e-6 && bestD > 1e-6) {
                     std::fprintf(stderr, "[Thread] face ref did not resolve "
-                                         "— coaxial fallback adopts r=%.4f "
+                                         "- coaxial fallback adopts r=%.4f "
                                          "(was %.4f)\n", bestR, m_radius);
                     m_radius = bestR;
                 } else if (bestR <= 1e-6) {
                     std::fprintf(stderr, "[Thread] face ref did NOT resolve "
-                                         "and no coaxial cylinder — keeping "
+                                         "and no coaxial cylinder - keeping "
                                          "stored axis/radius %.4f\n",
                                  m_radius);
                 }
@@ -2062,7 +2065,7 @@ bool ThreadOp::execute(Document& doc) {
         if (m_precomputed.IsNull() && s_asyncRecut && s_asyncRecut(*this, doc))
             return true;
 
-        // The popup's worker thread may have already computed the result —
+        // The popup's worker thread may have already computed the result -
         // consume it; redo / editStep recompute synchronously as usual.
         TopoDS_Shape result;
         if (!m_precomputed.IsNull()) {
@@ -2111,15 +2114,15 @@ void ThreadOp::renderProperties() {
     materializr::lengthField(materializr::trFormat("Depth (%s)", materializr::unitSuffix()).c_str(), &m_depth);
     if (m_depth < 0.05) m_depth = 0.05;
     // Past ~0.65·pitch the grooves merge and shred the crests into floating
-    // helical fins (Steve found this empirically — "it's jumping lol").
-    // Multi-start Rounded cuts with the rope tool, capped at 0.45·pitch —
+    // helical fins (Steve found this empirically - "it's jumping lol").
+    // Multi-start Rounded cuts with the rope tool, capped at 0.45·pitch -
     // same clamp buildResult applies, so the field shows what gets cut.
     const bool ropeCap = m_profile == ThreadProfile::Rounded && m_starts > 1;
     double maxDepth =
         std::min((ropeCap ? 0.45 : 0.65) * m_pitch, 0.45 * m_radius);
     if (m_depth > maxDepth) m_depth = maxDepth;
     // WRAPPED: this renders inside the history panel's inline editor, the
-    // narrowest column in the app — unwrapped it ran off the panel edge.
+    // narrowest column in the app - unwrapped it ran off the panel edge.
     // (TextDisabled has no wrapping variant, hence the explicit colour push.)
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
     ImGui::TextWrapped("%s", ropeCap
@@ -2127,7 +2130,7 @@ void ThreadOp::renderProperties() {
         : "Depth caps at 0.65 \xC3\x97 pitch (ISO is 0.61).");
     ImGui::PopStyleColor();
     // Cross-section profile. Standard is the fast, shipped V-thread; the rest
-    // are the maker/printing set (clean but slower — a boolean cut per turn).
+    // are the maker/printing set (clean but slower - a boolean cut per turn).
     const char* kProfiles[] = {"Standard (V)", "Trapezoidal (ACME)",
                                "Square", "Buttress", "Rounded (print)"};
     int prof = static_cast<int>(m_profile);
@@ -2144,11 +2147,11 @@ void ThreadOp::renderProperties() {
         materializr::lengthField(materializr::trFormat("Fit clearance (%s)", materializr::unitSuffix()).c_str(), &m_clearance);
         if (m_clearance < 0.0) m_clearance = 0.0;
         ImGui::SetItemTooltip("%s", materializr::tr("Radial gap so a PRINTED thread fits its mate (0.2\xE2\x80\x93""0.4mm typical). 0 = geometrically exact."));
-        ImGui::TextDisabled("%s", materializr::tr("Non-Standard profiles cut per-turn \xE2\x80\x94 a long thread can take a while."));
+        ImGui::TextDisabled("%s", materializr::tr("Non-Standard profiles cut per-turn - a long thread can take a while."));
     }
     bool rh = m_rightHanded;
     if (ImGui::Checkbox(materializr::tr("Right-handed"), &rh)) m_rightHanded = rh;
-    // Multi-start was missing here entirely — a saved 3-start cap could not
+    // Multi-start was missing here entirely - a saved 3-start cap could not
     // have its start count edited after the fact. Same 1-6 range and stepped
     // style as the create panel.
     int starts = m_starts;
@@ -2227,7 +2230,7 @@ bool ThreadOp::deserializeParams(const std::string& blob) {
         pos = end + 1;
     }
     // Rebuild the gp_Ax2 from the serialized components. buildResult reads
-    // the components directly, so threads WORKED on reloaded files — but
+    // the components directly, so threads WORKED on reloaded files - but
     // getAxis() consumers (the sketch-on-cap true centre) silently got a
     // default Z-axis on every reloaded op and concluded "no thread axis
     // pierces this plane". Guarded: a degenerate/absent axis (old files)

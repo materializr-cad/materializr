@@ -3,13 +3,13 @@
 // Two scopes with deliberately different appetites, and the tests pin the
 // difference:
 //
-//   * whole body — only merges what is EXACTLY coplanar, so it is safe to point
+//   * whole body - only merges what is EXACTLY coplanar, so it is safe to point
 //     at a whole part.
-//   * picked faces — bounded to the edges between the picked faces, so it may
+//   * picked faces - bounded to the edges between the picked faces, so it may
 //     escalate the angular tolerance. It must still refuse a real corner.
 //
 // The escalation itself was measured on the reporting user's imported nacelle,
-// where all 41 surviving seams sat between planes 1e-4 and 1e-2 rad apart —
+// where all 41 surviving seams sat between planes 1e-4 and 1e-2 rad apart -
 // nothing a body-wide tolerance can ever safely reach. These tests cover the
 // contract around that; the tolerance ladder's numbers live in MergeFacesOp.cpp.
 #include <gtest/gtest.h>
@@ -67,7 +67,7 @@ std::vector<TopoDS_Shape> facesFacing(const TopoDS_Shape& body, const gp_Dir& di
     return out;
 }
 
-// Two boxes fused side by side with the RAW kernel call — no unify — so the
+// Two boxes fused side by side with the RAW kernel call - no unify - so the
 // shared top plane comes back as two coplanar faces with a seam between them.
 // That is the shape of the bug: geometrically one surface, topologically two.
 TopoDS_Shape splitTopBar() {

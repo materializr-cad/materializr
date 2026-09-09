@@ -1,10 +1,10 @@
-// experiment/generative-edges — Phase 1: a filleted CORNER edge is anchored to
+// experiment/generative-edges - Phase 1: a filleted CORNER edge is anchored to
 // the sketch VERTEX it sits over, so it survives a sketch DIMENSION edit that
 // relocates the corner (where ordinal/carrier matching fails).
 //
 // The decisive test: build a box from a rectangle sketch, fillet one vertical
 // corner, then WIDEN the sketch. With generative anchoring the fillet re-binds
-// to the moved corner and re-executes; without it (control), it fails — which
+// to the moved corner and re-executes; without it (control), it fails - which
 // is exactly today's "a downstream fillet couldn't follow it" behaviour.
 
 #include "core/Document.h"
@@ -170,7 +170,7 @@ TEST(GenerativeEdges, FilletFollowsResize_RimEdge) {
 }
 
 // Coverage: EVERY edge of an extruded rectangular prism must anchor (4 corners
-// + 8 rims, 0 none) — otherwise a whole-body fillet fails the all-or-nothing
+// + 8 rims, 0 none) - otherwise a whole-body fillet fails the all-or-nothing
 // rule (this is exactly the user's 14-edge case).
 TEST(GenerativeEdges, WholePrismEveryEdgeAnchors) {
     Document doc;
@@ -199,7 +199,7 @@ TEST(GenerativeEdges, WholePrismEveryEdgeAnchors) {
 }
 
 // Control: a fillet whose anchors were never captured (a stale edge from the
-// pre-resize body, as any pre-anchoring op has) cannot follow the resize —
+// pre-resize body, as any pre-anchoring op has) cannot follow the resize -
 // proving it's the anchoring, not something else, doing the work.
 TEST(GenerativeEdges, WithoutAnchorResizeStillFails) {
     Document doc;
@@ -290,7 +290,7 @@ TEST(GenerativeEdges, AnchorSerializesAndParses) {
 }
 
 // THE IN-APP FLOW: the resize goes through History::editStep with a
-// SketchEditOp in the chain — exactly what cascadeFromSketchEdit runs. The
+// SketchEditOp in the chain - exactly what cascadeFromSketchEdit runs. The
 // replay rolls the LIVE sketch back through its snapshots, so when the fillet
 // re-executes mid-replay the sketch holds the STALE (pre-edit) state while
 // the extrude below was rebuilt from the final one. Without the cascade
@@ -332,7 +332,7 @@ TEST(GenerativeEdges, FilletFollowsResize_ThroughHistoryReplay) {
     ASSERT_TRUE(extP->rebuildProfileFromSketch(doc));
 
     // Control: WITHOUT the override the replay reads the rolled-back sketch
-    // and the fillet cannot re-find the moved corner — the bug this guards.
+    // and the fillet cannot re-find the moved corner - the bug this guards.
     EXPECT_FALSE(hist.editStep(0, doc, /*transactional=*/true))
         << "expected the replay to fail without the cascade sketch override "
            "(if this now PASSES, the override plumbing may be removable)";
@@ -346,7 +346,7 @@ TEST(GenerativeEdges, FilletFollowsResize_ThroughHistoryReplay) {
 }
 
 // Arc coverage: a rounded-corner profile (two lines bridged by an arc, closed
-// back to the origin) extrudes to a body whose every edge must anchor —
+// back to the origin) extrudes to a body whose every edge must anchor -
 // including the two circular rim edges from the ARC and the seamless walls.
 TEST(GenerativeEdges, ArcProfileEveryEdgeAnchors) {
     Document doc;

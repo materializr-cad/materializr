@@ -5,19 +5,19 @@
 //   1. Typed values were re-rounded to the lattice. Worst on circles:
 //      handleCircleTool ran snapRadialToGrid on whatever it was handed,
 //      including the exact position the typed-value path computed. Typing a
-//      7.3mm diameter on a 1mm grid built r=4.0 — and the same path then
+//      7.3mm diameter on a 1mm grid built r=4.0 - and the same path then
 //      recorded a Radius CONSTRAINT of 3.65 against it, so the circle
 //      disagreed with its own constraint from the moment it existed.
 //
 //   2. Rectangle-from-centre doubled a typed width. applyDimension halves the
 //      typed side in Center mode (m_firstClick is the centre and
 //      handleRectangleTool mirrors the corner through it), but the two places
-//      that RE-APPLY the locked width — onMouseDown and onMouseMove — did not.
+//      that RE-APPLY the locked width - onMouseDown and onMouseMove - did not.
 //      Typing the width and then CLICKING for the height spanned the full
 //      typed value either side of the centre. Typing BOTH values was correct,
 //      which is why it survived: the bug needed one typed side and one clicked.
 //
-// The grid must still apply to everything the user did NOT type — that is what
+// The grid must still apply to everything the user did NOT type - that is what
 // the last two cases guard, so a future "just turn the snapping off" fix can't
 // pass this file.
 #include <gtest/gtest.h>
@@ -90,7 +90,7 @@ TEST(TypedSketchValues, CircleTypedDiameterBeatsTheGrid) {
     EXPECT_NEAR(radius, 3.65, 1e-4);
 
     // And the constraint the same path records must describe the circle that
-    // was actually built — these disagreed before (r=4.0 vs a Radius of 3.65).
+    // was actually built - these disagreed before (r=4.0 vs a Radius of 3.65).
     bool sawRadius = false;
     for (const auto& c : r.sketch.getConstraints())
         if (c.type == ConstraintType::Radius) {

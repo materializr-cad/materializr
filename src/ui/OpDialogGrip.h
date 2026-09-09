@@ -15,7 +15,7 @@ inline void opDialogDragGrip(float s) {
     const float h = 22.0f * s;   // generous strip: an easy touch target
     const ImVec2 p0 = ImGui::GetCursorScreenPos();
     // Reserve the strip as INERT space (Dummy uses id 0, so it never claims
-    // HoveredId): grabbing it triggers ImGui's OWN window move — the dialogs
+    // HoveredId): grabbing it triggers ImGui's OWN window move - the dialogs
     // have NoMove removed. Built-in move handles fast flicks and edge-clamping
     // cleanly; the earlier manual SetWindowPos drag stalled slow and snapped
     // back on quick moves.

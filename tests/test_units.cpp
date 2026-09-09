@@ -1,9 +1,19 @@
 // Display units: the one place a length changes unit.
 //
 // This test deliberately includes NO ImGui header. Units.h must compile in a TU
-// that has never seen imgui.h — any ImGui call creeping into it (the Round-2
+// that has never seen imgui.h - any ImGui call creeping into it (the Round-2
 // review caught a ClearActiveID() that would have crashed before the context
 // existed) fails right here at compile time.
+
+// OCCT FIRST, deliberately. Standard_Real.hxx defines _USE_MATH_DEFINES and
+// then includes <math.h>; that is a no-op if <math.h> is already in, and
+// core/Units.h includes <cmath>. Put the core headers first and MSVC loses
+// M_PI for the inline bodies in gp_Vec.hxx / gp_Dir.hxx.
+#include "modeling/FaceTweakOp.h"
+#include "modeling/FilletOp.h"
+#include <gp_Ax1.hxx>
+#include <gp_Vec.hxx>
+#include <gp_Trsf.hxx>
 
 #include "core/Units.h"
 #include "core/LengthEdit.h"
@@ -19,7 +29,7 @@ using materializr::LengthUnit;
 namespace {
 
 // Every test that changes the global unit restores it on exit, including on an
-// early ASSERT failure — otherwise one failing case would poison the rest.
+// early ASSERT failure - otherwise one failing case would poison the rest.
 struct ScopedUnit {
     LengthUnit saved;
     explicit ScopedUnit(LengthUnit u) : saved(materializr::currentUnit()) { materializr::setCurrentUnit(u); }
@@ -45,7 +55,7 @@ TEST(Units, RoundTripExact) {
     }
 }
 
-// 2. The same through a FLOAT shadow — many Op members are float. The error
+// 2. The same through a FLOAT shadow - many Op members are float. The error
 // must stay below what the unit's own precision can show, or an untouched
 // value would visibly drift after one edit.
 TEST(Units, FloatMemberRoundTrip) {
@@ -104,7 +114,7 @@ TEST(Units, ParseNoSuffixUsesCurrentUnit) {
     { ScopedUnit s(LengthUnit::Mm); EXPECT_TRUE(materializr::parseLength("7",   mm)); EXPECT_DOUBLE_EQ(7.0,   mm); }
 }
 
-// 6. Garbage is refused and the output is left alone — parseFinite's contract.
+// 6. Garbage is refused and the output is left alone - parseFinite's contract.
 TEST(Units, ParseRejectsGarbage) {
     ScopedUnit s(LengthUnit::Mm);
     double mm = 42.0;
@@ -118,7 +128,7 @@ TEST(Units, ParseRejectsGarbage) {
 }
 
 // 7. Expressions are refused. Formulas are mm and are out of this parser's
-// scope — accepting "10+5" here (strtod would read the 10) is exactly how a
+// scope - accepting "10+5" here (strtod would read the 10) is exactly how a
 // variable-bearing formula would get scaled by the display unit.
 TEST(Units, ParseRejectsExpressions) {
     ScopedUnit s(LengthUnit::In);
@@ -145,7 +155,7 @@ TEST(Units, OutOfRangeUnitFallsBackToMm) {
     EXPECT_STREQ("mm", materializr::unitInfo(static_cast<LengthUnit>(-1)).suffix);
 }
 
-// 16. The RAII restorer every test relies on actually restores — including when
+// 16. The RAII restorer every test relies on actually restores - including when
 // the scope is left early.
 TEST(Units, ScopedUnitRestores) {
     ASSERT_EQ(LengthUnit::Mm, materializr::currentUnit());
@@ -163,7 +173,7 @@ TEST(Units, ScopedUnitRestores) {
 // Every editable length field has two halves: a SEED that writes the model into
 // a text buffer, and a COMMIT that parses that buffer back. If only one of them
 // converts, opening a dialog and pressing Enter without typing anything moves
-// the value by the unit factor — silent corruption from doing nothing.
+// the value by the unit factor - silent corruption from doing nothing.
 //
 // Seven fields shipped exactly that way: commit through parseLength (converts),
 // seed through snprintf("%.2f") (does not). No test could see it, because each
@@ -179,7 +189,7 @@ TEST(Units, SeedThenCommitIsIdentity) {
             double back = 0.0;
             ASSERT_TRUE(materializr::parseLength(buf, back))
                 << "unit " << u << " could not re-read its own seed: \"" << buf << "\"";
-            // Tolerance is what the unit's own decimals can represent — the
+            // Tolerance is what the unit's own decimals can represent - the
             // seed rounds to that many places, so the round trip cannot beat it.
             const double step = std::pow(10.0, -materializr::unitInfo(
                                     materializr::currentUnit()).decimals);
@@ -227,7 +237,7 @@ TEST(Units, ScopedUnitForcesAndRestores) {
     materializr::setCurrentUnit(materializr::LengthUnit::Mm);
 }
 
-// The guard must survive an early return — a throw mid-capture would otherwise
+// The guard must survive an early return - a throw mid-capture would otherwise
 // leave the whole app formatting in millimetres.
 TEST(Units, ScopedUnitRestoresOnEarlyExit) {
     materializr::setCurrentUnit(materializr::LengthUnit::Ft);
@@ -267,7 +277,7 @@ TEST(Units, LengthFormatFollowsTheTable) {
 
 // Switching to a large unit must move the WORKING SCALE with it. The initial
 // sketch view is sized in millimetres (orthoSize), so 40 mm is a reasonable
-// first view in millimetres and an absurd one in feet — the whole visible
+// first view in millimetres and an absurd one in feet - the whole visible
 // sketch 0.13 ft across, every number on screen a fraction.
 //
 // Only the FRAMING is unit-aware. Rescaling the grid step instead would have
@@ -290,4 +300,75 @@ TEST(Units, InitialFramingSpansTheDisplayUnit) {
     materializr::ScopedUnit s(materializr::LengthUnit::Ft);
     EXPECT_GT(materializr::toDisplay(materializr::toMm(40.0)), 1.0)
         << "a framed view must not read as a fraction of one foot";
+}
+
+// A face tweak's distance is a MODEL DIMENSION - how far the face moved - so
+// the history caption reads it in the display unit like every other length.
+// The angle branch is degrees and must stay untouched by the unit.
+//
+// description() is called live per frame (HistoryPanel), so nothing is stored
+// and a unit switch re-renders it; that is what this asserts by reading the
+// same op twice under different units.
+TEST(Units, FaceTweakCaptionFollowsTheDisplayUnitButNotForAngles) {
+    FaceTweakOp op;
+
+    gp_Trsf move;                       // 25.4 mm along X == 1 inch
+    move.SetTranslation(gp_Vec(25.4, 0.0, 0.0));
+    op.setTransform(move);
+    {
+        materializr::ScopedUnit mm(materializr::LengthUnit::Mm);
+        EXPECT_EQ("Tweak face 25.40 mm", op.description());
+    }
+    {
+        materializr::ScopedUnit in(materializr::LengthUnit::In);
+        EXPECT_EQ("Tweak face 1.000 in", op.description());
+    }
+
+    gp_Trsf turn;                       // 90 degrees about X
+    turn.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(1, 0, 0)),
+                     90.0 * 3.14159265358979323846 / 180.0);
+    op.setTransform(turn);
+    {
+        materializr::ScopedUnit in(materializr::LengthUnit::In);
+        EXPECT_EQ("Tweak face 90.00 deg", op.description())
+            << "an angle is not a length and must not follow the unit";
+    }
+}
+
+// One suffix, three converted numbers. A history caption gets little width, so
+// repeating "in" after every component reads as noise - but dropping the unit
+// entirely is what this whole feature exists to stop, and it is exactly what
+// the coordinate captions used to do (std::to_string on a raw millimetre).
+TEST(Units, FmtVec3ConvertsEveryComponentUnderOneSuffix) {
+    {
+        materializr::ScopedUnit mm(materializr::LengthUnit::Mm);
+        EXPECT_EQ("(25.40, 0.00, -12.70) mm", materializr::fmtVec3(25.4, 0.0, -12.7));
+    }
+    {
+        materializr::ScopedUnit in(materializr::LengthUnit::In);
+        EXPECT_EQ("(1.000, 0.000, -0.500) in", materializr::fmtVec3(25.4, 0.0, -12.7));
+    }
+    {
+        // Feet carry four decimals, so a half-inch offset still resolves.
+        materializr::ScopedUnit ft(materializr::LengthUnit::Ft);
+        EXPECT_EQ("(0.0833, 0.0000, -0.0417) ft", materializr::fmtVec3(25.4, 0.0, -12.7));
+    }
+}
+
+// The audit's third blind spot, as a test. "Fillet R2" carried no unit at all:
+// not a converted one, not even "mm" - so a reader in inches saw a raw model
+// number and no way to tell. numStr made it invisible to both the control scan
+// and the literal scan, which is why tools/units_audit.py now walks the
+// captions too.
+TEST(Units, FilletCaptionCarriesTheDisplayUnit) {
+    FilletOp op;
+    op.setRadius(25.4);
+    {
+        materializr::ScopedUnit mm(materializr::LengthUnit::Mm);
+        EXPECT_EQ("Fillet R25.40 mm on 0 edge(s)", op.description());
+    }
+    {
+        materializr::ScopedUnit in(materializr::LengthUnit::In);
+        EXPECT_EQ("Fillet R1.000 in on 0 edge(s)", op.description());
+    }
 }

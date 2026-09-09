@@ -1,7 +1,7 @@
 // Scale Face in BOTH directions.
 //
 // Steve, 2026-08-04: "scale is supposed to increase or decrease the size of the
-// face selected with the side walls following." Pinch did only half of that —
+// face selected with the side walls following." Pinch did only half of that -
 // it was Common(body, frustum), an intersection, which can only ever REMOVE
 // material, so >100% returned success and changed nothing. Extend was no
 // substitute: it adds a new tapered section on top rather than re-sloping the
@@ -65,7 +65,7 @@ TEST(ScaleFaceRange, PinchBelow100Shrinks) {
 }
 
 // THE REPORT: >100% must now GROW the body, with the side walls flaring out
-// from the base — not silently do nothing.
+// from the base - not silently do nothing.
 TEST(ScaleFaceRange, PinchAbove100Grows) {
     Boxed f;
     ScaleFaceOp op;
@@ -78,7 +78,7 @@ TEST(ScaleFaceRange, PinchAbove100Grows) {
     const double v = volumeOf(f.doc.getBody(f.bodyId));
     std::printf("  pinch 150%%: %.1f -> %.1f\n", f.vol0, v);
     EXPECT_GT(v, f.vol0 + 1e-6)
-        << "pinch past 100% did nothing — the Common/Fuse switch regressed";
+        << "pinch past 100% did nothing - the Common/Fuse switch regressed";
 
     // ...and grew into the RIGHT shape, not just "bigger". A 20mm box whose
     // top face goes to 150% is a frustum 20 wide at the base, 30 at the top:

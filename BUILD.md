@@ -2,7 +2,7 @@
 
 One repo, four targets. The windowing/input backend is SDL2 on every platform;
 the touch interface is a **runtime setting** (Settings ▸ General ▸ Touch mode,
-default on for Android, off on desktop) — not a separate build.
+default on for Android, off on desktop) - not a separate build.
 
 ## Linux (desktop)
 
@@ -60,10 +60,10 @@ cmake --build build -j$(sysctl -n hw.ncpu)
 Needs the Xcode Command Line Tools (`xcode-select --install`) for AppleClang.
 GLM and Dear ImGui are fetched by CMake; OpenCASCADE comes from Homebrew,
 and curl + zlib from the macOS SDK. The GL backend uses the system OpenGL
-framework (`<OpenGL/gl3.h>`) — no GLEW loader — with a forward-compatible **3.3
+framework (`<OpenGL/gl3.h>`) - no GLEW loader - with a forward-compatible **3.3
 Core** context running the same GLSL 330 shaders as the other desktop targets.
 
-Tested on arm64 (Apple Silicon), including HiDPI/Retina — the offscreen 3D
+Tested on arm64 (Apple Silicon), including HiDPI/Retina - the offscreen 3D
 viewport renders at the display's pixel resolution.
 
 A self-contained `Materializr.app` + `.dmg` is built by
@@ -76,7 +76,7 @@ quarantined, so the first launch needs **System Settings ▸ Privacy & Security 
 `xattr -dr com.apple.quarantine Materializr.app`.
 
 The bundled dylibs are built for the macOS they were compiled on, so a
-locally built `.dmg` requires that macOS or newer — the script writes the true
+locally built `.dmg` requires that macOS or newer - the script writes the true
 floor into `LSMinimumSystemVersion`. CI builds on the latest macOS runner with
 SDL2 source-built at `MACOSX_DEPLOYMENT_TARGET=14.0`, so the released `.dmg`
 targets **macOS 14+**; it is built, the bundle is launch-tested,
@@ -85,7 +85,7 @@ Not yet wired up: Intel/universal binaries and Developer-ID signing/notarization
 
 ## FreeBSD (desktop, unofficial)
 
-Not part of CI or the release matrix — no official FreeBSD binaries are
+Not part of CI or the release matrix - no official FreeBSD binaries are
 published, just a community build path. Builds clean on FreeBSD 15 with
 system packages:
 
@@ -104,10 +104,10 @@ Three portability gaps had to be closed to get a clean build here, all fixed
 in-tree (nothing FreeBSD-specific needed at the command line beyond the
 `pkg install` above):
 - OpenCASCADE detection now also takes the clean `find_package(OpenCASCADE
-  CONFIG REQUIRED)` path on FreeBSD — previously only Windows/macOS did;
+  CONFIG REQUIRED)` path on FreeBSD - previously only Windows/macOS did;
   Linux assumed a Debian `/usr/lib/<multiarch>` layout that doesn't exist here,
   since the port installs its CMake config under `/usr/local` like Homebrew.
-- `std::thread` needs `Threads::Threads` linked explicitly — implicit via
+- `std::thread` needs `Threads::Threads` linked explicitly - implicit via
   glibc on Linux, not on FreeBSD's libthr.
 - Bundled-font path resolution (`Application::resolveBundledFont`) gained a
   `sysctl(KERN_PROC_PATHNAME)` branch alongside the Linux `/proc/self/exe`
@@ -130,14 +130,14 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 Native prerequisites land under `$MATERIALIZR_WORK` (default `~/Android`);
 the OCCT `.so` set is staged into `android/app/src/main/jniLibs/` (not
-committed — everything builds from pinned upstream source).
+committed - everything builds from pinned upstream source).
 
 ## Layout notes
 
 - `src/` is shared by all targets. Platform code is guarded with
   `#if defined(__ANDROID__)`; touch *behaviour* gates on
   `materializr::touchMode()` (see `src/touch_mode.h`) so a tablet with a
-  mouse — or a desktop touchscreen — can switch interaction models at runtime.
+  mouse - or a desktop touchscreen - can switch interaction models at runtime.
 - `src/main.cpp` is the desktop entry; `src/android_main.cpp` (SDL_main) is
   Android's. Each build includes only its own.
 - `android/` is self-contained (Gradle project, vendored SDL Java glue with a

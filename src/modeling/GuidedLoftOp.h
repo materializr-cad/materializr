@@ -12,7 +12,7 @@
 // its centroid so it passes through the rail points, and the resulting stack
 // of generated sections is skinned with ThruSections (with a point apex when
 // the rails converge). This is the "pyramid with rounded sides" case a plain
-// section loft can't express — a plain loft treats every sketch as a
+// section loft can't express - a plain loft treats every sketch as a
 // cross-section in sequence, so perpendicular "wall" profiles weave through
 // themselves.
 //

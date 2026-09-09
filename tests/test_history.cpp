@@ -225,7 +225,7 @@ TEST(HistoryTest, UndoRedoSkipDisabledSteps) {
     ASSERT_EQ(doc.bodyCount(), 3);
     ASSERT_EQ(history.currentStep(), 2);
 
-    // Disable the TIP step (2) and rebuild — replayAll re-executes only 0 and 1,
+    // Disable the TIP step (2) and rebuild - replayAll re-executes only 0 and 1,
     // but lands currentIndex on the (disabled) tip at index 2.
     const_cast<Operation*>(history.getStep(2))->setEnabled(false);
     history.replayAll(doc);

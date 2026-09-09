@@ -1,7 +1,7 @@
 // Deadline guard for OCCT's uninterruptible fillet builder.
 //
-// BRepFilletAPI_MakeFillet::Build() cannot be cancelled — it delegates to
-// ChFi3d_Builder::Compute(), which takes no Message_ProgressRange — so a radius
+// BRepFilletAPI_MakeFillet::Build() cannot be cancelled - it delegates to
+// ChFi3d_Builder::Compute(), which takes no Message_ProgressRange - so a radius
 // OCCT cannot resolve wedges the calling thread forever. Observed live: the
 // render loop spun at 100% CPU inside ChFi3d_Builder::StoreData with no
 // progress, and the app had to be killed. probe() exists so the synchronous
@@ -96,7 +96,7 @@ TEST(FilletProbe, ZeroBudgetGivesUpImmediately) {
 }
 
 // An interactive preview re-asks the identical question every frame. Without
-// memoisation the guard would double every fillet's cost forever — the probe
+// memoisation the guard would double every fillet's cost forever - the probe
 // must answer a repeat query from cache, not by rebuilding.
 //
 // Asserted by RUN COUNT. Timing cannot tell a cache hit from a fast build: a
@@ -117,7 +117,7 @@ TEST(FilletProbe, RepeatQueryIsMemoised) {
         << "repeat query ran a second build instead of using the cache";
 }
 
-// The budget is a user setting, so it must actually take effect — and be
+// The budget is a user setting, so it must actually take effect - and be
 // clamped, since a zero or negative value would turn every fillet into an
 // instant refusal and a huge one would restore the freeze it exists to stop.
 TEST(FilletProbe, BudgetIsConfigurableAndClamped) {
@@ -130,7 +130,7 @@ TEST(FilletProbe, BudgetIsConfigurableAndClamped) {
     materializr::fillet::setProbeBudget(0.01);
     EXPECT_DOUBLE_EQ(0.25, materializr::fillet::probeBudget());
 
-    // Above the ceiling clamps down — 10 minutes is indistinguishable from the
+    // Above the ceiling clamps down - 10 minutes is indistinguishable from the
     // hang this guards against.
     materializr::fillet::setProbeBudget(600.0);
     EXPECT_DOUBLE_EQ(30.0, materializr::fillet::probeBudget());
@@ -147,7 +147,7 @@ TEST(FilletProbe, BudgetIsConfigurableAndClamped) {
 }
 
 // Changing the budget must drop cached verdicts. A refusal reached under a
-// tight budget means only "not in that long" — if it survived a budget increase
+// tight budget means only "not in that long" - if it survived a budget increase
 // the setting would look inert on exactly the fillets it was raised for.
 TEST(FilletProbe, ChangingBudgetInvalidatesCache) {
     const double original = materializr::fillet::probeBudget();
@@ -161,7 +161,7 @@ TEST(FilletProbe, ChangingBudgetInvalidatesCache) {
     EXPECT_FALSE(materializr::fillet::probe(s, edges, 2.0, 0.0));
 
     // With room to work, the SAME fillet must come back buildable. A stale
-    // cache — or a key that ignored the budget — would return false here.
+    // cache - or a key that ignored the budget - would return false here.
     materializr::fillet::setProbeBudget(5.0);
     EXPECT_TRUE(materializr::fillet::probe(s, edges, 2.0));
 
@@ -214,7 +214,7 @@ TEST(FilletProbe, DistinctEdgesAreDistinctCacheEntries) {
 
 // The cache pins the TShape each verdict was keyed on. Without that pin a freed
 // shape's address could be reused by unrelated geometry and serve a stale
-// "converges" for it — waving through exactly the build this guard exists to
+// "converges" for it - waving through exactly the build this guard exists to
 // refuse. Probing many short-lived shapes must stay correct, and must not grow
 // without bound.
 TEST(FilletProbe, ManyShortLivedShapesStayCorrectAndBounded) {

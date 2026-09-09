@@ -10,7 +10,7 @@
 
 // File → Import → SVG. Drops the artwork as a NEW sketch on the ground
 // plane at its natural size (clamped to something sane), centred on the
-// origin — the quick "get my logo into the project" path. For interactive
+// origin - the quick "get my logo into the project" path. For interactive
 // placement (click-to-position, width, rotation, live ghost preview), the
 // sketch toolbar's "Import SVG" tool is the richer flow; it needs the
 // active SketchTool, which plugins deliberately can't reach.
@@ -25,7 +25,7 @@ REGISTER_PLUGIN(SvgImport, [](materializr::PluginContext& ctx) {
                     if (!materializr::SvgImport::load(path, svg)) return;
 
                     // Ground plane in the USER's axis convention (Z up):
-                    // world XZ with +Y normal — the same plane the ground
+                    // world XZ with +Y normal - the same plane the ground
                     // sketch button uses.
                     auto sk = std::make_shared<materializr::Sketch>();
                     sk->setPlane(gp_Pln(gp_Ax3(gp_Pnt(0, 0, 0),

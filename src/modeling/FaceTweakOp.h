@@ -15,8 +15,8 @@
 // Deliberately separate from MoveFaceOp rather than a mode of it. The two answer
 // the same gesture with different geometry: MoveFaceOp shears the whole body
 // through a GTransform, this rebuilds only the faces meeting the one that moved.
-// Neither is a bug version of the other — a designer tapering a part wants the
-// shear, a designer nudging a boss upright wants the rebuild — so they stay two
+// Neither is a bug version of the other - a designer tapering a part wants the
+// shear, a designer nudging a boss upright wants the rebuild - so they stay two
 // steps in the timeline, each replaying as what the user chose.
 class FaceTweakOp : public Operation {
 public:
@@ -26,7 +26,7 @@ public:
     void setBody(int id) { m_bodyId = id; }
     void setFace(const TopoDS_Face& f) { m_face = f; }
     // Any rigid transform that leaves the face planar. An in-plane slide is
-    // refused as NoChange — see FaceTweak.h; that is geometry, not a gap.
+    // refused as NoChange - see FaceTweak.h; that is geometry, not a gap.
     void setTransform(const gp_Trsf& t) { m_xf = t; }
 
     int getBodyId() const { return m_bodyId; }
@@ -52,7 +52,7 @@ public:
 private:
     // Normal + centroid of the picked face, so a replay onto a rebuilt body can
     // find it again. Same scheme ShellOp and MergeFacesOp use for their picked
-    // faces — a face on a primitive or an imported body has no sketch feature
+    // faces - a face on a primitive or an imported body has no sketch feature
     // to name it by, which is what FaceAnchor would need.
     void captureAnchor();
     TopoDS_Face rebind(const TopoDS_Shape& base) const;

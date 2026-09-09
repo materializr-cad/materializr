@@ -1,4 +1,4 @@
-<!-- Thanks for contributing! Keep PRs focused — one logical change per PR. -->
+<!-- Thanks for contributing! Keep PRs focused - one logical change per PR. -->
 
 ## What this does
 
@@ -11,7 +11,7 @@
 ## Checklist
 
 - [ ] Builds on desktop (`cmake --build build-desktop`) and tests pass (`ctest`)
-- [ ] If it touches Android, it builds there too — and desktop behavior is unchanged
+- [ ] If it touches Android, it builds there too - and desktop behavior is unchanged
 - [ ] New user-facing **features live in a plugin** (`src/plugins/`), not bolted into core
 - [ ] Touch-specific behavior is gated on `materializr::touchMode()`, not `#if __ANDROID__`
 - [ ] Code matches the style of the surrounding files

@@ -1,6 +1,6 @@
 // De-risk probe for a "Twist Face" op: does BRepOffsetAPI_ThruSections (the
 // same ruled loft Move Face already uses) produce a genuine TWIST when the top
-// wire is a copy of the base rotated about the face normal — or does OCCT
+// wire is a copy of the base rotated about the face normal - or does OCCT
 // re-align the wires to minimise twist and hand back an untwisted solid?
 //
 // Mirrors MoveFaceOp::execute's loft exactly: reversed base outer wire + the
@@ -144,7 +144,7 @@ void tryTwist(const char* label, const TopoDS_Wire& baseWire,
 int main() {
     std::printf("=== Twist-face feasibility: ruled ThruSections base->rotated-top ===\n");
 
-    // SQUARE 10x10 (90-deg symmetric — a re-align to nearest corner shows up as
+    // SQUARE 10x10 (90-deg symmetric - a re-align to nearest corner shows up as
     // the twist wrapping toward 0 past 45 deg).
     std::printf("\nSquare 10x10 (centroid 5,5):\n");
     TopoDS_Wire sqBase = rectWire(5, 5, 5, 5, 0);
@@ -152,7 +152,7 @@ int main() {
     for (double d : {5.0, 15.0, 30.0, 45.0, 60.0, 80.0})
         tryTwist("square", sqBase, sqTop, 5, 5, d);
 
-    // RECTANGLE 10x6 (no 90-deg symmetry — correspondence errors are obvious;
+    // RECTANGLE 10x6 (no 90-deg symmetry - correspondence errors are obvious;
     // only 180-deg symmetric, so meaningful twist range is < ~90 deg anyway).
     std::printf("\nRectangle 10x6 (centroid 5,3):\n");
     TopoDS_Wire rcBase = rectWire(5, 3, 5, 3, 0);

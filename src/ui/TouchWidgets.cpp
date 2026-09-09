@@ -20,11 +20,11 @@ namespace touchui {
 namespace {
 
 // Icon drawn centered in a rect at an arbitrary size (the atlas glyph is
-// bitmap-scaled; fine at the small deltas we use — revisit if soft).
+// bitmap-scaled; fine at the small deltas we use - revisit if soft).
 void drawIconCentered(ImDrawList* dl, const ImVec2& center, float size,
                       const char* icon, ImU32 col) {
     // MZ_ICON_PRIMITIVE sentinel (U+E001): a square overlapping a larger
-    // circle (the CAD-sketch look — square top-left, circle through its
+    // circle (the CAD-sketch look - square top-left, circle through its
     // bottom-right corner). No Iconoir glyph reads as "basic solids".
     if (std::strcmp(icon, "\xee\x80\x81") == 0) {
         const float th = std::max(1.5f, size * 0.075f);
@@ -38,7 +38,7 @@ void drawIconCentered(ImDrawList* dl, const ImVec2& center, float size,
         return;
     }
     // MZ_ICON_CHAMFER sentinel (U+E000): Iconoir has no straight-corner-cut
-    // glyph, so draw one — a square outline with its top-right corner
+    // glyph, so draw one - a square outline with its top-right corner
     // chamfered off. Matches Iconoir's 1.5px-at-24px stroke look.
     if (std::strcmp(icon, "\xee\x80\x80") == 0) {
         const float h = size * 0.40f;          // half side
@@ -55,7 +55,7 @@ void drawIconCentered(ImDrawList* dl, const ImVec2& center, float size,
         return;
     }
     // MZ_ICON_UNFOLD sentinel (U+E002): a cube-unfold "Latin cross" of unit
-    // squares — the flat-pattern look. (Iconoir's ruler-combine glyph didn't
+    // squares - the flat-pattern look. (Iconoir's ruler-combine glyph didn't
     // read as "unfold".)
     if (std::strcmp(icon, "\xee\x80\x82") == 0) {
         const float cell = size * 0.22f;
@@ -82,7 +82,7 @@ void drawIconCentered(ImDrawList* dl, const ImVec2& center, float size,
         return;
     }
     // MZ_ICON_PATTERN_CIRCULAR sentinel (U+E004): three squares spaced around a
-    // centre (120° apart, one at the bottom) — the radial-pattern look.
+    // centre (120° apart, one at the bottom) - the radial-pattern look.
     if (std::strcmp(icon, "\xee\x80\x84") == 0) {
         const float hs = size * 0.12f;                 // square half-side
         const float r  = size * 0.30f;                 // ring radius
@@ -98,7 +98,7 @@ void drawIconCentered(ImDrawList* dl, const ImVec2& center, float size,
         return;
     }
     // MZ_ICON_THREAD sentinel (U+E005): a side-on flat-head screw with a
-    // threaded shaft tapering to a point — reads as "cut threads", where the
+    // threaded shaft tapering to a point - reads as "cut threads", where the
     // old refresh-arrows glyph read as "reload".
     if (std::strcmp(icon, "\xee\x80\x85") == 0) {
         const float th   = std::max(1.5f, size * 0.075f);
@@ -126,7 +126,7 @@ void drawIconCentered(ImDrawList* dl, const ImVec2& center, float size,
         }
         return;
     }
-    // MZ_ICON_OFFSET sentinel (U+E006): two nested rounded rectangles — a
+    // MZ_ICON_OFFSET sentinel (U+E006): two nested rounded rectangles - a
     // shape and its parallel copy. Iconoir's expand/frame glyphs all read as
     // "resize", which is the one thing an offset is not.
     if (std::strcmp(icon, "\xee\x80\x86") == 0) {
@@ -395,7 +395,7 @@ bool timelineBox(const char* id, const char* icon, bool current, bool editing,
 
     const bool hasLabel = label && label[0];
     // History steps stack the label UNDER a slightly smaller icon, in a slightly
-    // smaller font, with tight side padding — so a long run of named steps stays
+    // smaller font, with tight side padding - so a long run of named steps stays
     // compact. These metrics are private to this widget (the timeline is its
     // only caller), so nothing else is affected.
     const float iconSz   = 18.0f * s;                     // ~2px smaller
@@ -454,7 +454,7 @@ void valueReadout(const char* id, const char* text, bool dim, float width) {
     const float s = uiScale();
     if (width <= 0.0f) width = numberPadWidth();
     const float h = 52.0f * s;
-    const float ts = 26.0f * s;   // ~2x body text — the value is the point
+    const float ts = 26.0f * s;   // ~2x body text - the value is the point
 
     ImGui::PushID(id);
     const ImVec2 p = ImGui::GetCursorScreenPos();
@@ -482,7 +482,7 @@ bool numberPad(const char* id, char* buf, size_t bufSize, float keyW,
     ImGui::PushID(id);
     // Nudge the glyphs UP a couple of px. ImGui centres a button label on the
     // full frame height, which reads as sitting low once the keys are short
-    // and wide — the digit ends up optically below the middle of the key.
+    // and wide - the digit ends up optically below the middle of the key.
     ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.5f, 0.40f));
     static const char kRows[4][4] = {"789", "456", "123", ".0<"};
     for (int r = 0; r < 4; ++r) {
@@ -538,7 +538,7 @@ bool amountField(const char* id, const char* label, double* v,
         else                   ImGui::TextUnformatted(label);
     }
 
-    // Native keyboard field (tap to focus) — replaces the in-app number pad on
+    // Native keyboard field (tap to focus) - replaces the in-app number pad on
     // the face-op panels (push/pull, extrude, fillet, chamfer). FIXED item
     // width so the field can't grow off-screen as digits are typed; the text
     // scrolls inside it instead.
@@ -593,7 +593,7 @@ bool numberField(const char* id, const char* label, double* v, const char* fmt,
     // The well doubles as the readout: while unfolded it shows the LIVE typed
     // buffer, not the stored value. A separate calculator-style readout above
     // the keys cost ~50*s of height and pushed the digits being typed out of
-    // view whenever the panel had to scroll to reach the keys — the field
+    // view whenever the panel had to scroll to reach the keys - the field
     // itself is the obvious place to show them, and it's already on screen.
     const bool hintState = hint && *v <= 0.0;   // empty-is-meaningful fields
     char shown[64];
@@ -608,7 +608,7 @@ bool numberField(const char* id, const char* label, double* v, const char* fmt,
     }
 
     // Fit the pad to the panel rather than the other way round. A fixed key
-    // width wider than the host panel doesn't just overflow — the well is
+    // width wider than the host panel doesn't just overflow - the well is
     // sized to match it, and ImGui centres a button's label, so the label
     // lands outside the clip rect and the field renders BLANK.
     //
@@ -621,14 +621,14 @@ bool numberField(const char* id, const char* label, double* v, const char* fmt,
                                  78.0f * s);
     // 24, not the 42 this started at. The pad lives in a scrolling properties
     // column under as many as six other fields, so every unit of key HEIGHT is
-    // a unit the caller has to scroll past — and a number pad is the one
+    // a unit the caller has to scroll past - and a number pad is the one
     // keyboard where nobody needs a big target per key, because the keys are
     // huge in the width axis and there are only twelve of them. Still ~48px on
     // a tablet (uiScale ~2), comfortably above the 44pt touch-target floor.
     const float keyH  = 24.0f * s;
     const float padW  = numberPadWidth(keyW);
 
-    // A plain button, so the pad unfolds on an explicit tap and NOTHING else —
+    // A plain button, so the pad unfolds on an explicit tap and NOTHING else -
     // the old keyboard's habit of appearing whenever a dialog opened is the
     // specific behaviour this must not repeat.
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f * s, 6.0f * s));
@@ -655,7 +655,7 @@ bool numberField(const char* id, const char* label, double* v, const char* fmt,
     // Park the well at the TOP of the view on the frame after it unfolds, so
     // the whole pad has the panel's height below it. Scrolling the pad's
     // BOTTOM into view instead (the obvious reading of "keep it visible")
-    // pushes the well — and so the digits being typed — off the top.
+    // pushes the well - and so the digits being typed - off the top.
     if (openHere && s_justOpened == key) {
         ImGui::SetScrollHereY(0.0f);
         s_justOpened = 0;
@@ -686,7 +686,7 @@ bool numberField(const char* id, const char* label, double* v, const char* fmt,
         }
         ImGui::SameLine(0.0f, gap);
         // Enter commits. Parsing here rather than per keystroke is what makes
-        // the caller see one change instead of one per digit — a history-step
+        // the caller see one change instead of one per digit - a history-step
         // editor rebuilds once on commit, not on every tap.
         if (ImGui::Button(materializr::tr("Enter"), ImVec2(thirdW, keyH))) {
             char* end = nullptr;
@@ -724,7 +724,7 @@ bool treeGroup(const char* id, const char* label, int count, bool open,
     const ImVec2 p = ImGui::GetCursorScreenPos();
     ImDrawList* dl = ImGui::GetWindowDrawList();
 
-    // Trailing action pill (e.g. "+ Folder") — its own exclusive hit area on
+    // Trailing action pill (e.g. "+ Folder") - its own exclusive hit area on
     // the right, submitted BEFORE the group toggle so the toggle (which then
     // covers only the remaining width) can't swallow its taps. Same lesson as
     // treeLeaf's eye button.
@@ -798,11 +798,11 @@ TreeLeafAction treeLeaf(const char* id, const char* icon, const char* label,
 
     // Claim the whole row rect up front. The internals below are placed with
     // SetCursorScreenPos, and ImGui flags any such jump past the window's
-    // current content max ("uses SetCursorPos to extend window boundaries —
-    // submit an item e.g. Dummy()") — which, unfixed, fired every frame for
+    // current content max ("uses SetCursorPos to extend window boundaries -
+    // submit an item e.g. Dummy()") - which, unfixed, fired every frame for
     // the im-touch Bodies tree (##LiteTree). Same lesson as listRow: claim the
     // rect with a Dummy, and derive the row bottom the way ItemSize() does
-    // (post-Dummy cursor minus spacing) rather than the raw p.y + h — at a
+    // (post-Dummy cursor minus spacing) rather than the raw p.y + h - at a
     // fractional uiScale ImGui truncates the item advance to whole pixels, so
     // p.y + h overshoots the claimed max by the fraction and trips the warning
     // on every row. The max() guards the first auto-resize frame where the
@@ -811,7 +811,7 @@ TreeLeafAction treeLeaf(const char* id, const char* icon, const char* label,
     const float rowBottom =
         ImGui::GetCursorScreenPos().y - ImGui::GetStyle().ItemSpacing.y;
 
-    // Eye first — its own exclusive hit area (a row button submitted before
+    // Eye first - its own exclusive hit area (a row button submitted before
     // it would swallow the taps; same lesson as listRow's checkbox).
     ImGui::SetCursorScreenPos(ImVec2(p.x + indent, p.y));
     if (ImGui::InvisibleButton("##eye", ImVec2(eyeW, h))) {
@@ -819,7 +819,7 @@ TreeLeafAction treeLeaf(const char* id, const char* icon, const char* label,
     }
     const bool eyeHov = ImGui::IsItemHovered();
 
-    // Colour swatch (right edge) — also its own exclusive hit area, submitted
+    // Colour swatch (right edge) - also its own exclusive hit area, submitted
     // before the row so a swatch tap doesn't select the row.
     if (swatchRGB) {
         ImGui::SetCursorScreenPos(ImVec2(p.x + w - swW, p.y));
@@ -827,7 +827,7 @@ TreeLeafAction treeLeaf(const char* id, const char* icon, const char* label,
             act.swatchClicked = true;
     }
 
-    // Row body (select) — the middle, between the eye and the swatch.
+    // Row body (select) - the middle, between the eye and the swatch.
     ImGui::SetCursorScreenPos(ImVec2(p.x + indent + eyeW, p.y));
     act.clicked = ImGui::InvisibleButton(
         "##row", ImVec2(std::max(1.0f, w - indent - eyeW - swW), h));
@@ -837,7 +837,7 @@ TreeLeafAction treeLeaf(const char* id, const char* icon, const char* label,
     const float fillR = p.x + w - swW;   // fills stop short of the swatch
     if (selected) {
         ImVec4 selBg = accentFill();
-        selBg.w = 0.30f;   // soft fill — the tree stays see-through
+        selBg.w = 0.30f;   // soft fill - the tree stays see-through
         dl->AddRectFilled(ImVec2(p.x + indent, p.y), ImVec2(fillR, p.y + h),
                           ImGui::GetColorU32(selBg), radius(6.0f * s));
     } else if (rowHov) {
@@ -899,15 +899,15 @@ ListRowAction listRow(const char* id, bool* checked, const char* label,
     // Claim the WHOLE row rect first. The internals below are placed with
     // SetCursorScreenPos, and ImGui flags any such jump past the window's
     // current content max at the next item ("uses SetCursorPos to extend
-    // window boundaries — submit an item e.g. Dummy()"). With the row rect
+    // window boundaries - submit an item e.g. Dummy()"). With the row rect
     // claimed up front, every internal placement stays within bounds. The
     // max() guards the FIRST frame of an auto-resize host, where the content
-    // region reports ~0 wide — claim at least the internals' extent or the
+    // region reports ~0 wide - claim at least the internals' extent or the
     // checkbox placement still lands out of bounds (and the warning banner
     // it trips sticks for the whole session).
     ImGui::Dummy(ImVec2(std::max(w, lead + ovW + 1.0f), h));
     // ImGui TRUNCATES item advances to whole pixels, so the claimed row
-    // bottom is trunc-based — recompute it exactly the way ItemSize() does
+    // bottom is trunc-based - recompute it exactly the way ItemSize() does
     // (post-Dummy cursor minus spacing) instead of the raw p.y + h, which at
     // a fractional uiScale overshoots the claim by the fraction and trips
     // the boundary warning on EVERY row (found via instrumented logcat:
@@ -915,7 +915,7 @@ ListRowAction listRow(const char* id, bool* checked, const char* label,
     const float rowBottom =
         ImGui::GetCursorScreenPos().y - ImGui::GetStyle().ItemSpacing.y;
 
-    // Checkbox (visibility) FIRST, with its own exclusive hit area — a row
+    // Checkbox (visibility) FIRST, with its own exclusive hit area - a row
     // button submitted before it would claim its clicks (ImGui gives the
     // press to the first hovered item), leaving the checkbox untappable.
     bool chkHov = false;
@@ -929,7 +929,7 @@ ListRowAction listRow(const char* id, bool* checked, const char* label,
         chkHov = ImGui::IsItemHovered();
     }
 
-    // Row body (select) — from after the checkbox to before the trailing ⋯,
+    // Row body (select) - from after the checkbox to before the trailing ⋯,
     // so the three hit areas never overlap.
     ImGui::SetCursorScreenPos(ImVec2(p.x + lead, p.y));
     act.clicked = ImGui::InvisibleButton(

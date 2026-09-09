@@ -44,7 +44,7 @@ struct SketchEditedEvent {
 };
 
 // Fired when Document::removeBody actually erases a body. The renderer
-// listens so it can drop the body's mesh + edge slots IMMEDIATELY — without
+// listens so it can drop the body's mesh + edge slots IMMEDIATELY - without
 // this, a preview-undo during a push/pull drag leaves the previous prism's
 // mesh in the ShapeRenderer until something else triggers a full rebuild,
 // producing the "banding" effect of N overlapping prism previews drawn on
@@ -70,7 +70,7 @@ struct PlaneChangedEvent {
     int planeId = -1;
 };
 
-// Construction-axis lifecycle. Same pattern as planes — the plugin that
+// Construction-axis lifecycle. Same pattern as planes - the plugin that
 // owns the axis renderer subscribes to all three and re-syncs its draw list.
 struct AxisAddedEvent {
     int axisId = -1;
@@ -84,7 +84,7 @@ struct AxisChangedEvent {
     int axisId = -1;
 };
 
-// The ACTIVE DOCUMENT was swapped underneath everything — a different tab is
+// The ACTIVE DOCUMENT was swapped underneath everything - a different tab is
 // now in front (or a project was loaded into this one). Anything holding
 // state DERIVED from the document must rebuild: unlike Plane/Axis/Body
 // events, nothing about the old document changed, so no other event fires.

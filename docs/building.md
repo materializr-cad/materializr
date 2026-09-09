@@ -1,7 +1,7 @@
 # Building from Source
 
 The released binaries (AppImage / Windows zip / installer) are produced by CI
-from this same source — see `.github/workflows/windows.yml` and
+from this same source - see `.github/workflows/windows.yml` and
 `scripts/build-appimage.sh`. The instructions below cover building locally
 when you want to hack on the code.
 

@@ -22,18 +22,18 @@ public:
     // Diff the before/after snapshots so the project save can persist what
     // this step changed. Without this every snapshot op (revolve-rotate,
     // multi-body transform bundles, reloaded steps on re-save) wrote an EMPTY
-    // diff — the step reloaded as a no-op and undoing it silently skipped to
+    // diff - the step reloaded as a no-op and undoing it silently skipped to
     // the previous step.
     OperationDiff captureDiff() const override;
     std::string name() const override { return m_name; }
     std::string description() const override { return m_description; }
     void renderProperties() override;
     std::string typeId() const override { return m_typeId; }
-    // Only reloaded (project-restored) instances should report as such — fresh
+    // Only reloaded (project-restored) instances should report as such - fresh
     // in-session batch ops (e.g. multi-body Move/Rotate/Scale) use the same
     // snapshot machinery but should not be marked "(reloaded; not editable)".
     bool isReloaded() const override { return m_fromReload; }
-    // Warn (amber banner) only when a reloaded step actually shaped a body —
+    // Warn (amber banner) only when a reloaded step actually shaped a body -
     // it carries before/after body snapshots. A sketch-only reloaded step
     // (e.g. a sketchedit whose params were lost) has EMPTY body states: it's
     // inert history, not a frozen feature, so it must not trigger the warning.
@@ -55,7 +55,7 @@ public:
 
 private:
     // Apply only the body changes between two snapshots (created/modified/
-    // deleted), leaving bodies that ride along unchanged alone — so replaying a
+    // deleted), leaving bodies that ride along unchanged alone - so replaying a
     // reloaded step doesn't reset edits made to an upstream step's bodies.
     static void applyDelta(Document& doc, const BodyState& from,
                            const BodyState& to);

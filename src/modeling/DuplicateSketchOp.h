@@ -8,14 +8,14 @@
 // Duplicate a sketch into an independent copy. The copy gets its own document
 // id and its own geometry (a deep copy of the source), so editing it never
 // touches the original or any body built from it. This is how you make a
-// same-layout / different-detail variant — e.g. a box whose holes are sized for
+// same-layout / different-detail variant - e.g. a box whose holes are sized for
 // heat-set inserts, then a lid from a copy of the same sketch with smaller
 // screw-clearance holes.
 //
 // The duplicated sketch is a first-class sketch: it is saved in the project's
 // sketch list and reloads like any other, so the feature works end-to-end even
 // if this history step bakes. execute() adds it (allocating an id the first
-// time, re-using the same id on redo); undo() removes it cleanly — no stranded
+// time, re-using the same id on redo); undo() removes it cleanly - no stranded
 // empty husk, unlike emptying a SketchEditOp snapshot. m_sketchCopy keeps the
 // geometry alive across an undo so redo can re-insert it.
 class DuplicateSketchOp : public Operation {

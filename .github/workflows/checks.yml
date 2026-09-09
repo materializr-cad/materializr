@@ -1,0 +1,58 @@
+name: Checks
+
+# The two repo hygiene gates, which until now existed as scripts nobody ran.
+# Both are pure Python with no dependencies, so this job is seconds, not
+# minutes - it is deliberately separate from the three build workflows so a
+# style failure reports in under a minute instead of behind a Windows build.
+#
+# NOTE the missing paths-ignore. The build workflows skip '**.md' and 'docs/**'
+# because documentation cannot break a compile. It can break these: docs and
+# markdown are exactly where em-dashes accumulate, and docs/units-audit.md is
+# the file the second gate compares against. Skipping those paths here would
+# make the gate blind to most of what it is for.
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    name: Repo gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Project rule: no em-dashes, use a hyphen. The gate matches BOTH
+      # spellings - the literal character and the six-character escape a C++
+      # string uses for the same three bytes. That second form is why four
+      # hand sweeps in a row missed 54 user-facing strings: no search for the
+      # literal character can see a single one of them.
+      - name: No em-dashes
+        run: python3 tools/no_em_dashes.py
+
+      # An OCCT boolean performed twice for one result. The two-shape
+      # constructor of BRepAlgoAPI_Cut/Fuse/Common already builds, so a
+      # trailing Build() runs the whole boolean a second time and throws the
+      # first result away. It reads as correct code, which is how thirty-one
+      # sites drifted into it unreviewed.
+      - name: No double-built booleans
+        run: |
+          python3 tools/no_double_build.py --selftest
+          python3 tools/no_double_build.py
+
+      # The display-units inventory. Two failures to catch, and they are
+      # different: unclassified rows mean real unconverted work exists, while
+      # a diff against the committed file means someone changed a length site
+      # without regenerating - so the doc everyone reviews against is stale.
+      # Regenerating and then diffing catches both in one step.
+      - name: Units audit is complete and current
+        run: |
+          python3 tools/units_audit.py
+          git diff --exit-code docs/units-audit.md docs/units-audit-allow.txt

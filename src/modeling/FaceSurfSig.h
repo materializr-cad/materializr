@@ -5,7 +5,7 @@
 // needs to tell the faces an op CREATED from the faces it merely re-trimmed.
 // Matching by face centroid is wrong: when a new chamfer/fillet trims a corner
 // off an ADJACENT earlier bevel, that face keeps its exact surface but its
-// centroid shifts — so a centroid test flags it as "new" and the hover lights
+// centroid shifts - so a centroid test flags it as "new" and the hover lights
 // up bevels from earlier steps. Comparing the unbounded surface instead, a
 // trimmed face still matches its prev self (same plane/cylinder/…); only a
 // genuinely new blend surface fails to match and is reported as created.
@@ -27,7 +27,7 @@ namespace materializr {
 
 // True if a and b lie on the same unbounded analytic surface (same plane,
 // coaxial+same-radius cylinder, etc.), independent of how each is trimmed.
-// Non-analytic surfaces (B-spline/Bézier) return false — the caller falls
+// Non-analytic surfaces (B-spline/Bézier) return false - the caller falls
 // back to its centroid test for those, preserving prior behaviour.
 inline bool sameSurface(const TopoDS_Face& a, const TopoDS_Face& b,
                         double tolLin = 1e-4, double tolAng = 1e-4) {
@@ -71,7 +71,7 @@ inline bool sameSurface(const TopoDS_Face& a, const TopoDS_Face& b,
                     && axisSame(ta.Axis(), tb.Axis());
             }
             default:
-                return false;  // non-analytic — caller falls back to centroid
+                return false;  // non-analytic - caller falls back to centroid
         }
     } catch (...) { return false; }
 }

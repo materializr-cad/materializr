@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-// Merge coplanar faces back into single faces — the repair half of issue #81.
+// Merge coplanar faces back into single faces - the repair half of issue #81.
 //
 // An imported STEP part usually arrives with flat surfaces already split into
 // several coplanar pieces, and editing it splits more. The pieces read as one
@@ -21,16 +21,16 @@
 //
 // TWO SCOPES, and the difference matters:
 //
-//   * whole body (setBody alone) — conservative. Runs at the same angular
+//   * whole body (setBody alone) - conservative. Runs at the same angular
 //     tolerance as every other unify site, so it only merges faces that are
 //     EXACTLY coplanar. Safe to point at a whole part.
 //
-//   * picked faces (setFaces) — the user asserting "these are one face".
+//   * picked faces (setFaces) - the user asserting "these are one face".
 //     Restricted to the edges BETWEEN the picked faces, so nothing else in the
 //     body can dissolve, and because the scope is bounded it escalates the
 //     angular tolerance up to 1e-2 rad. That matters: measured on the reporting
 //     user's nacelle, all 41 remaining seams were between planes 1e-4..1e-2 rad
-//     apart — not exactly coplanar, so no tolerance safe for a whole body will
+//     apart - not exactly coplanar, so no tolerance safe for a whole body will
 //     ever touch them. Every result is still checked valid and volume-preserving
 //     before it is accepted.
 //
@@ -98,7 +98,7 @@ public:
 
 private:
     // Normal + point per picked face, so a replay onto a rebuilt body can find
-    // the same faces again. Same anchor scheme ShellOp uses for its openings —
+    // the same faces again. Same anchor scheme ShellOp uses for its openings -
     // the picked faces have no stable name of their own on an imported body.
     struct FaceAnchor { gp_Dir normal; gp_Pnt point; };
 

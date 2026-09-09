@@ -2,25 +2,25 @@
 //
 // Found on an imported-and-edited STEP nacelle: shrinking 4mm holes to 3.4mm
 // left a hair-thin tube standing proud of the surface. Dissecting the part
-// showed cylindrical faces at r = 2.010 — a radius nothing in the design
-// produces, but exactly ResizeCylindricalOp's oldR + kRadialPad — bounded by
+// showed cylindrical faces at r = 2.010 - a radius nothing in the design
+// produces, but exactly ResizeCylindricalOp's oldR + kRadialPad - bounded by
 // two planes whose normals were (0,-1,0) and (-0.007,1,0). Antiparallel to
 // within 0.007 rad: ONE flat surface split into two faces 0.4 degrees apart,
 // which is #81 geometry.
 //
 // So the hole's rim sits at two slightly different heights. m_height is a
 // single number (the bore face's V range), the fused ring is built to the full
-// span, and it pokes past the LOWER of the two caps — leaving its own padded
+// span, and it pokes past the LOWER of the two caps - leaving its own padded
 // wall standing in free air. Band height on the part was 0.0140mm; 2.010 *
 // 0.007 = 0.01407. That is the whole bug.
 //
-// The cure is not in ResizeCylindricalOp — it is to stop the cap being two
+// The cure is not in ResizeCylindricalOp - it is to stop the cap being two
 // faces. These pin that: merge the caps first and the shrink comes out clean.
 //
 // Deliberately NOT asserting that the unmerged case still leaves a band. That
 // is today's behaviour, not a contract; if the resize op is ever hardened to
 // handle a split cap directly, this test should keep passing. What it pins is
-// the relationship — merging never makes it worse — plus the absolute promise
+// the relationship - merging never makes it worse - plus the absolute promise
 // that after a merge there is nothing left behind.
 #include <gtest/gtest.h>
 
@@ -72,7 +72,7 @@ int facesAtRadius(const TopoDS_Shape& s, double r, double tol = 1e-4) {
     return n;
 }
 
-// Planar faces pointing up — the cap(s) the bore exits through.
+// Planar faces pointing up - the cap(s) the bore exits through.
 std::vector<TopoDS_Shape> topCaps(const TopoDS_Shape& s) {
     std::vector<TopoDS_Shape> out;
     for (TopExp_Explorer ex(s, TopAbs_FACE); ex.More(); ex.Next()) {
@@ -136,7 +136,7 @@ bool shrinkBore(Document& doc, int id) {
 
 TEST(ShrinkOverSeam, FixtureReallyHasASeam) {
     // If the raw fuse ever starts unifying these two faces on its own, the rest
-    // of this file stops testing anything — so say so loudly here rather than
+    // of this file stops testing anything - so say so loudly here rather than
     // passing vacuously.
     const TopoDS_Shape body = seamBlockWithHole();
     EXPECT_EQ(topCaps(body).size(), 2u);

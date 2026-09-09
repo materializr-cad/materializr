@@ -3,7 +3,7 @@
 //
 // Signature-compatible with ImGui::InputDouble / InputFloat / InputInt on
 // purpose: migrating a panel is a find-replace, not a rewrite. That matters
-// because the alternative — the pattern the im-touch face-op panels use — is
+// because the alternative - the pattern the im-touch face-op panels use - is
 // an ADDITIVE second call per field:
 //
 //     if (stepperRow("taperStep", &m_angle, true, -45, 45)) changed = true;
@@ -15,8 +15,8 @@
 // judgement per field, which is why it reached 19 sites and stopped, while
 // ~107 numeric fields kept raising the OS keyboard on a tablet.
 //
-// NUMERIC ONLY. Anything alphanumeric — Items-panel renames, variable
-// expressions, body names — stays on ImGui::InputText and the native
+// NUMERIC ONLY. Anything alphanumeric - Items-panel renames, variable
+// expressions, body names - stays on ImGui::InputText and the native
 // keyboard, which is the right tool for letters. The one thing to watch when
 // converting a panel is a numeric field wearing a text coat: an InputText
 // carrying ImGuiInputTextFlags_CharsDecimal (e.g. the sketch constraint value
@@ -33,12 +33,12 @@
 
 namespace materializr {
 
-// Returns true when the value changed — per keystroke on desktop (ImGui's
+// Returns true when the value changed - per keystroke on desktop (ImGui's
 // behaviour), once on Enter under the number pad. Callers that only set a
 // dirty flag need no changes; a caller that live-previews every keystroke
 // will preview on commit instead, which on a tablet is the better trade.
 // `flags` exists for the dozen sites that pass EnterReturnsTrue. That flag is
-// already the pad's semantics — it commits on Enter and nowhere else — so the
+// already the pad's semantics - it commits on Enter and nowhere else - so the
 // touch branch ignores it and the desktop branch forwards it unchanged.
 inline bool inputNumber(const char* label, double* v, double step = 0.1,
                         double stepFast = 1.0, const char* fmt = "%g",
@@ -67,7 +67,7 @@ inline bool inputNumberInt(const char* label, int* v, int step = 1,
                            int stepFast = 10) {
     if (!touchMode()) return ImGui::InputInt(label, v, step, stepFast);
     double d = static_cast<double>(*v);
-    // "%.0f" keeps the pad's readout free of a trailing ".000" — the decimal
+    // "%.0f" keeps the pad's readout free of a trailing ".000" - the decimal
     // key still types one, but the commit truncates, same as InputInt.
     if (!touchui::numberField(label, label, &d, "%.0f")) return false;
     *v = static_cast<int>(d);

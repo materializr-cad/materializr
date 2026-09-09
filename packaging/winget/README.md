@@ -2,7 +2,7 @@
 
 Reference copies of the [winget](https://learn.microsoft.com/windows/package-manager/)
 manifests for Materializr. The canonical home is Microsoft's
-[`winget-pkgs`](https://github.com/microsoft/winget-pkgs) repo — these are kept
+[`winget-pkgs`](https://github.com/microsoft/winget-pkgs) repo - these are kept
 here so the packaging steps live with the source (same idea as the F-Droid
 recipe in `metadata/`).
 
@@ -49,7 +49,7 @@ SmartScreen reputation from the download volume.
 
 ## Notes / gotchas
 
-- **Identifier:** `Materializr.Materializr` (`Publisher.Package`, both the brand —
+- **Identifier:** `Materializr.Materializr` (`Publisher.Package`, both the brand -
   the accepted form for a single-product publisher).
 - **Silent install:** `nullsoft` type implies `/S`; the NSIS script installs
   machine-wide to `%ProgramFiles%\Materializr` and needs elevation.
@@ -58,5 +58,5 @@ SmartScreen reputation from the download volume.
   declares that exact value so winget's post-install detection matches. (If you
   later strip the `v` in `windows.yml`, drop it here too.)
 - Microsoft's validation pipeline installs the package in a sandbox VM, so the
-  silent install + Add/Remove-Programs registration must succeed — both are
+  silent install + Add/Remove-Programs registration must succeed - both are
   handled by `packaging/windows/installer.nsi`.

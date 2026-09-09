@@ -6,7 +6,7 @@
 // _Unwind_Backtrace is the portable-ish unwinder that bionic actually ships
 // (Android has no <execinfo.h>/backtrace()); it is also what Android's own
 // libbase uses. glibc has it too, so Linux desktop gets the same treatment.
-// MSVC has neither header, and this is a diagnostic — no-op there rather than
+// MSVC has neither header, and this is a diagnostic - no-op there rather than
 // drag in DbgHelp for a build that has never seen the bug.
 #if defined(__ANDROID__) || defined(__linux__)
 #  define MZR_HAVE_UNWIND 1
@@ -55,7 +55,7 @@ std::string lastThrowTrace() {
     // captureThrowTrace itself, which is never interesting.
     // MODULE+OFFSET, not the raw pc. Two reasons, both learned the hard way:
     // ASLR makes an absolute address meaningless in a later addr2line run, and
-    // dladdr resolves only DYNAMIC symbols — every static / anonymous-namespace
+    // dladdr resolves only DYNAMIC symbols - every static / anonymous-namespace
     // function (i.e. most of this codebase) comes back unnamed, so a
     // symbol-only trace names almost nothing. The offset is exact and always
     // resolvable offline:

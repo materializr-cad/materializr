@@ -117,7 +117,7 @@ void AxisRenderer::render(const glm::mat4& view, const glm::mat4& projection) {
         glm::vec3 up = (std::abs(d.y) < 0.9f) ? glm::vec3(0, 1, 0) : glm::vec3(1, 0, 0);
         glm::vec3 t1 = glm::normalize(glm::cross(d, up));
         glm::vec3 t2 = glm::normalize(glm::cross(d, t1));
-        float m = h * 0.06f; // marker size — proportional to the axis length
+        float m = h * 0.06f; // marker size - proportional to the axis length
         float markVerts[] = {
             (o - t1*m).x, (o - t1*m).y, (o - t1*m).z,
             (o + t1*m).x, (o + t1*m).y, (o + t1*m).z,

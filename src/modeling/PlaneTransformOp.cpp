@@ -111,7 +111,7 @@ bool PlaneTransformOp::deserializeParams(const std::string& blob) {
 }
 
 bool PlaneTransformOp::rehydrateFromReload(const ReloadState&, Document&) {
-    // No body state — the poses in the params are everything. The planes
+    // No body state - the poses in the params are everything. The planes
     // themselves reload with the document; setPlane on a missing id is a
     // safe no-op, so a deleted plane can't break replay.
     return !m_entries.empty();

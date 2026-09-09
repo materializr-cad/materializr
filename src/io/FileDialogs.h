@@ -31,7 +31,7 @@ public:
     // and returns success. On desktop this drives a Save dialog (filters apply,
     // `mime` ignored); on Android it pops a Share / Save-to-device sheet
     // (`title`/`filters` ignored, `mime` used). Keeping the platform branch
-    // here lets plugins call one function with no #if — important because the
+    // here lets plugins call one function with no #if - important because the
     // REGISTER_PLUGIN macro stringifies its argument, and a preprocessor
     // directive inside a macro argument is ill-formed under MSVC.
     static void exportFile(const std::string& title,
@@ -54,7 +54,7 @@ public:
 
     // Desktop file dialogs shell out to zenity / kdialog / qarma / matedialog;
     // if NONE is installed they silently do nothing (a fresh/minimal Linux box
-    // often lacks them). Returns whether a backend exists — always true on
+    // often lacks them). Returns whether a backend exists - always true on
     // Android (SAF). Lets the app warn instead of failing mute.
     static bool dialogsAvailable();
     // Invoked in place of showing a dialog when openFile/saveFile is requested

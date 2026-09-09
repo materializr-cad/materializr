@@ -50,7 +50,7 @@ bool TaperOp::execute(Document& doc) {
         // Mint topo names on the first run, while the stored handles are
         // valid; on later runs, if any handle is no longer a sub-shape of the
         // current body (an upstream edit rebuilt it), resolve the names
-        // instead — otherwise DraftAngle::Add just fails on the stale face.
+        // instead - otherwise DraftAngle::Add just fails on the stale face.
         {
             auto isLive = [&](const TopoDS_Shape& f) {
                 for (TopExp_Explorer ex(m_previousShape, TopAbs_FACE);
@@ -186,7 +186,7 @@ bool TaperOp::deserializeParams(const std::string& blob) {
         size_t end = blob.find(';', eq);
         if (end == std::string::npos) end = blob.size();
         std::string key = blob.substr(pos, eq - pos);
-        // facerefs is a length-prefixed list written last — read to the end.
+        // facerefs is a length-prefixed list written last - read to the end.
         if (key == "facerefs") {
             std::string rest = blob.substr(eq + 1);
             m_faceRefs.clear();

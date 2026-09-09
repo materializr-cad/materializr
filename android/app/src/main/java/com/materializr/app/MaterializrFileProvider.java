@@ -13,7 +13,7 @@ import java.io.FileNotFoundException;
 
 // Minimal content provider so exported files in the app cache can be handed to
 // the system share sheet as content:// URIs (file:// is blocked since Android 7).
-// Self-contained — no AndroidX/support dependency. It only serves read-only files
+// Self-contained - no AndroidX/support dependency. It only serves read-only files
 // out of <cacheDir>/share/, by file name (the URI's last path segment).
 public class MaterializrFileProvider extends ContentProvider {
 

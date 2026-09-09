@@ -5,8 +5,8 @@
 // world axis. The rule was "align X to the face's longest straight edge", and a
 // trapezoid's two longest edges are its diagonals.
 //
-// That rule existed for a reason — a lofted cap's parametric X sits ~45 degrees
-// off its visible edges — so it is not simply reverted. The rule now prefers a
+// That rule existed for a reason - a lofted cap's parametric X sits ~45 degrees
+// off its visible edges - so it is not simply reverted. The rule now prefers a
 // straight edge that agrees with the world frame and falls back to the longest
 // edge, which keeps the loft case working and stops a part rotated deliberately
 // off-axis from being force-aligned.
@@ -58,7 +58,7 @@ TEST(SketchPlaneAxis, SymmetricTaperFollowsTheWorldNotTheDiagonal) {
     const gp_Dir x = sketchPlaneXDirection(f, kUp, kWorldX);
 
     // The diagonals run about 5.7 degrees off vertical and are ~40mm long
-    // against the 4mm top and 12mm bottom — the old longest-edge rule took one
+    // against the 4mm top and 12mm bottom - the old longest-edge rule took one
     // of them. The horizontal ends are the world-aligned pair.
     EXPECT_LT(axisAngleDeg(x, kWorldX), 1.0);
 }
@@ -67,7 +67,7 @@ TEST(SketchPlaneAxis, ANearlyAlignedDiagonalDoesNotWinOnLength) {
     // The cockpit face, to scale. Its long side runs 4.51 degrees off world Z
     // while an 81.6mm side is exactly on world X. The first attempt at this
     // rule used a 5-degree ABSOLUTE tolerance, so the diagonal counted as
-    // "aligned" and then beat the exact edge on length — the grid stayed on
+    // "aligned" and then beat the exact edge on length - the grid stayed on
     // the diagonal and the fix shipped doing nothing. Rank by angle first.
     const double off = 4.51 * M_PI / 180.0;
     const double L = 130.40;
@@ -84,7 +84,7 @@ TEST(SketchPlaneAxis, AxisAlignedRectangleIsUnchanged) {
     const TopoDS_Face f = quad(gp_Pnt(0, 0, 0), gp_Pnt(30, 0, 0),
                                gp_Pnt(30, 10, 0), gp_Pnt(0, 10, 0));
     const gp_Dir x = sketchPlaneXDirection(f, kUp, kWorldX);
-    // Either world axis in the plane is fine — a square grid looks identical
+    // Either world axis in the plane is fine - a square grid looks identical
     // under a 90 degree turn. What must not happen is a diagonal.
     const double toX = axisAngleDeg(x, kWorldX);
     const double toY = axisAngleDeg(x, gp_Dir(0, 1, 0));
@@ -122,7 +122,7 @@ TEST(SketchPlaneAxis, CircularCapWithNoStraightEdgeTakesAWorldAxis) {
     }
     ASSERT_FALSE(cap.IsNull());
 
-    // Hand it a deliberately skewed "surface X" — it must be ignored.
+    // Hand it a deliberately skewed "surface X" - it must be ignored.
     const gp_Dir skewed(std::cos(0.7), std::sin(0.7), 0.0);
     const gp_Dir x = sketchPlaneXDirection(cap, kUp, skewed);
     const double toX = axisAngleDeg(x, kWorldX);

@@ -12,7 +12,7 @@ class PluginContext;
 
 enum class ToolAction {
     None,
-    // Sketch tools (still dispatched via ToolAction — tightly coupled to viewport)
+    // Sketch tools (still dispatched via ToolAction - tightly coupled to viewport)
     StartSketch, StartSketchXY, StartSketchXZ, StartSketchYZ,
     SketchOnFace, SelectSketch, Line, Circle, Rectangle, Arc, Spline, Polygon, Trim, SketchText,
     SketchSvg, SketchAirfoil, SketchDimension, SketchOffset,
@@ -33,11 +33,11 @@ enum class ToolAction {
     // Was three plugin buttons that each cut through the bbox centre.
     Split,
     // Sketch constraints (operate on the current SketchTool element selection).
-    // All opt-in — none of them runs unless the user clicks the button.
+    // All opt-in - none of them runs unless the user clicks the button.
     SketchConstrainCoincident, SketchConstrainHorizontal, SketchConstrainVertical,
     SketchConstrainParallel, SketchConstrainPerpendicular, SketchConstrainEqual,
     SketchConstrainFixed,
-    // Dimension constraints — captured at current geometry value, so adding
+    // Dimension constraints - captured at current geometry value, so adding
     // one is non-destructive. User edits the displayed value later.
     SketchDimDistance, SketchDimAngle, SketchDimRadius,
     // Geometric constraints that need circle/arc selection (Session 4 catalogue).
@@ -59,7 +59,7 @@ public:
     ToolAction render();
 
     // The modern/im-touch tool rail: the tools of the current selection
-    // context (mirrors render()'s dispatch — keep the two in sync). Icons are
+    // context (mirrors render()'s dispatch - keep the two in sync). Icons are
     // MZ_ICON_* strings, labels are short rail captions. Plugin toolbar
     // contributions are included with pluginIndex >= 0 (an index into
     // PluginRegistry::toolbarContributions()); the shells fire those through
@@ -73,7 +73,7 @@ public:
         int         pluginIndex = -1; // >= 0: plugin contribution, not a ToolAction
     };
     std::vector<RailTool> railTools() const;
-    // Fire a plugin RailTool (activate its tool / run its action) — the rail
+    // Fire a plugin RailTool (activate its tool / run its action) - the rail
     // twin of renderPluginButtons' click handling.
     void fireRailPlugin(int index);
 
@@ -81,14 +81,14 @@ public:
     //
     // railTools() above is that catalogue. It used to serve the modern and
     // im-touch rails ONLY, while the classic Tools palette ran a completely
-    // parallel set of render*Tools() functions — two hand-maintained lists
+    // parallel set of render*Tools() functions - two hand-maintained lists
     // that happened to agree. They did not always: Push/Pull was missing from
     // classic, "Move Hole" shipped to the rails only, and Toolbar.cpp's own
     // comments record both. Every such gap is invisible until a user in one
     // layout can't reach a feature.
     //
-    // Now classic consults the catalogue too. It keeps its OWN presentation —
-    // section headers, the Move/Rotate/Scale row, the Fabrication group — and
+    // Now classic consults the catalogue too. It keeps its OWN presentation -
+    // section headers, the Move/Rotate/Scale row, the Fabrication group - and
     // asks the catalogue only whether a tool applies right now. A tool added
     // to railTools() therefore appears in all three layouts: with bespoke
     // placement in classic if someone wrote a button for it, and via
@@ -117,23 +117,23 @@ public:
     // the "Edit Diameter" button in Face Operations when the picked face is a
     // cylinder on a recognized cylinder-or-tube body.
     void setCanEditDiameter(bool b) { m_canEditDiameter = b; }
-    // The selected face is flat — Push/Pull is only offered on flat faces (a
+    // The selected face is flat - Push/Pull is only offered on flat faces (a
     // curved/fillet face makes the boolean freak out; #28).
     void setSelFacePlanar(bool b) { m_selFacePlanar = b; }
     // Selected edges resolve to one hole's rim, so Move has a meaning for them
-    // (tilt / reshape / slide — MoveHoleOp::classifyRimEdges picks which).
+    // (tilt / reshape / slide - MoveHoleOp::classifyRimEdges picks which).
     void setSelEdgeIsHoleRim(bool b) { m_selEdgeIsHoleRim = b; }
     void setSelFaceIsHoleWall(bool b) { m_selFaceIsHoleWall = b; }
     void setSelectedFaceFrozenRound(bool b) { m_selFrozenRound = b; }
 
     // Set each frame by Application: true when the selected sketch / sketch
     // region is still bound to a body (getSourceBody() >= 0 && !detached). It
-    // gates which tool the rail offers — Push/Pull (modify the host body) for a
+    // gates which tool the rail offers - Push/Pull (modify the host body) for a
     // body-attached sketch, Extrude (make a new body) for a standalone one. A
     // face selection is unaffected: it always offers both.
     void setSelectedSketchAttached(bool b) { m_selSketchAttached = b; }
 
-    // Active SketchToolMode (int — Toolbar avoids depending on SketchTool.h).
+    // Active SketchToolMode (int - Toolbar avoids depending on SketchTool.h).
     // Matches SketchToolMode enum: 0=None, 1=Select, 2=Line, 3=Circle,
     // 4=Rectangle, 5=Arc, 6=Spline, 7=Polygon, 8=Trim, 14=Offset. Used to draw a
     // highlight border around the matching button so the active tool is
@@ -221,7 +221,7 @@ private:
     ToolAction renderNoSelectionTools();
     // primaryContext=false means "rendered as a FALL-THROUGH under a Face
     // selection, purely for the Transform row". It then suppresses the
-    // HasBodies plugin contributions (Split / Duplicate / Pattern — whole-body
+    // HasBodies plugin contributions (Split / Duplicate / Pattern - whole-body
     // operations that don't apply while the user is interacting with a face),
     // the Fabrication group, and the catalogue-remainder net, which would
     // otherwise re-render every FACE tool renderFaceTools just placed.
@@ -234,7 +234,7 @@ private:
     // creation modes the current selection supports. Shared across the face /
     // plane / edge / axis context renderers; renders nothing when no mode
     // applies.
-    // OCCT primitives (Box / Cylinder / Sphere / Cone / Torus) — a single
+    // OCCT primitives (Box / Cylinder / Sphere / Cone / Torus) - a single
     // "Primitives..." button that opens a popup with one menu item per kind.
     // Each item fires a requestInteractiveOp the PrimitivesPlugin set up
     // and Application opens the per-kind parameter popup. Keeps the empty-
@@ -256,7 +256,7 @@ private:
     // Render every catalogue entry the caller did NOT handle itself, as a
     // plain full-width button. This is the anti-drift net: a tool added to
     // railTools() shows up in classic even if nobody wrote a bespoke button
-    // for it. `handled` lists the actions the caller has already placed — or
+    // for it. `handled` lists the actions the caller has already placed - or
     // deliberately suppresses (classic drops Measure, which lives in the View
     // menu). Plugin entries are skipped: classic renders those through
     // renderPluginButtons at its own chosen point.

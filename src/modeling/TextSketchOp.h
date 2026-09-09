@@ -10,7 +10,7 @@ class Sketch;
 // TrueType text → sketch geometry. Renders glyphs with OCCT's
 // Font_BRepFont (real outlines, holes in O/A/B included, kerning included),
 // samples each outline wire to a fine polyline and adds it to the sketch as
-// closed line loops — so the letters form proper regions: extrudable,
+// closed line loops - so the letters form proper regions: extrudable,
 // push/pullable, and projectable onto curved faces for engraving.
 //
 // (This file used to hold a hand-drawn single-stroke font that was never
@@ -34,7 +34,7 @@ public:
     static bool measure(const std::string& text, const std::string& fontPath,
                         float heightMm, glm::vec2& bbMin, glm::vec2& bbMax);
 
-    // Glyph contours relative to the baseline-left anchor, UNROTATED, in mm —
+    // Glyph contours relative to the baseline-left anchor, UNROTATED, in mm -
     // the SAME coordinate space as measure()'s bbox. Each entry is one closed
     // contour (polyline). Drives a live preview of the actual letters before
     // placement. False when the font is missing / text renders to nothing.

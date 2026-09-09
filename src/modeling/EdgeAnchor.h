@@ -12,23 +12,23 @@ namespace materializr { class Sketch; }
 // A fillet/chamfer stores WHICH SKETCH FEATURE produced each edge it operates
 // on, instead of an absolute position or an ordinal index. After a sketch
 // DIMENSION edit relocates the edge, it is re-found from the sketch element's
-// CURRENT position — surviving resizes that break ordinal/carrier matching.
+// CURRENT position - surviving resizes that break ordinal/carrier matching.
 //
 // Real bodies are carved by SEVERAL sketches (base extrude + profile cuts), so
 // every anchor carries its own sketch id and each edge is classified against
 // every sketch in the document. Edge kinds:
-//   Corner — straight edge parallel to a sketch's normal, sitting over a
+//   Corner - straight edge parallel to a sketch's normal, sitting over a
 //            single sketch VERTEX (point id).
-//   Rim    — straight edge at a fixed height along a sketch's normal, lying ON
+//   Rim    - straight edge at a fixed height along a sketch's normal, lying ON
 //            a sketch LINE's segment. Intersecting features clip rims into
 //            fragments, so this is an on-segment test (not endpoint-pair
 //            equality); `h` plus the fractional midpoint `t` disambiguate
 //            between fragments and between top/bottom caps.
-//   Arc    — circular/elliptical edge cut from the cylinder swept by a sketch
+//   Arc    - circular/elliptical edge cut from the cylinder swept by a sketch
 //            ARC: its center lies on the arc's extrusion axis and its radius
 //            (minor radius for oblique = elliptical sections) equals the arc
 //            radius. `h` = center height along the normal.
-//   Circle — same test for a full sketch CIRCLE (hole rims).
+//   Circle - same test for a full sketch CIRCLE (hole rims).
 namespace EdgeAnchor {
 
 struct Anchor {
@@ -39,7 +39,7 @@ struct Anchor {
     double t        = 0.5; // Rim only: midpoint fraction along the sketch line
 };
 
-// (document sketch id, sketch) pairs — the caller supplies every sketch it has.
+// (document sketch id, sketch) pairs - the caller supplies every sketch it has.
 using SketchRef = std::pair<int, const materializr::Sketch*>;
 
 // One anchor per input edge (Kind::None for edges no sketch can attribute).
@@ -49,7 +49,7 @@ std::vector<Anchor> compute(const std::vector<TopoDS_Edge>& edges,
 // Re-find each anchored edge in `base` at its sketch element's CURRENT
 // position. Candidates matching the element are disambiguated by nearest
 // (h, t); each anchor takes a distinct edge. Returns false (out cleared)
-// unless EVERY anchor is non-None and resolves — a partial result would
+// unless EVERY anchor is non-None and resolves - a partial result would
 // fillet the wrong geometry.
 bool resolve(const std::vector<Anchor>& anchors,
              const std::vector<SketchRef>& sketches,

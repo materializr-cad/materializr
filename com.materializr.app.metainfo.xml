@@ -12,7 +12,7 @@
 
   <description>
     <p>
-      Materializr is open-source 3D CAD for makers — the middle ground between
+      Materializr is open-source 3D CAD for makers - the middle ground between
       dead-simple tools like Tinkercad and full professional suites like
       FreeCAD. Enough genuine solid modeling to make real parts, without a steep
       learning curve, a subscription, or an account.
@@ -20,12 +20,12 @@
     <p>
       Sketch on a plane, pull it into a solid (extrude, revolve, loft, sweep),
       fillet and chamfer, run boolean operations, cut threads, and edit any step
-      of the history later — even after closing and reopening the project.
+      of the history later - even after closing and reopening the project.
     </p>
     <p>
       Sketches export to SVG at 1:1 millimeters for laser cutters and 2.5D CNC.
       It also imports STEP and IGES, and exports STEP, STL, IGES and glTF. The
-      geometry kernel is OpenCASCADE — real B-rep solids, not meshes.
+      geometry kernel is OpenCASCADE - real B-rep solids, not meshes.
     </p>
     <p>Features:</p>
     <ul>

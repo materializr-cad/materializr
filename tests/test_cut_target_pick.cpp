@@ -1,7 +1,7 @@
 // Subtract-from-sketch picks its victim by GEOMETRY, not by provenance.
 //
 // The old rule was "cut the body this sketch was drawn on, and if there isn't
-// one, do nothing" — so the Subtract button was a silent no-op for every sketch
+// one, do nothing" - so the Subtract button was a silent no-op for every sketch
 // on a construction or origin plane, and for every sketch that had been unlinked
 // from its body. Worse, a linked sketch whose sweep MISSED its host still landed
 // a History step: BRepAlgoAPI_Cut hands back the untouched body, which is valid,
@@ -45,7 +45,7 @@ double volumeOf(const TopoDS_Shape& s) {
     return g.Mass();
 }
 
-// A square sketch on a plane at height z, facing +Z — a construction-plane
+// A square sketch on a plane at height z, facing +Z - a construction-plane
 // sketch, with no source body and no source face.
 std::shared_ptr<Sketch> floatingSquare(double z, double x0, double y0,
                                        double side) {
@@ -169,7 +169,7 @@ TEST(CutTargetPick, AFloatingSketchCutsThePartBelowIt) {
     ASSERT_EQ(sk->getSourceBody(), -1) << "this sketch has no host body";
 
     // The plane's normal is +Z and the part is BELOW it, so the cut must run the
-    // other way. Sweeping along the normal would carve nothing but air — which
+    // other way. Sweeping along the normal would carve nothing but air - which
     // is what a fixed "Subtract goes against the normal" rule gives you here
     // only by luck, and gets backwards on a plane the user flipped.
     std::vector<TopoDS_Shape> shapes{doc.getBody(part)};
@@ -204,7 +204,7 @@ TEST(CutTargetPick, AFloatingSketchCutsThePartBelowIt) {
 
 TEST(CutTargetPick, ASweepThatStopsShortReachesNothing) {
     // The other silent failure: a target IS known, but the tool never gets
-    // there. BRepAlgoAPI_Cut returns the body untouched — valid, non-empty, and
+    // there. BRepAlgoAPI_Cut returns the body untouched - valid, non-empty, and
     // indistinguishable from a real cut once it is on History. Catching it needs
     // exactly this overlap test.
     Document doc;
@@ -214,7 +214,7 @@ TEST(CutTargetPick, ASweepThatStopsShortReachesNothing) {
 
     ExtrudeOp tool;
     tool.setSketchSource(sid);
-    tool.setDistance(-5.0);                 // z=20 down to z=15 — stops above
+    tool.setDistance(-5.0);                 // z=20 down to z=15 - stops above
     tool.setMode(ExtrudeMode::NewBody);
     ASSERT_TRUE(tool.rebuildProfileFromSketch(doc));
     ASSERT_TRUE(tool.execute(doc));
@@ -234,7 +234,7 @@ TEST(CutTargetPick, CuttingEverythingReturnsEveryBodyTheSweepReaches) {
         {3, box(0, 0, 0,  10, 10, 4)},     // z 0..4
         {1, box(0, 0, 6,  10, 10, 4)},     // z 6..10
         {2, box(0, 0, 12, 10, 10, 4)},     // z 12..16
-        {5, box(40, 0, 0, 10, 10, 4)},     // off to the side — untouched
+        {5, box(40, 0, 0, 10, 10, 4)},     // off to the side - untouched
     };
     TopoDS_Shape tool = box(3, 3, -1, 3, 3, 20);
     const std::vector<int> hits = pickAllCutTargets(bodies, tool);

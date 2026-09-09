@@ -2,7 +2,7 @@
 // operation succeeded.
 //
 // The bug this pins (2026-08-20, "robot ass" project): a Union of two healthy
-// solids fused perfectly — 227.049 = 219.691 + 7.357, one solid, valid — and
+// solids fused perfectly - 227.049 = 219.691 + 7.357, one solid, valid - and
 // then the seam-merge pass turned it into a 161.075 mm3 INVALID shape while
 // merging nothing at all (9 faces in, 9 faces out). BooleanOp validity-checked
 // the mangled shape, saw false, and reported "Fuse failed even with fuzzy" over
@@ -11,10 +11,10 @@
 // It is worse than it looks: UnifySameDomain edits its input IN PLACE, so the
 // pre-unify shape is corrupted too and there is nothing left to fall back to
 // unless a copy was taken first. materializr::unifySameDomain does exactly
-// that — copy, merge, and hand back the copy when the merge moved geometry or
+// that - copy, merge, and hand back the copy when the merge moved geometry or
 // broke validity.
 // These tests cover the guard's contract and, just as importantly, that it
-// still LETS the ordinary merge through — a guard that rejects everything
+// still LETS the ordinary merge through - a guard that rejects everything
 // would leave a seam on every boolean and nobody would notice for months.
 #include <gtest/gtest.h>
 
@@ -113,7 +113,7 @@ TEST(UnifyGuard, MergesThroughTheWrapper) {
 }
 
 // The guard must not cost us the merge it is guarding. Two boxes stacked face
-// to face fuse into one solid where every boundary between them is redundant —
+// to face fuse into one solid where every boundary between them is redundant -
 // the shared 10x10 face (which the fuse drops on its own) and the four coplanar
 // side-wall pairs. Unify merges the walls and hands back a plain 10x10x20 box,
 // and the guard has to let that through: 10 faces in, 6 out.
@@ -146,6 +146,6 @@ TEST(UnifyGuard, OverlappingUnionKeepsItsVolume) {
     op.setMode(BooleanMode::Union);
     ASSERT_TRUE(op.execute(doc));
 
-    // 15 x 10 x 10 — the 5mm overlap counted once.
+    // 15 x 10 x 10 - the 5mm overlap counted once.
     EXPECT_NEAR(volumeOf(doc.getBody(target)), 1500.0, 1e-6);
 }

@@ -48,7 +48,7 @@ constexpr int kMaxPatchEdges = 4096;
 //
 // and in the GeomAbs_Shape enum G2 == 3, so passing the documented value throws
 // the very error that claims the value is wrong. The enumerator whose ordinal
-// is 2 — the one the constraint reads as second-order — is GeomAbs_C1.
+// is 2 - the one the constraint reads as second-order - is GeomAbs_C1.
 GeomAbs_Shape occOrder(PatchOp::Continuity c) {
     switch (c) {
         case PatchOp::Continuity::Tangent:   return GeomAbs_G1;   // ordinal 1
@@ -110,7 +110,7 @@ std::vector<TopoDS_Edge> PatchOp::resolveEdges(const TopoDS_Shape& base) const {
     // Handles stored in this op are from the body as it stood when the patch
     // was first made. A replay (or a reload) hands us a rebuilt body whose
     // TShapes are all new, so constrain the CURRENT edges where we can find
-    // them and fall back to the stored geometry where we can't — a fit against
+    // them and fall back to the stored geometry where we can't - a fit against
     // a stale-but-correct curve still lands in the right place, it just won't
     // sew.
     if (base.IsNull() || m_edges.empty()) return m_edges;
@@ -181,7 +181,7 @@ TopoDS_Shape PatchOp::healInto(const TopoDS_Shape& base,
             }
 
             // Still open. Only accept it if the patch actually reduced the
-            // opening — otherwise we would be swapping one broken shape for
+            // opening - otherwise we would be swapping one broken shape for
             // another and calling it a fix.
             if (!wasSolid && freeEdgeCount(sewn) < baseFree &&
                 BRepCheck_Analyzer(sewn).IsValid())
@@ -219,7 +219,7 @@ bool PatchOp::fitOnce(const std::vector<TopoDS_Edge>& edges,
             } else {
                 // No neighbour to blend with: this stretch of the boundary is
                 // held in position only. Degrading per-edge rather than failing
-                // the whole patch is deliberate — a ring where three sides touch
+                // the whole patch is deliberate - a ring where three sides touch
                 // the body and one spans open air is a normal bridging case, not
                 // an error.
                 if (order != GeomAbs_C0) ++out.unsupported;
@@ -242,7 +242,7 @@ bool PatchOp::fitOnce(const std::vector<TopoDS_Edge>& edges,
         return true;
     } catch (...) {
         // Every failure mode of this solver arrives as an exception rather than
-        // a return code — a null pcurve, a degenerate initial plane
+        // a return code - a null pcurve, a degenerate initial plane
         // ("Geom_RectangularTrimmedSurface::V1==V2"), a plate that will not
         // converge. The caller's ladder decides what to try next.
         return false;
@@ -300,13 +300,13 @@ bool PatchOp::execute(Document& doc) {
 
         // Whether the tangency was actually delivered, as opposed to asked for.
         //
-        // GeomPlate discards a G1/G2 constraint outright — silently, keeping
-        // IsDone() true — when the angle between its initial surface's normal
+        // GeomPlate discards a G1/G2 constraint outright - silently, keeping
+        // IsDone() true - when the angle between its initial surface's normal
         // and the target normal exceeds ~89.4 degrees
         // (Plate_GtoCConstraint: `if (fabs(cos_normales) < COSMIN) return;`).
         // Its initial surface is the average plane through the rim, so the
         // constraint survives right up until the surrounding faces stand
-        // perpendicular to the opening — a flat lid on vertical walls being the
+        // perpendicular to the opening - a flat lid on vertical walls being the
         // exact case, where a tangent patch would have to balloon without limit
         // anyway. Measured on a cone frustum: a wall leaning 0.6 degrees off
         // vertical loses tangency entirely, 2.9 degrees gets it to 1e-2 rad, and
@@ -344,7 +344,7 @@ bool PatchOp::execute(Document& doc) {
         }
 
         // Standalone surface. Undo must not restore a body shape we never
-        // touched, so clear the healed bookkeeping explicitly — this op is
+        // touched, so clear the healed bookkeeping explicitly - this op is
         // re-executed in place during a live preview and can flip modes
         // between frames.
         if (m_healed && m_bodyId >= 0 && !m_previousShape.IsNull())
@@ -396,7 +396,7 @@ void PatchOp::renderProperties() {
 
 std::string PatchOp::serializeParams() const {
     // Scalars, then ALL geometry as one length-prefixed ASCII BREP compound
-    // (edges first, then support faces) — the LoftOp / BoundaryFillOp
+    // (edges first, then support faces) - the LoftOp / BoundaryFillOp
     // discipline. Carrying the geometry rather than sub-shape indices is what
     // lets a reloaded patch re-fit even when the body it was cut against has
     // been rebuilt underneath it.

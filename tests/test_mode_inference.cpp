@@ -4,7 +4,7 @@
 // Perpendicular/parallel-to-previous, tangent-to-curve, angle snap and the
 // hover-charged guides were all written for Line and gated on
 // `m_mode == SketchToolMode::Line`. Arcs, circles, polygons and splines
-// therefore drew with no directional assistance at all — no 15° angle snap on
+// therefore drew with no directional assistance at all - no 15° angle snap on
 // an arc's chord, no tangent guide while starting a spline, nothing. The gate
 // is now SketchTool::directionalAnchor(), which answers both "does a direction
 // apply here" and "measured from where".
@@ -15,8 +15,8 @@
 // wrong end.
 //
 // Two modes are deliberately left inert and are pinned so below:
-//   * Rectangle — axis-aligned by construction, there is no direction to pick;
-//   * Circle in centre-radius mode — only the DISTANCE means anything, and
+//   * Rectangle - axis-aligned by construction, there is no direction to pick;
+//   * Circle in centre-radius mode - only the DISTANCE means anything, and
 //     steering the direction would just perturb the radius.
 
 #include "modeling/Sketch.h"
@@ -142,7 +142,7 @@ TEST(ModeInference, CircleCentreRadiusStaysInert) {
     EXPECT_FALSE(has(r.tool, InferenceGuide::AngleSnap));
 }
 
-// Axis-aligned by construction — the "segment" is the diagonal, and steering it
+// Axis-aligned by construction - the "segment" is the diagonal, and steering it
 // would only distort the box.
 TEST(ModeInference, RectangleStaysInert) {
     Rig r(SketchToolMode::Rectangle);
@@ -201,7 +201,7 @@ TEST(ModeInference, SplineGuidesMeasureFromTheLastControlPoint) {
     EXPECT_GT(std::abs(fromFirst - std::round(fromFirst / 15.0f) * 15.0f), 1.0f);
 }
 
-// Splines were invisible to the tangent guide — it only ever scanned circles
+// Splines were invisible to the tangent guide - it only ever scanned circles
 // and arcs. Control points laid around a circle of radius 10 give a known
 // answer: the tangent from (-40,0) leaves at ±14.478°, same as the real circle.
 TEST(ModeInference, TangentToASpline) {
@@ -240,7 +240,7 @@ TEST(ModeInference, SplineTangentIsAccurate) {
     r.sketch.addSpline(cps);
     r.click(kAnchor);
 
-    // Walk the catch window and take its centre — that is where the engine
+    // Walk the catch window and take its centre - that is where the engine
     // believes the tangent lies.
     float lo = 1e9f, hi = -1e9f;
     for (int i = -400; i <= 400; ++i) {

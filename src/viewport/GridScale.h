@@ -30,11 +30,11 @@ namespace materializr {
 // Returns baseStepMm x 10^n for the SMALLEST integer n (positive, zero or
 // negative) whose cell is at least `minPx` wide. That bounds the cell to
 // [minPx, minPx * 10) at every zoom and every unit, with no second parameter
-// for the upper end — one decade more would be the next n up, which by
+// for the upper end - one decade more would be the next n up, which by
 // definition was not the smallest.
 inline float gridStepForZoom(float baseStepMm, float mmPerPx, float minPx) {
     // Every arithmetic step below is IEEE-defined for a nan, an infinity or a
-    // zero, and each one propagates to a nan/infinity/zero result — so ONE
+    // zero, and each one propagates to a nan/infinity/zero result - so ONE
     // check at the end rejects every bad input, and separate guards per
     // argument were provably dead (nothing could make them fire alone).
     const double want = static_cast<double>(minPx) * static_cast<double>(mmPerPx);
@@ -50,7 +50,7 @@ inline float gridStepForZoom(float baseStepMm, float mmPerPx, float minPx) {
 
 // The opening view for an EMPTY sketch, in millimetres of half-span.
 //
-// Framing a fixed count of DISPLAY units is right in spirit — 40 mm is a fine
+// Framing a fixed count of DISPLAY units is right in spirit - 40 mm is a fine
 // first view in millimetres and 0.13 ft is an absurd one in feet, which is why
 // the count is unit-aware. But 40 of a large unit is enormous: 40 ft is a
 // twelve-metre view, so a shape drawn at screen centre lands metres from the

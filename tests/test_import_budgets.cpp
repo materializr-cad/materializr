@@ -2,7 +2,7 @@
 // paths. Both are reachable from a file the user was merely sent: a DXF from the
 // import dialog, an image from the REFIMG section of any shared .materializr.
 //
-// Before these budgets existed neither path had a ceiling of any kind — unlike
+// Before these budgets existed neither path had a ceiling of any kind - unlike
 // SvgImport (32 MB + a 500k point budget) and IgesIO (kMaxEntities), which this
 // codebase already got right.
 
@@ -50,7 +50,7 @@ TEST(DxfBudgets, WellFormedFileStillImports) {
 TEST(DxfBudgets, OverlongLineAfterValidGeometryIsRefusedNotTruncated) {
     // THE discriminating case. An earlier version of this test put the long
     // line first, so nothing was ever emitted and the failure actually came
-    // from "no profile entities found" — it passed without exercising the cap
+    // from "no profile entities found" - it passed without exercising the cap
     // at all. Here a complete LINE lands FIRST, so if the budget breach is
     // mistaken for clean EOF the import SUCCEEDS with the drawing silently
     // truncated, which is the bug.
@@ -68,7 +68,7 @@ TEST(DxfBudgets, OverlongLineAfterValidGeometryIsRefusedNotTruncated) {
 
 TEST(DxfBudgets, AbsurdSplineDegreeDoesNotOverflow) {
     // Group code 71 = 2147483647. `n + degree + 1` was computed BEFORE the
-    // guard that would have rejected it — signed overflow, i.e. UB. The degree
+    // guard that would have rejected it - signed overflow, i.e. UB. The degree
     // is now bounded first, so this parses to "no usable entities" instead.
     std::string dxf = "0\nSECTION\n2\nENTITIES\n0\nSPLINE\n"
                       "71\n2147483647\n"
@@ -119,7 +119,7 @@ void patchDims(std::vector<uint8_t>& png, uint32_t w, uint32_t h) {
 } // namespace
 
 TEST(ImageBudgets, RejectsAbsurdDeclaredDimensions) {
-    // ~90 bytes on disk, declares 30000x30000 — about 3.6 GB decoded. The check
+    // ~90 bytes on disk, declares 30000x30000 - about 3.6 GB decoded. The check
     // has to happen on the PROBE, before stbi_load_from_memory allocates.
     std::vector<uint8_t> png = tinyPng();
     patchDims(png, 30000, 30000);

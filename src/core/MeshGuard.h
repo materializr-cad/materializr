@@ -4,7 +4,7 @@
 // An STL is a tessellation, not a modelled solid: a real import measured here
 // is a 4,881-face solid where the equivalent modelled part has a dozen analytic
 // faces. Nothing downstream is built for that. A boolean on two such bodies
-// completed in 101 seconds and produced an 8,745-face result — not a failure, a
+// completed in 101 seconds and produced an 8,745-face result - not a failure, a
 // success nobody wants: the output is another mesh, with no analytic faces to
 // fillet, sketch on, or edit afterwards. Fillet/chamfer/shell/thread are worse
 // still, because they look for analytic edges and surfaces that a triangle soup

@@ -46,7 +46,7 @@ static constexpr int kRingSegments = 48;
 static constexpr float kPickThreshold = 0.04f;
 
 // World-size factor the gizmo scales by (× camera distance). A fingertip is far
-// less precise than a cursor, so grow the whole widget on touch — the visual
+// less precise than a cursor, so grow the whole widget on touch - the visual
 // arrows/rings AND their hit-tests both derive from this, so they enlarge
 // together (same approach as the ViewCube).
 static float gizmoScale() {
@@ -434,7 +434,7 @@ Gizmo::PickResult Gizmo::pickNearest(float mx, float my, float vpW, float vpH,
     PickResult best;
     best.axis = GizmoAxis::None;
     best.mode = GizmoMode::Translate;
-    // Widen the catch radius on touch — a fingertip can't land on a thin arrow
+    // Widen the catch radius on touch - a fingertip can't land on a thin arrow
     // line as precisely as a cursor. (The widget itself is also larger on touch
     // via gizmoScale(), so this is the matching slack around it.)
     best.dist = kPickThreshold * (materializr::touchMode() ? 2.5f : 1.0f);
@@ -453,7 +453,7 @@ Gizmo::PickResult Gizmo::pickNearest(float mx, float my, float vpW, float vpH,
     glm::vec3 axisDirs[3] = {{1,0,0}, {0,1,0}, {0,0,1}};
     GizmoAxis axisIds[3] = {GizmoAxis::X, GizmoAxis::Y, GizmoAxis::Z};
 
-    // Only the active mode's handles are pickable — otherwise the long translate
+    // Only the active mode's handles are pickable - otherwise the long translate
     // arrow lines would steal clicks meant for the scale cubes / rotate rings.
     // Test translate arrows (line from origin to tip)
     if (m_mode == GizmoMode::Translate)

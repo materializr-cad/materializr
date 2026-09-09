@@ -32,7 +32,7 @@ on:
   release:
     types: [ published ]
 
-# A newer push on main (or a new commit on a PR) cancels an in-flight build —
+# A newer push on main (or a new commit on a PR) cancels an in-flight build -
 # older runs wouldn't ship, and a superseded PR result is noise.
 concurrency:
   group: macos-${{ github.ref }}
@@ -42,7 +42,7 @@ jobs:
   macos:
     name: macOS (arm64)
     # Apple Silicon runner. TRACK THE LATEST image: the bundled Homebrew SDL2
-    # bottle is compiled for the RUNNER's macOS — a macos-14 bottle's dylib
+    # bottle is compiled for the RUNNER's macOS - a macos-14 bottle's dylib
     # initializer aborts before main() on much newer systems (issue #12,
     # macOS 26.5.2: SIGABRT in libSDL2 dllinit during dyld init). Building on
     # the newest image keeps the bundled dylibs matched to modern SDKs.
@@ -96,15 +96,15 @@ jobs:
       # Linux/Windows do it explicitly; macOS rides Homebrew's stable, which is
       # 7.9.3 today). OCCT 8.0 hangs long-rod thread generation, so if Homebrew
       # ever bumps opencascade to 8.x, FAIL LOUDLY here rather than silently
-      # shipping the broken kernel — the fix at that point is to source-build
+      # shipping the broken kernel - the fix at that point is to source-build
       # 7.9.3 on macOS like the other platforms do.
       - name: Guard OpenCASCADE version (must stay 7.9.x)
         run: |
           OCCT_VER="$(brew list --versions opencascade | awk '{print $2}')"
           echo "Homebrew opencascade: $OCCT_VER"
           case "$OCCT_VER" in
-            7.9.*) echo "OK — on the pinned 7.9.x line" ;;
-            *) echo "::error::opencascade drifted to $OCCT_VER (expected 7.9.x). OCCT 8.0 hangs threads — source-build 7.9.3 instead of trusting brew latest."; exit 1 ;;
+            7.9.*) echo "OK - on the pinned 7.9.x line" ;;
+            *) echo "::error::opencascade drifted to $OCCT_VER (expected 7.9.x). OCCT 8.0 hangs threads - source-build 7.9.3 instead of trusting brew latest."; exit 1 ;;
           esac
 
       - name: Configure
@@ -124,7 +124,7 @@ jobs:
       # main binary and every bundled dylib, and fail if the SDL2 we ship
       # regressed past the 14.0 floor (the exact regression a contributor
       # caught in the first #12 fix artifact). The other dylibs (OCCT bottles)
-      # are reported informationally — if they carry a high minos the bundle's
+      # are reported informationally - if they carry a high minos the bundle's
       # real floor is theirs, and the next step is source-building them too.
       - name: Audit bundled deployment targets
         run: |
@@ -139,13 +139,13 @@ jobs:
                 minos=$(echo "$line" | awk '{print $1}')
                 case "$minos" in
                   14.*|13.*|12.*|11.*|10.*) : ;;
-                  *) echo "::error::bundled SDL2 minos=$minos — must stay at the 14.0 floor (issue #12 regression guard)"; fail=1 ;;
+                  *) echo "::error::bundled SDL2 minos=$minos - must stay at the 14.0 floor (issue #12 regression guard)"; fail=1 ;;
                 esac ;;
             esac
           done
           exit $fail
 
-      # Mount the .dmg and actually launch the bundled app — the only thing that
+      # Mount the .dmg and actually launch the bundled app - the only thing that
       # proves the dylib bundling + rpath rewrites are correct (a green build that
       # only `ls`-es the file can still ship a bundle that doesn't load). A dyld
       # failure aborts before main; reaching GL init proves every dylib resolved.
@@ -169,7 +169,7 @@ jobs:
           hdiutil detach /Volumes/MZ -quiet || true
           echo "---- launch log ----"; cat /tmp/launch.log || true
           if grep -qiE "dyld|Library not loaded|duplicate LC_RPATH|image not found|symbol not found" /tmp/launch.log; then
-            echo "FAIL: dynamic loader error — the bundle is not self-contained"; exit 1
+            echo "FAIL: dynamic loader error - the bundle is not self-contained"; exit 1
           elif grep -qiE "^GL |Loaded font" /tmp/launch.log; then
             echo "PASS: bundle launched and reached GL init"
           elif grep -qiE "SDL|window|display" /tmp/launch.log; then
@@ -179,10 +179,10 @@ jobs:
             # no loader error. On a HEADLESS runner a GUI app can create its
             # window through the window server and enter the render loop without
             # emitting our stderr markers, so silence-while-running is not a
-            # failure — the self-containment check (dyld) already passed above.
+            # failure - the self-containment check (dyld) already passed above.
             echo "PASS: bundle ran to timeout with no loader error (headless: no window/GL output)"
           else
-            echo "FAIL: app exited early with no output — possible silent crash"; exit 1
+            echo "FAIL: app exited early with no output - possible silent crash"; exit 1
           fi
 
       - name: Upload .dmg artifact

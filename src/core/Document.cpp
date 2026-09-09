@@ -73,7 +73,7 @@ void Document::putBody(int id, const TopoDS_Shape& shape, const std::string& nam
     // a non-existent body was serialized into a project's history.
     if (id < 0) {
         std::fprintf(stderr,
-                     "[doc] putBody id=%d — rejected (negative id).\n", id);
+                     "[doc] putBody id=%d - rejected (negative id).\n", id);
         return;
     }
     int idx = findBodyIndex(id);
@@ -110,7 +110,7 @@ const TopoDS_Shape& Document::getBody(int id) const {
     if (idx < 0) {
         // Record where this came from. Most callers guard this throw on
         // purpose (a body legitimately may be gone), so nothing is printed
-        // here — the frame firewall in Application::run() renders the trace
+        // here - the frame firewall in Application::run() renders the trace
         // only if the throw escapes, which is the case that is always a bug.
         materializr::captureThrowTrace();
         throw std::runtime_error("Body not found: " + std::to_string(id));
@@ -336,7 +336,7 @@ void Document::removePlane(int id) {
     for (auto it = m_planes.begin(); it != m_planes.end(); ++it) {
         if (it->id == id) {
             m_planes.erase(it);
-            // A hosted reference image can't outlive its plane — the plane IS
+            // A hosted reference image can't outlive its plane - the plane IS
             // its pose/selection/visibility. Drop it silently (the
             // PlaneRemovedEvent below is what the image renderer watches).
             removeRefImage(id);
@@ -579,7 +579,7 @@ int Document::axisCount() const {
 
 void Document::clear() {
     // Announce each entity's removal before wiping the lists. Subscribers keep
-    // caches keyed off these events — the plugin Plane/Axis renderers only
+    // caches keyed off these events - the plugin Plane/Axis renderers only
     // rebuild when a removal flips their dirty flag, and the TShape-keyed
     // selection caches evict on BodyRemovedEvent. Clearing silently left ghost
     // construction planes/axes rendered (but unclickable) after File → Close
@@ -672,7 +672,7 @@ void Document::setFolderColor(int folderId, const glm::vec3& color) {
     int idx = findFolderIndex(folderId);
     if (idx < 0) return;
     m_folders[idx].color = color;
-    // Cascade to members — overwrites their colour. Re-customisable per body
+    // Cascade to members - overwrites their colour. Re-customisable per body
     // afterwards (per-body picker still works as before).
     for (auto& b : m_bodies) {
         if (b.folderId == folderId) b.color = color;

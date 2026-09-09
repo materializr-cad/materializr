@@ -29,12 +29,12 @@ std::vector<int> distinctSelectedBodies(materializr::PluginContext& ctx) {
 }
 
 // Reference bodies (imported meshes) are not boolean operands. An STL is a
-// tessellation — a 4,881-face solid where a modelled part has a dozen analytic
-// faces — so a fuse has to intersect thousands of facet pairs. It is not
+// tessellation - a 4,881-face solid where a modelled part has a dozen analytic
+// faces - so a fuse has to intersect thousands of facet pairs. It is not
 // invalid: measured on a real import it completed in 101 seconds and produced
 // an 8,745-face result. That is the problem. It runs on the main thread, so the
 // window stops painting and the app looks hung (Steve, 2026-08-03), and what
-// comes out the far side is another mesh, not a modelled body — no analytic
+// comes out the far side is another mesh, not a modelled body - no analytic
 // faces to fillet, sketch on, or edit afterwards.
 //
 // So refuse rather than offer a slow path to a useless result. An imported mesh
@@ -75,14 +75,14 @@ void runChainedBoolean(materializr::PluginContext& ctx,
         // failures here; Union and Intersect run the same path and said nothing.
         ctx.events().publish(materializr::ToastEvent{
             std::string(mode == BooleanMode::Union ? "Union" : "Intersect") +
-            " couldn't make a valid solid from these bodies \xE2\x80\x94 they "
+            " couldn't make a valid solid from these bodies - they "
             "may not overlap, share a coincident face, or the geometry is too "
             "degenerate.", 5.0});
     }
 }
 
 // Subtract is order-dependent, so unlike Union/Intersect we put up a modal: the
-// user ticks which bodies are CUTTERS (subtracted) — everything unticked is kept
+// user ticks which bodies are CUTTERS (subtracted) - everything unticked is kept
 // and has the cutters cut out of it. State persists while the modal is open.
 std::vector<int> g_subtractBodies;     // all selected, in selection order
 std::set<int>    g_subtractCutters;    // ticked = cutter (subtracts)
@@ -91,7 +91,7 @@ bool g_subtractOpenRequested = false;
 
 // Subtract every cutter from every kept body. A cutter is consumed on its LAST
 // use (so a cutter shared across several targets survives until the last one),
-// unless the user asked to keep the cutters — then it's never consumed.
+// unless the user asked to keep the cutters - then it's never consumed.
 void runSubtractMulti(materializr::PluginContext& ctx,
                       const std::vector<int>& targets,
                       const std::vector<int>& cutters, bool keepCutters) {
@@ -112,7 +112,7 @@ void runSubtractMulti(materializr::PluginContext& ctx,
     else {
         std::fprintf(stderr, "Subtract failed\n");
         ctx.events().publish(materializr::ToastEvent{
-            "Subtract couldn't make a valid solid from these bodies \xE2\x80\x94 "
+            "Subtract couldn't make a valid solid from these bodies - "
             "they may not overlap, share a coincident face, or the geometry is "
             "too degenerate.", 5.0});
     }
@@ -134,7 +134,7 @@ REGISTER_PLUGIN(Boolean, [](materializr::PluginContext& ctx) {
     ctx.registerToolbarButton({"Subtract", "Boolean",
         materializr::SelectionContext::MultipleBodies, 101,
         [](materializr::PluginContext& ctx) {
-            // Order matters — open the modal to pick cutters vs kept bodies.
+            // Order matters - open the modal to pick cutters vs kept bodies.
             auto b = distinctSelectedBodies(ctx);
             if (refuseMeshOperands(ctx, b)) return;
             if (b.size() >= 2) {
@@ -172,7 +172,7 @@ REGISTER_PLUGIN(Boolean, [](materializr::PluginContext& ctx) {
         ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
         if (ImGui::BeginPopupModal("Subtract##boolpick", nullptr,
                                    ImGuiWindowFlags_AlwaysAutoResize)) {
-            ImGui::TextUnformatted(materializr::tr("Tick the cutters \xE2\x80\x94 they're subtracted"));
+            ImGui::TextUnformatted(materializr::tr("Tick the cutters - they're subtracted"));
             ImGui::TextUnformatted(materializr::tr("from the unticked bodies, which remain."));
             ImGui::Separator();
             for (int id : g_subtractBodies) {

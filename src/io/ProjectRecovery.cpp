@@ -44,7 +44,7 @@ std::string recoveryDir() { return configBaseDir() + "/recovery"; }
 
 // Concurrent instances that get their own snapshot namespace, and tabs per
 // instance that get their own snapshot file. Both scans and the free-slot
-// search must agree on these bounds — a mismatch either hides orphans or
+// search must agree on these bounds - a mismatch either hides orphans or
 // reclaims a slot that still holds live work.
 constexpr int kMaxSlots = 16;   // kMaxSessionsPerSlot lives in the header
 
@@ -71,7 +71,7 @@ std::string slotLockPath(int slot) {
 
 // ---- OS file locks -------------------------------------------------------
 // The claim lock is held for the whole process lifetime and released by the
-// KERNEL when the process dies (cleanly or not) — that's the liveness signal.
+// KERNEL when the process dies (cleanly or not) - that's the liveness signal.
 // A probe uses an independent open: per flock(2), a second file description
 // in the SAME process is denied against our own held lock, so a probe never
 // mistakes our own slot for an orphan. On Windows the exclusive-share
@@ -105,11 +105,11 @@ void releaseLock(LockHandle h) {
 
 // True if slot N holds ANY session's leftover snapshot. Checking only the
 // session-0 (legacy) name is not enough: a slot can hold nothing but "-t<K>"
-// files — an instance that quit cleanly with an unsaved BACKGROUND tab leaves
+// files - an instance that quit cleanly with an unsaved BACKGROUND tab leaves
 // exactly that, since clean exit deliberately preserves a dirty inactive tab's
 // snapshot while clearing the active one's. Treating such a slot as free let a
 // new instance claim it, which hid those orphans from the scan (it skips slots
-// whose lock it cannot take — and we would then hold that lock) and then
+// whose lock it cannot take - and we would then hold that lock) and then
 // overwrote them with our own tabs. That is the only copy of that work.
 bool slotHasAnySnapshot(int slot) {
     std::error_code ec;
@@ -119,7 +119,7 @@ bool slotHasAnySnapshot(int slot) {
     // The in-progress SKETCH draft is per-instance too, and keys off this same
     // slot. A slot holding nothing but a leftover draft is still occupied:
     // claiming it would make our own lock hide that draft from the orphan scan
-    // and then overwrite it on the first autosave — the only copy of that work.
+    // and then overwrite it on the first autosave - the only copy of that work.
     if (std::filesystem::exists(sketchDraftPathForSlot(slot), ec)) return true;
     return false;
 }
@@ -131,7 +131,7 @@ int claimedSlot() {
         std::error_code ec;
         std::filesystem::create_directories(recoveryDir(), ec);
         // Pass 1: prefer a slot with NO leftover snapshot. A slot whose owner
-        // crashed holds that session's snapshot — claiming it would make the
+        // crashed holds that session's snapshot - claiming it would make the
         // orphan scan treat the file as OURS (probe denied against our own
         // lock) and silently shadow the very recovery we should be offering.
         for (int pass = 0; pass < 2; ++pass) {
@@ -142,7 +142,7 @@ int claimedSlot() {
                 if (h != kBadLock) return n; // hold forever (kernel frees on exit)
             }
         }
-        // 16 concurrent instances?! Fall back to slot 0 unlocked — behaves
+        // 16 concurrent instances?! Fall back to slot 0 unlocked - behaves
         // like the old shared-path world, which is still better than nothing.
         std::fprintf(stderr, "[Recovery] no free instance slot; sharing 0\n");
         return 0;
@@ -157,7 +157,7 @@ std::string metaPathFor(const std::string& snapshotPath) {
 // The orphaned snapshot chosen by hasProjectRecovery() for this launch, and
 // how many orphans the scan saw in total (for the prompt's plural wording).
 std::string s_candidatePath;
-// Every orphan the scan saw, newest first — one per tab the dead instance
+// Every orphan the scan saw, newest first - one per tab the dead instance
 // had open. The restore takes them ALL (one per tab); s_candidatePath stays
 // the newest for the prompt's summary line.
 std::vector<std::string> s_orphanPaths;
@@ -191,7 +191,7 @@ bool writeProjectRecovery(const Document& doc, const ProjectHistory* history,
     std::filesystem::create_directories(
         std::filesystem::path(path).parent_path(), ec);
 
-    // Save to a temp file, then atomically rename — a crash mid-write must never
+    // Save to a temp file, then atomically rename - a crash mid-write must never
     // truncate the snapshot we'd restore from.
     const std::string tmp = path + ".tmp";
     // Fastest compression, deliberately: this sidecar is rewritten every few
@@ -233,11 +233,11 @@ bool hasProjectRecovery() {
     std::filesystem::file_time_type bestTime{};
     for (int n = 0; n < kMaxSlots; ++n) {
         // Liveness probe once per slot: acquirable lock = the owning instance
-        // is dead (or the files predate slot locks — same conclusion: nobody
-        // owns them). A dead slot may hold SEVERAL per-session snapshots —
-        // one per tab that instance had open — and every one is an orphan.
+        // is dead (or the files predate slot locks - same conclusion: nobody
+        // owns them). A dead slot may hold SEVERAL per-session snapshots -
+        // one per tab that instance had open - and every one is an orphan.
         LockHandle h = tryLock(slotLockPath(n));
-        if (h == kBadLock) continue; // owner alive (possibly us) — not ours to offer
+        if (h == kBadLock) continue; // owner alive (possibly us) - not ours to offer
         releaseLock(h);
         for (int t = 0; t < kMaxSessionsPerSlot; ++t) {
             const std::string snap = sessionSnapshotPath(n, t);

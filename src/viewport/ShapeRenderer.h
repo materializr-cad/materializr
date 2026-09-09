@@ -5,8 +5,11 @@
 #include <glm/glm.hpp>
 
 #include <TopoDS_Shape.hxx>
+#include "MeshTag.h"
 
 #include <map>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 #include <string>
 
@@ -33,9 +36,15 @@ public:
 
     /// Tessellate a TopoDS_Shape and store the resulting mesh.
     /// Returns the mesh index (for later color/selection control).
-    /// `angularDeflection` (radians) controls faceting of curved surfaces — a
+    /// `angularDeflection` (radians) controls faceting of curved surfaces - a
     /// tighter angle makes fillets/holes/cylinders visibly smoother while adding
     /// almost no triangles to flat faces.
+    // Upload `vertices` as a new slot at the tail of m_meshes; -1 if empty.
+    int appendVertices(const std::vector<float>& vertices);
+    // Give the appended tail slot to `bodyId`: a new body keeps the slot, an
+    // existing body has its GL data replaced in place (slot index and
+    // cosmetic state kept). Returns the slot the body ends up in.
+    int placeSlot(int bodyId, int appendedSlot);
     int tessellate(const TopoDS_Shape& shape, float deflection = 0.1f,
                    float angularDeflection = 0.2f);
 
@@ -47,6 +56,38 @@ public:
     /// avoid re-tessellating every body on every preview frame.
     int setBodyMesh(int bodyId, const TopoDS_Shape& shape,
                     float deflection = 0.1f, float angularDeflection = 0.2f);
+    /// Same slot semantics as setBodyMesh, but the caller supplies the
+    /// triangles: six floats per vertex (position, normal), three vertices
+    /// per triangle. No shape, no mesher. Used for the push/pull ghost, whose
+    /// tool volume is built from the profile's own triangulation.
+    int setBodyVertices(int bodyId, const std::vector<float>& vertices);
+    /// A worker thread meshed `shape` off the main thread well enough for a
+    /// tessellate(shape, deflection, angularDeflection) request: remember
+    /// that so tessellate() reuses it. Pass the pair the renderer WILL ask
+    /// for (the worker may have meshed at a finer angular deflection, which
+    /// satisfies that request). OCCT records only the ACHIEVED deflection on
+    /// each face, never the requested one, so the mesh itself cannot say
+    /// which quality it was built at.
+    void notePreMeshed(const TopoDS_Shape& shape, float requestedDeflection,
+                       float requestedAngularDeflection);
+
+    /// Whether tessellate() would skip the mesher for `shape` at this quality:
+    /// the shape carries the pre-meshed tag for exactly these parameters.
+    bool isPreMeshed(const TopoDS_Shape& shape, float deflection,
+                     float angularDeflection) const;
+
+    /// Bring the retired slot of `bodyId` back as it is, old mesh and all, so
+    /// a body whose new mesh is still being built off-thread keeps drawing its
+    /// previous one. Returns false if no retired slot has that id.
+    bool reclaimStale(int bodyId);
+
+    /// Whether `bodyId` has a mesh on screen or in the retired list: the
+    /// off-thread path is only taken when there is an old mesh to keep.
+    bool hasMeshFor(int bodyId) const;
+
+    /// Wall time of the mesher run inside the last setBodyMesh(), in
+    /// milliseconds, or -1 when that call reused a mesh.
+    double lastMeshMillis() const { return m_lastMeshMs; }
 
     /// Remove the mesh associated with `bodyId`. The slot is marked empty
     /// (vertexCount = 0, GL buffers freed) but kept in the array so other
@@ -78,7 +119,7 @@ public:
     void setLighting(const LightingParams& params) { m_lighting = params; }
 
     /// Section view: clip away the half-space on the `normal` side of the
-    /// plane through `point`. Render-only — geometry is untouched.
+    /// plane through `point`. Render-only - geometry is untouched.
     void setSectionPlane(bool enabled, const glm::vec3& point,
                          const glm::vec3& normal) {
         m_sectionEnabled = enabled;
@@ -88,9 +129,18 @@ public:
 
     /// Remove all meshes.
     void clear();
+    /// Start of a full rebuild: drop every slot but keep its GPU buffers, so
+    /// the setBodyMesh calls that follow can hand them straight back to
+    /// bodies whose shape did not change (see m_retired).
+    void retireAll();
+    /// Free every buffer retireAll() kept that was not reclaimed since. The
+    /// full rebuild calls this after visiting every visible body, so nothing
+    /// still retired can be live (a quality change retires a whole
+    /// generation at once; do not let it sit until the next commit).
+    void freeRetired();
 
     /// Diagnostic: print every slot (bodyId, vertex count, flags) to
-    /// stderr — used by the click-miss diagnostic to expose phantom slots
+    /// stderr - used by the click-miss diagnostic to expose phantom slots
     /// whose body no longer exists or whose mesh is stale.
     void debugDumpSlots() const;
 
@@ -107,6 +157,13 @@ private:
         glm::vec3 color = glm::vec3(0.7f, 0.7f, 0.7f);
         bool selected = false;
         bool subtractPreview = false;
+        // What the vertices were built from and at what quality, so a
+        // retired slot can be reclaimed (see m_retired). IsEqual, not
+        // IsSame: the baked vertices carry the Location AND the normals
+        // flip with face orientation.
+        TopoDS_Shape shape;
+        float deflection = 0.0f;
+        float angularDeflection = 0.0f;
     };
 
     bool compileShader(unsigned int& shader, unsigned int type, const char* source);
@@ -118,6 +175,28 @@ private:
     // bodyId → slot index in m_meshes. Lets setBodyMesh / removeBody resolve
     // by body id without scanning the vector.
     std::map<int, int> m_bodyToSlot;
+    // Slots retireAll() kept instead of destroying. A full rebuild re-runs
+    // setBodyMesh for every visible body, not just the ones the last
+    // operation touched; setBodyMesh first reclaims a retired slot whose
+    // shape IsEqual at the same quality (skipping vertex collection and the
+    // VBO upload too, not just the mesher), and whatever is still retired at
+    // the next retireAll() or clear() is freed then. Same retire/reclaim
+    // generations as EdgeRenderer::m_retired.
+    std::vector<MeshData> m_retired;
+    // TShape -> what the mesher achieved on it for which requested (linear,
+    // angular) deflection (see tessellate and MeshTag.h). Both parameters,
+    // because callers do vary them independently (the ghost preview uses the
+    // default angular value). retireAll() - the start of every full rebuild -
+    // retires the map to m_meshedAtPrev, and tessellate carries an entry back
+    // only when it is looked up again, so the map holds what the last full
+    // rebuild visited plus previews since (a long drag makes a fresh TShape
+    // per frame). A recycled address is harmless because meshTagCovers()
+    // never trusts a tag on a shape whose every face is bare, and a face the
+    // mesher could not triangulate is expected bare rather than forcing a
+    // re-mesh on every rebuild.
+    std::unordered_map<const void*, MeshTag> m_meshedAt;
+    std::unordered_map<const void*, MeshTag> m_meshedAtPrev;
+    double m_lastMeshMs = -1.0;
 
     // Mesh shader program
     unsigned int m_meshProgram = 0;

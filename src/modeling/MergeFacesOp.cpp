@@ -102,14 +102,14 @@ struct Attempt {
 // plane not quite carrying the other's boundary, which BRepCheck rejects.
 // ShapeFix closes that gap; measured on the nacelle it rescues most of the
 // seams that would otherwise be unmergeable (10 of 41 at 1e-2). The caller
-// still has to accept the result — this only produces a candidate.
+// still has to accept the result - this only produces a candidate.
 Attempt runUnify(const TopoDS_Shape& body, const TopTools_MapOfShape* keep,
                  double angularTol, double linearTol) {
     Attempt out;
     try {
         // concatBSplines deliberately FALSE. With it on, unify re-fits spline
         // surfaces rather than just dropping redundant boundaries, and on a
-        // part with curved faces that MOVES geometry — measured on the nacelle
+        // part with curved faces that MOVES geometry - measured on the nacelle
         // as a 5.5e-6 relative volume change, which the guard below rejected.
         // A repair must not reshape the part.
         ShapeUpgrade_UnifySameDomain u(body, /*edges=*/true, /*faces=*/true,
@@ -142,7 +142,7 @@ Attempt runUnify(const TopoDS_Shape& body, const TopTools_MapOfShape* keep,
 // Is this candidate a merge we are willing to keep?
 //
 // Volume is checked at 1e-4 RELATIVE, not tighter. BRepGProp integrates over
-// the faces, so its answer depends on how the boundary is subdivided — merging
+// the faces, so its answer depends on how the boundary is subdivided - merging
 // 189 faces into 183 moves the result by ~5e-6 relative on the nacelle with
 // nothing geometrically changed. That is the integrator's own repeatability,
 // not a reshape. A merge that actually moved material is orders of magnitude
@@ -165,7 +165,7 @@ bool acceptable(const TopoDS_Shape& before, const Attempt& a, int facesBefore) {
 
 // Escalation ladder for a face-scoped merge. The scope is bounded to the picked
 // faces' shared edges, so a loose tolerance can only affect what the user
-// pointed at — and it has to be loose: on the nacelle NONE of the 41 surviving
+// pointed at - and it has to be loose: on the nacelle NONE of the 41 surviving
 // seams were within 1e-6, they sit between 1e-4 and 1e-2 rad. Tightest first, so
 // a genuinely coplanar pair is still merged the conservative way.
 //
@@ -352,7 +352,7 @@ bool MergeFacesOp::rebindFaces(const TopoDS_Shape& body) {
     }
 
     // Replay onto a rebuilt body: find each anchor's face again by orientation
-    // first, then nearness. Same scheme as ShellOp — good enough because the
+    // first, then nearness. Same scheme as ShellOp - good enough because the
     // picked faces are, by definition, ones the user could see and click.
     if (m_anchors.empty()) return false;
     std::vector<TopoDS_Shape> rebound;
@@ -390,7 +390,7 @@ bool MergeFacesOp::execute(Document& doc) {
         m_facesBefore = faceCount(m_previousShape);
 
         // UnifySameDomain edits its input in place when the merge goes wrong
-        // (see UnifyTolerance.h), and runUnify below is handed the LIVE body —
+        // (see UnifyTolerance.h), and runUnify below is handed the LIVE body -
         // up to five times on the face-scoped ladder. Without a spare, a merge
         // this op then refuses would leave the body silently reshaped: the user
         // is told nothing merged, and the part is already wrong. A merge that
@@ -485,7 +485,7 @@ bool MergeFacesOp::execute(Document& doc) {
             if (acceptable(workShape, a, facesInWork)) best = a;
         }
         // Nothing merged. Refusing means History::pushOperation declines and no
-        // step is added — a merge that did nothing should not litter the
+        // step is added - a merge that did nothing should not litter the
         // timeline, and the caller says so instead.
         if (best.shape.IsNull()) {
             g_lastRefusal = pickIssue != Refusal::None ? pickIssue
@@ -512,7 +512,7 @@ bool MergeFacesOp::execute(Document& doc) {
             carried = materializr::topo::carryThrough(*im, best.history, best.shape);
             // Unify's history describes the shape it built. If ShapeFix then
             // rebuilt faces to close the gap, those ids point at faces that are
-            // no longer in the body — follow the repair's own substitutions
+            // no longer in the body - follow the repair's own substitutions
             // rather than leaving the map half-stale.
             if (!best.fixContext.IsNull()) {
                 materializr::topo::FaceIdMap remapped;
@@ -608,7 +608,7 @@ bool MergeFacesOp::rehydrateFromReload(const ReloadState& state, Document& /*doc
     for (const auto& [id, shp] : state.modifiedBefore)
         if (id == m_bodyId) { m_previousShape = shp; break; }
     // The picked faces are re-found from the anchors at execute() time, against
-    // whatever the body has become by this point in the replay — the stored
+    // whatever the body has become by this point in the replay - the stored
     // TopoDS_Shapes belong to a session that no longer exists.
     m_faces.clear();
     return !m_previousShape.IsNull();

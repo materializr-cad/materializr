@@ -51,7 +51,7 @@ void installCrashBacktrace() {
 // glibc treats 0 as "allocate your own buffer", but MSVC's UCRT rejects it for
 // _IOLBF/_IOFBF as an invalid parameter and calls __fastfail(FAST_FAIL_INVALID_ARG),
 // which killed Materializr on the FIRST LINE of main() with no message at all.
-// Windows 1.6.1 and 1.6.2 could not start at all because of it (#82) — the
+// Windows 1.6.1 and 1.6.2 could not start at all because of it (#82) - the
 // console window opened and closed, and there was nothing to see because the
 // process died before a single write. Verified on Windows: size 0 exits
 // 0xC0000409 in ucrtbase.dll, size 4096 returns 0.
@@ -131,9 +131,9 @@ void printHelp() {
 int main(int argc, char* argv[]) {
     // Line-buffer stdout even when it's a pipe (journald, a log file). Block
     // buffering held MINUTES of prints and flushed them in one burst, giving
-    // every journal line the same timestamp — which made an input-storm
+    // every journal line the same timestamp - which made an input-storm
     // non-bug out of an ordinary session while hiding the real event order.
-    // (MSVC treats _IOLBF as full buffering, so that intent is Linux-only —
+    // (MSVC treats _IOLBF as full buffering, so that intent is Linux-only -
     // but the call must still pass a valid size there. See kStdioBufSize.)
     std::setvbuf(stdout, nullptr, _IOLBF, kStdioBufSize);
     CliOptions opts = parseArgs(argc, argv);
@@ -159,7 +159,7 @@ int main(int argc, char* argv[]) {
                       << " (continuing with stderr to terminal)" << std::endl;
         }
     }
-    // Convert OCCT internal faults (SIGSEGV/SIGFPE inside the kernel — e.g. a
+    // Convert OCCT internal faults (SIGSEGV/SIGFPE inside the kernel - e.g. a
     // NURBS-convert on degenerate geometry) into catchable Standard_Failure
     // exceptions, so an op's try/catch (with OCC_CATCH_SIGNALS) refuses the
     // operation instead of taking the whole app down.

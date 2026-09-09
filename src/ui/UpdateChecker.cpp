@@ -29,7 +29,7 @@ size_t writeToString(void* contents, size_t size, size_t nmemb, void* userp) {
 }
 
 // Extract a quoted JSON string value for a top-level "key". Skips whitespace
-// after the colon and reads through escapes minimally — sufficient for the few
+// after the colon and reads through escapes minimally - sufficient for the few
 // fields we want (tag_name, html_url) without dragging in a JSON dependency.
 std::string findJsonString(const std::string& json, const std::string& key) {
     std::string needle = "\"" + key + "\"";
@@ -59,7 +59,7 @@ std::string findJsonString(const std::string& json, const std::string& key) {
     return out;
 }
 
-// Strip a leading "v"/"V" — release tags are usually "v0.1.0".
+// Strip a leading "v"/"V" - release tags are usually "v0.1.0".
 std::string stripV(std::string s) {
     if (!s.empty() && (s.front() == 'v' || s.front() == 'V')) s.erase(0, 1);
     return s;
@@ -77,7 +77,7 @@ std::vector<int> parseNumericComponents(const std::string& v) {
         else {
             // A hostile/oversized version token (e.g. a crafted tag_name with a
             // 40-digit number) would make std::stoi throw out_of_range and crash
-            // the app on an uncaught exception — treat as 0 instead.
+            // the app on an uncaught exception - treat as 0 instead.
             try { parts.push_back(std::stoi(tok.substr(0, i))); }
             catch (...) { parts.push_back(0); }
         }
@@ -162,7 +162,7 @@ UpdateChecker::Result UpdateChecker::check(const std::string& owner,
     if (!curl) { r.errorMessage = "Failed to initialise libcurl."; return r; }
 
     // Stable channel uses /releases/latest (GitHub excludes pre-releases from
-    // it). Beta channel uses /releases, which lists everything newest-first —
+    // it). Beta channel uses /releases, which lists everything newest-first -
     // the first element is the most recent build, pre-release or not. Both
     // responses put the release's own tag_name / html_url first in the JSON
     // (before the nested author/asset objects), so the same first-match parse
@@ -205,7 +205,7 @@ UpdateChecker::Result UpdateChecker::check(const std::string& owner,
         return r;
     }
     if (httpStatus == 404) {
-        // No releases published yet — treat as "up to date" rather than an error.
+        // No releases published yet - treat as "up to date" rather than an error.
         r.ok = true;
         r.latest = r.current;
         r.errorMessage = "No releases published yet.";
@@ -218,7 +218,7 @@ UpdateChecker::Result UpdateChecker::check(const std::string& owner,
 
     std::string tag = findJsonString(body, "tag_name");
     if (tag.empty()) {
-        // Beta channel with an empty release list ("[]") lands here — treat it
+        // Beta channel with an empty release list ("[]") lands here - treat it
         // as "nothing newer" rather than an error.
         if (includePrereleases) {
             r.ok = true;

@@ -8,11 +8,11 @@ namespace materializr {
 // The three interface layouts (Settings → Appearance → Interface). One
 // mutually-exclusive choice; add future layouts to the end (the numeric
 // values line up with the Settings combo order). Each layout's chrome lives
-// in src/app/layout/<name>/ — see src/app/layout/LayoutCommon.h for the
+// in src/app/layout/<name>/ - see src/app/layout/LayoutCommon.h for the
 // keep-in-lockstep contract when adding features or plugin entry points.
-//   Classic — desktop menu bar + docked panels + status bar.
-//   Modern  — top app bar + tool rail + right side panel.
-//   ImTouch — near-zero chrome: full-bleed viewport, floating overlays
+//   Classic - desktop menu bar + docked panels + status bar.
+//   Modern  - top app bar + tool rail + right side panel.
+//   ImTouch - near-zero chrome: full-bleed viewport, floating overlays
 //             (the name is an homage to ImGui).
 enum class UiLayout { Classic = 0, Modern = 1, ImTouch = 2 };
 
@@ -21,7 +21,7 @@ enum class UiLayout { Classic = 0, Modern = 1, ImTouch = 2 };
 // key is missing or unreadable in the settings file.
 struct AppSettings {
     int  theme              = 0;    // 0 = Dark, 1 = Light
-    // LEGACY — read and written so an existing settings file round-trips, but
+    // LEGACY - read and written so an existing settings file round-trips, but
     // NOTHING consumes it any more. The Linux desktop scale used to be a manual
     // Low/High pick here (Settings → Appearance, plus a first-run picker)
     // because DPI auto-detection was believed unreliable on X11/Xwayland. It
@@ -57,14 +57,14 @@ struct AppSettings {
     // button in the top-right cluster.
     bool imTouchTimeline    = true;
     int  touchRightTab      = 0;    // shell right panel: 0 = Items, 1 = History & Properties
-    // Shell right-panel width in logical px (× uiScale at use) — written by
+    // Shell right-panel width in logical px (× uiScale at use) - written by
     // the panel's left-edge drag splitter / edge tab.
     float touchRightW       = 300.0f;
     // Shell tool-rail width, same convention (edge-tab drag).
     float touchRailW        = 92.0f;
 #if defined(MZ_MOBILE)
     // Touch-first default: trackpad mode (one-finger drag = orbit, two-finger
-    // pan/zoom). Just the first-run default — the Settings dialog can rebind to
+    // pan/zoom). Just the first-run default - the Settings dialog can rebind to
     // Middle/Right for an attached mouse or trackpad, and the choice persists.
     int  orbitButton        = 0;    // ImGuiMouseButton: 0=Left, 1=Right, 2=Middle
     int  panButton          = 0;
@@ -87,7 +87,7 @@ struct AppSettings {
     // behind it).
     float doubleClickTimeSec = 0.30f;
     // Seconds a fillet may spend proving it terminates before it is refused.
-    // OCCT's blend cannot be interrupted, so this is the only bound on it —
+    // OCCT's blend cannot be interrupted, so this is the only bound on it -
     // raise it for heavy bodies, lower it if a stalled fillet feels sluggish.
     float filletProbeSeconds = 2.5f;
 
@@ -98,7 +98,7 @@ struct AppSettings {
     int   msaaSamples    = 4;     // viewport anti-aliasing: 0=off, 2, 4, 8
     int   meshQuality    = 1;     // tessellation density: 0=Low,1=Medium,2=High,3=Ultra
     float selectionLineWidth = 3.0f; // px width of highlighted edges/body outlines (1..10)
-    float sketchLineWidth = 2.5f;    // px width of sketch geometry — thicker reads better over the grid (1..6)
+    float sketchLineWidth = 2.5f;    // px width of sketch geometry - thicker reads better over the grid (1..6)
     float sketchGridOpacity = 0.55f; // opacity of the sketch-plane grid (0..1)
     float sketchGridThickness = 1.0f; // grid line-width multiplier (0.1..2)
     bool  smallScreenWarned = false; // user dismissed the "designed for larger screens" notice
@@ -120,11 +120,11 @@ struct AppSettings {
     // --- Session ---
     // Restore the previous session on launch: every project that was open in a
     // TAB comes back, instead of the home screen. (Named for its single-project
-    // past — the key is kept so users who had it on keep it on.)
+    // past - the key is kept so users who had it on keep it on.)
     bool  autoOpenLastProject = false;
     // Path of the project currently open. Updated on save / load; cleared on
     // File → Close Project. On launch (with autoOpenLastProject on) this is
-    // read and the file is loaded if it still exists — so "I closed the
+    // read and the file is loaded if it still exists - so "I closed the
     // project before quitting" produces an empty launch next time, and
     // "I just quit while working" reopens where you left off. Kept as the
     // single-tab case of sessionPaths below, and as the fallback when a build
@@ -132,7 +132,7 @@ struct AppSettings {
     std::string lastProjectPath;
     // Every open tab's project ref, in tab order, as of the last settings
     // write; `sessionActive` is the index that was in front. Unsaved tabs
-    // contribute an empty entry and are skipped on restore — their work lives
+    // contribute an empty entry and are skipped on restore - their work lives
     // in the recovery snapshots, which have their own prompt. Machine-local
     // (omitted from JSON import/export). Serialized as indexed sessionN_path.
     std::vector<std::string> sessionPaths;
@@ -144,9 +144,9 @@ struct AppSettings {
     std::string lastFileDir;
 
     // Recently opened / saved projects, most-recent-first (capped; see
-    // Application::addRecentProject). `ref` is what re-opens the project — a
+    // Application::addRecentProject). `ref` is what re-opens the project - a
     // filesystem path on desktop, or a persisted SAF content:// URI on
-    // Android — and `name` is the display label. Machine-local (omitted from
+    // Android - and `name` is the display label. Machine-local (omitted from
     // JSON import/export like lastProjectPath). Serialized as indexed
     // recentN_ref / recentN_name keys.
     struct RecentProject { std::string ref; std::string name; };
@@ -202,7 +202,7 @@ struct AppSettings {
     // setup wizard ask on first run.
     int  language = -1;
     // Display unit for every length readout and input: materializr::LengthUnit
-    // (0 mm, 1 cm, 2 m, 3 in, 4 ft). An int for the same reason language is —
+    // (0 mm, 1 cm, 2 m, 3 in, 4 ft). An int for the same reason language is -
     // this header stays free of core/Units.h. The model is always mm; this only
     // changes what the user sees and types.
     int  displayUnit = 0;
@@ -233,7 +233,7 @@ namespace SettingsIO {
     // Portable import/export as JSON, for backing up preferences or moving them
     // between machines (File → Import/Export Settings). Same tolerance contract
     // as load(): unknown keys are ignored and missing keys keep their defaults.
-    // `lastProjectPath` is deliberately omitted — it is machine-specific session
+    // `lastProjectPath` is deliberately omitted - it is machine-specific session
     // state, not a portable preference. On a read error or unparseable file,
     // importJson returns defaults and sets *ok (if provided) to false.
     bool        exportJson(const std::string& path, const AppSettings& s);

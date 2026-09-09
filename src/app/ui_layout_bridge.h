@@ -9,7 +9,7 @@
 //
 // First consumer: the Getting Started tour's layout picker, which switches
 // the layout LIVE behind its modal as the user taps each option (the whole
-// app re-renders in the candidate layout — a real preview, not a screenshot).
+// app re-renders in the candidate layout - a real preview, not a screenshot).
 namespace materializr {
 
 int  currentUiLayoutIndex();

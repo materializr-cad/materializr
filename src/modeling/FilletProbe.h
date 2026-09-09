@@ -5,7 +5,7 @@
 // off to ChFi3d_Builder::Compute(), which takes NO progress argument (see
 // ChFi3d_Builder.hxx). Nothing inside the blend algorithm ever polls for a user
 // break, so a pathological radius cannot be cancelled: the call simply never
-// returns. Observed on FOB.mzr — ChFi3d_Builder::StoreData spinning at 100% CPU
+// returns. Observed on FOB.mzr - ChFi3d_Builder::StoreData spinning at 100% CPU
 // with no progress for minutes, wedging the render loop that called it.
 //
 // Since the build cannot be interrupted, it must not be entered blind. probe()
@@ -15,7 +15,7 @@
 //
 // The worker is detached, not a std::async future, on purpose: a std::future's
 // destructor BLOCKS until the task finishes, so a wedged probe parked in a
-// member vector would hang the app on quit — the same freeze, moved to exit.
+// member vector would hang the app on quit - the same freeze, moved to exit.
 //
 // Detaching is a TRADE, not a clean win, and the trade is this: a detached
 // worker holds its own TopoDS_Shape/TopoDS_Edge copies, so if the process exits
@@ -41,7 +41,7 @@ namespace fillet {
 inline constexpr double kDefaultProbeSeconds = 2.5;
 
 // Passed as `budget` to mean "whatever setProbeBudget() last configured".
-// Distinct from 0.0, which is a real budget meaning "give up immediately" —
+// Distinct from 0.0, which is a real budget meaning "give up immediately" -
 // the tests rely on that difference, so this sentinel is negative, not zero.
 inline constexpr double kUseConfiguredBudget = -1.0;
 

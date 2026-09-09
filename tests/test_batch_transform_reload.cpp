@@ -1,5 +1,5 @@
 // A multi-body gizmo transform ("Move/Rotate/Scale N bodies") must reload as a
-// REAL op that re-applies to the LIVE bodies — not a baked snapshot that
+// REAL op that re-applies to the LIVE bodies - not a baked snapshot that
 // re-slams stale geometry over an upstream edit on replay (the "batchtransform
 // bakes" bug: a repair beneath a threaded body reverted once the step re-landed).
 #include "modeling/BatchTransformOp.h"
@@ -62,7 +62,7 @@ TEST(BatchTransformReload, ReAppliesToLiveGeometryAfterReload) {
     ASSERT_TRUE(fresh->rehydrateFromReload(rs, doc));
 
     // THE FIX: an upstream edit changed body A's geometry (a taller box). Roll
-    // the doc back to that EDITED pre-transform state and replay the batch op —
+    // the doc back to that EDITED pre-transform state and replay the batch op -
     // it must transform the EDITED geometry, not restore a stale snapshot.
     doc.updateBody(a, BRepPrimAPI_MakeBox(10, 10, 30).Shape()); // A is now taller
     doc.updateBody(b, BRepPrimAPI_MakeBox(gp_Pnt(0,20,0),10,10,10).Shape());

@@ -6,7 +6,7 @@ class Document;
 
 namespace materializr {
 
-// OCCT's native BREP format (ASCII, BRepTools::Write/Read) — the exact,
+// OCCT's native BREP format (ASCII, BRepTools::Write/Read) - the exact,
 // lossless exchange path with FreeCAD and anything else OCCT-based. Same
 // disk-axis convention as STEP: files are Z-up, the scene is Y-up.
 class BrepIO {

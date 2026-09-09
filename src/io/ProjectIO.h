@@ -60,10 +60,10 @@ class ProjectIO {
 public:
     // `history` is optional; when provided it is written as a HISTORY section.
     // `thumbnailPng` is optional; when provided (encoded PNG bytes) it is
-    // written as a THUMB_PNG section — base64 on one line, so pre-1.6 loaders
+    // written as a THUMB_PNG section - base64 on one line, so pre-1.6 loaders
     // skip it as an unknown section and old files simply have none.
     // How hard to compress. Measured on a 17 MB project: Balanced and Smallest
-    // produce the SAME 8.7 MB file, but Smallest takes 5.29 s against 1.01 s —
+    // produce the SAME 8.7 MB file, but Smallest takes 5.29 s against 1.01 s -
     // so Balanced is the right default for a file the user waits on. Fastest
     // (0.71 s, 9.1 MB) is for the crash-recovery sidecar, which is rewritten
     // every few seconds and read only after a crash.
@@ -76,7 +76,7 @@ public:
 
     // Extract just the embedded thumbnail (PNG bytes) without loading the
     // project: inflates, then hops over the body blocks via their length
-    // prefixes — no OCCT parsing. Returns false when the file has no
+    // prefixes - no OCCT parsing. Returns false when the file has no
     // THUMB_PNG section (any pre-1.6 save) or can't be read. Cheap enough
     // to run over the whole recent-projects list at startup.
     static bool peekThumbnail(const std::string& filePath,

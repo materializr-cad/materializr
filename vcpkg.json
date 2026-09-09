@@ -1,5 +1,5 @@
 {
-  "$comment": "Windows dependency manifest. Exists to PIN OpenCASCADE to 7.9.3 so Windows matches Android/macOS/Linux — vcpkg's rolling baseline had drifted Windows to OCCT 8.0.0, which hangs long-rod thread generation. The override pins only opencascade; the other ports track the baseline. windows.yml runs `vcpkg x-update-baseline` so the builtin-baseline below is refreshed to the runner's own vcpkg checkout (avoids 'baseline commit not found' if the runner lags/leads this SHA).",
+  "$comment": "Windows dependency manifest. Exists to PIN OpenCASCADE to 7.9.3 so Windows matches Android/macOS/Linux - vcpkg's rolling baseline had drifted Windows to OCCT 8.0.0, which hangs long-rod thread generation. The override pins only opencascade; the other ports track the baseline. windows.yml runs `vcpkg x-update-baseline` so the builtin-baseline below is refreshed to the runner's own vcpkg checkout (avoids 'baseline commit not found' if the runner lags/leads this SHA).",
   "name": "materializr",
   "version-string": "1.4.2",
   "builtin-baseline": "42e4e33e1505c9f47b58c21e0f557c1571b751ee",

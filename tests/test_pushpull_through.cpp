@@ -1,4 +1,4 @@
-// Regression: a push/pull cut deeper than the body consumed the ENTIRE solid —
+// Regression: a push/pull cut deeper than the body consumed the ENTIRE solid -
 // BRepAlgoAPI_Cut returns an empty compound, execute() stored it via
 // updateBody, tessellation then failed every preview frame (stale mesh) and
 // the body vanished on commit. A cut that would leave no solid must be
@@ -61,12 +61,12 @@ TEST(PushPullThrough, CutConsumingWholeBodyIsRefused) {
     targets[0].profile = top;
     targets[0].sourceBodyId = id;
     op.setTargets(std::move(targets));
-    op.setDistance(-50.0); // cut 5x deeper than the body — would consume it all
+    op.setDistance(-50.0); // cut 5x deeper than the body - would consume it all
     op.setCutIntersecting(true); // app sets this for every cut direction
 
     const bool applied = op.execute(doc);
 
-    // The document must still hold the intact solid — never an empty shape.
+    // The document must still hold the intact solid - never an empty shape.
     TopoDS_Shape after = doc.getBody(id);
     EXPECT_TRUE(hasSolid(after))
         << "cut-through stored a solid-less shape (the vanishing-body bug)";
@@ -90,7 +90,7 @@ TEST(PushPullThrough, PartialCutStillWorks) {
     targets[0].profile = top;
     targets[0].sourceBodyId = id;
     op.setTargets(std::move(targets));
-    op.setDistance(-5.0); // pocket half way — legitimate
+    op.setDistance(-5.0); // pocket half way - legitimate
     op.setCutIntersecting(true);
 
     ASSERT_TRUE(op.execute(doc));

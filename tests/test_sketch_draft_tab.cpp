@@ -3,8 +3,8 @@
 //
 // The draft sidecar records the project it belonged to, but the restore
 // ignored that field and simply re-entered sketch mode on whatever session was
-// active. After project recovery that is always tab 0 — restoreProjectRecovery
-// lands the newest snapshot there and switches back to it — so a sketch begun
+// active. After project recovery that is always tab 0 - restoreProjectRecovery
+// lands the newest snapshot there and switches back to it - so a sketch begun
 // in an untitled tab reappeared grafted on top of an unrelated restored
 // project. Steve, 2026-09-04: "it restores it to the first tab instead of its
 // own untitled project as it had been in."
@@ -23,7 +23,7 @@
 using materializr::sketchDraftTargetSession;
 
 namespace {
-const std::string kUntitled;                 // "" — never saved
+const std::string kUntitled;                 // "" - never saved
 const std::string kA = "/home/kevin/a.mzr";
 const std::string kB = "/home/kevin/b.mzr";
 } // namespace
@@ -38,7 +38,7 @@ TEST(SketchDraftTab, SavedProjectGoesToItsOwnTab) {
 
 // The reported case. Project recovery has restored a project into tab 0 and
 // left it in front; the draft came from an untitled tab. It must NOT land on
-// the restored project — it gets a tab of its own.
+// the restored project - it gets a tab of its own.
 TEST(SketchDraftTab, UntitledDraftDoesNotLandOnARestoredProject) {
     const std::vector<std::string> tabs{kA};
     EXPECT_EQ(sketchDraftTargetSession(kUntitled, tabs, 0, /*scratch=*/false),

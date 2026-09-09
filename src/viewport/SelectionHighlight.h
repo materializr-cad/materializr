@@ -22,7 +22,7 @@ public:
     void render(const SelectionManager& sel, const Document& doc,
                 const glm::mat4& view, const glm::mat4& projection);
 
-    // Highlight an explicit list of shapes in one colour — the history-step
+    // Highlight an explicit list of shapes in one colour - the history-step
     // preview (hover/select) knows the exact faces/bodies an op produced and
     // draws them directly, bypassing the SelectionManager. Faces dispatch to
     // the face fill, edges to the edge outline, everything else to the body
@@ -36,7 +36,7 @@ public:
     // width, but most support up to ~10.
     void setLineWidth(float w);
 
-    // Drop every cached tessellation. Called on project load — the entries
+    // Drop every cached tessellation. Called on project load - the entries
     // pin their source shapes alive (see CacheEntry), so the outgoing
     // project's topology would otherwise stay resident forever.
     void clearCaches();
@@ -51,7 +51,7 @@ private:
     // Draw the `count` vertices already resident in `vao` (xyz triplets,
     // GL_LINES order) as quads of `halfWidthPx` pixels using the geometry-
     // shader line program. Used by both edge and body highlighting so
-    // thickness is honoured in core-profile GL. No per-frame upload — the
+    // thickness is honoured in core-profile GL. No per-frame upload - the
     // buffer was filled once when the cache entry was built.
     void drawThickLines(unsigned int vao, int count, const glm::mat4& vp,
                         const glm::vec3& color, float halfWidthPx);
@@ -75,13 +75,13 @@ private:
 
     // Highlight-tessellation caches. Without these, every frame the user has
     // something selected we re-walk the body's edges / the face's triangles /
-    // the edge's curve (GCPnts / triangulation walks — 5-50ms per frame on a
+    // the edge's curve (GCPnts / triangulation walks - 5-50ms per frame on a
     // complex part), so caching is the difference between smooth and 6-fps
     // orbits with a selection. Keyed on the sub-shape's TShape POINTER, with
     // three safety properties the original raw-pointer/vector maps lacked:
     //
     //  1. OWNERSHIP: each entry stores the TopoDS_Shape it was built from,
-    //     pinning the TShape alive — so the key pointer can never be REUSED
+    //     pinning the TShape alive - so the key pointer can never be REUSED
     //     by a new allocation while the entry lives (a freed TShape's address
     //     could otherwise false-hit and render the OLD geometry for a NEW
     //     face).
@@ -90,7 +90,7 @@ private:
     //     TShape but moves the body, so a pointer-only key kept drawing the
     //     outline at the pre-move position ("wireframe lagging behind").
     //  3. BOUNDED SIZE: entries went stale on every topology rebuild (new
-    //     TShape → new entry, old one orphaned forever) — hundreds of edits ×
+    //     TShape → new entry, old one orphaned forever) - hundreds of edits ×
     //     hundreds of KB per big-face entry leaked real memory over a long
     //     session. When a cache exceeds kCacheCap on insert it is cleared
     //     outright: only the CURRENT selection's entries get rebuilt next
@@ -99,7 +99,7 @@ private:
     //
     // Each entry owns a PERSISTENT GPU buffer: the tessellation is uploaded
     // once (GL_STATIC_DRAW) when the entry is built and the CPU copy freed,
-    // so every subsequent frame just binds the VAO and draws — no per-frame
+    // so every subsequent frame just binds the VAO and draws - no per-frame
     // glBufferData re-upload of the (unchanging) selection geometry.
     struct CacheEntry {
         TopoDS_Shape shape;   // ownership pin (see above)

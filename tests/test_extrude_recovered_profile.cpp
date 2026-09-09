@@ -1,7 +1,7 @@
 // Guards the extrude footprint-recovery fallback. When a sketch-sourced
 // extrude's stored region seed fails to re-match on replay (the region moved
 // or its topology changed), the rebuild must fall back to the SAVED footprint
-// — never to the #53 "ALL regions" catastrophe that sweeps every region of the
+// - never to the #53 "ALL regions" catastrophe that sweeps every region of the
 // sketch (grabbing unrelated features and corrupting everything downstream).
 #include <gtest/gtest.h>
 

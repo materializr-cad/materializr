@@ -126,7 +126,7 @@ TopoDS_Edge rebindOne(const TopTools_IndexedMapOfShape& map,
                     std::abs(c0.Axis().Direction().Dot(c1.Axis().Direction())) > kDirTol &&
                     std::abs(c0.Radius() - c1.Radius()) < kDistTol;
             } else {
-                // Free-form curves: midpoint proximity only, and tight — a
+                // Free-form curves: midpoint proximity only, and tight - a
                 // wrong match here would silently blend the wrong edge.
                 // (A relaxed unique-winner pass below rescues fragmented /
                 // merged curves whose midpoint shifted, #54.)
@@ -146,7 +146,7 @@ TopoDS_Edge rebindOne(const TopTools_IndexedMapOfShape& map,
     // Relaxed second chance (#54): a fragmented or merged curved edge keeps
     // its carrier but shifts its midpoint past the strict tolerance. Accept a
     // same-curve-type candidate within 2 mm ONLY when it wins unambiguously
-    // (runner-up at least twice as far) — never a coin-flip re-bind.
+    // (runner-up at least twice as far) - never a coin-flip re-bind.
     TopoDS_Edge loose;
     double d1 = 1e100, d2 = 1e100;
     for (int i = 1; i <= map.Extent(); ++i) {
@@ -176,12 +176,12 @@ bool rebindEdges(const TopoDS_Shape& shape, std::vector<TopoDS_Edge>& edges) {
         std::vector<TopoDS_Edge> rebound;
         rebound.reserve(edges.size());
         for (const auto& e : edges) {
-            if (map.Contains(e)) {          // still a live sub-shape — keep
+            if (map.Contains(e)) {          // still a live sub-shape - keep
                 rebound.push_back(e);
                 continue;
             }
             TopoDS_Edge r = rebindOne(map, e);
-            if (r.IsNull()) return false;   // genuinely gone — caller decides
+            if (r.IsNull()) return false;   // genuinely gone - caller decides
             rebound.push_back(r);
         }
         edges = std::move(rebound);

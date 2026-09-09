@@ -29,7 +29,7 @@ void HelpPanel::render() {
     }
     if (!ImGui::Begin("User Guide", &m_visible)) { ImGui::End(); return; }
 
-    ImGui::TextWrapped("%s", materializr::tr("Welcome to Materializr — a parametric 3D CAD app. This guide covers the basics so you can get something on screen quickly. Camera controls and key bindings can be changed in File → Settings."));
+    ImGui::TextWrapped("%s", materializr::tr("Welcome to Materializr - a parametric 3D CAD app. This guide covers the basics so you can get something on screen quickly. Camera controls and key bindings can be changed in File → Settings."));
 
     section("Navigating the viewport",
         "Drag the middle mouse button to orbit, the right button to pan, and "
@@ -55,13 +55,13 @@ void HelpPanel::render() {
         "distance. Press D for the Dimension tool: click a line, circle, "
         "two points, or two lines (parallel = distance, angled = angle), "
         "click to place the label, then type the value. Switch to Select / "
-        "Move to drag existing points and lines — double-click empties to "
+        "Move to drag existing points and lines - double-click empties to "
         "select the whole sketch, then use Copy / Mirror / Rotate. Click "
         "Finish Sketch (or press Enter) to exit.");
 
     section("Modelling from a sketch",
         "With a sketch region or face selected, click Extrude or Push/Pull. "
-        "An arrow gizmo appears on the face — drag it for live preview, or "
+        "An arrow gizmo appears on the face - drag it for live preview, or "
         "type a value in the popup. Negative values cut into the body. After "
         "you have a body, use Fillet or Chamfer on edges (drag the handle "
         "outward to grow the radius/distance) and Mirror / Pattern from the "
@@ -78,7 +78,7 @@ void HelpPanel::render() {
         "edit its parameters in Properties; right-click for Delete, Disable, "
         "Set Breakpoint, or Edit. Click a fillet/chamfer face in the viewport "
         "to jump straight to its history step. Reloaded projects show "
-        "steps marked (reloaded) — undo/redo still walks through them but "
+        "steps marked (reloaded) - undo/redo still walks through them but "
         "their parameters can't be re-edited.");
 
     section("Saving and autosave",

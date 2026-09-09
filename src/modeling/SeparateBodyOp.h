@@ -6,10 +6,10 @@
 #include <vector>
 
 // Separate: a body whose shape holds several DISCONNECTED solids (air-gapped
-// lumps that got fused into one body object — e.g. a boolean leaving tool
+// lumps that got fused into one body object - e.g. a boolean leaving tool
 // remnants) is split into one body per solid. The largest lump keeps the
 // original body; every other lump becomes a new body the user can inspect or
-// delete. Purely a re-parceling of existing geometry — no shape changes.
+// delete. Purely a re-parceling of existing geometry - no shape changes.
 class SeparateBodyOp : public Operation {
 public:
     SeparateBodyOp() = default;
@@ -19,7 +19,7 @@ public:
     int getBodyId() const { return m_bodyId; }
     const std::vector<int>& getNewBodyIds() const { return m_newBodyIds; }
 
-    // Number of disconnected solids in a body shape — the menu gate uses this
+    // Number of disconnected solids in a body shape - the menu gate uses this
     // to only offer Separate when there is actually something to separate.
     static int solidCount(const TopoDS_Shape& shape);
 

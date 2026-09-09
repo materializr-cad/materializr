@@ -22,7 +22,7 @@ public:
 
     bool initialize();
 
-    // Width (px) for committed sketch geometry — user setting (Sketch line
+    // Width (px) for committed sketch geometry - user setting (Sketch line
     // width). Point markers scale with it too. See uploadAndDraw / drawLines.
     void setLineWidth(float w) { m_lineWidth = w; }
 
@@ -46,14 +46,14 @@ public:
                           const glm::mat4& view, const glm::mat4& projection);
 
     // Highlight every primitive in a sketch (lines, circles, arcs, splines,
-    // polygon edges) in a single colour at the given line width — used when
+    // polygon edges) in a single colour at the given line width - used when
     // the whole sketch is in the selection, including open profiles that
     // have no closed region for renderRegionBoundary to outline.
     void renderSketchHighlight(const Sketch* sketch,
                                const glm::vec3& color, float lineWidth,
                                const glm::mat4& view, const glm::mat4& projection);
 
-    // Highlight only specific elements (by id) of a sketch — used to show which
+    // Highlight only specific elements (by id) of a sketch - used to show which
     // line / circle / arc a selected history step edits, even when that sketch
     // isn't the one being actively drawn.
     void renderElementsHighlight(const Sketch* sketch,
@@ -95,15 +95,15 @@ private:
     // ── Static-sketch geometry cache ────────────────────────────────────
     // Every VISIBLE sketch used to regenerate its full CPU vertex stream
     // (64-segment circles, spline resampling, …) AND re-upload it through
-    // glBufferData every rendered frame — the dominant per-frame cost when
+    // glBufferData every rendered frame - the dominant per-frame cost when
     // sketches are on screen in a complex project. Sketches rendered with
     // no tool/solver (everything except the one being actively edited) are
     // pure functions of their geometry + plane, so their draw passes are
     // captured ONCE into persistent GPU buffers and revalidated with a
     // content signature: an FNV-1a hash of the plane, points, elements and
     // pass inputs. Hash validation (instead of a mutation counter on
-    // Sketch) makes the cache immune to EVERY mutation route — ops, the
-    // solver, whole-object snapshot restores — at O(content bytes) per
+    // Sketch) makes the cache immune to EVERY mutation route - ops, the
+    // solver, whole-object snapshot restores - at O(content bytes) per
     // frame, orders of magnitude cheaper than retessellating. The ACTIVE
     // sketch keeps the untouched live path (it legitimately changes every
     // frame while drawing).
@@ -133,7 +133,7 @@ private:
     std::uint64_t contentSignature(const Sketch* sketch) const;
 
     // Frame-local point lookup: Sketch::getPoint is a linear scan, and the
-    // draw passes called it 1-3× per element — O(elements × points) per
+    // draw passes called it 1-3× per element - O(elements × points) per
     // sketch per frame. Built once per render() from getPoints(); pointers
     // are valid for the duration of the call only.
     void buildPointLut(const Sketch* sketch);

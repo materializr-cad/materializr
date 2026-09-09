@@ -1,8 +1,8 @@
-// Rung 4: generation-map ("gen") naming — the seed of the general kernel.
+// Rung 4: generation-map ("gen") naming - the seed of the general kernel.
 // A prism's side face is named by its DERIVATION (the profile edge that
 // generated it, via OCCT's BRepBuilderAPI Generated() map), not by geometry.
 // The decisive property: that name, minted on the ORIGINAL prism, resolves to
-// the STRUCTURALLY CORRESPONDING face after the profile is edited — because the
+// the STRUCTURALLY CORRESPONDING face after the profile is edited - because the
 // derivation structure is invariant even though the geometry changed. This is
 // what will eventually cover blend/boolean/loft faces no sketch scheme can name.
 
@@ -85,7 +85,7 @@ TEST(TopoGen, PrismSideFaceNameSurvivesProfileEdit) {
 
     // Resolve the ORIGINAL name against the NEW prism: it must land the front
     // wall of the widened prism (y=0), now spanning x 0..40 (area 40x10=400),
-    // centroid ~ (20,0,5) — the structurally corresponding face.
+    // centroid ~ (20,0,5) - the structurally corresponding face.
     topo::Context ctx2;
     ctx2.shape = prism2; ctx2.type = TopAbs_FACE; ctx2.gen = &led2;
     TopoDS_Shape out;

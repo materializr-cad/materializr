@@ -17,7 +17,7 @@ using materializr::gridStepForZoom;
 namespace {
 constexpr float kMinPx = 8.0f;
 
-// Legitimate only if step is base x 10^n for a whole n — positive, zero or
+// Legitimate only if step is base x 10^n for a whole n - positive, zero or
 // negative. Checked in log space because the ratio spans 40 decades.
 bool isDecadeMultiple(float step, float base) {
     const double n = std::log10(static_cast<double>(step) / base);
@@ -60,7 +60,7 @@ TEST(GridScale, CellStaysLegibleAndTheStepStaysADecadeMultiple) {
     }
 }
 
-// A base already sized for the zoom is left exactly alone — no drift, and no
+// A base already sized for the zoom is left exactly alone - no drift, and no
 // cosmetic rescaling of a step the user deliberately chose.
 TEST(GridScale, LeavesAWellSizedBaseUntouched) {
     // cell = 1.0 / 0.05 = 20 px, inside [8, 80).
@@ -95,7 +95,7 @@ TEST(GridScale, RejectsNonFiniteAndNonPositiveInputs) {
     EXPECT_FLOAT_EQ(0.0f, gridStepForZoom(0.0f, 15.0f, kMinPx));
 }
 
-// Extreme zooms must stay finite and positive at both ends — the step is
+// Extreme zooms must stay finite and positive at both ends - the step is
 // divided by AND modulo'd by, so neither an infinity nor a zero may escape.
 TEST(GridScale, ExtremeZoomsStayFiniteAndPositive) {
     for (float mmPerPx : {1.0e-30f, 1.0e-10f, 1.0e10f, 1.0e30f, 1.0e37f}) {
@@ -127,7 +127,7 @@ TEST(GridScale, OpeningSketchViewStaysHumanScaleInEveryUnit) {
         EXPECT_LE(span, kCap) << cs.unit << ": a first view must stay human scale";
     }
 
-    // Millimetres are untouched — the whole point is that the common case does
+    // Millimetres are untouched - the whole point is that the common case does
     // not move. 40 mm in, 40 mm out.
     EXPECT_FLOAT_EQ(40.0f,
         materializr::openingSketchSpanMm(40.0f, 1.0f, kMin, kCap));

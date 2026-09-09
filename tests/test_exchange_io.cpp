@@ -1,6 +1,6 @@
 // Exchange formats round 1 (#41 BREP in/out, #42 OBJ export, #43 DXF sketch
 // export, #44 3MF export). BREP is verified by geometric round-trip; the
-// mesh/drawing exporters by structural parses of what they wrote — every
+// mesh/drawing exporters by structural parses of what they wrote - every
 // numeric claim is checked against the source document, not just "file
 // exists".
 #include <gtest/gtest.h>
@@ -95,10 +95,10 @@ TEST(BrepIO, RoundTripsTwoBodiesWithExactVolumes) {
 
 TEST(BrepIO, DiskFileIsZUpPerTheStepConvention) {
     // A self-round-trip can't see a rotation-sign error (the pair inverts
-    // itself), so read the exported file RAW — no import rotation — and
+    // itself), so read the exported file RAW - no import rotation - and
     // assert the disk axes: scene box 20(X)×30(Y-up)×40(Z) must land with
     // its height on disk-Z (extent 30) and scene-Z on disk −Y (extent 40,
-    // span [−40, 0]) — exactly what StepIO/StlExport write. Caught #45.
+    // span [−40, 0]) - exactly what StepIO/StlExport write. Caught #45.
     Document doc;
     doc.addBody(BRepPrimAPI_MakeBox(20.0, 30.0, 40.0).Shape(), "Box");
     const std::string path = tmpPath("axes.brep");
@@ -143,7 +143,7 @@ TEST(BrepIO, ImportRejectsGarbage) {
 
 TEST(IgesIO, RoundTripRestoresSceneOrientation) {
     // IGES translates solids as surface collections by default, so volume is
-    // not a meaningful invariant — the scene-space BOUNDING BOX is: it proves
+    // not a meaningful invariant - the scene-space BOUNDING BOX is: it proves
     // the export and import rotations compose to identity (the actual #46
     // fix) and the size survives.
     Document doc;
@@ -169,7 +169,7 @@ TEST(IgesIO, RoundTripRestoresSceneOrientation) {
 
 TEST(IgesIO, DiskFileIsZUpPerTheStepConvention) {
     // Same raw-read pattern as the BREP twin (#45): read the file with the
-    // bare OCCT reader — none of our import rotation — and assert disk axes.
+    // bare OCCT reader - none of our import rotation - and assert disk axes.
     Document doc;
     doc.addBody(BRepPrimAPI_MakeBox(20.0, 30.0, 40.0).Shape(), "Box");
     const std::string path = tmpPath("axes.iges");
@@ -264,7 +264,7 @@ TEST(DxfExport, WritesAllEntityKindsWithExactValues) {
     // Circle radius written under group 40.
     EXPECT_NE(text.find("40\n7.500000"), std::string::npos);
     // Arc angles: group 50 (start) ≈ 0°, group 51 (end) ≈ 90°. Parsed, not
-    // string-matched — the sketch stores points as float vec2 and addArc
+    // string-matched - the sketch stores points as float vec2 and addArc
     // re-derives the end point through float trig, so the written angle is
     // 90-ish to ~1e-5° (observed 90.000003), which is exactly right for the
     // exporter to pass through.

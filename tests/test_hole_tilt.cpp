@@ -5,10 +5,10 @@
 // The earlier probe tried to find "the wire on the top face" by matching plane
 // Z, got the void's silhouette instead, and sent me chasing three fixes for a
 // measurement bug. Asking "is this point inside the solid?" can't be fooled the
-// same way: it is the actual question — did material move or not.
+// same way: it is the actual question - did material move or not.
 //
 // Block 40x40x20, Ø10 hole on the axis at (20,20). The move is 12 mm so the old
-// and new openings are DISJOINT (x[15..25] vs x[27..37]) — at 4 mm they overlap
+// and new openings are DISJOINT (x[15..25] vs x[27..37]) - at 4 mm they overlap
 // and "the old spot is now solid" is simply false, which cost me a debugging
 // round when the assertion failed for the right reason.
 #include <gtest/gtest.h>
@@ -48,7 +48,7 @@ bool insideSolid(const TopoDS_Shape& s, double x, double y, double z) {
     return cls.State() == TopAbs_IN;
 }
 
-// The hole's cylindrical wall — the face a user would click.
+// The hole's cylindrical wall - the face a user would click.
 TopoDS_Face holeWall(const TopoDS_Shape& s) {
     for (TopExp_Explorer fx(s, TopAbs_FACE); fx.More(); fx.Next()) {
         const TopoDS_Face& f = TopoDS::Face(fx.Current());
@@ -108,12 +108,12 @@ TEST(TiltOp, TopRimMovesAndBottomRimStaysPut) {
                 "  top new (32,20,19) now hole : %d\n",
                 (int)botStillHole, (int)topOldSolid, (int)topNewHole);
 
-    EXPECT_TRUE(botStillHole) << "the pinned rim moved — the bottom closed up";
-    EXPECT_TRUE(topOldSolid)  << "the near rim did not move — old spot still open";
+    EXPECT_TRUE(botStillHole) << "the pinned rim moved - the bottom closed up";
+    EXPECT_TRUE(topOldSolid)  << "the near rim did not move - old spot still open";
     EXPECT_TRUE(topNewHole)   << "no opening where the rim was moved to";
 }
 
-// Slide must keep working exactly as before — the tilt shares its recipe.
+// Slide must keep working exactly as before - the tilt shares its recipe.
 TEST(TiltOp, SlideStillMovesBothRims) {
     Holed f;
     MoveHoleOp op;
@@ -134,7 +134,7 @@ TEST(TiltOp, SlideStillMovesBothRims) {
 // ── Non-round holes ─────────────────────────────────────────────────────────
 // The loft never inspects the profile, so in principle a square hole tilts by
 // the same code. The risk is vertex CORRESPONDENCE: ThruSections pairs the two
-// wires up, and if it starts them at different corners the loft twists — the
+// wires up, and if it starts them at different corners the loft twists - the
 // bore would spiral instead of leaning. A square is the cheapest thing that
 // would expose it (a twist shows as a wrong volume and a wrong opening).
 namespace {
@@ -191,7 +191,7 @@ TEST(TiltOp, SquareHoleTilts) {
     EXPECT_TRUE(valid);
     // A twisted loft changes the swept volume; an honest lean does not.
     EXPECT_NEAR(volumeOf(out), before, 1.0)
-        << "volume changed — the loft probably twisted between corners";
+        << "volume changed - the loft probably twisted between corners";
 
     // Square hole 10 wide moved 12: old opening x[15..25], new x[27..37].
     EXPECT_FALSE(insideSolid(out, 20, 20, 1))  << "pinned rim moved";
@@ -201,7 +201,7 @@ TEST(TiltOp, SquareHoleTilts) {
 
 // ── EdgeMove: drag one straight side, neighbours follow ─────────────────────
 namespace {
-// The rim edge nearest a given x on the top face — what a user would grab.
+// The rim edge nearest a given x on the top face - what a user would grab.
 TopoDS_Edge topRimEdgeNear(const TopoDS_Shape& s, double wantX) {
     TopoDS_Edge best; double bestD = 1e30;
     for (TopExp_Explorer ex(s, TopAbs_EDGE); ex.More(); ex.Next()) {
@@ -243,7 +243,7 @@ TEST(TiltOp, EdgeMoveWidensASquareHole) {
     EXPECT_LT(volumeOf(out), before - 100.0) << "nothing was removed";
 
     // Bottom keeps its 10 mm square; the top now reaches past x=25.
-    EXPECT_TRUE(insideSolid(out, 28, 20, 1))   << "bottom widened — it shouldn't";
+    EXPECT_TRUE(insideSolid(out, 28, 20, 1))   << "bottom widened - it shouldn't";
     EXPECT_FALSE(insideSolid(out, 28, 20, 19)) << "top did not widen";
 }
 
@@ -337,7 +337,7 @@ TEST(HoleEdgePick, OneSquareSideMeansEdgeMoveAllFourMeanTilt) {
     EXPECT_TRUE(all.ok);
     EXPECT_EQ(all.mode, MoveHoleOp::Mode::Tilt);
 
-    // Two of four is neither verb — decline rather than guess.
+    // Two of four is neither verb - decline rather than guess.
     const auto two = MoveHoleOp::classifyRimEdges(in, {rim[0], rim[1]});
     EXPECT_FALSE(two.ok);
 }
@@ -356,7 +356,7 @@ TEST(HoleEdgePick, BothRimsMeanSlide) {
 
 // THE TRAP: buildVoid names the mouths in its own order, not the user's. Tilt
 // must pin the rim that was NOT grabbed, so grabbing either rim has to be
-// recognised — and as the near one.
+// recognised - and as the near one.
 TEST(HoleEdgePick, EitherRimCanBeTheGrabbedOne) {
     Holed f;
     const TopoDS_Shape in = f.doc.getBody(f.bodyId);
@@ -369,7 +369,7 @@ TEST(HoleEdgePick, EitherRimCanBeTheGrabbedOne) {
     EXPECT_EQ(pTop.mode, MoveHoleOp::Mode::Tilt);
     EXPECT_EQ(pBot.mode, MoveHoleOp::Mode::Tilt);
     EXPECT_NE(pTop.nearIsEntry, pBot.nearIsEntry)
-        << "both rims resolved to the same mouth — tilt would pin the wrong end";
+        << "both rims resolved to the same mouth - tilt would pin the wrong end";
 }
 
 // An ordinary edge is not a rim: offer nothing (never a surprise body move).
@@ -387,7 +387,7 @@ TEST(HoleEdgePick, PlainBoxEdgeOffersNothing) {
     EXPECT_FALSE(MoveHoleOp::classifyRimEdges(in, {corner}).ok);
 }
 
-// classifyRimEdges reporting the right mouth is only half the job — the OP has
+// classifyRimEdges reporting the right mouth is only half the job - the OP has
 // to act on it. It didn't: nearIsEntry was computed, returned, and dropped on
 // the floor, so Tilt always moved buildVoid's "entry" rim whichever end the
 // user grabbed. Grab the bottom and the TOP would swing away.
@@ -427,7 +427,7 @@ TEST(TiltOp, NearRimFlagDecidesWhichEndMoves) {
 
     EXPECT_NE(aTopMoved, bTopMoved) << "flipping nearIsEntry moved the same end";
     EXPECT_NE(aBotMoved, bBotMoved) << "flipping nearIsEntry pinned the same end";
-    // Exactly one end moves in each case — a tilt, not a slide.
+    // Exactly one end moves in each case - a tilt, not a slide.
     EXPECT_NE(aTopMoved, aBotMoved) << "near=entry slid the whole bore";
     EXPECT_NE(bTopMoved, bBotMoved) << "near=exit slid the whole bore";
 }
@@ -453,7 +453,7 @@ TEST(MoveHoleSerialize, ModeAndNearFlagRoundTrip) {
     EXPECT_NEAR(dst.getMoveVector().Y(), -2.5, 1e-9);
 }
 
-// Projects saved before the mode was written must still load, as slides —
+// Projects saved before the mode was written must still load, as slides -
 // which is what they were.
 TEST(MoveHoleSerialize, OldBlobWithoutModeLoadsAsSlide) {
     MoveHoleOp dst;

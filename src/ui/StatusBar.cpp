@@ -65,7 +65,7 @@ void StatusBar::render() {
             bodyCount = m_document->bodyCount();
         }
 
-        // Project name first — the thing people most want to confirm.
+        // Project name first - the thing people most want to confirm.
         ImGui::Text(materializr::tr("Project: %s"),
                     m_projectName.empty() ? "New project"
                                           : m_projectName.c_str());

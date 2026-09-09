@@ -13,6 +13,7 @@
 #include <Poly_Triangulation.hxx>
 #include <TopLoc_Location.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
+#include "core/MeshParams.h"
 #include <BRepAdaptor_Curve.hxx>
 #include <GCPnts_TangentialDeflection.hxx>
 
@@ -109,7 +110,7 @@ bool SelectionHighlight::initialize() {
 
     // Second program with a geometry shader for thick lines. GL ES 3.0 has no
     // geometry shaders, so on Android m_lineProgram stays 0 and drawThickLines()
-    // becomes a no-op — selected faces still highlight; thick edge outlines are
+    // becomes a no-op - selected faces still highlight; thick edge outlines are
     // skipped (TODO: emulate with an instanced-quad expansion in the touch pass).
 #if !defined(MZ_GLES)
     unsigned int lvert = 0, lgeom = 0, lfrag = 0;
@@ -141,7 +142,7 @@ bool SelectionHighlight::initialize() {
     m_locHalfWidth = glGetUniformLocation(m_lineProgram, "u_halfWidth");
 #endif
 
-    // No shared scratch VAO/VBO any more — each cache entry owns its own
+    // No shared scratch VAO/VBO any more - each cache entry owns its own
     // persistent buffer (see CacheEntry), uploaded once on build.
     return true;
 }
@@ -245,10 +246,10 @@ void SelectionHighlight::clearCaches() {
 
 void SelectionHighlight::renderFace(const TopoDS_Shape& faceShape, const glm::mat4& vp,
                                      const glm::vec3& color) {
-    // Just a blue tint over the face — no outline, no solid
+    // Just a blue tint over the face - no outline, no solid
     TopoDS_Face face = TopoDS::Face(faceShape);
 
-    // Cache the triangulated vertex buffer per face — walking every triangle
+    // Cache the triangulated vertex buffer per face - walking every triangle
     // per frame was 5-50ms on a big NURBS face. See the CacheEntry comment in
     // the header for the key/ownership/revalidation/cap scheme.
     const void* key = faceShape.TShape().get();
@@ -257,14 +258,9 @@ void SelectionHighlight::renderFace(const TopoDS_Shape& faceShape, const glm::ma
         TopLoc_Location location;
         Handle(Poly_Triangulation) tri = BRep_Tool::Triangulation(face, location);
         if (tri.IsNull()) {
-            BRepMesh_IncrementalMesh mesh(faceShape, 0.1);
-            mesh.Perform();
+            BRepMesh_IncrementalMesh mesh(faceShape, materializr::meshParams(0.1, 0.5, false));
             tri = BRep_Tool::Triangulation(face, location);
-            if (tri.IsNull()) return;
         }
-
-        const gp_Trsf& trsf = location.Transformation();
-        bool hasXform = !location.IsIdentity();
 
         if (it == m_faceCache.end() && m_faceCache.size() >= kCacheCap)
             freeCacheGL(m_faceCache); // flush orphans; live entries rebuild next frame
@@ -272,6 +268,16 @@ void SelectionHighlight::renderFace(const TopoDS_Shape& faceShape, const glm::ma
         entry.shape = faceShape;
         entry.loc = faceShape.Location();
         std::vector<float> verts;
+        // A face the mesher cannot triangulate (a self-intersecting wire, some
+        // fused tangent surfaces) gets an EMPTY entry, so the mesher is not
+        // re-run on every frame it stays selected; the entry draws nothing.
+        if (tri.IsNull()) {
+            uploadEntry(entry, verts);
+            return;
+        }
+
+        const gp_Trsf& trsf = location.Transformation();
+        bool hasXform = !location.IsIdentity();
         verts.reserve(tri->NbTriangles() * 9);
         for (int i = 1; i <= tri->NbTriangles(); i++) {
             int n1, n2, n3;
@@ -399,7 +405,7 @@ void SelectionHighlight::drawThickLines(unsigned int vao, int count, const glm::
 
 #if defined(MZ_GLES)
     // GL ES 3.0 has no geometry shader, so there's no screen-space line widening
-    // (m_lineProgram is 0). Fall back to plain GL_LINES with the basic program —
+    // (m_lineProgram is 0). Fall back to plain GL_LINES with the basic program -
     // the selection outline renders, just at hardware line width rather than the
     // antialiased ribbon. (void halfWidthPx; line width is fixed.)
     (void)halfWidthPx;

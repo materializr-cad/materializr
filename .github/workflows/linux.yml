@@ -23,7 +23,7 @@ on:
   release:
     types: [ published ]
 
-# A new push on main cancels the previous build still in flight — older runs
+# A new push on main cancels the previous build still in flight - older runs
 # wouldn't ship anyway.
 concurrency:
   group: linux-${{ github.ref }}
@@ -34,7 +34,7 @@ jobs:
     name: AppImage (${{ matrix.arch }})
     # `contents: write` lets action-gh-release attach the AppImages to a
     # published Release. Without it the attach step fails with "Resource not
-    # accessible by integration" — which is exactly how the aarch64 (and CI
+    # accessible by integration" - which is exactly how the aarch64 (and CI
     # x86_64) assets silently vanished from every release after v0.3.x.
     # windows.yml has carried this block all along.
     permissions:
@@ -51,7 +51,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # The runners come with Docker pre-installed and BuildKit enabled — the
+      # The runners come with Docker pre-installed and BuildKit enabled - the
       # build script just shells out to `docker build`. Native build on each
       # arch (no QEMU emulation), so the aarch64 run is real-time, not glacial.
       - name: Verify Docker

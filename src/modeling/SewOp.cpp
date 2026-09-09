@@ -39,7 +39,7 @@ double volumeOf(const TopoDS_Shape& s) {
 }
 
 // Edges carried by exactly one face. A degenerate edge is a parametric artefact
-// — a cone apex, a sphere pole — with no free side, so it is never a gap.
+// - a cone apex, a sphere pole - with no free side, so it is never a gap.
 int freeEdgeCount(const TopoDS_Shape& s) {
     if (s.IsNull()) return 0;
     TopTools_IndexedDataMapOfShapeListOfShape anc;
@@ -84,7 +84,7 @@ bool SewOp::execute(Document& doc) {
             for (TopExp_Explorer ex(s, TopAbs_FACE); ex.More(); ex.Next()) ++faces;
         if (faces == 0) return false;
 
-        // Tightest tolerance that closes — see the header for why this is a
+        // Tightest tolerance that closes - see the header for why this is a
         // ladder and not a slider.
         TopoDS_Shape best;
         int bestFree = -1;
@@ -135,7 +135,7 @@ bool SewOp::execute(Document& doc) {
         }
 
         // Refuse a no-op rather than spend a history step on it. With nothing
-        // to join, sewing a lone body can only hand back what went in — either
+        // to join, sewing a lone body can only hand back what went in - either
         // it was already a solid, or it is a shell that stayed exactly as open
         // as it started. Checking !madeSolid alone missed the first case, which
         // is the common one: an ordinary solid re-solidified into itself and
@@ -167,7 +167,7 @@ bool SewOp::undo(Document& doc) {
         if (!m_bodyIds.empty() && !m_previousShape.IsNull())
             doc.updateBody(m_bodyIds.front(), m_previousShape);
         // Back under their ORIGINAL ids, so any later step that names one still
-        // resolves it — the DeleteOp discipline.
+        // resolves it - the DeleteOp discipline.
         for (const auto& c : m_consumed) {
             doc.putBody(c.id, c.shape, c.name);
             doc.setBodyVisible(c.id, c.visible);

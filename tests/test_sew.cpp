@@ -49,7 +49,7 @@ int freeEdges(const TopoDS_Shape& s) {
     return n;
 }
 
-// The faces of a box, each added to `doc` as its own one-face surface body —
+// The faces of a box, each added to `doc` as its own one-face surface body -
 // what a user ends up with after patching a space shut one opening at a time.
 std::vector<int> boxAsLooseFaces(Document& doc, double size, int skip = -1) {
     const TopoDS_Shape box = BRepPrimAPI_MakeBox(size, size, size).Shape();
@@ -77,7 +77,7 @@ TEST(Sew, SixLooseFacesBecomeASolid) {
     EXPECT_TRUE(op.madeSolid());
     EXPECT_EQ(op.freeEdgesLeft(), 0);
     EXPECT_EQ(op.facesSewn(), 6);
-    // One body left, and it has a volume — which is the entire point.
+    // One body left, and it has a volume - which is the entire point.
     EXPECT_EQ(doc.getAllBodyIds().size(), 1u);
     const TopoDS_Shape r = doc.getBody(ids.front());
     EXPECT_TRUE(isSolid(r));
@@ -143,8 +143,8 @@ TEST(Sew, DiffReportsTheConsumedBodiesAsDeleted) {
 }
 
 TEST(Sew, ASingleClosedShellBecomesASolid) {
-    // No second selection to make: a shell that already closes — one that came
-    // in from STEP, or the body a last patch just finished — is a valid Sew.
+    // No second selection to make: a shell that already closes - one that came
+    // in from STEP, or the body a last patch just finished - is a valid Sew.
     Document doc;
     const TopoDS_Shape box = BRepPrimAPI_MakeBox(10.0, 10.0, 10.0).Shape();
     BRepBuilderAPI_Sewing sew(1e-6);

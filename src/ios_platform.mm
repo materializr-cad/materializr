@@ -1,4 +1,4 @@
-// iOS runtime setup — the counterpart of android_platform.cpp, but much
+// iOS runtime setup - the counterpart of android_platform.cpp, but much
 // smaller: the .app bundle is a real directory, so nothing needs extracting.
 // We chdir into the bundle (cwd-relative "assets/fonts/<name>" resolves as on
 // Android after its extraction step) and point the OCCT CSF_* env vars straight
@@ -26,7 +26,7 @@ namespace {
 std::atomic<bool> g_inBackground{false};
 
 // SDL delivers SDL_APP_WILLENTERBACKGROUND / DIDENTERFOREGROUND through event
-// watches *during* the UIKit callback — they cannot be polled later, because
+// watches *during* the UIKit callback - they cannot be polled later, because
 // the process may be suspended before the queue is drained. The watch just
 // flips the flag Application::run() gates rendering on.
 int lifecycleWatch(void*, SDL_Event* e) {
@@ -71,7 +71,7 @@ void iosInitRuntime() {
 
         // (2) Settings: SettingsIO::defaultPath() uses $HOME/.config/materializr.
         //     The container *root* $HOME points at is not writable on device
-        //     (mkdir → EPERM; only Documents/, Library/, tmp/ are) — re-point
+        //     (mkdir → EPERM; only Documents/, Library/, tmp/ are) - re-point
         //     HOME at Library/ so the desktop path logic lands somewhere
         //     writable, out of the user's Files view, and backed up.
         NSString* lib = NSSearchPathForDirectoriesInDomains(
@@ -87,7 +87,7 @@ void iosInitRuntime() {
                              ec.message().c_str());
         }
 
-        // (3) OpenCASCADE resources: bundled as a plain directory tree —
+        // (3) OpenCASCADE resources: bundled as a plain directory tree -
         //     point every CSF_* var straight at it, no extraction step.
         const std::string resRoot = std::string(res ? res.UTF8String : ".") + "/occt-resources";
         auto setres = [&](const char* var, const std::string& sub) {
@@ -112,7 +112,7 @@ void iosInitRuntime() {
         SDL_InitSubSystem(SDL_INIT_EVENTS);
         SDL_AddEventWatch(lifecycleWatch, nullptr);
 
-        // Log what actually resolved — the first thing to check if fonts or
+        // Log what actually resolved - the first thing to check if fonts or
         // STEP import misbehave (see ios/README.md "First-build checklist").
         std::error_code ec;
         std::fprintf(stderr,

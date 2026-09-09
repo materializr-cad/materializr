@@ -18,7 +18,7 @@
 // poison survives.
 //
 // If M_PI comes back in that header, THIS FILE STOPS COMPILING with an
-// undeclared identifier. A build error here means the dependency returned —
+// undeclared identifier. A build error here means the dependency returned -
 // it does not mean this test is broken.
 #include <cmath>
 #undef M_PI
@@ -56,7 +56,7 @@ TEST(LengthEdit, LengthFieldCommitWritesMm) {
 
 // 11. Convert, THEN halve. A circle's Radius constraint is typed as a diameter:
 // "2" under inches is a 2 in diameter = 50.8 mm, stored as a 25.4 mm radius.
-// Mutation: halve then convert gives the same number here — so the arc case
+// Mutation: halve then convert gives the same number here - so the arc case
 // and the angle case pin the order: an arc must NOT be halved, an angle must
 // NOT be converted.
 TEST(LengthEdit, RadiusEditConvertsThenHalves) {
@@ -93,7 +93,7 @@ TEST(LengthEdit, DimensionEditRefusesBadInput) {
 }
 
 // Seeding mirrors the commit: a circle shows its diameter, an arc its radius,
-// an angle its degrees — all in the current unit except the angle.
+// an angle its degrees - all in the current unit except the angle.
 TEST(LengthEdit, SeedDimensionTextMirrorsApply) {
     ScopedUnit s(LengthUnit::In);
     char b[32];
@@ -125,7 +125,7 @@ TEST(LengthEdit, SliderBoundsConvertTogether) {
 // 13. Drags snap in the DISPLAY unit's step, not to 0.1 mm.
 TEST(LengthEdit, DragQuantisesInDisplayUnit) {
     { ScopedUnit s(LengthUnit::In); EXPECT_NEAR(25.654, materializr::quantiseDragMm(25.7), 1e-9) << "in dragStep 0.01 in = 0.254 mm"; }
-    { ScopedUnit s(LengthUnit::Mm); EXPECT_NEAR(25.7, materializr::quantiseDragMm(25.7), 1e-9) << "mm dragStep 0.1 — the snap upstream always had"; }
+    { ScopedUnit s(LengthUnit::Mm); EXPECT_NEAR(25.7, materializr::quantiseDragMm(25.7), 1e-9) << "mm dragStep 0.1 - the snap upstream always had"; }
     { ScopedUnit s(LengthUnit::Cm); EXPECT_NEAR(25.7, materializr::quantiseDragMm(25.7), 1e-9) << "cm dragStep 0.01 cm = 0.1 mm"; }
 }
 

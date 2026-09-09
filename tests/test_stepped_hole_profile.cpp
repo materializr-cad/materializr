@@ -1,7 +1,7 @@
 // #60: a stepped/counterbore hole (two concentric circles) inside a part
 // outline must NOT extrude the inner circle as a solid plug. Even-odd parity
 // nests the inner circle two levels deep (inside the outline AND the outer
-// circle) and would fill it solid — a floating lump disconnected from the
+// circle) and would fill it solid - a floating lump disconnected from the
 // body. buildProfileShape must drop that plug so the hole stays open.
 #include <gtest/gtest.h>
 
@@ -47,7 +47,7 @@ TEST(SteppedHoleProfile, InnerCircleIsNotAFilledDisk) {
     TopoDS_Shape prof = sk->buildProfileShape();
     ASSERT_FALSE(prof.IsNull());
     // No face may be a standalone r=2.5 disk (area ~19.635). The profile is
-    // the plate with a r=4.5 hole — one island, hole open.
+    // the plate with a r=4.5 hole - one island, hole open.
     for (TopExp_Explorer fx(prof, TopAbs_FACE); fx.More(); fx.Next()) {
         GProp_GProps g;
         BRepGProp::SurfaceProperties(fx.Current(), g);

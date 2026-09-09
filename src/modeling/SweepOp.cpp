@@ -53,7 +53,7 @@ bool SweepOp::undo(Document& doc) {
     try {
         if (m_createdBodyId >= 0) {
             doc.removeBody(m_createdBodyId);
-            // Keep m_createdBodyId — tombstone restore on next execute().
+            // Keep m_createdBodyId - tombstone restore on next execute().
         }
         return true;
     } catch (...) {
@@ -99,7 +99,7 @@ OperationDiff SweepOp::captureDiff() const {
 #include <sstream>
 
 std::string SweepOp::serializeParams() const {
-    // Profile + path are raw picked geometry — persist as an ASCII BREP
+    // Profile + path are raw picked geometry - persist as an ASCII BREP
     // compound [profile, path] embedded in the params (length-prefixed,
     // last; the PARAMS_LEN container is binary-safe).
     std::string blob = "created=" + std::to_string(m_createdBodyId);

@@ -1,7 +1,7 @@
 #include "ViewCube.h"
 #include "Camera.h"
 #include "../touch_mode.h"
-#include "../ui_scale.h"   // uiScale — the widget tracks the interface size
+#include "../ui_scale.h"   // uiScale - the widget tracks the interface size
 
 #include <imgui.h>
 #include <glm/glm.hpp>
@@ -48,7 +48,7 @@ ViewCubeAction ViewCube::render(Camera& camera, bool invertDrag, bool lightMode,
     // targets (rotation arrows, roll arcs, corner dots, Home) become comfortably
     // finger-sized. Everything below is sized off `ts`, so the cube, its
     // accessories and their hit-tests grow together. 1.0 on desktop = unchanged.
-    // The widget is a UI element, so it tracks the INTERFACE size — otherwise a
+    // The widget is a UI element, so it tracks the INTERFACE size - otherwise a
     // HiDPI desktop doubles every font and panel around it while the cube, its
     // arrows, the Home button and the axis triad stay at their 1x pixel sizes
     // and read as shrunken (Steve, on a 2x Framework panel).
@@ -108,7 +108,7 @@ ViewCubeAction ViewCube::render(Camera& camera, bool invertDrag, bool lightMode,
     struct Face { int c[4]; glm::vec3 n; const char* label; ViewCubeAction act; };
     // Side faces use single-letter labels (L/F/R/B) since the cube is now
     // half its old size and full words don't fit cleanly. Top/Bottom keep
-    // their full label — they're the most recognisable and have more room
+    // their full label - they're the most recognisable and have more room
     // on the square top/bottom faces of the projection.
     static const Face kFaces[6] = {
         {{4,5,6,7}, { 0, 0, 1}, "F",      ViewCubeAction::Front},
@@ -125,11 +125,11 @@ ViewCubeAction ViewCube::render(Camera& camera, bool invertDrag, bool lightMode,
     // Only act on clicks the viewport actually owns. The cube reads global mouse
     // state, so without this a click on a panel that OVERLAPS the cube's corner
     // (e.g. the Move Face Cancel button, which sits over the cube) registers as a
-    // cube-face press too — snapping the camera to that face.
+    // cube-face press too - snapping the camera to that face.
     //
     // NOTE: do NOT use io.WantCaptureMouse here. The Viewport is a normal docked
     // window (not a passthrough central node), so WantCaptureMouse is true across
-    // the ENTIRE viewport — including the bare canvas and the cube itself — which
+    // the ENTIRE viewport - including the bare canvas and the cube itself - which
     // killed all cube clicks. The cube draws inside the Viewport window's scope,
     // so IsWindowHovered() is the right signal: true when the viewport (and not an
     // overlay sitting on top of it) is the hovered window at the cursor. An
@@ -170,7 +170,7 @@ ViewCubeAction ViewCube::render(Camera& camera, bool invertDrag, bool lightMode,
     std::sort(drawList.begin(), drawList.end(),
               [](const VisFace& a, const VisFace& b){ return a.depth < b.depth; });
 
-    // A cube vertex / edge is part of the visible silhouette — and so clickable —
+    // A cube vertex / edge is part of the visible silhouette - and so clickable -
     // whenever it borders a front-facing face. The earlier code culled on the
     // corner's OWN eye-space Z (eyeZ(corner) < 0), which crosses zero at ~45° for
     // the side corners of a face that is itself still visible (front-facing up to
@@ -223,7 +223,7 @@ ViewCubeAction ViewCube::render(Camera& camera, bool invertDrag, bool lightMode,
 
     // --- Edge click-spots: clicking the seam between two visible faces snaps to
     //     a two-face view (looking down that edge). Hover-revealed with no
-    //     persistent marker so the small cube stays uncluttered — hovering near a
+    //     persistent marker so the small cube stays uncluttered - hovering near a
     //     cube edge highlights the whole segment. Tested after faces (an edge
     //     wins over the face it lies on) but before corners (a corner still wins
     //     at the very ends, since the hit zone is restricted to the mid-segment).
@@ -422,7 +422,7 @@ ViewCubeAction ViewCube::render(Camera& camera, bool invertDrag, bool lightMode,
     //     short arms rotate with the camera so the user can read off the
     //     current orientation. Labels use the user's Z-up convention:
     //     user X → world X (red), user Y → world Z (green), user Z → world Y
-    //     (blue) — matches the rest of the UI.
+    //     (blue) - matches the rest of the UI.
     {
         ImVec2 tc(center.x - widgetR - 22.0f * ts, center.y + widgetR + 22.0f * ts);
         const float armLen = 18.0f * ts;
@@ -454,14 +454,14 @@ ViewCubeAction ViewCube::render(Camera& camera, bool invertDrag, bool lightMode,
         if (ImGui::IsMouseDragging(ImGuiMouseButton_Left, 4.0f)) {
             m_cubeDragging = true;
             ImVec2 d = ImGui::GetIO().MouseDelta;
-            // Drag scaling: ~0.5° per pixel — gentle enough for precise aiming
+            // Drag scaling: ~0.5° per pixel - gentle enough for precise aiming
             // but covers full rotation in a short stroke. `invertDrag` flips
             // the orbit sign for users who prefer the opposite mapping.
             const float k = invertDrag ? 0.01f : -0.01f; // radians per pixel
             camera.rotateAroundTarget(d.x * k, d.y * k);
         }
         if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
-            // A release synthesized by a two-finger takeover is not a click —
+            // A release synthesized by a two-finger takeover is not a click -
             // the finger is mid-pinch, not lifting. Cancel instead of commit
             // (the "pinch with one finger on the cube snaps the view" bug, #38).
             if (!m_cubeDragging && !releaseIsGesture)

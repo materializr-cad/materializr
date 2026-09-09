@@ -25,7 +25,7 @@ enum class TipPhase {
 
 #if defined(MZ_IOS)
 
-void iosStoreInit();            // attach the transaction observer — once, at launch
+void iosStoreInit();            // attach the transaction observer - once, at launch
 void iosStoreBuySupporter();    // fetch the Supporter product and start a purchase
 void iosStoreRestore();         // restore a previous Supporter purchase
 TipPhase iosStorePhase();

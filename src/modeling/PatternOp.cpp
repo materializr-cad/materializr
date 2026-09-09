@@ -191,7 +191,7 @@ bool PatternOp::rehydrateFromReload(const ReloadState& state, Document& /*doc*/)
     if (m_bodyId < 0) return false;
     // A pattern with count >= 2 must have created copies. An empty created
     // set means the file was saved before PatternOp had captureDiff (the
-    // step's diff is missing) — decline so undo doesn't silently no-op.
+    // step's diff is missing) - decline so undo doesn't silently no-op.
     if (state.created.empty()) return false;
 
     // The bodies this step created ARE the pattern copies (copies 1..count-1;

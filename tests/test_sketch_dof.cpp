@@ -77,7 +77,7 @@ TEST(SketchDof, FixedCentrePlusRadiusIsFullyConstrained) {
 
 // An arc stores seven values for a shape that geometrically has five
 // freedoms. The other two are the relations |start - centre| == |end - centre|
-// == radius — but they may only be SUBTRACTED where something holds them. A
+// == radius - but they may only be SUBTRACTED where something holds them. A
 // driving Radius does (its correction reprojects both endpoints); with no
 // driving Radius nothing does, so the arc really can reach all seven.
 TEST(SketchDof, BareArcKeepsAllSevenStoredFreedoms) {
@@ -113,7 +113,7 @@ TEST(SketchDof, FixedCentrePlusRadiusOnArcLeavesTwoBearings) {
 }
 
 // A CircleGap pins one freedom across two circles, same as any other
-// single-equation dimension — it must not read as over-constrained.
+// single-equation dimension - it must not read as over-constrained.
 TEST(SketchDof, CircleGapDoesNotOverConstrain) {
     Sketch sk;
     int ca = sk.addPoint({0.0f, 0.0f});
@@ -136,7 +136,7 @@ TEST(SketchDof, CircleGapDoesNotOverConstrain) {
 }
 
 // Sketches with no radius-bearing geometry must be completely unaffected by
-// the accounting change — this is the regression guard on the old behaviour.
+// the accounting change - this is the regression guard on the old behaviour.
 TEST(SketchDof, PointOnlySketchUnchanged) {
     Sketch sk;
     int a = sk.addPoint({0.0f, 0.0f});

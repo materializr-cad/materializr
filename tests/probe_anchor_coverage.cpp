@@ -1,6 +1,6 @@
 // Diagnostic probe (experiment/generative-edges): load a real project file,
 // rehydrate its ops the way Application::rebuildHistoryFromProject does, then
-// report — for every fillet/chamfer — how each selected edge classifies
+// report - for every fillet/chamfer - how each selected edge classifies
 // against EVERY sketch in the document. This is the ground-truth loop for
 // extending EdgeAnchor to cover real multi-sketch bodies.
 //
@@ -107,7 +107,7 @@ int main(int argc, char** argv) {
     }
 
     // Replay the factory path from rebuildHistoryFromProject (simplified: no
-    // ReplayOp fallback, no legacy param synthesis — we only care about ops
+    // ReplayOp fallback, no legacy param synthesis - we only care about ops
     // that rehydrate for real).
     std::map<int, TopoDS_Shape> running;
     for (const auto& [id, shape] : hist.initialState) running[id] = shape;
@@ -133,7 +133,7 @@ int main(int argc, char** argv) {
         if (st.typeId != "fillet" && st.typeId != "chamfer") continue;
         std::printf("\n=== step %d: %s '%s' (%s) ===\n", stepIdx,
                     st.typeId.c_str(), st.name.c_str(), st.description.c_str());
-        if (st.params.empty()) { std::printf("  (no params — baked)\n"); continue; }
+        if (st.params.empty()) { std::printf("  (no params - baked)\n"); continue; }
 
         std::unique_ptr<Operation> op;
         if (st.typeId == "fillet") op = std::make_unique<FilletOp>();

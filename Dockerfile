@@ -2,7 +2,7 @@ FROM ubuntu:24.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Build deps. OCCT is NOT taken from apt (Ubuntu 24.04 ships 7.6.3) — it is
+# Build deps. OCCT is NOT taken from apt (Ubuntu 24.04 ships 7.6.3) - it is
 # compiled from source below so every platform runs the SAME kernel (7.9.3):
 # matching Android/macOS and pulling Windows off vcpkg's 8.0 (which hangs long-
 # rod thread generation). fontconfig + the X11 dev headers are OCCT build-deps
@@ -53,7 +53,7 @@ RUN mkdir -p build && cd build \
         -DMZR_OCCT_PREFIX=/usr/local \
     && make -j$(nproc)
 
-# appimagetool — pinned tag + per-arch sha256, same treatment as OCCT above.
+# appimagetool - pinned tag + per-arch sha256, same treatment as OCCT above.
 #
 # This was `continuous`: a rolling tag upstream force-updates, downloaded with
 # no integrity check and then EXECUTED to package every shipped Linux release.
@@ -61,7 +61,7 @@ RUN mkdir -p build && cd build \
 # into the AppImage users install, and nothing in the pipeline would notice.
 #
 # 1.9.1 is the current stable release, and is byte-identical to what
-# `continuous` serves today — so this pins the behaviour we already have rather
+# `continuous` serves today - so this pins the behaviour we already have rather
 # than changing versions. Bumping is then a deliberate, reviewable diff.
 ARG APPIMAGETOOL_VERSION=1.9.1
 ARG APPIMAGETOOL_SHA256_X86_64=ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0
@@ -100,8 +100,8 @@ RUN find /usr/lib /usr/local/lib -name "libTK*.so*" -o -name "libtbb*.so*" -o -n
 # Bundle the binary's FULL shared-lib closure, minus the system layer that
 # must come from the host (glibc, GL stack, X11/xcb, fontconfig, wayland).
 # The hand-list above stopped sufficing when TKService arrived (Text tool's
-# Font_BRepFont): it drags in FreeImage and its whole codec tree — jpeg,
-# png, tiff, webp, OpenEXR, raw — which no hand-list should chase.
+# Font_BRepFont): it drags in FreeImage and its whole codec tree - jpeg,
+# png, tiff, webp, OpenEXR, raw - which no hand-list should chase.
 RUN ldd /AppDir/usr/bin/materializr | awk '/=> \//{print $3}' | sort -u \
     | grep -vE '/(libc|libm|libdl|libpthread|librt|libresolv|libgcc_s|libstdc\+\+|ld-linux|libGL|libGLX|libGLdispatch|libOpenGL|libEGL|libX11|libxcb|libXau|libXdmcp|libXext|libXrender|libXi|libXfixes|libXcursor|libXrandr|libXinerama|libXxf86vm|libfontconfig|libexpat|libdbus|libdrm|libwayland)[.-]' \
     | while read lib; do cp -L "$lib" /AppDir/usr/lib/ 2>/dev/null || true; done
@@ -115,7 +115,7 @@ RUN patchelf --set-rpath '$ORIGIN/../lib' /AppDir/usr/bin/materializr || true
 RUN printf '[Desktop Entry]\nName=Materializr\nExec=materializr\nIcon=materializr\nType=Application\nCategories=Graphics;3DGraphics;Engineering;\nComment=Open-source parametric 3D CAD\nStartupWMClass=Materializr\n' \
     > /AppDir/materializr.desktop
 
-# AppStream metainfo — lets Gear Lever / AppImagePool / software centres
+# AppStream metainfo - lets Gear Lever / AppImagePool / software centres
 # auto-populate the description, screenshot, links and release notes instead
 # of falling back to just the .desktop Name/Comment.
 RUN mkdir -p /AppDir/usr/share/metainfo \

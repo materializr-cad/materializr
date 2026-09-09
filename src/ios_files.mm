@@ -1,11 +1,11 @@
 // iOS implementation of the mobile_files.h picker/share bridge, mirroring the
 // Android SAF flow with UIKit equivalents:
 //
-//   open  — UIDocumentPickerViewController (open-in-place), then the picked
+//   open  - UIDocumentPickerViewController (open-in-place), then the picked
 //           document is copied to an app temp path (NSFileCoordinator handles
 //           iCloud downloads) and that path is delivered via the poll, exactly
 //           like Android's copy-through-ContentResolver.
-//   save  — iOS's export picker needs an EXISTING file, the reverse of SAF's
+//   save  - iOS's export picker needs an EXISTING file, the reverse of SAF's
 //           pick-destination-first. So mobileStartCreateDocument() completes
 //           immediately with "ok" (the caller then writes the temp file), and
 //           mobileCommitSave() presents the export sheet for the just-written
@@ -13,7 +13,7 @@
 //           save succeeded, and the recents ref recorded right after a save is
 //           the temp path (self-heals: Open Recent drops it on first failure).
 //           TODO(phase-4): make the app-side save flow await the export result.
-//   recents — security-scoped bookmarks (base64 in the ref string) stand in
+//   recents - security-scoped bookmarks (base64 in the ref string) stand in
 //           for Android's persistable content:// URIs.
 //
 // All calls arrive on the main thread (SDL's uikit main IS the UIKit main
@@ -120,7 +120,7 @@ UIViewController* topViewController() {
         g_pick.ready = true;
     } else {
         // Export completed: the document now lives at the user's destination.
-        // Nothing is polled for at this point (see header note) — just record
+        // Nothing is polled for at this point (see header note) - just record
         // the destination for later mobileLastDocUri() queries.
         BOOL scoped = [url startAccessingSecurityScopedResource];
         recordLastDoc(url);
@@ -134,7 +134,7 @@ UIViewController* topViewController() {
         g_pick.value = "";
         g_pick.ready = true;
     } else {
-        std::fprintf(stderr, "ios_files: export cancelled — file not saved\n");
+        std::fprintf(stderr, "ios_files: export cancelled - file not saved\n");
         g_pick.mode = PickMode::None;
     }
 }
@@ -150,7 +150,7 @@ namespace materializr {
 bool mobileStartOpenDocument(const std::string& /*mimeCsv*/) {
     UIViewController* top = topViewController();
     if (!top) return false;
-    // "*/*" on Android; same idea here — show everything, the user decides.
+    // "*/*" on Android; same idea here - show everything, the user decides.
     UIDocumentPickerViewController* picker =
         [[UIDocumentPickerViewController alloc] initForOpeningContentTypes:@[ UTTypeItem ]
                                                                     asCopy:NO];
@@ -163,7 +163,7 @@ bool mobileStartOpenDocument(const std::string& /*mimeCsv*/) {
 
 bool mobileStartCreateDocument(const std::string& /*suggestedName*/,
                                const std::string& /*mime*/) {
-    // Destination is chosen AFTER the write on iOS (export model) — complete
+    // Destination is chosen AFTER the write on iOS (export model) - complete
     // the "picker" immediately so the caller writes its temp file, then
     // mobileCommitSave() presents the real export sheet.
     g_pick.mode = PickMode::None;
@@ -194,7 +194,7 @@ bool mobileCommitSave(const std::string& tempPath) {
     picker.delegate = pickerDelegate();
     g_pick.mode = PickMode::Export;
     [top presentViewController:picker animated:YES completion:nil];
-    return true; // optimistic — see header note about cancelled exports
+    return true; // optimistic - see header note about cancelled exports
 }
 
 void mobileShareFile(const std::string& path, const std::string& /*mime*/) {
@@ -241,12 +241,12 @@ std::string mobileOpenUri(const std::string& uri) {
     return ok ? tmp : std::string{};
 }
 
-// mobileOpenUri() above never substitutes a backup copy — it returns the real
-// document or fails — so an open here is never "via fallback".
+// mobileOpenUri() above never substitutes a backup copy - it returns the real
+// document or fails - so an open here is never "via fallback".
 bool mobileLastOpenWasFallback() { return false; }
 
 // SDL's iOS backend raises/dismisses the system keyboard itself from
-// SDL_StartTextInput/SDL_StopTextInput — the Android IME workaround isn't
+// SDL_StartTextInput/SDL_StopTextInput - the Android IME workaround isn't
 // needed here.
 void mobileShowTextInput() {}
 void mobileHideTextInput() {}

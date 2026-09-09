@@ -1,11 +1,11 @@
 // THREADS-LAST IS ENFORCED BY REFLOW, NOT REFUSAL. An op pushed onto a
 // thread-modified body must reorder beneath the Thread step (the op runs
 // against clean geometry, the thread re-cuts parametrically on the result)
-// instead of being declined. Guards History::pushOperation's reflow path —
+// instead of being declined. Guards History::pushOperation's reflow path -
 // the June-2026 "threads-last discipline" refusal is gone.
 //
 // PHASE 2 (ThreadFollows suite): the thread must FOLLOW its cylinder through
-// upstream edits via its minted face ref — resize (new radius), transform
+// upstream edits via its minted face ref - resize (new radius), transform
 // (new axis), and a sketch-edit cascade (cylinder moved at the source).
 #include <gtest/gtest.h>
 
@@ -54,7 +54,7 @@ bool inAt(const TopoDS_Shape& s, double x, double y, double z) {
 }
 
 // Ring sample: how many of 16 points on the circle (r, z) about (cx, cy)
-// are inside the solid. NOTE: bbox is USELESS here — a swept helicoid's
+// are inside the solid. NOTE: bbox is USELESS here - a swept helicoid's
 // BSpline control points bulge far outside the real surface (a correct
 // r=10 threaded rod bboxes at 16).
 int ringHits(const TopoDS_Shape& s, double cx, double cy, double r,
@@ -67,7 +67,7 @@ int ringHits(const TopoDS_Shape& s, double cx, double cy, double r,
     return n;
 }
 
-constexpr double R = 10.0, L = 9.0; // 3 coarse turns — fast
+constexpr double R = 10.0, L = 9.0; // 3 coarse turns - fast
 
 std::unique_ptr<ThreadOp> makeThread(int bodyId) {
     auto t = std::make_unique<ThreadOp>();
@@ -140,7 +140,7 @@ TEST(ThreadReflow, SubtractOnThreadedBodyReflowsBeneathThread) {
     EXPECT_EQ(hist.getStep(hist.currentStep() - 1)->typeId(), "boolean");
 
     // Result: valid, holed AND threaded (less material than the plain holed
-    // rod — the re-cut thread grooves came back on the new geometry).
+    // rod - the re-cut thread grooves came back on the new geometry).
     TopoDS_Shape res = doc.getBody(rodId);
     ASSERT_FALSE(res.IsNull());
     EXPECT_TRUE(BRepCheck_Analyzer(res).IsValid());
@@ -174,7 +174,7 @@ TEST(ThreadReflow, SecondOpStacksAndThreadStaysLast) {
 
 TEST(ThreadReflow, RoundedRecutOnHoledRodKeepsSweptGeometry) {
     // The reflow re-cut of a SMOOTH profile on a modified rod must derive its
-    // cutter from the sweep — falling into the rope groove instead produced
+    // cutter from the sweep - falling into the rope groove instead produced
     // the deep-scoop "stacked discs" body (2026-07-21). Same-geometry check:
     // (rod ⊖ thread) ⊖ hole and (rod ⊖ hole) ⊖ thread must agree in volume.
     Document doc;
@@ -205,7 +205,7 @@ TEST(ThreadReflow, RoundedRecutOnHoledRodKeepsSweptGeometry) {
     TopoDS_Shape res = doc.getBody(rodId);
     ASSERT_FALSE(res.IsNull());
     EXPECT_TRUE(BRepCheck_Analyzer(res).IsValid());
-    // Rope scoops remove several times the sine grooves' material — a 1%
+    // Rope scoops remove several times the sine grooves' material - a 1%
     // band on the expected volume rules them out without being brittle.
     EXPECT_NEAR(vol(res), vExpected, 0.01 * vExpected);
 }
@@ -260,7 +260,7 @@ TEST(ThreadReflow, ExternalThreadOnUnionedBoltGrafts) {
     // gift box regression: an external (buttress) thread on a cylinder that is
     // part of a body rebuilt by an upstream UNION. The direct helical cut can
     // invert against the rebuilt TShape even though plain cuts are fine and the
-    // same cylinder threads standalone — ThreadOp's graft fallback threads a
+    // same cylinder threads standalone - ThreadOp's graft fallback threads a
     // clean segment and splices it at the shoulder. Whichever path runs, the
     // thread must apply: valid single solid with real grooves on the end.
     // (The exact gift-box body that inverts is exercised by
@@ -298,8 +298,8 @@ TEST(ThreadReflow, ExternalThreadOnUnionedBoltGrafts) {
     // valley (void). A plain cylinder would be fully solid there.
     const double zMid = zEnd0 + endLen * 0.5, rMid = rEnd - 0.25;
     const int hits = ringHits(res, 0.0, 0.0, rMid, zMid);
-    EXPECT_GT(hits, 0) << "no crest material — end not threaded";
-    EXPECT_LT(hits, 16) << "no groove voids — end not threaded";
+    EXPECT_GT(hits, 0) << "no crest material - end not threaded";
+    EXPECT_LT(hits, 16) << "no groove voids - end not threaded";
     // The threaded end must not have vanished or ballooned.
     EXPECT_GT(vol(res), 0.6 * vol(bolt));
     EXPECT_LT(vol(res), 1.1 * vol(bolt));
@@ -325,8 +325,8 @@ TEST(ThreadReflow, ExternalThreadOnUnionedBoltGrafts) {
 
 TEST(ThreadReflow, ThreadRunsThroughEndChamfer) {
     // A threaded rod whose end is TAPERED (chamfer/cone) must run the thread
-    // THROUGH the taper — grooves continue, crests truncated by the cone (a
-    // real bolt lead-in) — instead of stopping at the cylinder/chamfer edge
+    // THROUGH the taper - grooves continue, crests truncated by the cone (a
+    // real bolt lead-in) - instead of stopping at the cylinder/chamfer edge
     // and leaving a smooth bevel.
     const double rCyl = 5.0, zCyl = 20.0, depth = 0.6;
     TopoDS_Shape cyl = BRepPrimAPI_MakeCylinder(rCyl, zCyl).Shape();
@@ -347,13 +347,13 @@ TEST(ThreadReflow, ThreadRunsThroughEndChamfer) {
     ASSERT_FALSE(res.IsNull());
     EXPECT_TRUE(BRepCheck_Analyzer(res).IsValid());
 
-    // ON THE TAPER (z=21, surface r≈4.75): the thread must be present — a ring
+    // ON THE TAPER (z=21, surface r≈4.75): the thread must be present - a ring
     // between the valley (r=4.4) and the taper surface is part crest, part
     // groove. Without run-through this region is a smooth cone (fully solid
     // below the surface, so a ring at r=4.6 would be all-solid).
     const int taper = ringHits(res, 0.0, 0.0, 4.6, 21.0);
     EXPECT_GT(taper, 0) << "no crest on the taper";
-    EXPECT_LT(taper, 16) << "no grooves on the taper — thread stopped at the edge";
+    EXPECT_LT(taper, 16) << "no grooves on the taper - thread stopped at the edge";
     // The cylinder body below is still fully threaded.
     const int barrel = ringHits(res, 0.0, 0.0, rCyl - 0.5 * depth, 10.0);
     EXPECT_GT(barrel, 0);
@@ -394,12 +394,12 @@ TEST(ThreadReflow, UndoRedoAcrossReflowedTimeline) {
     EXPECT_TRUE(BRepCheck_Analyzer(doc.getBody(rodId)).IsValid());
 }
 
-// ─── Phase 2: ThreadFollows — the thread tracks its cylinder via face ref ────
+// ─── Phase 2: ThreadFollows - the thread tracks its cylinder via face ref ────
 
 namespace {
 
 // Rod built through the REAL sketch→extrude pipeline (so topo naming has
-// provenance) and threaded with a MINTED face ref — the app's exact path.
+// provenance) and threaded with a MINTED face ref - the app's exact path.
 struct RefRod {
     int bodyId = -1;
     int sketchId = -1;
@@ -471,7 +471,7 @@ RefRod buildThreadedRefRod(Document& doc, History& hist, double r, double h,
 }
 
 // Reference volume: the same thread swept on a plain cylinder of the given
-// radius/height at the origin (position-independent — volume only).
+// radius/height at the origin (position-independent - volume only).
 double refThreadedVol(double r, double h, double pitch, double depth) {
     ThreadOp t;
     t.setAxis(gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1), gp_Dir(1, 0, 0)));
@@ -486,7 +486,7 @@ double refThreadedVol(double r, double h, double pitch, double depth) {
 
 TEST(ThreadFollows, ReloadedOpKeepsItsAxis) {
     // deserializeParams filled the axis COMPONENTS but never rebuilt the
-    // gp_Ax2 — every reloaded op's getAxis() reported a default Z-axis, so
+    // gp_Ax2 - every reloaded op's getAxis() reported a default Z-axis, so
     // the sketch-on-cap centre concluded "no thread axis pierces this
     // plane" on ANY loaded project (in-process tests never caught it).
     ThreadOp a;
@@ -526,7 +526,7 @@ TEST(ThreadFollows, ResizeCylinderRethreadsAtNewRadius) {
     // buried inside the fatter rod).
     const int near10 = ringHits(body, 0.0, 0.0, 9.9, 10.0);
     EXPECT_GT(near10, 0) << "crest material at the new radius";
-    EXPECT_LT(near10, 16) << "groove openings at the new surface — a full "
+    EXPECT_LT(near10, 16) << "groove openings at the new surface - a full "
                              "ring means the thread is buried (stale r=8)";
     EXPECT_EQ(ringHits(body, 0.0, 0.0, 10.15, 10.0), 0)
         << "nothing past the new radius";
@@ -549,7 +549,7 @@ TEST(ThreadFollows, MovedBodyRethreadsAtNewAxisOnEdit) {
     EXPECT_NEAR(vol(doc.getBody(rod.bodyId)), vBefore, 1e-3)
         << "rigid move keeps the thread as-is";
 
-    // Edit the thread's pitch — the recompute must re-cut at the MOVED axis
+    // Edit the thread's pitch - the recompute must re-cut at the MOVED axis
     // (face ref), not at the original origin (stale params = null cut).
     ThreadOp* th = dynamic_cast<ThreadOp*>(
         const_cast<Operation*>(hist.getStep(rod.threadStep)));
@@ -605,7 +605,7 @@ TEST(ThreadFollows, InternalRoundedRingSplice) {
     // The nut side of the Rounded pair: internal thread built by the ring
     // splice (bore to major + constructed thread ring + GLUED plain-seam
     // fuse), not the flat-topped rope grooves. Two proportion regimes: the
-    // fat/short tube AND Steve's 10x20mm hole (r=5, 20 deep, ~10 turns) —
+    // fat/short tube AND Steve's 10x20mm hole (r=5, 20 deep, ~10 turns) -
     // the plain fuse INVERTED on the latter (fused vol -409 vs +1994)
     // until the seam went to glue mode.
     struct Cfg { double rOut, rBore, len, pitch; };

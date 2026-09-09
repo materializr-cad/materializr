@@ -36,7 +36,7 @@ public:
     // Sketches that move RIGIDLY WITH this body (a unison move: the user selected
     // the body and its driving sketch and moved them together). Applying the same
     // transform to the sketch's plane in this one op keeps it a single, atomic
-    // undo/redo step — the sketch always follows the body.
+    // undo/redo step - the sketch always follows the body.
     void addFollowSketch(int sketchId) { m_followSketchIds.push_back(sketchId); }
 
     // Getters
@@ -52,7 +52,7 @@ public:
     std::string typeId() const override { return "transform"; }
     OperationDiff captureDiff() const override;
     // A transform references its body by id and is a pure gp_Trsf, so it reloads
-    // as a real, editable op that re-applies to the LIVE body — otherwise a
+    // as a real, editable op that re-applies to the LIVE body - otherwise a
     // baked transform re-slams its stale result over any edit made to an
     // upstream step (e.g. a fillet on the same body). New files serialise the
     // typed params; legacy files (no blob) reconstruct the rigid transform from
@@ -78,7 +78,7 @@ private:
     bool m_nonUniform = false;
     double m_cx = 0, m_cy = 0, m_cz = 0;       // centre for rotate/scale
     TopoDS_Shape m_previousShape;
-    // Input face lineage, captured at execute so undo can restore it —
+    // Input face lineage, captured at execute so undo can restore it -
     // updateBody wipes the map and a partial replay (editStep starting after
     // the producer) never re-runs the op that minted it.
     materializr::topo::FaceIdMap m_prevFaceIds;

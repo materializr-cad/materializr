@@ -1,4 +1,4 @@
-// Session (tab) persistence in settings.cfg — the "reopen last session on
+// Session (tab) persistence in settings.cfg - the "reopen last session on
 // launch" list. These guard the SHRINK case: the writer preserves keys it
 // didn't emit (so another build's settings round-trip instead of vanishing),
 // which for an INDEXED LIST silently resurrects removed entries.
@@ -69,7 +69,7 @@ TEST(SettingsSessions, RoundTripsOpenTabsAndActiveIndex) {
 
 // An UNSAVED tab contributes an empty entry so the indices stay aligned with
 // sessionActive; it must survive the round trip as a placeholder rather than
-// truncating the list (the recents reader stops at the first empty — this one
+// truncating the list (the recents reader stops at the first empty - this one
 // must not).
 TEST(SettingsSessions, EmptyPlaceholderKeepsIndicesAligned) {
     const std::string p = tmpCfg("placeholder");
@@ -88,7 +88,7 @@ TEST(SettingsSessions, EmptyPlaceholderKeepsIndicesAligned) {
 
 // THE REGRESSION: save 3 tabs, then save 1 over the same file. The writer's
 // "preserve keys another build wrote" pass must NOT carry session1/session2
-// forward — doing so reopened tabs the user had closed.
+// forward - doing so reopened tabs the user had closed.
 TEST(SettingsSessions, ClosingTabsDoesNotResurrectThem) {
     const std::string p = tmpCfg("shrink");
     AppSettings three;
@@ -113,7 +113,7 @@ TEST(SettingsSessions, ClosingTabsDoesNotResurrectThem) {
 }
 
 // Same shrink hazard for the recents list (its reader stops at the first
-// missing key, which masked this — but a stale CONTIGUOUS key would not be).
+// missing key, which masked this - but a stale CONTIGUOUS key would not be).
 TEST(SettingsSessions, ShrinkingRecentsDoesNotResurrectEntries) {
     const std::string p = tmpCfg("recents");
     AppSettings many;
@@ -134,7 +134,7 @@ TEST(SettingsSessions, ShrinkingRecentsDoesNotResurrectEntries) {
     fs::remove(p);
 }
 
-// Genuinely-unknown keys (a newer build's setting) must still round-trip —
+// Genuinely-unknown keys (a newer build's setting) must still round-trip -
 // the shrink fix must not have thrown that away.
 TEST(SettingsSessions, UnknownKeysStillPreserved) {
     const std::string p = tmpCfg("unknown");
@@ -152,7 +152,7 @@ TEST(SettingsSessions, UnknownKeysStillPreserved) {
 // The sketch grid step is stored as a DISPLAY NUMBER, not millimetres. It is
 // chosen from presets labelled 0.1 / 0.5 / 1 / 10, and "1" means one of
 // whatever unit is showing. Stored as millimetres, a session in feet saved
-// sketchGridStep=1 and reloaded it as a 1 mm grid inside a 40 ft view — 12192
+// sketchGridStep=1 and reloaded it as a 1 mm grid inside a 40 ft view - 12192
 // lines, faded to nothing by the renderer, so the grid vanished entirely.
 TEST(SettingsSessions, GridStepPersistsAsADisplayNumber) {
     // Millimetre users are unaffected: 1 means 1 mm either way.
@@ -162,7 +162,7 @@ TEST(SettingsSessions, GridStepPersistsAsADisplayNumber) {
         EXPECT_FLOAT_EQ(1.0f, static_cast<float>(materializr::toDisplay(1.0)));
     }
     // Under feet, the same stored "1" is one FOOT, which is what the preset
-    // labelled "1" set — not one millimetre.
+    // labelled "1" set - not one millimetre.
     {
         materializr::ScopedUnit s(materializr::LengthUnit::Ft);
         const float mm = static_cast<float>(materializr::toMm(1.0));
@@ -184,12 +184,18 @@ TEST(SettingsSessions, GridStepPersistsAsADisplayNumber) {
 // The grid step changed meaning, so it changed key. A file carrying only the
 // legacy "sketchGridStep" is millimetres; one carrying "sketchGridStepUnits"
 // is a display number. Without that distinction a 304.8 saved under feet (one
-// foot, in millimetres) would have been re-read as 304.8 FEET — a 93-metre
-// grid — and no version counter can tell them apart after the fact.
+// foot, in millimetres) would have been re-read as 304.8 FEET - a 93-metre
+// grid - and no version counter can tell them apart after the fact.
 TEST(SettingsSessions, LegacyGridStepMigratesByKey) {
     auto roundTrip = [](const std::string& body) {
         const std::string path = tmpCfg("grid_mig");
         { std::ofstream o(path); o << body; }
+        // Prove the CONTENT landed before trusting anything loaded from it.
+        // Most cases in these two tests expect the DEFAULT sketchGridStep, so a
+        // silent write failure makes them pass against the defaults rather than
+        // against the migration. fs::exists is not enough on its own: a
+        // zero-byte file exists and still loads as defaults.
+        EXPECT_EQ(body, readAll(path)) << "settings file was not written: " << path;
         materializr::AppSettings s = materializr::SettingsIO::load(path);
         std::remove(path.c_str());
         return s;
@@ -221,6 +227,10 @@ TEST(SettingsSessions, GridStepMigrationBoundaries) {
     const std::string path = tmpCfg("gridbounds");
     auto load = [&](const std::string& body) {
         { std::ofstream o(path); o << body; }
+        // Same guard as LegacyGridStepMigratesByKey, and this test needs it
+        // more: of its assertions, all but two expect kDefault, so a write
+        // failure hides in almost every case rather than in half of them.
+        EXPECT_EQ(body, readAll(path)) << "settings file was not written: " << path;
         AppSettings s = SettingsIO::load(path);
         std::remove(path.c_str());
         return s;
@@ -236,7 +246,7 @@ TEST(SettingsSessions, GridStepMigrationBoundaries) {
     // Neither key (a file written before the setting existed): the default.
     EXPECT_FLOAT_EQ(kDefault, load("displayUnit = 4\n").sketchGridStep);
 
-    // An out-of-range displayUnit means MILLIMETRES — the same rule the
+    // An out-of-range displayUnit means MILLIMETRES - the same rule the
     // setting itself uses. Clamping it to the nearest legal index instead
     // would make 99 mean Feet here and mm there, so one file would be read
     // two ways and 304.8 mm would migrate to one foot of grid.

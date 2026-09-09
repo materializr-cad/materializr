@@ -38,14 +38,14 @@ struct PendingDimension {
 // Application::applyPendingDimension's mirrored-DistancePointLine dedup
 // (which must not treat two genuinely angled lines as the same gap just
 // because their picked point/line ids happen to cross-reference each
-// other's endpoints — see SketchTool::linesParallelWithinDimTol). Written as
+// other's endpoints - see SketchTool::linesParallelWithinDimTol). Written as
 // a literal rather than via M_PI/180 so this header doesn't need to pull in
 // <cmath> or the M_PI portability guard every other file including it uses.
 constexpr double kDimParallelTolRad = 0.017453292519943295; // 1.0 deg
 
 enum class DimPhase { PickFirst, PickSecondOrPlace, PlaceLabel };
 
-// One drawing-time alignment hint. Inferences are transient — they describe
+// One drawing-time alignment hint. Inferences are transient - they describe
 // what the cursor IS aligned to right now, get drawn as coloured ghost lines /
 // markers, and disappear after the click is placed. No constraint metadata is
 // stored on the resulting geometry; the placed point is just a point.
@@ -127,7 +127,7 @@ public:
         m_selectedArcs.clear();
         m_selectedSplines.clear();
     }
-    // Full replace, including curve types — used by box-select so a drag can
+    // Full replace, including curve types - used by box-select so a drag can
     // catch circles / arcs / splines, not just points + lines.
     void setSelectionFull(const std::set<int>& pointIds, const std::set<int>& lineIds,
                           const std::set<int>& circleIds, const std::set<int>& arcIds,
@@ -157,7 +157,7 @@ public:
     // count before clicking.
     int getPolygonSides() const { return m_polygonSides; }
     void setPolygonSides(int n) { m_polygonSides = (n < 3) ? 3 : n; }
-    // Text tool settings — the popup edits these; the click consumes them.
+    // Text tool settings - the popup edits these; the click consumes them.
     const std::string& getTextString() const { return m_textString; }
     void setTextString(const std::string& s) { m_textString = s; }
     const std::string& getTextFontPath() const { return m_textFontPath; }
@@ -179,7 +179,7 @@ public:
         m_textPrevMin = mn; m_textPrevMax = mx; m_textPrevValid = true;
     }
     void clearTextPreviewBox() { m_textPrevValid = false; m_textPrevLoops.clear(); }
-    // Actual glyph contours (anchor-relative, unrotated mm — same space as the
+    // Actual glyph contours (anchor-relative, unrotated mm - same space as the
     // box) for a LIVE preview of the letters. Pushed alongside the box.
     void setTextPreviewLoops(std::vector<std::vector<glm::vec2>> loops) {
         m_textPrevLoops = std::move(loops);
@@ -204,7 +204,7 @@ public:
     float getSvgWidth() const { return m_svgWidth; }
     void setSvgWidth(float w) { m_svgWidth = (w < 0.1f) ? 0.1f : w; }
     // Backspace while the Text/SVG tool is active yanks the whole last
-    // stamp — a misplaced 550-line logo is not undoable element-by-element.
+    // stamp - a misplaced 550-line logo is not undoable element-by-element.
     bool hasLastStamp() const { return !m_stampStack.empty(); }
     void undoLastStamp();
     // Commit a Text/SVG stamp at the current anchor (touch "Place" button).
@@ -255,7 +255,7 @@ public:
     // describes the live preview), so reading it does not clear it.
     const char* offsetRejection() const { return m_offsetResult.rejectReason; }
     // Chain highlight (Pick phase) and result ghost (Distance phase), as
-    // sketch-space polylines — one per contiguous run, so a pruned offset with
+    // sketch-space polylines - one per contiguous run, so a pruned offset with
     // gaps draws correctly.
     const std::vector<std::vector<glm::vec2>>& getOffsetChainHover() const {
         return m_offsetChainHover;
@@ -279,13 +279,13 @@ public:
     int getRectDimStage() const { return m_rectDimStage; }
 
     // True while the tool has an in-progress placement (first click made,
-    // second pending) — used by the host to give Escape two-step semantics:
+    // second pending) - used by the host to give Escape two-step semantics:
     // first Esc cancels just the in-progress shape, second Esc exits the
     // sketch mode entirely.
     bool isPlacing() const { return m_isPlacing; }
     // True when a line chain has only its anchor placed (first click, no segment
     // yet). The app defers that click's undo step so the first segment absorbs
-    // it — otherwise the lone anchor is a surprise extra step at the end of undo.
+    // it - otherwise the lone anchor is a surprise extra step at the end of undo.
     bool isChainAnchorPending() const {
         return m_mode == SketchToolMode::Line && m_isPlacing && m_lineChain.size() == 1;
     }
@@ -294,7 +294,7 @@ public:
     // 0 disables grid snap entirely.
     // POINTING precision, not grid coarseness. Trim, pick, inference and hover
     // distances track the user's chosen step so a fine grid gives fine picking
-    // — but they must not grow without bound when that step is coarse. With
+    // - but they must not grow without bound when that step is coarse. With
     // the step following the display unit, a 1 ft grid put the trim threshold
     // at 152 mm: a click on empty space could cut geometry 15 cm away, with
     // grid snapping OFF. The cap is the largest step the presets ever offered
@@ -302,7 +302,7 @@ public:
     //
     // It is m_toleranceStep that is capped here, not the snap lattice. Since
     // the lattice started following the zoom, capping THAT would have pinned
-    // the pick radius at 10 mm the moment a 1 mm grid coarsened — see tolStep.
+    // the pick radius at 10 mm the moment a 1 mm grid coarsened - see tolStep.
     static constexpr float kToleranceStepCapMm = 10.0f;
     // How many SCREEN PIXELS a click may be from an existing point and still
     // WELD onto it. Deliberately tighter than the pointing radius below:
@@ -326,7 +326,7 @@ public:
     void setPixelScale(float mmPerPx) { m_mmPerPixel = mmPerPx > 0.0f ? mmPerPx : 0.0f; }
 
     // Pointing tolerance, in sketch millimetres. A tolerance is a SCREEN
-    // distance — how near the cursor is in pixels — not a property of the
+    // distance - how near the cursor is in pixels - not a property of the
     // model. Deriving it from the grid alone gave 152 mm under a foot grid
     // (a click on empty space cut distant geometry) and, once capped at 10 mm,
     // gave 5 mm in a view where one pixel is 8 mm: sub-pixel, so nothing could
@@ -341,14 +341,14 @@ public:
         // ZOOM (it is the user's base scaled by decades), and a tolerance that
         // followed it with it would grow every time the view pulled back: a
         // 1 mm base coarsening to 10 mm pins this at the cap below, turning a
-        // ~1.5 mm pick radius into 10 mm — an 80-pixel grab — for no reason
+        // ~1.5 mm pick radius into 10 mm - an 80-pixel grab - for no reason
         // the user expressed. The base is the precision they actually chose.
         const float fromGrid   = std::min(m_toleranceStep, kToleranceStepCapMm);
         const float fromScreen = kPointingRadiusPx * m_mmPerPixel;
         return std::max(fromGrid, fromScreen);
     }
 
-    // The lattice points snap to — scaled by zoom, so it changes as you zoom.
+    // The lattice points snap to - scaled by zoom, so it changes as you zoom.
     // Also moves the tolerance step, so a caller that only ever sets this one
     // behaves exactly as this class did before the two were separated. The
     // viewport calls setToleranceStep straight after, to pin tolerances to the
@@ -373,7 +373,7 @@ public:
     // Max is the touch-oriented tier: everything Full does, but with widened
     // snap / inference catch ranges (see snapScale/angleScale) so an imprecise
     // fingertip still grabs the intended point / endpoint / alignment. Full and
-    // below behave identically on every device — desktop is never "over-snapped".
+    // below behave identically on every device - desktop is never "over-snapped".
     // Listed last so the persisted int values for Full/Reduced/Off stay 0/1/2.
     enum class InferenceLevel { Full, Reduced, Off, Max };
     void setInferenceLevel(InferenceLevel lvl) { m_inferenceLevel = lvl; }
@@ -390,12 +390,12 @@ public:
     // Center = first click is the centre, drag to a corner. Circle:
     // Center = first click is the centre, drag the radius (default);
     // TwoPoint = the two clicks are opposite ends of the diameter (the rim
-    // passes through the first click — handy to align a circle to a corner).
+    // passes through the first click - handy to align a circle to a corner).
     enum class RectMode { Corner, Center };
     enum class CircleMode { Center, TwoPoint };
 
     // What a typed value means at the arc's THIRD click. Clicks 1 and 2 fix the
-    // chord, so either the swept angle or the radius pins the apex exactly —
+    // chord, so either the swept angle or the radius pins the apex exactly -
     // two ways of saying the same thing, and which one you have to hand depends
     // on the drawing (a 90-degree corner versus a 6 mm fillet run). The cursor's
     // side of the chord still decides which way the arc bows: that is a
@@ -416,7 +416,7 @@ public:
     }
     void setArcDimMode(ArcDimMode m) { m_arcDimMode = m; }
     ArcDimMode getArcDimMode() const { return m_arcDimMode; }
-    // Half the chord — the smallest radius any arc through these two endpoints
+    // Half the chord - the smallest radius any arc through these two endpoints
     // can have. Below it no arc exists, so the UI can grey out Apply rather
     // than let applyDimension silently refuse. 0 when not at the apex stage.
     float arcMinRadius() const;
@@ -430,7 +430,7 @@ public:
     // the cursor dwells ~0.3 s on an existing reference (sketch point, sketch
     // line midpoint, host-face vertex, or host-face edge midpoint) it becomes
     // "charged" and projects axis + perpendicular guides anchored AT that
-    // position — until a different one charges or the placement ends. The
+    // position - until a different one charges or the placement ends. The
     // renderer reads hasChargedRef() / getChargedPos() to draw the cyan ring.
     struct ChargedRef {
         // None = nothing charged; the other kinds carry an anchor position the
@@ -446,7 +446,7 @@ public:
     void updateHoverCharge(double tNow, glm::vec2 cursorSketchPos);
     bool hasChargedRef() const { return m_charged.kind != ChargedRef::Kind::None; }
     glm::vec2 getChargedPos() const { return m_charged.pos; }
-    // Legacy accessor used elsewhere — returns the sketch-point id only when
+    // Legacy accessor used elsewhere - returns the sketch-point id only when
     // the charged ref happens to BE a sketch point; -1 for the new kinds.
     int  getChargedRefPoint() const {
         return m_charged.kind == ChargedRef::Kind::SketchPoint ? m_charged.sourceId : -1;
@@ -503,7 +503,7 @@ public:
     void clearDimState();                                       // back to PickFirst, pending invalidated
     // One-shot reason the last Dimension click was refused, or nullptr. The
     // tool used to just `return` on an unusable pick, so the click looked
-    // like it had simply missed — indistinguishable from a mis-aim. The app
+    // like it had simply missed - indistinguishable from a mis-aim. The app
     // drains this each frame and toasts it. Reading clears it.
     const char* consumeDimRejection() {
         const char* r = m_dimRejectReason;
@@ -513,7 +513,7 @@ public:
     DimPick dimHitTest(glm::vec2 pos) const { return hitTestDimEntity(pos); } // hover highlight for the viewport
     static PendingDimension resolveDimension(const Sketch& sk, DimPick a, DimPick b);
     // True when the two lines' directions are parallel or anti-parallel
-    // within kDimParallelTolRad — the same test resolveDimension's line-line
+    // within kDimParallelTolRad - the same test resolveDimension's line-line
     // branch uses to decide DistancePointLine vs Angle. Exposed standalone
     // so callers outside resolveDimension (the mirrored-DistancePointLine
     // dedup in Application::applyPendingDimension) can gate on the same
@@ -522,7 +522,7 @@ public:
     static bool linesParallelWithinDimTol(const Sketch& sk, int lineIdA, int lineIdB);
 
 private:
-    // Catch-range multipliers — >1 only at the Max inference tier, so Full and
+    // Catch-range multipliers - >1 only at the Max inference tier, so Full and
     // below snap exactly as before on every device. See enum InferenceLevel.
     float snapScale()  const { return m_inferenceLevel == InferenceLevel::Max ? 1.8f : 1.0f; } // distances
     float angleScale() const { return m_inferenceLevel == InferenceLevel::Max ? 1.5f : 1.0f; } // angles
@@ -577,7 +577,7 @@ private:
     // clicked. Generated geometry must use findExactCoincidentPoint.
     int findCoincidentPoint(glm::vec2 pos, int excludeId = -1) const;
 
-    // Coincidence for GENERATED geometry — a mirrored vertex, an offset
+    // Coincidence for GENERATED geometry - a mirrored vertex, an offset
     // endpoint, a derived circle centre. Fixed model-space radius, so the same
     // operation on the same sketch produces the same topology no matter where
     // the camera is. A screen radius here would make the model a function of
@@ -593,7 +593,7 @@ private:
     void handleArcTool(glm::vec2 pos);
     // Snap the arc's swept apex to a 15°-multiple sweep when within ±5° of one
     // (the 180° semicircle case especially). Used by BOTH the live preview
-    // (onMouseMove) and the commit (handleArcTool) so they can't diverge —
+    // (onMouseMove) and the commit (handleArcTool) so they can't diverge -
     // previously only the preview snapped, so the committed arc landed at the
     // raw cursor and its centre drifted off the intended (e.g. semicircle) one.
     glm::vec2 snapArcApex(glm::vec2 start, glm::vec2 end, glm::vec2 apex) const;
@@ -626,7 +626,7 @@ private:
     void handleSvgTool(glm::vec2 pos);
     void handleAirfoilTool(glm::vec2 pos);
     // Collapse a directional-inference result onto the axis (+ grid) when
-    // it's within a few degrees of horizontal/vertical — crooked-line guard.
+    // it's within a few degrees of horizontal/vertical - crooked-line guard.
     glm::vec2 rectifyNearAxis(glm::vec2 target) const;
     void handleTrimTool(glm::vec2 pos);
     void computeTrimHover(glm::vec2 pos); // updates m_trimHoverPoints (no mutation)
@@ -652,7 +652,7 @@ public:
 
     // Backspace during spline placement: drop the last control point
     // (removing it from the sketch too unless something else references
-    // it — e.g. the user snapped onto an existing vertex).
+    // it - e.g. the user snapped onto an existing vertex).
     void removeLastSplinePoint();
 
 private:
@@ -677,7 +677,7 @@ private:
 
     // One entry per Text/SVG stamp (newest last), each holding that stamp's
     // element ids (lines first, then points, so removal order never orphans
-    // references). A STACK — not a single slot — so undoLastStamp can walk back
+    // references). A STACK - not a single slot - so undoLastStamp can walk back
     // through every stamp to the original, not just the most recent one.
     // Cleared on setMode so each tool session starts fresh.
     std::vector<std::vector<int>> m_stampStack;
@@ -751,7 +751,7 @@ private:
     PendingDimension m_dimPending;
     glm::vec2 m_dimLabelPos{0.0f};
     bool m_dimReady = false;
-    // Static string literal (never owns storage) — see consumeDimRejection.
+    // Static string literal (never owns storage) - see consumeDimRejection.
     const char* m_dimRejectReason = nullptr;
     DimPick hitTestDimEntity(glm::vec2 pos) const;
     void handleDimensionTool(glm::vec2 pos);

@@ -5,7 +5,7 @@
 #include <set>
 #include <vector>
 
-// Sketch Offset tool — geometry core.
+// Sketch Offset tool - geometry core.
 //
 // Split plan/apply exactly like the Trim tool's planTrim/applyTrim: nothing
 // here mutates a Sketch except applyOffset(), so the hover ghost and the
@@ -58,7 +58,7 @@ struct OffsetChain {
 
 // Resolve the chain containing the element under `pos`.
 //
-// Adjacency is by shared POINT ID, which is exact — no tolerance games. The
+// Adjacency is by shared POINT ID, which is exact - no tolerance games. The
 // walk extends both ways while the shared endpoint has degree exactly 2, and
 // stops at a branch, a free end, or a spline (which cannot be offset). Returns
 // an empty chain when nothing was hit, or when the hit element is a spline or
@@ -72,7 +72,7 @@ struct OffsetChain {
 // normal, and re-fitted to a spline at commit.
 OffsetChain walkOffsetChain(const Sketch& sk, glm::vec2 pos, float threshold);
 
-// How an OPENING corner is closed — the two offset segments have pulled apart
+// How an OPENING corner is closed - the two offset segments have pulled apart
 // and something must bridge the gap.
 enum class OffsetCorners {
     Round,  // an arc of radius |d| centred on the source vertex (always exact)
@@ -87,7 +87,7 @@ struct OffsetResult {
     const char* rejectReason = nullptr; // set when !valid
 };
 
-// Offset `ch` by the SIGNED distance `d` — positive is right of travel, which
+// Offset `ch` by the SIGNED distance `d` - positive is right of travel, which
 // is outward for a counter-clockwise closed chain. The caller derives the sign
 // from which side of the chain the cursor is on; the chain's own travel
 // direction is arbitrary (it falls out of the picked element's stored point
@@ -95,7 +95,7 @@ struct OffsetResult {
 //
 // A Sharp miter with no intersection (near-parallel segments would meet at
 // infinity) silently falls back to Round, as does any corner involving a
-// spline — a sampled curve has no analytic intersection to miter to. Segments whose offset radius
+// spline - a sampled curve has no analytic intersection to miter to. Segments whose offset radius
 // collapses to zero or inverts are dropped, leaving a gap for pruneOffset to
 // resolve.
 OffsetResult offsetChain(const OffsetChain& ch, float d, OffsetCorners corners);
@@ -105,7 +105,7 @@ float distanceToChain(const OffsetChain& ch, glm::vec2 q);
 
 // As distanceToChain, but signed by which SIDE of the chain q lies on:
 // positive is right of travel. This is how the cursor chooses the offset
-// direction — for a counter-clockwise closed chain it reads as outward, but
+// direction - for a counter-clockwise closed chain it reads as outward, but
 // the walk's travel direction is arbitrary, so callers must take the sign from
 // here rather than assuming one.
 float signedDistanceToChain(const OffsetChain& ch, glm::vec2 q);
@@ -124,7 +124,7 @@ void pruneOffset(OffsetResult& res, const OffsetChain& src, float d);
 // Commit the offset into `sk` as ordinary sketch elements.
 //
 // `weld` returns the id of an existing sketch point coincident with the given
-// position, or -1 — pass SketchTool::coincidentPoint so an offset endpoint
+// position, or -1 - pass SketchTool::coincidentPoint so an offset endpoint
 // landing on existing geometry joins it instead of leaving a duplicate, the
 // same way Mirror does. Segments that meet each other share one point id, so
 // the result is a connected chain for region building.

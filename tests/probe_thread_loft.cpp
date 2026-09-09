@@ -1,4 +1,4 @@
-// PROBE v2: threaded rod via BRepOffsetAPI_MakePipeShell — the notched
+// PROBE v2: threaded rod via BRepOffsetAPI_MakePipeShell - the notched
 // cross-section swept along the STRAIGHT axis while an auxiliary HELIX spine
 // drives its rotation ("twist"). No boolean; a handful of smooth helicoid
 // faces; validity by construction. Timed against Steve's real case
@@ -64,7 +64,7 @@ int main(int argc, char** argv) {
     gp_Pnt crestA = polar(R, 135), crestM = polar(R, 180), crestB = polar(R, 225);
     TopoDS_Edge eRoot  = BRepBuilderAPI_MakeEdge(
         GC_MakeArcOfCircle(rootA, rootM, rootB).Value()).Edge();
-    // Flanks as 3-point arcs staying in the thread band — a straight chord
+    // Flanks as 3-point arcs staying in the thread band - a straight chord
     // across 90 deg of arc sags to ~0.7R and gouges the rod.
     TopoDS_Edge eUp    = BRepBuilderAPI_MakeEdge(
         GC_MakeArcOfCircle(rootB, polar(0.5 * (rr + R), 90), crestA).Value()).Edge();
@@ -82,7 +82,7 @@ int main(int argc, char** argv) {
     TopoDS_Wire spine = BRepBuilderAPI_MakeWire(eSpine).Wire();
 
     // ── Auxiliary spine: helix on the cylinder, same span, pitch P ──
-    // (2D line in the cylinder's UV space; BuildCurves3d gives the 3D helix —
+    // (2D line in the cylinder's UV space; BuildCurves3d gives the 3D helix -
     // the same trick ThreadOp's cutter uses.)
     Handle(Geom_CylindricalSurface) cyl =
         new Geom_CylindricalSurface(gp_Ax3(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), R);

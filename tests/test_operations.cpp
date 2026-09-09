@@ -392,7 +392,7 @@ TEST(ChamferTest, ChamferViaHistory) {
 #include "modeling/AxisTransformOp.h"
 #include <gp_Ax3.hxx>
 
-// Plane/axis gizmo transforms must round-trip their params — without this a
+// Plane/axis gizmo transforms must round-trip their params - without this a
 // BRAND-NEW file containing one plane move reloaded with frozen steps and the
 // misleading "restored from an older save" amber banner (Steve's mug).
 TEST(TransformOps, PlaneAndAxisTransformParamsRoundTrip) {
@@ -420,7 +420,7 @@ TEST(TransformOps, PlaneAndAxisTransformParamsRoundTrip) {
 
 #include "modeling/ReplayOp.h"
 // A reloaded SKETCH-only step (no body snapshots) must NOT be a frozen feature
-// — it's inert history and shouldn't raise the amber warning (Steve: a benign
+// - it's inert history and shouldn't raise the amber warning (Steve: a benign
 // "Remove sketch element" kept prompting it). A reloaded BODY step still is.
 TEST(ReloadWarning, SketchOnlyReloadIsNotFrozenFeature) {
     ReplayOp sketchOnly("sketchedit", "Sketch Edit", "Remove sketch element",

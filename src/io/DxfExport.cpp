@@ -12,7 +12,7 @@ namespace materializr {
 
 // R12 (AC1009) ASCII: the lowest common denominator every laser-cutter and
 // CAM package reads. Minimal file = HEADER ($ACADVER + $INSUNITS mm) and an
-// ENTITIES section — R12 needs no TABLES for entities on layer 0.
+// ENTITIES section - R12 needs no TABLES for entities on layer 0.
 DxfExportResult DxfExport::exportSketch(const std::string& filePath, const Sketch& sketch) {
     DxfExportResult result;
 
@@ -22,7 +22,7 @@ DxfExportResult DxfExport::exportSketch(const std::string& filePath, const Sketc
         return result;
     }
 
-    // Group-code/value pair — DXF is just alternating lines of these.
+    // Group-code/value pair - DXF is just alternating lines of these.
     auto tag = [&](int code, const char* v) { std::fprintf(f, "%d\n%s\n", code, v); };
     auto tagd = [&](int code, double v) { std::fprintf(f, "%d\n%.6f\n", code, v); };
     auto tagi = [&](int code, int v) { std::fprintf(f, "%d\n%d\n", code, v); };
@@ -62,7 +62,7 @@ DxfExportResult DxfExport::exportSketch(const std::string& filePath, const Sketc
         const SketchPoint* s = sketch.getPoint(a.startPointId);
         const SketchPoint* e = sketch.getPoint(a.endPointId);
         if (!ctr || !s || !e || a.radius <= 0.0) continue;
-        // Sketch arcs run CCW start→end — exactly DXF's ARC convention
+        // Sketch arcs run CCW start→end - exactly DXF's ARC convention
         // (group 50 = start angle, 51 = end angle, degrees CCW from +X).
         double a0 = std::atan2(s->pos.y - ctr->pos.y, s->pos.x - ctr->pos.x) * 180.0 / M_PI;
         double a1 = std::atan2(e->pos.y - ctr->pos.y, e->pos.x - ctr->pos.x) * 180.0 / M_PI;

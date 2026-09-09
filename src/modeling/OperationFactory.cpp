@@ -54,7 +54,7 @@ std::unique_ptr<Operation> create(const std::string& typeId) {
     //                 declines when any target is a bare body face.
     //   - "revolve":  profile re-derived from its sketch; axis is geometric
     //                 (origin+direction) and serialises directly.
-    //   - datum creation ops: self-contained — params carry the computed
+    //   - datum creation ops: self-contained - params carry the computed
     //     plane/axis + its document id, so reloaded steps undo/redo cleanly.
     if (typeId == "pattern")  return std::make_unique<PatternOp>();
     if (typeId == "extrude")  return std::make_unique<ExtrudeOp>();

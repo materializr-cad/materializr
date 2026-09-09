@@ -9,14 +9,14 @@ namespace materializr {
 
 // STL import. Reads an ASCII or binary STL mesh, optionally decimates it
 // (quadric edge collapse), sews the facets into a solid, and merges near-flat
-// regions into single planar faces — so the result is selectable and sketchable
+// regions into single planar faces - so the result is selectable and sketchable
 // (pick a flat face → "Sketch on Face"), useful for manually re-creating a model
 // from a scan/print. The body is tagged isMesh so the viewport takes a
 // mesh-aware path (cached picking, optional wireframe).
 //
 // A single `accuracy` in [0,1] drives the fidelity/cost trade-off:
-//   0.0 = coarse/fast — aggressive decimation + wide flat-merge (big faces, snappy)
-//   1.0 = faithful/slow — light decimation + tight merge (keeps detail, heavier)
+//   0.0 = coarse/fast - aggressive decimation + wide flat-merge (big faces, snappy)
+//   1.0 = faithful/slow - light decimation + tight merge (keeps detail, heavier)
 // It maps to: decimation target triangles, UnifySameDomain angular tolerance
 // (the flat-merge knob), and sewing tolerance. See StlIO.cpp for the mapping.
 //

@@ -1,5 +1,5 @@
 #pragma once
-// Display units for lengths — mm, cm, m, in, ft.
+// Display units for lengths - mm, cm, m, in, ft.
 //
 // The model is millimetres and stays millimetres: OCCT geometry, every Operation
 // parameter, the .mzr file, exports and the sketch solver all speak mm. This
@@ -10,7 +10,7 @@
 //
 // The current unit is a process-global setting, like the UI language. It is a
 // presentation preference, not model state; nothing that computes geometry
-// reads it. Operation::description() methods DO read it (through fmtLength) —
+// reads it. Operation::description() methods DO read it (through fmtLength) -
 // they are presentation methods that happen to live on modeling classes, and
 // that is stated rather than hidden. The setter has one caller,
 // Application::applyDisplayUnitChange, which also owns the ImGui side effect
@@ -29,6 +29,22 @@
 
 namespace materializr {
 
+// M_PI is NOT standard C++. MSVC defines it only when <cmath> is reached with
+// _USE_MATH_DEFINES, and this header cannot assume that: the app target sets
+// it (CMakeLists.txt, MSVC branch) but materializr_core - which the tests and
+// every modeling Op build against - does not. The other M_PI users in core get
+// away with it because they include OpenCASCADE headers first, and OCCT
+// defines the macro itself; this header deliberately includes no OCCT, so in a
+// translation unit where it lands first there is nothing to supply it. Windows
+// CI caught exactly that, in eighteen Ops at once.
+//
+// A header should not depend on a macro its consumer's build happens to set.
+// tests/test_length_edit.cpp POISONS M_PI before including this, so the
+// dependency cannot come back unnoticed. It poisons rather than #undefs
+// because a bare #undef does not hold: this header includes <cmath>, which
+// defines the macro straight back.
+constexpr double kPi = 3.14159265358979323846;
+
 // Order is the on-disk Settings int; append only.
 enum class LengthUnit { Mm = 0, Cm, M, In, Ft };
 inline constexpr int kLengthUnitCount = 5;
@@ -38,7 +54,7 @@ struct UnitInfo {
     const char* suffix;    // as printed after a number
     int         decimals;  // printed precision
     double      step;      // widget +/- increment, in display units
-    double      dragStep;  // drag SNAP granularity, in display units — finer than
+    double      dragStep;  // drag SNAP granularity, in display units - finer than
                            // `step`. One field served both and made the fillet
                            // drag snap to 1 mm where it had always snapped to
                            // 0.1 mm: a 10x coarser handle for every mm user, in
@@ -70,7 +86,7 @@ inline LengthUnit& currentUnitRef() {
 } // namespace detail
 
 inline LengthUnit currentUnit() { return detail::currentUnitRef(); }
-// Pure store. Deliberately no UI side effects — see the header comment.
+// Pure store. Deliberately no UI side effects - see the header comment.
 inline void setCurrentUnit(LengthUnit u) { detail::currentUnitRef() = u; }
 
 inline double toDisplay(double mm)      { return mm / unitInfo(currentUnit()).toMm; }
@@ -96,6 +112,18 @@ inline std::string fmtLength(double mm)  { return detail::fmtQuantity(toDisplay(
 inline std::string fmtArea(double mm2)   { return detail::fmtQuantity(areaToDisplay(mm2), "\xC2\xB2"); }
 inline std::string fmtVolume(double mm3) { return detail::fmtQuantity(volToDisplay(mm3), "\xC2\xB3"); }
 
+// "(12.70, 0.00, 3.81) in" - a point or an offset, three converted numbers
+// under ONE suffix. Repeating the unit on each component reads as noise at the
+// width a history caption gets.
+inline std::string fmtVec3(double xMm, double yMm, double zMm) {
+    const UnitInfo& u = unitInfo(currentUnit());
+    char b[128];
+    std::snprintf(b, sizeof b, "(%.*f, %.*f, %.*f) %s",
+                  u.decimals, toDisplay(xMm), u.decimals, toDisplay(yMm),
+                  u.decimals, toDisplay(zMm), u.suffix);
+    return b;
+}
+
 // printf format for a length in the current display unit, e.g. "%.3f". The
 // unit table picks decimals so every unit resolves to about 0.01 mm; a
 // hardcoded "%.3f" under metres or feet (4 decimals) instead snaps the value
@@ -108,7 +136,7 @@ inline const char* lengthFormat() {
 
 // Force a unit for a scope and restore it on exit, including on an early
 // return or a throw. For values that must be produced in a CANONICAL unit
-// regardless of what the user is looking at — history captions are written
+// regardless of what the user is looking at - history captions are written
 // into the .mzr file, so they must not carry the unit that happened to be
 // selected at save time.
 struct ScopedUnit {
@@ -121,9 +149,9 @@ struct ScopedUnit {
 
 // Parse a typed length into mm.
 //
-// Accepts ONLY a pure numeric literal with an optional trailing unit token —
+// Accepts ONLY a pure numeric literal with an optional trailing unit token -
 // "25.4", "1in", "2\"", "3 ft", "3'". No suffix means the current display unit.
-// Anything else — an operator, an identifier, a second number — is refused and
+// Anything else - an operator, an identifier, a second number - is refused and
 // `mm` is left untouched, exactly the parseFinite() contract. That refusal is
 // what keeps formulas safe: a variable-bearing expression is always mm and must
 // never be scaled here, so it must never be accepted here.

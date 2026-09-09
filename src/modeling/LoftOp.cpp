@@ -39,6 +39,7 @@
 #include "../i18n.h"
 #include "../i18n.h"
 #include "ParamParse.h"
+#include "BoolArgs.h"
 
 namespace {
 
@@ -446,7 +447,7 @@ bool LoftOp::execute(Document& doc) {
         // Degenerate section stacks (e.g. perpendicular "wall" profiles that
         // make the surface fold through itself) can drive ThruSections to a
         // kernel FAULT, not just a clean failure. OCC_CATCH_SIGNALS turns that
-        // signal into a Standard_Failure the catch below absorbs — without it
+        // signal into a Standard_Failure the catch below absorbs - without it
         // the app dies (crash reproduced by repeated preview/cancel on a
         // weaving 3-section loft).
         OCC_CATCH_SIGNALS
@@ -507,10 +508,11 @@ bool LoftOp::execute(Document& doc) {
                 }
                 inner.Build();
                 if (!inner.IsDone()) continue; // skip a hole that won't loft
-                BRepAlgoAPI_Cut cut(loftedShape, inner.Shape());
+                BRepAlgoAPI_Cut cut;
+                materializr::setBooleanShapes(cut, loftedShape, inner.Shape());
                 cut.Build();
                 if (!cut.IsDone()) continue;
-                // Adopt the cut only if it's still a usable solid — a bad hole
+                // Adopt the cut only if it's still a usable solid - a bad hole
                 // channel can yield a null/empty/invalid result that would
                 // otherwise replace a perfectly good outer loft.
                 TopoDS_Shape cutShape = cut.Shape();
@@ -526,7 +528,7 @@ bool LoftOp::execute(Document& doc) {
         // Validate-or-refuse (same gate as BooleanOp/FilletOp/ShellOp): a
         // degenerate section stack can pass IsDone() yet produce a null or
         // topologically invalid shape that later crashes tessellation/save.
-        // The volume check only applies to solid lofts — a surface loft
+        // The volume check only applies to solid lofts - a surface loft
         // legitimately encloses no volume.
         if (loftedShape.IsNull()) return false;
         if (m_solid) {
@@ -575,7 +577,7 @@ bool LoftOp::undo(Document& doc) {
     try {
         if (m_createdBodyId >= 0) {
             doc.removeBody(m_createdBodyId);
-            // Keep m_createdBodyId — tombstone restore on next execute().
+            // Keep m_createdBodyId - tombstone restore on next execute().
         }
         return true;
     } catch (...) {
@@ -629,7 +631,7 @@ OperationDiff LoftOp::captureDiff() const {
 
 std::string LoftOp::serializeParams() const {
     // Profiles are raw wires (picked from sketch regions / body loops at
-    // create time) — no persistent source ids exist, so they persist as an
+    // create time) - no persistent source ids exist, so they persist as an
     // ASCII BREP compound embedded in the params. PARAMS_LEN stores raw
     // bytes, so the multi-line BREP is safe; it goes LAST, length-prefixed.
     // Compound order: profile0, its holes..., profile1, its holes..., etc.
@@ -692,7 +694,7 @@ bool LoftOp::deserializeParams(const std::string& blob) {
                     // Check the HOLE children too, as BoundaryFillOp's twin loop
                     // does. Without this a crafted compound reached TopoDS::Wire()
                     // on a non-wire and threw Standard_TypeMismatch out of
-                    // deserializeParams — the try/catch above covers only
+                    // deserializeParams - the try/catch above covers only
                     // BRepTools::Read, so nothing here caught it.
                     if (it.Value().ShapeType() != TopAbs_WIRE) return false;
                     holes.push_back(TopoDS::Wire(it.Value()));
@@ -711,7 +713,7 @@ bool LoftOp::deserializeParams(const std::string& blob) {
         else if (key == "created") { m_createdBodyId = std::atoi(val.c_str()); any = true; }
         else if (key == "np")      { np = std::atoi(val.c_str()); any = true; }
         // h<N>: N comes from the file and SIZES the vector below, so it is bounded
-        // before the resize. This site was weaker than BoundaryFillOp's twin — it
+        // before the resize. This site was weaker than BoundaryFillOp's twin - it
         // had no digit guard at all, so any "h*" key reached std::atoi.
         // isdigit() gates the branch so an unknown future 'h*' key is ignored
         // rather than failing the whole op. (The original had no digit test at

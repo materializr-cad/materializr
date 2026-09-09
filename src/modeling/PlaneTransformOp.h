@@ -6,7 +6,7 @@
 
 // Undoable construction-plane transform (move / rotate / hinge). Plane edits
 // are applied LIVE to the Document (by the gizmo drag and the Rotate-About-
-// Axis popup) — this op just records before/after gp_Pln snapshots so undo /
+// Axis popup) - this op just records before/after gp_Pln snapshots so undo /
 // redo can swap between them. Pushed via History::pushExecuted (the effect is
 // already in the document by the time we record it).
 //
@@ -34,7 +34,7 @@ public:
     std::string description() const override;
     void renderProperties() override;
     std::string typeId() const override { return "plane_transform"; }
-    // Reload support: pure plane poses — everything serialises, so a plane
+    // Reload support: pure plane poses - everything serialises, so a plane
     // move/rotate comes back EDITABLE instead of freezing the whole project
     // into the amber "restored from an older save" state (which the banner
     // wrongly claimed for brand-new files containing one of these steps).

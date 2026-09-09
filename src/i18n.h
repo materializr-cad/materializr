@@ -23,7 +23,7 @@
 // ImGui note: labels of the form "Visible##id" carry a widget IDENTITY after
 // the ##. tr() translates ONLY the visible half and re-attaches the id
 // untouched, so translating can never break widget identity, focus, or the
-// .ini layout. Never hand tr() a bare "##id" — there is nothing to translate.
+// .ini layout. Never hand tr() a bare "##id" - there is nothing to translate.
 
 namespace materializr {
 

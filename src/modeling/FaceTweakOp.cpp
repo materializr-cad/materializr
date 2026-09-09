@@ -1,5 +1,7 @@
 #include "FaceTweakOp.h"
 
+#include "core/Units.h"
+
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepGProp.hxx>
 #include <BRepTools.hxx>
@@ -127,13 +129,18 @@ std::string FaceTweakOp::description() const {
     const gp_XYZ t = m_xf.TranslationPart();
     const double dist = std::sqrt(t.X() * t.X() + t.Y() * t.Y() + t.Z() * t.Z());
     double ang = 0.0;
-    try { ang = m_xf.GetRotation().GetRotationAngle() * 180.0 / M_PI; } catch (...) {}
-    char buf[96];
-    if (std::abs(ang) > 1e-6)
+    try { ang = m_xf.GetRotation().GetRotationAngle() * 180.0 / materializr::kPi; } catch (...) {}
+    // The distance is a MODEL DIMENSION - how far the face actually moved - so
+    // it reads in the display unit like every other length in the history
+    // panel. description() is called live per frame, so switching units
+    // re-renders it with no stored string to go stale. The angle branch is
+    // degrees and never touches the unit.
+    if (std::abs(ang) > 1e-6) {
+        char buf[96];
         std::snprintf(buf, sizeof buf, "Tweak face %.2f deg", ang);
-    else
-        std::snprintf(buf, sizeof buf, "Tweak face %.3f mm", dist);
-    return buf;
+        return buf;
+    }
+    return "Tweak face " + materializr::fmtLength(dist);
 }
 
 void FaceTweakOp::renderProperties() {
@@ -150,7 +157,7 @@ OperationDiff FaceTweakOp::captureDiff() const {
 }
 
 std::string FaceTweakOp::serializeParams() const {
-    // Scalars, then the picked face as a length-prefixed ASCII BREP — the
+    // Scalars, then the picked face as a length-prefixed ASCII BREP - the
     // LoftOp / BoundaryFillOp / PatchOp discipline. The face travels as geometry
     // rather than a sub-shape index so a reload can rebind it against a body
     // that upstream edits have since regenerated.

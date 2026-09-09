@@ -7,8 +7,8 @@
 #include <cstdio>
 #include <memory>
 
-// File → Import → DXF. Same flow as the SVG import plugin — the profile
-// lands as a NEW sketch on the ground plane — but DXF is a DIMENSIONED
+// File → Import → DXF. Same flow as the SVG import plugin - the profile
+// lands as a NEW sketch on the ground plane - but DXF is a DIMENSIONED
 // format, so unlike SVG there is no width clamp or rescale: a 100 mm part
 // imports at exactly 100 mm ($INSUNITS handles inch-authored files), only
 // the drawing's offset is normalized to the origin.

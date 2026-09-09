@@ -19,14 +19,14 @@ struct SketchPoint {
     glm::vec2 pos;
     bool isConstruction = false;
     // Glyph-outline geometry from the Text tool. Still forms regions and is
-    // still selectable, but hidden from vertex markers and snap/inference —
+    // still selectable, but hidden from vertex markers and snap/inference -
     // a five-letter word carries hundreds of vertices, and drawing anywhere
     // near it became impossible when every one was a snap target.
     bool fromText = false;
     // STICKY, not locked: the circle/arc this point was placed on, or -1.
     // Dragging the point (or a line that owns it) slides it ALONG that rim
     // while the drag stays near the rim, and simply lets go once the drag
-    // pulls it clear — see SketchTool's drag handling. Deliberately not a
+    // pulls it clear - see SketchTool's drag handling. Deliberately not a
     // solver Constraint: constraints in this sketcher are opt-in and binding,
     // and this is a hint the user can walk away from without ceremony.
     int onCurveId = -1;
@@ -118,23 +118,23 @@ public:
     std::vector<glm::vec2> sampleSpline2D(const SketchSpline& sp,
                                           int segsPerSpan = 12) const;
     // Interpolate a smooth curve through raw 2D positions (no sketch points
-    // needed) — used for the live in-progress spline preview. Falls back to
+    // needed) - used for the live in-progress spline preview. Falls back to
     // the input polyline on failure.
     static std::vector<glm::vec2> interpolate2D(
         const std::vector<glm::vec2>& ctrl, int segsPerSpan = 12,
         bool closed = false);
 
     // The point of `plane` NEAREST `near` whose sketch coordinates are both
-    // multiples of `step` — i.e. a point of the snap lattice.
+    // multiples of `step` - i.e. a point of the snap lattice.
     //
     // Snapping rounds sketch (u,v), measured from the PLANE ORIGIN along the
     // plane's X/Y directions, so the lattice is only defined in that frame.
     // Rounding world XYZ and projecting onto the plane is a different (and
     // wrong) thing: the projection of a world lattice point lands at an
     // arbitrary fraction of a cell in-plane. Anything that has to agree with
-    // where clicks land — above all the grid the viewport DRAWS — must round
+    // where clicks land - above all the grid the viewport DRAWS - must round
     // here rather than roll its own.
-    // `nearPt`, not `near` — <windef.h> defines `near` as an empty macro, which
+    // `nearPt`, not `near` - <windef.h> defines `near` as an empty macro, which
     // silently erases the parameter on MSVC. See the definition in Sketch.cpp.
     static gp_Pnt latticeAnchor(const gp_Pln& plane, const gp_Pnt& nearPt,
                                 double step);
@@ -155,14 +155,14 @@ public:
     // The LONGEST open chain of lines/arcs/splines as one wire, emitted as a
     // dense polyline (arcs and splines are sampled). buildWires() deliberately
     // prunes every non-cycle edge while hunting closed regions, so an open
-    // silhouette curve yields nothing there — this walker does the opposite,
+    // silhouette curve yields nothing there - this walker does the opposite,
     // following degree-1 endpoints. Null wire when the sketch has no open
     // chain. Used for guided-loft rails; consumers resample by height/length,
     // so polyline fidelity is ample.
     TopoDS_Wire buildOpenWire() const;
 
     // Whole-profile shape for "extrude everything this sketch encloses":
-    // closed wires grouped even-odd by containment depth — every
+    // closed wires grouped even-odd by containment depth - every
     // even-depth wire is an island outer, its directly-contained
     // odd-depth wires are holes. Returns a compound of faces (one per
     // island), or a null shape when no closed wires exist. This replaced
@@ -188,7 +188,7 @@ public:
 
     // True when buildRegions() would be a cache HIT (valid cache + current
     // geometry hash). Lets the per-frame hover pick skip sketches whose
-    // regions would need the heavy OCCT fuse — a freshly-unhidden complex
+    // regions would need the heavy OCCT fuse - a freshly-unhidden complex
     // sketch otherwise turns the first hover into a seconds-long stall.
     bool regionsCached() const;
 
@@ -200,13 +200,13 @@ public:
     // region, widening the otherwise pixel-thin boundary catch area.
     bool isPointInOrNearRegion(const Region& region, glm::vec2 p, float tol) const;
 
-    // Originating face / body — set when the sketch was started on a planar face.
+    // Originating face / body - set when the sketch was started on a planar face.
     // -1 means the sketch is on a freestanding plane (e.g. world XY).
     void setSourceBody(int bodyId) { m_sourceBodyId = bodyId; }
     int getSourceBody() const { return m_sourceBodyId; }
 
     // Parametric link state. When true, this sketch no longer drives the body
-    // it created — set when the user moves the sketch (or its body) on its own
+    // it created - set when the user moves the sketch (or its body) on its own
     // in 3D, deliberately breaking them out of unison. The sketch-edit cascade
     // skips detached sketches, so editing one won't retro-modify the body.
     // Cleared when the sketch and body are moved together (re-linked).
@@ -220,7 +220,7 @@ public:
     bool getSourceFaceCentroid(glm::vec2& out) const;
 
     // The host body's TRUE centre in sketch-plane 2D (e.g. the Thread step's
-    // axis piercing the plane). NOT serialized — recomputed on every sketch
+    // axis piercing the plane). NOT serialized - recomputed on every sketch
     // entry (new AND re-edit) by the app. While set, it outranks and
     // SUPPRESSES the area-centroid snap: on a threaded cap the centroid sits
     // just off-axis, and with both live the snap flip-flopped between them.
@@ -232,7 +232,7 @@ public:
         return true;
     }
 
-    // Reference geometry pulled from the source face on sketch entry — the
+    // Reference geometry pulled from the source face on sketch entry - the
     // face's corner vertices, edge endpoints, edge midpoints, and straight
     // edges (start/end pairs) projected into sketch-plane 2D. The inference
     // snap reads these so the cursor can land on a 3D face's corners/edges
@@ -266,7 +266,7 @@ public:
 
     // World-space axis-aligned bounds of all sketch geometry (points expanded
     // by circle radii). Returns false when the sketch has no points, leaving
-    // out* untouched. Used to frame an in-progress sketch — it lives outside
+    // out* untouched. Used to frame an in-progress sketch - it lives outside
     // the Document, so the usual body-bbox path can't see it.
     bool getWorldBounds(glm::vec3& outMin, glm::vec3& outMax) const;
 
@@ -292,7 +292,7 @@ public:
     // Resize a line to `newLength`, growing/shrinking symmetrically about its
     // midpoint along its current direction. Both endpoints move, so any element
     // sharing those points (chained lines, rectangle corners, arc ends) rides
-    // along — that's the "anchored to the ends" behaviour. Arcs whose endpoint
+    // along - that's the "anchored to the ends" behaviour. Arcs whose endpoint
     // moves are repaired to preserve their swept angle (see below).
     void setLineLength(int lineId, double newLength);
 
@@ -307,7 +307,7 @@ public:
     void setArcSweep(int arcId, double sweepRad);
 
     // Set the straight-line distance between an arc's two endpoints (its chord)
-    // keeping the SWEEP ANGLE fixed — i.e. the same arc shape, just scaled. Both
+    // keeping the SWEEP ANGLE fixed - i.e. the same arc shape, just scaled. Both
     // endpoints slide radially about the (fixed) centre; the radius adjusts to
     // hit the requested chord. (Equivalent to a Radius edit, parameterised by
     // endpoint distance instead of curvature.)
@@ -357,7 +357,7 @@ private:
     bool m_detached = false;   // link to driven body deliberately broken
     TopoDS_Face m_sourceFace;
     glm::vec2 m_centerPoint{0.0f};      // host body's true centre (2D); see
-    bool m_hasCenterPoint = false;      // setCenterPoint — session-only
+    bool m_hasCenterPoint = false;      // setCenterPoint - session-only
 
     std::vector<SketchPoint> m_points;
     std::vector<SketchLine> m_lines;
@@ -372,7 +372,7 @@ private:
     // Cached in 3D, deliberately. The centroid belongs to the FACE, so its
     // world position is fixed until the face itself is replaced; only its
     // sketch-2D coordinates depend on the plane. Caching the 2D value meant a
-    // plane change silently invalidated it — and setPlane is exactly what
+    // plane change silently invalidated it - and setPlane is exactly what
     // moving a sketch does, so the centre marker (and the snap that follows it)
     // stayed behind by the distance moved. Projecting on read is two dot
     // products; recomputing the centroid is a BRepGProp pass over the face.
@@ -396,8 +396,8 @@ private:
 // a full circle by DIAMETER ("O 20"), while Constraint::value stores a radius
 // for both. The label, the edit-popup seed and the commit must all agree on
 // which convention applies. This was a file-static in Application_Viewport.cpp,
-// so the fourth site that needed it — applyPendingDimension, in another
-// translation unit — could not call it, open-coded the scan, and missed the
+// so the fourth site that needed it - applyPendingDimension, in another
+// translation unit - could not call it, open-coded the scan, and missed the
 // unit conversion with it. Shared so that cannot recur.
 bool constraintIsArcRadius(const Sketch& sk, const Constraint& c);
 

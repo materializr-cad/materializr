@@ -31,7 +31,7 @@ ImportResult IgesIO::import(const std::string& filePath, Document& doc) {
     // OCCT can throw Standard_Failure / std::bad_alloc on malformed or adversarial
     // IGES geometry (during TransferRoots / shape handling). Catch it so a bad
     // import is a graceful error rather than an uncaught exception that aborts the
-    // whole process (an instant crash, notably on Android) — mirrors StepIO::import.
+    // whole process (an instant crash, notably on Android) - mirrors StepIO::import.
     try {
     OCC_CATCH_SIGNALS // convert an OCCT kernel fault on a crafted file into the catch below
     IGESControl_Reader reader;
@@ -76,7 +76,7 @@ ImportResult IgesIO::import(const std::string& filePath, Document& doc) {
     int importCount = 0;
 
     // Disk Z-up → scene Y-up, the StepIO convention. IGES skipped this for
-    // years ("i don't think anyone even noticed it was sideways" — Steve),
+    // years ("i don't think anyone even noticed it was sideways" - Steve),
     // which left IGES imports lying down relative to STEP imports (#46).
     gp_Trsf zUpToYUp;
     zUpToYUp.SetRotation(gp_Ax1(gp_Pnt(0.0, 0.0, 0.0), gp_Dir(1.0, 0.0, 0.0)),
@@ -166,7 +166,7 @@ ExportResult IgesIO::exportFile(const std::string& filePath, const Document& doc
 
     IGESControl_Writer writer;
 
-    // Scene Y-up → disk Z-up (+90° about X), matching StepIO::exportBodies —
+    // Scene Y-up → disk Z-up (+90° about X), matching StepIO::exportBodies -
     // see the import-side note (#46).
     gp_Trsf yUpToZUp;
     yUpToZUp.SetRotation(gp_Ax1(gp_Pnt(0.0, 0.0, 0.0), gp_Dir(1.0, 0.0, 0.0)),

@@ -48,13 +48,13 @@ FaceIdMap propagate(
             if (e.face.IsNull() || e.ids.empty()) continue;
             bool carried = false;
             if (led.modified.Contains(e.face)) {
-                // Modified (possibly into SEVERAL pieces — a boolean split):
+                // Modified (possibly into SEVERAL pieces - a boolean split):
                 // every piece inherits the ancestry. This is the case no
                 // geometric matcher can trace (#51).
                 for (const TopoDS_Shape& piece : led.modified.FindFromKey(e.face)) {
                     if (piece.ShapeType() != TopAbs_FACE) continue;
                     // Membership guard: a post-boolean cleanup (Union's
-                    // UnifySameDomain) can merge pieces away — only faces
+                    // UnifySameDomain) can merge pieces away - only faces
                     // actually present in the result carry ancestry.
                     if (!resultFaces.Contains(piece)) continue;
                     for (int id : e.ids) addId(out, piece, id);
@@ -62,7 +62,7 @@ FaceIdMap propagate(
                 }
             }
             if (!carried && resultFaces.Contains(e.face)) {
-                // Untouched by the op — the identical face survives.
+                // Untouched by the op - the identical face survives.
                 for (int id : e.ids) addId(out, e.face, id);
             }
             // Deleted faces: ancestry ends here, correctly.
@@ -83,7 +83,7 @@ FaceIdMap carryThrough(const FaceIdMap& in,
         if (hist->IsRemoved(e.face)) continue;            // deleted by the rewrite
         const TopTools_ListOfShape& mod = hist->Modified(e.face);
         if (mod.IsEmpty()) {
-            if (resultFaces.Contains(e.face))             // unchanged — survives
+            if (resultFaces.Contains(e.face))             // unchanged - survives
                 for (int id : e.ids) addId(out, e.face, id);
         } else {
             for (TopTools_ListIteratorOfListOfShape it(mod); it.More(); it.Next())

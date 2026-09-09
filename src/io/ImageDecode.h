@@ -5,10 +5,10 @@
 
 namespace materializr {
 
-// Thin wrapper over stb_image (the app's only raster decoder — everything
+// Thin wrapper over stb_image (the app's only raster decoder - everything
 // else in the codebase is vector). Decodes PNG / JPEG / BMP / GIF(first
 // frame) / PSD / TGA from an in-memory buffer to tightly-packed RGBA8.
-// Returns false (and leaves outputs untouched) on any parse failure — the
+// Returns false (and leaves outputs untouched) on any parse failure - the
 // bytes are untrusted user files, and stb_image fails closed.
 struct DecodedImage {
     int width = 0;

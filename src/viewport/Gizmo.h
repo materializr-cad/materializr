@@ -43,7 +43,7 @@ public:
     // the plane perpendicular to it). Used for the face-tilt gizmo.
     void renderRingAbout(const glm::mat4& view, const glm::mat4& projection,
                          glm::vec3 position, glm::vec3 axisDir, glm::vec3 color);
-    // A scale handle (shaft + cube) at `position` pointing along `dir` — the
+    // A scale handle (shaft + cube) at `position` pointing along `dir` - the
     // regular scale-gizmo look, for the face scale gizmo.
     void renderCubeAlong(const glm::mat4& view, const glm::mat4& projection,
                          glm::vec3 position, glm::vec3 dir, glm::vec3 color);

@@ -12,11 +12,11 @@ namespace materializr {
 //
 // FIRST user of the LiveOp preview model, and the reason that model got
 // built. The hand-written version pushed a real ExtrudeOp onto History and
-// undid it again on EVERY preview frame — the same churn Push/Pull was
+// undid it again on EVERY preview frame - the same churn Push/Pull was
 // rescued from earlier, still carrying its symptoms: the created body's id
 // changed each frame, and an outside history touch mid-gesture left the
 // bookkeeping desynced (the old code had an explicit "preview op no longer on
-// top of history — resyncing without undo" bail-out for exactly that). Keeping
+// top of history - resyncing without undo" bail-out for exactly that). Keeping
 // ONE instance and toggling it undo/execute fixes both: ExtrudeOp re-uses
 // m_createdBodyId through addOrPutBody, so the preview body keeps its id, and
 // History sees nothing at all until commit.
@@ -28,14 +28,14 @@ class ExtrudeController : public InteractiveOpController {
 public:
     // Entry point (this op is handed its profile rather than reading the
     // selection, so it doesn't fit onBegin's capture-from-selection shape).
-    // Returns false when it refused — a curved face has no single normal.
+    // Returns false when it refused - a curved face has no single normal.
     //
     // A Subtract may pass targetBody = -1: the body to cut is then resolved
     // from the swept volume at commit (see resolveCutTarget).
     bool beginExtrude(const IopContext& ctx, const TopoDS_Shape& profile,
                       ExtrudeMode mode, int targetBody, int sourceSketchId);
 
-    // The arrow's frame — Application still DRAWS the dimension arrow (it
+    // The arrow's frame - Application still DRAWS the dimension arrow (it
     // shares the extrude/push-pull/edge-op arrow renderer).
     const glm::vec3& origin() const { return m_origin; }
     const glm::vec3& normal() const { return m_normal; }
@@ -46,7 +46,7 @@ public:
 
     // The distance panel (banner + value well + Confirm/Cancel). Called from
     // renderViewport where the viewport window is current, because it anchors
-    // to that window's rect — same arrangement as Move Face's.
+    // to that window's rect - same arrangement as Move Face's.
     void renderExtrudePanel(const IopContext& ctx);
     // Enter-to-confirm from the global key handler: take whatever is in the
     // text field, then commit. (This op has no scaffold panel to catch it.)
@@ -56,8 +56,8 @@ public:
     // typed value exact (the grid step would round it under the user).
     void updateExtrude(const IopContext& ctx, bool applySnap = true);
 
-    // Subtract resolves its target from the swept volume first, and REFUSES —
-    // staying open, so the distance can be adjusted — when that volume reaches
+    // Subtract resolves its target from the swept volume first, and REFUSES -
+    // staying open, so the distance can be adjusted - when that volume reaches
     // no body at all. Committing anyway would either record a step that changed
     // nothing (a cut that misses leaves the body intact and passes every
     // validity check) or, with no target, leave the tool volume behind as a
@@ -81,7 +81,7 @@ protected:
 
 private:
     // Signed distance for the op: a Subtract's tool travels against the profile
-    // normal (which points OUT of the host body) — except for a sketch with no
+    // normal (which points OUT of the host body) - except for a sketch with no
     // host, where the direction is aimed at the nearest body instead.
     double opDistance() const;
     // The visible body the current tool volume removes the most material from,
@@ -89,8 +89,8 @@ private:
     int resolveCutTarget(const IopContext& ctx) const;
     // Every visible body the tool volume reaches, for the all-bodies option.
     std::vector<int> resolveAllCutTargets(const IopContext& ctx) const;
-    // Push one Subtract per body. History has no op grouping — the existing
-    // multi-body Boolean does the same — so each body's cut is its own step,
+    // Push one Subtract per body. History has no op grouping - the existing
+    // multi-body Boolean does the same - so each body's cut is its own step,
     // which also keeps each one's face lineage and undo exactly as they are for
     // the single-target case.
     void commitCutAll(const IopContext& ctx, const std::vector<int>& targets);
@@ -101,7 +101,7 @@ private:
     // +1 sweeps along the profile normal, -1 against it. See opDistance.
     double m_sweepSign = 1.0;
     // Subtract only: cut EVERY body the sweep passes through, not just the one
-    // it belongs to. Off by default — a sketch on a face means that face's
+    // it belongs to. Off by default - a sketch on a face means that face's
     // body, and silently carving a neighbour it happens to overlap would be a
     // surprise. Per-gesture, not persisted.
     bool m_cutAllBodies = false;

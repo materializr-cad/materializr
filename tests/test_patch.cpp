@@ -6,8 +6,8 @@
 // solver, only the continuity changed. Position has no reason to leave the
 // plane of the rim, so it lands as a flat disc. Tangent has to leave the rim
 // along the wall, which no flat disc can do, so it domes. If the continuity
-// were being dropped on the floor — as it silently is when the enumerator is
-// spelled the way the kernel documents it — those two areas would match.
+// were being dropped on the floor - as it silently is when the enumerator is
+// spelled the way the kernel documents it - those two areas would match.
 //
 // PerpendicularWallsDegradeToPositionAndSaySo pins the other half: where the
 // solver genuinely cannot deliver tangency, the void is still filled and the op
@@ -51,7 +51,7 @@ double surfaceArea(const TopoDS_Shape& s) {
 }
 
 // Every face of `solid` except the one whose centre is highest / lowest along
-// Z, sewn back into an open shell — i.e. a body with a hole in it, which is
+// Z, sewn back into an open shell - i.e. a body with a hole in it, which is
 // what this tool exists to repair.
 TopoDS_Shape shellWithFaceRemoved(const TopoDS_Shape& solid, bool removeTop) {
     TopoDS_Face victim;
@@ -131,7 +131,7 @@ TEST(Patch, UndoPutsTheHoleBack) {
 
 TEST(Patch, TangencyDomesTheCapOnALeaningWall) {
     // A cone frustum, lid removed. The wall leans ~11 degrees off vertical, so
-    // a tangent cap has to leave the rim at that angle and dome — it cannot be
+    // a tangent cap has to leave the rim at that angle and dome - it cannot be
     // the flat disc that satisfies position alone.
     const double r1 = 5.0, r2 = 3.0, h = 10.0;
     const double flatArea = M_PI * r2 * r2;
@@ -306,7 +306,7 @@ TEST(Patch, RefusesAGarbageBlob) {
 // Three different situations hand the user the same loose surface, and they
 // want three different things done next. The one that reads as the tool
 // ignoring you is a hole that goes right THROUGH: capping one end cannot close
-// the body, so the patch correctly refuses to sew — and used to say nothing at
+// the body, so the patch correctly refuses to sew - and used to say nothing at
 // all about why.
 
 TEST(Patch, AClosedBodyReportsThatThereIsNothingToSewInto) {

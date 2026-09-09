@@ -29,7 +29,7 @@ if(NOT DEFINED MATERIALIZR_IOS_PREFIX)
     set(MATERIALIZR_IOS_PREFIX "$ENV{HOME}/iOS/prefix/iphoneos-arm64")
 endif()
 if(NOT EXISTS "${MATERIALIZR_IOS_PREFIX}/include/opencascade")
-    message(FATAL_ERROR "No cross-built OCCT at ${MATERIALIZR_IOS_PREFIX} — run ios/scripts/setup-deps.sh first")
+    message(FATAL_ERROR "No cross-built OCCT at ${MATERIALIZR_IOS_PREFIX} - run ios/scripts/setup-deps.sh first")
 endif()
 set(OCCT_INC "${MATERIALIZR_IOS_PREFIX}/include/opencascade")
 set(OCCT_LIB "${MATERIALIZR_IOS_PREFIX}/lib")
@@ -101,7 +101,7 @@ target_link_libraries(materializr PRIVATE ${OCCT_A_PATHS} "${MATERIALIZR_IOS_PRE
 # CoreBluetooth/CoreMotion/CoreHaptics are deliberately absent: they were only
 # referenced by SDL's joystick/haptic/sensor subsystems, which
 # ios/scripts/setup-deps.sh now builds OFF (App Store validation demands
-# purpose strings for APIs the binary references — ITMS-90683). A prefix built
+# purpose strings for APIs the binary references - ITMS-90683). A prefix built
 # before that change needs them back to link. GameController stays: SDL's
 # UIKit event backend uses GCKeyboard/GCMouse for iPad hardware keyboard and
 # mouse support (independent of the joystick subsystem), and that framework
@@ -125,7 +125,7 @@ if(NOT DEFINED MATERIALIZR_VERSION_NAME OR MATERIALIZR_VERSION_NAME STREQUAL "")
         string(REGEX MATCH "set\\(MATERIALIZR_VERSION_SUFFIX \"([^\"]*)\"" _ "${_root_cml}")
         string(APPEND MATERIALIZR_VERSION_NAME "${CMAKE_MATCH_1}")
     else()
-        set(MATERIALIZR_VERSION_NAME "0.0.0") # root parse failed — ad-hoc build
+        set(MATERIALIZR_VERSION_NAME "0.0.0") # root parse failed - ad-hoc build
     endif()
     unset(_root_cml)
 endif()
@@ -134,7 +134,7 @@ target_compile_definitions(materializr PRIVATE
     OCC_CONVERT_SIGNALS)   # OCCT kernel faults -> catchable exceptions (Unix)
 
 # ── Bundle ───────────────────────────────────────────────────────────────────
-# CFBundleVersion must be numeric — strip any -beta suffix for the plist.
+# CFBundleVersion must be numeric - strip any -beta suffix for the plist.
 string(REGEX REPLACE "[-+].*$" "" MZ_PLIST_VERSION "${MATERIALIZR_VERSION_NAME}")
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/Info.plist.in"
                "${CMAKE_CURRENT_BINARY_DIR}/Info.plist" @ONLY)
@@ -154,7 +154,7 @@ set_target_properties(materializr PROPERTIES
     XCODE_ATTRIBUTE_SKIP_INSTALL "NO"
     XCODE_ATTRIBUTE_INSTALL_PATH "$(LOCAL_APPS_DIR)"
     # CMake's Xcode generator defaults to plain "dwarf", which leaves the
-    # archive without a dSYM — App Store crash reports would come back
+    # archive without a dSYM - App Store crash reports would come back
     # unsymbolicated. Release only; Debug keeps the faster format.
     "XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT[variant=Release]" "dwarf-with-dsym")
 if(DEFINED MZ_DEVELOPMENT_TEAM)
@@ -163,7 +163,7 @@ if(DEFINED MZ_DEVELOPMENT_TEAM)
 endif()
 
 # Keep the StoreKit test configuration as a project member across regens, so
-# the scheme's StoreKit Configuration picker always finds it — a reference
+# the scheme's StoreKit Configuration picker always finds it - a reference
 # dragged into the Xcode navigator by hand dies with the next pbxproj
 # regeneration. HEADER_FILE_ONLY: listed, never compiled or bundled.
 target_sources(materializr PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Materializr.storekit")
@@ -173,7 +173,7 @@ set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/Materializr.storekit"
 # ── Bundle resources ─────────────────────────────────────────────────────────
 # Staged through Xcode's Copy Bundle Resources phase (runs before code signing;
 # a POST_BUILD copy would land after signing and break device installs).
-# On iOS "Resources/<sub>" maps to "<bundle root>/<sub>" — matching the
+# On iOS "Resources/<sub>" maps to "<bundle root>/<sub>" - matching the
 # cwd-relative lookups after ios_platform.mm chdirs to the bundle.
 
 # Launch storyboard (required for native fullscreen resolution).
@@ -184,7 +184,7 @@ set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/LaunchScreen.storyboard
 # App icon: single-size (1024x1024, opaque) asset catalog. Xcode compiles it
 # with actool (ASSETCATALOG_COMPILER_APPICON_NAME above) and derives every
 # launcher/Settings/Spotlight size; AppIcon.png is regenerated from the
-# repo-root icon.png (cover-crop to square, alpha flattened — Apple rejects
+# repo-root icon.png (cover-crop to square, alpha flattened - Apple rejects
 # icons with an alpha channel).
 target_sources(materializr PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Assets.xcassets")
 set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/Assets.xcassets"

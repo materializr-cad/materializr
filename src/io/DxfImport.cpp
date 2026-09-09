@@ -23,7 +23,7 @@ namespace {
 // ── Parsed intermediate: everything lands as one of these, in FILE units. ───
 struct PLine { glm::dvec2 a, b; };
 struct PCircle { glm::dvec2 c; double r; };
-// CCW from startAngle to endAngle (radians) — both DXF's and the sketch's
+// CCW from startAngle to endAngle (radians) - both DXF's and the sketch's
 // native arc convention.
 struct PArc { glm::dvec2 c; double r, a0, a1; };
 
@@ -44,7 +44,7 @@ struct Pair { int code; std::string value; };
 // bounded the pair count, the vertices in one polyline, the control points of
 // one spline, or the primitives they expand into. Each budget is checked before
 // the push_back it guards, and an over-budget file is refused with a message
-// rather than silently truncated — the SvgImport precedent.
+// rather than silently truncated - the SvgImport precedent.
 constexpr size_t kMaxDxfBytes        = 64u * 1024 * 1024;
 constexpr size_t kMaxDxfLineBytes    = 4096;
 constexpr size_t kMaxDxfPairs        = 4000000;
@@ -63,7 +63,7 @@ constexpr int    kMaxSplineDegree    = 32;
 class PairReader {
 public:
     explicit PairReader(std::string_view buf) : m_buf(buf) {}
-    // False at EOF *or* on a budget breach — call failed() to tell them apart.
+    // False at EOF *or* on a budget breach - call failed() to tell them apart.
     // They must not be conflated: treating a breach as EOF silently imports a
     // TRUNCATED drawing, i.e. geometry the user never drew.
     bool next(Pair& out) {
@@ -79,7 +79,7 @@ public:
 
 private:
     // Returns one line as a VIEW. The length cap is applied to the view, so an
-    // absurd single line is refused before any allocation — the previous
+    // absurd single line is refused before any allocation - the previous
     // getline-then-check form had already materialised a 1 GB std::string by
     // the time it looked at .size().
     bool nextLine(std::string_view& out) {
@@ -95,7 +95,7 @@ private:
     }
 
     // from_chars takes a pointer PAIR, so it needs no NUL terminator and works
-    // directly on the view — and it REJECTS rather than silently saturating.
+    // directly on the view - and it REJECTS rather than silently saturating.
     // (An earlier hand-rolled parser here was justified by "std::atoi needs a
     // NUL-terminated string"; that argued against atoi, not for a hand-roll.)
     static int svToInt(std::string_view sv) {
@@ -167,13 +167,13 @@ void emitPolyline(Drawing& d, const std::vector<PolyVertex>& vs, bool closed) {
 }
 
 // De Boor sampling of a DXF SPLINE (degree + knots + control points; weights
-// ignored — rational splines are vanishingly rare in profile files). Output
+// ignored - rational splines are vanishingly rare in profile files). Output
 // is a polyline in `samples`. Falls back to the control polygon when the
 // knot vector is inconsistent.
 void sampleSpline(const std::vector<glm::dvec2>& ctrl, int degree,
                   const std::vector<double>& knots, bool closed,
                   std::vector<glm::dvec2>& samples) {
-    // Bound the degree BEFORE computing expectKnots — that expression is the
+    // Bound the degree BEFORE computing expectKnots - that expression is the
     // overflow site: group code 71 can spell 2147483647, and `n + degree + 1`
     // is then signed overflow (UB) evaluated before any guard below runs.
     if (degree < 1 || degree > kMaxSplineDegree ||
@@ -425,8 +425,8 @@ DxfImportResult DxfImport::importFile(const std::string& filePath, Sketch& sketc
     // parse() bound what the file can expand into; this bounds the file itself.
     //
     // Size the read from the ALREADY-OPEN handle, not from the path. Sizing via
-    // std::filesystem::file_size(filePath) would re-resolve the path — a genuine
-    // check-then-read TOCTOU — and its error path is easy to write fail-OPEN.
+    // std::filesystem::file_size(filePath) would re-resolve the path - a genuine
+    // check-then-read TOCTOU - and its error path is easy to write fail-OPEN.
     // seekg/tellg here interrogate the same file description we are about to
     // read, and any failure below refuses the file.
     in.seekg(0, std::ios::end);
@@ -447,7 +447,7 @@ DxfImportResult DxfImport::importFile(const std::string& filePath, Sketch& sketc
     const std::streamsize got = in.gcount();
     // in.bad() means a real I/O failure; eof() alone is fine (a short final
     // read). Without this an I/O error mid-read parses truncated content as a
-    // success — the same fail-open class the size cap above was fixed for.
+    // success - the same fail-open class the size cap above was fixed for.
     if (in.bad()) {
         result.errorMessage = "Could not read file: " + filePath;
         return result;
@@ -458,7 +458,7 @@ DxfImportResult DxfImport::importFile(const std::string& filePath, Sketch& sketc
     if (!parse(buf, d, result.errorMessage)) return result;
 
     // Scale to mm, then centre the drawing's bounding box on the sketch
-    // origin (dimensions preserved exactly; only the offset is normalized —
+    // origin (dimensions preserved exactly; only the offset is normalized -
     // real drawings frequently live thousands of units from their origin).
     const double s = d.unitScale;
     glm::dvec2 mn(std::numeric_limits<double>::max());

@@ -39,7 +39,7 @@ public:
         return {m_targetBodyId, m_toolBodyId};
     }
     // A boolean references its target/tool purely by body id (+ a mode enum),
-    // so it can reload as a fully editable real op — recomputing from upstream
+    // so it can reload as a fully editable real op - recomputing from upstream
     // geometry on edit instead of baking a stale result over it (the bug where
     // editing a fillet upstream of a reloaded union silently did nothing).
     std::string serializeParams() const override;
@@ -61,7 +61,7 @@ private:
     materializr::topo::FaceIdMap m_prevTargetFaceIds;
     materializr::topo::FaceIdMap m_prevToolFaceIds;
     // Ids minted to complete the published map (faces with no inherited
-    // ancestry — e.g. when the inputs carried no lineage at all). REUSED
+    // ancestry - e.g. when the inputs carried no lineage at all). REUSED
     // across re-executes while the uncovered-face count is unchanged, so a
     // downstream op's stored face-id pairs stay valid through a replay.
     std::vector<int> m_mintedIds;

@@ -17,7 +17,7 @@ renderer's mesh + edge slots immediately, instead of waiting for a full
 rebuild that never came mid-drag.
 
 Same change also fixed a per-frame leak that was marking every invisible body
-dirty 60 times per second on a 100-body project — push/pull preview now stays
+dirty 60 times per second on a 100-body project - push/pull preview now stays
 smooth.
 
 ### Body dimension editor
@@ -25,7 +25,7 @@ smooth.
 Selecting a single body shows an editable **X / Y / Z** dimension block in the
 Properties panel using the user-Z-up convention (X / Y the floor, Z up). Type
 a new extent value to scale that axis, anchored at the body's bbox-min corner
-so growth happens along +axis only — predictable, no centre drift.
+so growth happens along +axis only - predictable, no centre drift.
 
 Body bbox readouts now use OCCT's `BRepBndLib::AddOptimal` (analytic bounds,
 no tessellation + tolerance padding) so a Ø80 mm cylinder reads exactly
@@ -46,8 +46,8 @@ the Measure tool's bbox readout.
 While placing the third click on the Arc tool:
 
 - Live sweep angle readout in degrees, pinned 14 px right of the cursor.
-- Common fractions tagged automatically — `90.0° (¼)`, `180.0° (½)`,
-  `270.0° (¾)`, `360.0° (full)` — within 1.5° of canonical.
+- Common fractions tagged automatically - `90.0° (¼)`, `180.0° (½)`,
+  `270.0° (¾)`, `360.0° (full)` - within 1.5° of canonical.
 - **15° snap**: when the natural sweep is within ±5° of a 15° multiple, the
   cursor jumps to the exact apex via `d = (L/2)·tan(θ/4)`, keeping you on the
   same side of the chord so the arc doesn't flip. Defers to the global snap
@@ -64,7 +64,7 @@ pair, so it handles loose Coincident pairs too.
 
 Push/Pull, Extrude, Fillet, Chamfer drag arrows are now amber
 (`255, 200, 60`) with a black halo and ~2× the arrowhead size. Sketch
-inferences and the move-gizmo translate readout keep the lighter style — they
+inferences and the move-gizmo translate readout keep the lighter style - they
 need to coexist with selection highlights.
 
 ### JetBrains Mono UI font

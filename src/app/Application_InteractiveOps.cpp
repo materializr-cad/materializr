@@ -34,6 +34,7 @@
 #include "modeling/ResizeCylindricalOp.h"
 #include "modeling/ThreadOp.h"
 #include <BRepMesh_IncrementalMesh.hxx>
+#include "core/MeshParams.h"
 #include <future>
 #include "modeling/PatternOp.h"
 #include "modeling/LoftOp.h"
@@ -94,7 +95,7 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-// Implementations split out of Application.cpp — every interactive operation
+// Implementations split out of Application.cpp - every interactive operation
 // (Fillet / Chamfer / Edit Fillet-Chamfer, Edit Diameter, Shell, Extrude,
 // Push/Pull) lives here. The shared pattern is begin → update (per-frame live
 // preview) → commit (push to history) → cancel (rollback). The corresponding
@@ -138,9 +139,9 @@ void Application::beginThread(const materializr::CylindricalPick& p) {
     if (refuseMeshSelection("Thread")) return;
     cancelActiveIops();
     if (!p.ok) return;
-    // Threads need a true cylinder — a cone's helix would leave the surface.
+    // Threads need a true cylinder - a cone's helix would leave the surface.
     if (std::abs(p.bottomR - p.topR) > 1e-5) {
-        std::fprintf(stderr, "[Thread] picked face is conical — thread needs "
+        std::fprintf(stderr, "[Thread] picked face is conical - thread needs "
                              "a cylinder\n");
         return;
     }
@@ -189,7 +190,7 @@ void Application::beginThread(const materializr::CylindricalPick& p) {
 
     // Name the picked cylinder face topologically so the committed thread
     // FOLLOWS an upstream edit (the cylinder moving or its diameter changing)
-    // instead of floating at its original absolute axis. Best-effort — an
+    // instead of floating at its original absolute axis. Best-effort - an
     // unnameable face (imported/primitive cylinder with no sketch) leaves the
     // ref empty and the thread keeps today's absolute-param behaviour.
     m_threadFaceRef = materializr::topo::Ref{};
@@ -238,20 +239,20 @@ void Application::commitThread() {
     if (m_threadBodyId < 0) { cancelThread(); return; }
     if (m_threadComputing) {
         // Assigning a new std::async future while the old one is in flight
-        // BLOCKS until it finishes — exactly the "app frozen and punishing
+        // BLOCKS until it finishes - exactly the "app frozen and punishing
         // the CPU" failure. One compute at a time.
-        std::fprintf(stderr, "[Thread] Apply ignored — still computing\n");
+        std::fprintf(stderr, "[Thread] Apply ignored - still computing\n");
         return;
     }
     std::fprintf(stderr, "[Thread] Apply: launching worker\n");
     // Kick the multi-second sweep + boolean onto a worker thread. renderThreadPanel
-    // polls the future and pushes the real op — with the precomputed result — when
+    // polls the future and pushes the real op - with the precomputed result - when
     // it lands.
     //
     // DEEP-COPY the shape into the worker. A bare TopoDS_Shape handle copy is
     // refcount-shared with the live document's TShape, whose lazy OCCT caches
     // (triangulation, bounding box, surface adaptors) the RENDER thread populates
-    // and reads every frame — concurrent read/write on the same TShape is a data
+    // and reads every frame - concurrent read/write on the same TShape is a data
     // race (UB → intermittent crash/corruption). BRepBuilderAPI_Copy gives the
     // worker an independent TShape, so the two threads share nothing.
     TopoDS_Shape live;
@@ -269,21 +270,21 @@ void Application::commitThread() {
     m_threadApplyCancel = std::make_shared<std::atomic<bool>>(false);
     worker->setCancelToken(m_threadApplyCancel);
     // Pre-mesh on the worker at the CURRENT quality so the renderer's
-    // tessellate() reuses the cache — meshing the swept rod's helicoid faces
+    // tessellate() reuses the cache - meshing the swept rod's helicoid faces
     // on the main thread froze the app ~10s after the popup closed. Finer
     // angular pass (helicoids show 0.3 rad facets); linear must match the
     // app's exactly for the cache check.
     float mdefl, mang;
     meshQualityParams(mdefl, mang);
     const float meshAng = std::min(mang, 0.15f);
+    m_threadPreMeshDefl = mdefl;
+    m_threadPreMeshAng = mang;
     m_threadFuture = std::async(std::launch::async,
         [worker, body, mdefl, meshAng]() {
             TopoDS_Shape r = worker->buildResult(body);
             if (!r.IsNull()) {
                 try {
-                    BRepMesh_IncrementalMesh mesh(r, mdefl, Standard_False,
-                                                  meshAng, Standard_True);
-                    mesh.Perform();
+                    BRepMesh_IncrementalMesh mesh(r, materializr::meshParams(mdefl, meshAng, true));
                 } catch (...) {}
             }
             return r;
@@ -311,7 +312,7 @@ void Application::cancelThread() {
 // ─── Interactive Extrude (drag-to-distance) ─────────────────────────────────
 
 // Interactive Extrude now lives in ExtrudeController (the first user of the
-// base's LiveOp preview model — see InteractiveOpController.h). What used to
+// base's LiveOp preview model - see InteractiveOpController.h). What used to
 // be four methods of history churn here is a delegate each; the controller
 // keeps ONE ExtrudeOp instance and toggles it undo/execute, so the preview
 // body keeps its id and History stays untouched until commit.
@@ -331,18 +332,16 @@ void Application::updateInteractiveExtrude(bool applySnap) {
 void Application::commitInteractiveExtrude() {
     m_extrudeCtl.commit(iopContext());
     markDirty();
-    m_meshesDirty = true;
 }
 
 void Application::cancelInteractiveExtrude() {
     m_extrudeCtl.cancel(iopContext());
-    m_meshesDirty = true;
 }
 
 // ─── Sketch region picking ──────────────────────────────────────────────────
 //
 // Ray-cast a screen point against every visible sketch's regions. Feeds both
-// hover highlighting and the click that produces a SketchRegion selection —
+// hover highlighting and the click that produces a SketchRegion selection -
 // which is in turn what Push/Pull (PushPullController) reads at begin.
 
 Application::SketchRegionHit Application::pickSketchRegion(float screenX, float screenY,
@@ -396,7 +395,7 @@ Application::SketchRegionHit Application::pickSketchRegion(float screenX, float 
         if (!projectToPlane(rayOrigin, rayDir, t, p2d)) return;
         if (t >= bestT) return;
 
-        // Cold region cache: building it runs the OCCT general fuse — on a
+        // Cold region cache: building it runs the OCCT general fuse - on a
         // heavy sketch (SVG import, text) that's a SECONDS-long stall. The
         // per-frame HOVER pick must never trigger it (unhiding a complex
         // sketch used to freeze the app on the very next mouse move); a
@@ -417,7 +416,7 @@ Application::SketchRegionHit Application::pickSketchRegion(float screenX, float 
         //      inside a letter is also within `tol` of the surrounding
         //      region's hole edge; first-match let the big region steal
         //      every click that wasn't dead-centre in the stroke.
-        //   2. Among matches of equal rank, the SMALLEST region wins —
+        //   2. Among matches of equal rank, the SMALLEST region wins -
         //      clicking inside a nested shape picks the shape, not the
         //      sea it sits in.
         int bestIdx = -1;
@@ -454,7 +453,7 @@ Application::SketchRegionHit Application::pickSketchRegion(float screenX, float 
 
         // Fallback: edge picking. Open profiles (an arc, an unclosed polyline,
         // a spline used as a loft rib, …) have no closed region, so the loop
-        // above misses them entirely — which used to make such sketches
+        // above misses them entirely - which used to make such sketches
         // unselectable from the viewport. Test 2D distance from the click
         // point to each primitive; if it lands within `tol` of any line /
         // circle / arc / spline / polygon edge, treat that as a whole-
@@ -625,7 +624,7 @@ void Application::beginPattern(PatternKind kind) {
     m_patternCount    = (kind == PatternKind::Linear) ? 3   : 6;
     m_patternDistance = 5.0f;
     m_patternAngle    = 360.0f;
-    // Default radial origin = body's bbox centre — that puts the rotation
+    // Default radial origin = body's bbox centre - that puts the rotation
     // axis through the body the first time so the user sees a sensible
     // ring immediately and can re-pick the origin via the viewport.
     m_patternOriginX = m_patternOriginY = m_patternOriginZ = 0.0f;
@@ -652,6 +651,7 @@ void Application::beginPattern(PatternKind kind) {
 
 void Application::updatePattern() {
     if (!m_patternActive || m_patternBodyId < 0) return;
+    auto trackBodies = trackBodyChanges(); // marks what this edit changed
 
     // Retract the applied preview so the new parameters land on a clean
     // document. NOT a history undo: the preview never reaches History (see
@@ -661,7 +661,6 @@ void Application::updatePattern() {
     m_patternPreview.retract(*m_document);
     if (m_patternCount < 2) {
         // Nothing to preview at count=1 (a pattern of 1 is just the source).
-        m_meshesDirty = true;
         return;
     }
     if (!m_patternPreview.op())
@@ -669,8 +668,8 @@ void Application::updatePattern() {
     auto* op = static_cast<PatternOp*>(m_patternPreview.op());
     op->setBody(m_patternBodyId);
 
-    // Axis direction comes from the chosen world axis, or — when the user
-    // picked a construction axis from the dropdown — from that axis's own
+    // Axis direction comes from the chosen world axis, or - when the user
+    // picked a construction axis from the dropdown - from that axis's own
     // direction (and, for radial, its origin too, since the axis defines the
     // full rotation line).
     glm::vec3 axisDir = userAxisToWorldVec(m_patternAxisIdx);
@@ -700,26 +699,25 @@ void Application::updatePattern() {
         op->setTotalAngle(m_patternAngle);
     }
     m_patternPreview.apply(*m_document);
-    m_meshesDirty = true;
 }
 
 void Application::commitPattern() {
-    // The previewed instance IS the final op — record it without re-running
+    auto trackBodies = trackBodyChanges(); // marks what this edit changed
+    // The previewed instance IS the final op - record it without re-running
     // it. (It used to already BE a history step by this point, which is what
     // made the preview undoable mid-gesture.)
     m_patternPreview.commit(*m_history);
     m_patternActive        = false;
     m_patternPickingOrigin = false;
     m_patternBodyId        = -1;
-    m_meshesDirty = true;
 }
 
 void Application::cancelPattern() {
+    auto trackBodies = trackBodyChanges(); // marks what this edit changed
     m_patternPreview.clear(*m_document);
     m_patternActive        = false;
     m_patternPickingOrigin = false;
     m_patternBodyId        = -1;
-    m_meshesDirty = true;
 }
 
 // ─── Loft (interactive popup) ──────────────────────────────────────────────
@@ -727,13 +725,13 @@ void Application::cancelPattern() {
 // LoftPlugin walks the selection and, when 2+ distinct sketches are present,
 // fires requestInteractiveOp(InteractiveOp::Loft). The main frame loop dispatches that to
 // beginLoft(), which snapshots one profile section per selected sketch (the
-// outer wire of each sketch's outermost region, in click order — that order
+// outer wire of each sketch's outermost region, in click order - that order
 // is the skinning order) and opens the popup. updateLoft re-pushes a preview
 // LoftOp each frame the user changes a toggle / flips / reorders a section,
 // commitLoft leaves the final op on history, cancelLoft undoes the preview.
 
 // The outermost closed region of a sketch (largest outer-wire bbox) plus its
-// hole wires — shared by Loft and Boundary Fill. Concentric profiles decompose
+// hole wires - shared by Loft and Boundary Fill. Concentric profiles decompose
 // into multiple regions; taking the outermost keeps the holes as channels
 // instead of grabbing the inner disk.
 static TopoDS_Wire outermostRegionWire(materializr::Sketch* sk,
@@ -797,7 +795,7 @@ void Application::beginLoft() {
     if (refuseMeshSelection("Loft")) return;
     if (!m_selection || !m_document) return;
 
-    // Snapshot every distinct selected sketch, in click order — with three
+    // Snapshot every distinct selected sketch, in click order - with three
     // ribs the loft runs first→last, so the order the user picked them in IS
     // the loft order (reorderable later in the panel).
     std::vector<int> sketchIds;
@@ -849,7 +847,7 @@ void Application::beginLoft() {
 
     // Classify each sketch: a closed region = a SECTION; no closed region but
     // an open wire = a RAIL candidate (a side-silhouette curve). One section +
-    // 1–2 rails = guided loft (base swept along the rails — the "pyramid with
+    // 1–2 rails = guided loft (base swept along the rails - the "pyramid with
     // rounded sides" shape a section stack can't express). Anything else =
     // plain N-section loft.
     m_loftSections.clear();
@@ -893,13 +891,13 @@ void Application::beginLoft() {
             sec.outer = outermostRegionWire(sk.get(), sec.holes, &fromRegion);
         }
         // "Closed" = the sketch produced a REGION. (Never trust TopoDS's
-        // Closed() flag — it's builder-advisory and the region walker doesn't
+        // Closed() flag - it's builder-advisory and the region walker doesn't
         // set it, which mis-filed plain circles as open and refused the loft.)
         if (!sec.outer.IsNull() && fromRegion) {
             m_loftSections.push_back(std::move(sec));
             continue;
         }
-        // No closed region — take the sketch's longest OPEN chain as a rail.
+        // No closed region - take the sketch's longest OPEN chain as a rail.
         // (buildWires() can't serve here: it prunes every non-cycle edge.)
         if (auto sk = m_document->getSketch(id)) {
             TopoDS_Wire open = sk->buildOpenWire();
@@ -923,7 +921,7 @@ void Application::beginLoft() {
         // Plain section loft; open sketches (if any) don't participate.
         if (!m_loftRails.empty())
             showToast(std::to_string(m_loftRails.size()) +
-                      " open sketch(es) ignored — rails need exactly ONE "
+                      " open sketch(es) ignored - rails need exactly ONE "
                       "closed base profile.");
         m_loftRails.clear();
     } else {
@@ -954,11 +952,12 @@ void Application::beginLoft() {
 
 void Application::updateLoft() {
     if (!m_loftActive || !m_history || !m_document) return;
+    auto trackBodies = trackBodyChanges(); // marks what this edit changed
     if (m_loftRailsMode ? m_loftSections.empty() : m_loftSections.size() < 2)
         return;
 
     // Retract the applied preview so the new parameters land on a clean
-    // document. NOT a history undo — the preview never reaches History, and
+    // document. NOT a history undo - the preview never reaches History, and
     // holding ONE instance keeps the lofted body's id stable while the user
     // flips and reorders sections (see LiveOpPreview).
     m_loftPreview.retract(*m_document);
@@ -978,7 +977,6 @@ void Application::updateLoft() {
         if (!m_loftPreview.apply(*m_document))
             showToast("Guided loft failed - rails must rise away from the "
                       "base profile's plane.");
-        m_meshesDirty = true;
         return;
     }
 
@@ -991,7 +989,7 @@ void Application::updateLoft() {
     op->clearProfiles();
     for (const LoftSection& sec : m_loftSections) {
         // Flip reverses the wire's vertex order so it pairs differently
-        // against its neighbours — the standard remedy for the "apex pinch /
+        // against its neighbours - the standard remedy for the "apex pinch /
         // twist" output when start vertices are misaligned. Holes reverse
         // with it, so inner channels pair consistently.
         if (sec.reverse) {
@@ -1009,29 +1007,28 @@ void Application::updateLoft() {
     if (m_loftBridgeBodyId >= 0)
         op->setBridge(m_loftBridgeBodyId, m_loftBridgeFaces);
     m_loftPreview.apply(*m_document);
-    m_meshesDirty = true;
 }
 
 void Application::commitLoft() {
+    auto trackBodies = trackBodyChanges(); // marks what this edit changed
     // Record the already-applied instance without re-running it.
     m_loftPreview.commit(*m_history);
     m_loftActive = false;
     m_loftSections.clear();
     m_loftRails.clear();
     m_loftRailsMode = false;
-    m_meshesDirty = true;
 }
 
 // ─── Cascade: re-execute Extrudes that consumed a just-edited sketch ───────
 //
 // Triggered by SketchEditedEvent. Walks the live history forward and, for
 // every enabled ExtrudeOp whose source sketch matches, rebuilds the profile
-// from the current sketch state and re-runs execute() — which uses
+// from the current sketch state and re-runs execute() - which uses
 // addOrPutBody under the hood, so the resulting body keeps the same id and
 // the user sees its shape morph in place.
 //
 // We deliberately stop at Extrude. Downstream ops (Fillet, Chamfer, Pattern,
-// Mirror, Push/Pull) reference faces / edges of the extruded body — when
+// Mirror, Push/Pull) reference faces / edges of the extruded body - when
 // the body's topology shifts, those references go stale (the toponaming
 // problem). Re-running them blindly would produce wrong-edge fillets or
 // outright crashes. For the user's "edit a dimension and watch the prism
@@ -1039,7 +1036,7 @@ void Application::commitLoft() {
 // workflows leave the downstream ops on the stale body and the user
 // manually re-runs them.
 const std::map<int, std::set<int>>& Application::sketchBodyLinks() const {
-    // Memoized on the history revision — the Properties panel reads the link
+    // Memoized on the history revision - the Properties panel reads the link
     // hint every frame a body/sketch is selected, and this walk (dynamic_cast
     // + captureDiff per step, fresh map/set nodes) was running per frame.
     if (m_history && m_linkMapRevision == m_history->revision())
@@ -1085,7 +1082,7 @@ bool Application::bodySafelyRederivable(int bodyId, int viaSketchId) const {
         if (!touches) continue;
         // The only op allowed to touch this body is its own sketch's extrude /
         // push-pull. Anything else (fillet, chamfer, boolean, a second feature,
-        // a transform) means re-deriving at a new position would break — not safe.
+        // a transform) means re-deriving at a new position would break - not safe.
         if (auto* ext = dynamic_cast<const ExtrudeOp*>(op)) {
             if (ext->getSketchId() == viaSketchId) continue;
         } else if (auto* pp = dynamic_cast<const PushPullOp*>(op)) {
@@ -1117,8 +1114,7 @@ void Application::relinkSketch(bool isBody, int id) {
         }
     if (changed) {
         markDirty();
-        m_meshesDirty = true;
-        showToast("Sketch re-linked — editing it will drive the body again.");
+        showToast("Sketch re-linked - editing it will drive the body again.");
     }
 }
 
@@ -1143,9 +1139,9 @@ std::string Application::linkHintFor(bool isBody, int id) const {
         if (live.empty() && detached.empty()) return "";
         if (!live.empty())
             return std::string(materializr::tr("Built from ")) + nameList(live, false) +
-                   materializr::tr(" — editing it updates this body.");
+                   materializr::tr(" - editing it updates this body.");
         return std::string(materializr::tr("Detached from ")) + nameList(detached, false) +
-               materializr::tr(" — moved independently; sketch edits won't update this body.");
+               materializr::tr(" - moved independently; sketch edits won't update this body.");
     }
     // Sketch: what body it drives + whether it's detached.
     auto it = links.find(id);
@@ -1153,23 +1149,23 @@ std::string Application::linkHintFor(bool isBody, int id) const {
     auto sk = m_document->getSketch(id);
     std::string bodies = nameList(it->second, true);
     if (sk && sk->isDetachedFromBody())
-        return std::string(materializr::tr("Detached — moved independently; edits won't update ")) +
+        return std::string(materializr::tr("Detached - moved independently; edits won't update ")) +
                bodies + ".";
     return std::string(materializr::tr("Drives ")) + bodies +
-           materializr::tr(" — editing this sketch updates it.");
+           materializr::tr(" - editing this sketch updates it.");
 }
 
 void Application::cascadeFromSketchEdit(int sketchId) {
     if (sketchId < 0 || !m_history || !m_document) return;
     // A detached sketch has been deliberately broken out of unison with its
-    // body (moved on its own in 3D) — editing it must NOT retro-drive the body.
+    // body (moved on its own in 3D) - editing it must NOT retro-drive the body.
     if (auto sk = m_document->getSketch(sketchId); sk && sk->isDetachedFromBody())
         return;
     int n = m_history->stepCount();
 
     // Re-derive the profile of every sketch-sourced extrude / push-pull that
     // references the edited sketch, and remember the EARLIEST such step. We do
-    // NOT execute them in isolation here — that used to overwrite the body with
+    // NOT execute them in isolation here - that used to overwrite the body with
     // just the bare extrude, discarding everything downstream (hollows,
     // fillets) and leaving a "cube with N holes". Instead we replay the whole
     // chain from the earliest affected step below.
@@ -1197,25 +1193,24 @@ void Application::cascadeFromSketchEdit(int sketchId) {
                      sketchId, matched);
         if (matched > 0) {
             // A body IS driven by this sketch, but its profile couldn't be
-            // re-derived from the new geometry — tell the user instead of
+            // re-derived from the new geometry - tell the user instead of
             // silently leaving the sketch changed and the body stale.
             showToast("Updated the sketch, but the body built from it couldn't "
-                      "rebuild from the new shape \xE2\x80\x94 the model is unchanged.");
+                      "rebuild from the new shape - the model is unchanged.");
         }
         // matched == 0: nothing in the model is built from this sketch (e.g.
         // editing a freshly-duplicated sketch before it's extruded). That's the
-        // normal case while sketching — stay silent, just refresh.
-        m_meshesDirty = true;
+        // normal case while sketching - stay silent, just refresh.
         return;
     }
 
     // Replay the chain from the earliest re-derived op forward, TRANSACTIONALLY:
     // the new profiles take effect and ALL downstream ops re-run on the updated
     // geometry. If any can't follow (e.g. a fillet whose edge no longer exists
-    // after the change), the entire model is restored — never half-built.
+    // after the change), the entire model is restored - never half-built.
     //
     // Snapshot every body's shape BEFORE the replay so we can re-tessellate
-    // ONLY the bodies it actually changes — not the whole scene. On a multi-
+    // ONLY the bodies it actually changes - not the whole scene. On a multi-
     // body project a sketch edit touching one body would otherwise re-mesh
     // every body, which is the dominant cost on a tablet. A re-executed op
     // hands its bodies a fresh TShape, so IsEqual cleanly separates changed
@@ -1226,7 +1221,7 @@ void Application::cascadeFromSketchEdit(int sketchId) {
 
     // Pin the edited sketch's FINAL state for the replay: re-executing the
     // chain rolls the live sketch back through its SketchEditOp snapshots, so
-    // mid-replay it holds a STALE state — while the extrude below was rebuilt
+    // mid-replay it holds a STALE state - while the extrude below was rebuilt
     // from the final one. A fillet/chamfer re-finding its edges from "the
     // sketch the user just edited" (generative anchors) must read the final
     // state or it looks for the old geometry and fails every time.
@@ -1237,7 +1232,7 @@ void Application::cascadeFromSketchEdit(int sketchId) {
     // A step that can't follow the change (its geometry no longer exists on
     // the re-derived body) used to revert the WHOLE edit behind a message
     // that guessed at the culprit. Instead: disable the failing step, retry,
-    // and tell the user exactly which feature to re-apply (#53). Bounded —
+    // and tell the user exactly which feature to re-apply (#53). Bounded -
     // if several steps fail we stop rather than gut the history.
     std::vector<int> disabledSteps;
     while (!ok && m_history->lastEditFailStep() >= 0 &&
@@ -1252,7 +1247,7 @@ void Application::cascadeFromSketchEdit(int sketchId) {
         ok = m_history->editStep(earliest, *m_document, /*transactional=*/true);
     }
     if (!ok && !disabledSteps.empty()) {
-        // Still failing — restore what we disabled and fall back to a clean
+        // Still failing - restore what we disabled and fall back to a clean
         // full revert (never leave the history silently gutted).
         for (int i : disabledSteps)
             m_history->setStepEnabled(i, true, *m_document);
@@ -1270,7 +1265,7 @@ void Application::cascadeFromSketchEdit(int sketchId) {
                           std::to_string(m_history->lastEditFailStep() + 1) +
                           ": " + op->description() + ")";
         }
-        showToast("Couldn't update the model for that sketch change \xE2\x80\x94 a "
+        showToast("Couldn't update the model for that sketch change - a "
                   "downstream feature" + culprit + " couldn't follow it, so "
                   "the model was left unchanged.");
     } else if (!disabledSteps.empty()) {
@@ -1281,16 +1276,16 @@ void Application::cascadeFromSketchEdit(int sketchId) {
                      std::to_string(disabledSteps[i] + 1) +
                      (op ? " (" + op->description() + ")" : "");
         }
-        showToast("Model updated \xE2\x80\x94 but " + names +
+        showToast("Model updated - but " + names +
                   " couldn't follow the change and was DISABLED. Its edge/face "
-                  "picks no longer exist on the new shape \xE2\x80\x94 delete "
+                  "picks no longer exist on the new shape - delete "
                   "it and re-apply the feature (re-enabling would retry the "
                   "old picks).", 9.0);
     }
 
     // Partial remesh: mark only bodies whose shape changed, plus any that were
     // created or removed. On a failed (reverted) replay every body is restored
-    // to its snapshot TShape, so nothing is marked — no needless remesh at all.
+    // to its snapshot TShape, so nothing is marked - no needless remesh at all.
     std::set<int> nowIds;
     for (int id : m_document->getAllBodyIds()) {
         nowIds.insert(id);
@@ -1304,12 +1299,12 @@ void Application::cascadeFromSketchEdit(int sketchId) {
 }
 
 void Application::cancelLoft() {
+    auto trackBodies = trackBodyChanges(); // marks what this edit changed
     m_loftPreview.clear(*m_document);
     m_loftActive = false;
     m_loftSections.clear();
     m_loftRails.clear();
     m_loftRailsMode = false;
-    m_meshesDirty = true;
 }
 
 
@@ -1347,7 +1342,7 @@ void Application::beginBoundaryFill() {
         prof.outer = outermostRegionWire(sk.get(), prof.holes, &fromRegion);
         if (prof.outer.IsNull() || !fromRegion) {
             std::fprintf(stderr,
-                "[BoundaryFill] sketch %d has no closed region — skipped.\n", id);
+                "[BoundaryFill] sketch %d has no closed region - skipped.\n", id);
             continue;
         }
         prof.plane = sk->getPlane();
@@ -1367,10 +1362,11 @@ void Application::beginBoundaryFill() {
 
 void Application::updateBoundaryFill() {
     if (!m_bfillActive || !m_history || !m_document) return;
+    auto trackBodies = trackBodyChanges(); // marks what this edit changed
     if (m_bfillProfiles.size() < 2) return;
 
     // Retract the applied preview, re-sync the SAME instance, re-execute.
-    // History sees nothing until commit — see LiveOpPreview for the three
+    // History sees nothing until commit - see LiveOpPreview for the three
     // bugs the old push-a-real-step-per-frame version carried.
     m_bfillPreview.retract(*m_document);
     if (!m_bfillPreview.op())
@@ -1382,21 +1378,20 @@ void Application::updateBoundaryFill() {
     if (!m_bfillPreview.apply(*m_document))
         showToast("Boundary Fill: the silhouettes don't enclose a common "
                   "volume - make sure they overlap in space.");
-    m_meshesDirty = true;
 }
 
 void Application::commitBoundaryFill() {
+    auto trackBodies = trackBodyChanges(); // marks what this edit changed
     m_bfillPreview.commit(*m_history);   // record the applied instance as-is
     m_bfillActive = false;
     m_bfillProfiles.clear();
-    m_meshesDirty = true;
 }
 
 void Application::cancelBoundaryFill() {
+    auto trackBodies = trackBodyChanges(); // marks what this edit changed
     m_bfillPreview.clear(*m_document);
     m_bfillActive = false;
     m_bfillProfiles.clear();
-    m_meshesDirty = true;
 }
 
 // ─── Patch (interactive popup) ──────────────────────────────────────────────
@@ -1409,7 +1404,7 @@ void Application::cancelBoundaryFill() {
 // The op wants a body id so it can find each boundary edge's neighbouring face
 // (the thing tangency is measured against) and so it can sew the finished patch
 // back in. Edges from two different bodies have no single such body, so the
-// patch is fitted as a standalone surface instead — which is the honest answer
+// patch is fitted as a standalone surface instead - which is the honest answer
 // for geometry that bridges a gap rather than filling one.
 
 void Application::beginPatch() {
@@ -1457,9 +1452,10 @@ void Application::beginPatch() {
 
 void Application::updatePatch() {
     if (!m_patchActive || !m_history || !m_document) return;
+    auto trackBodies = trackBodyChanges(); // marks what this edit changed
     if (m_patchEdges.empty()) return;
 
-    // Retract the applied preview, re-sync the SAME instance, re-execute —
+    // Retract the applied preview, re-sync the SAME instance, re-execute -
     // History sees nothing until commit. See LiveOpPreview.
     m_patchPreview.retract(*m_document);
     if (!m_patchPreview.op())
@@ -1486,23 +1482,22 @@ void Application::updatePatch() {
     if (!m_patchPreview.apply(*m_document))
         showToast("Patch: no surface fits these edges. They need to form one "
                   "closed ring around the opening.");
-    m_meshesDirty = true;
 }
 
 void Application::commitPatch() {
+    auto trackBodies = trackBodyChanges(); // marks what this edit changed
     m_patchPreview.commit(*m_history);   // record the applied instance as-is
     m_patchActive = false;
     m_patchEdges.clear();
     m_patchSupports.clear();
-    m_meshesDirty = true;
 }
 
 void Application::cancelPatch() {
+    auto trackBodies = trackBodyChanges(); // marks what this edit changed
     m_patchPreview.clear(*m_document);
     m_patchActive = false;
     m_patchEdges.clear();
     m_patchSupports.clear();
-    m_meshesDirty = true;
 }
 
 // ─── Sew (one-shot) ─────────────────────────────────────────────────────────
@@ -1510,6 +1505,7 @@ void Application::cancelPatch() {
 void Application::beginSew() {
     if (refuseMeshSelection("Sew")) return;
     if (!m_selection || !m_document || !m_history) return;
+    auto trackBodies = trackBodyChanges(); // marks what this edit changed
 
     std::vector<int> ids;
     for (const auto& e : m_selection->getSelection()) {
@@ -1534,7 +1530,7 @@ void Application::beginSew() {
     }
 
     // Report what it managed, not that it ran. "Closed" and "still open" are
-    // different outcomes and the second one is actionable — the edge count is
+    // different outcomes and the second one is actionable - the edge count is
     // how many gaps are left to patch.
     if (raw->madeSolid()) {
         showToast("Sewed " + std::to_string(raw->facesSewn()) +
@@ -1547,7 +1543,6 @@ void Application::beginSew() {
     // The consumed bodies are gone; a selection naming them would resolve to
     // nothing.
     m_selection->clear();
-    m_meshesDirty = true;
 }
 
 // ─── Construction Plane (interactive popup) ────────────────────────────────
@@ -1696,7 +1691,7 @@ void Application::updateConstructionPlane() {
 
     // Retract the applied preview before building the next one. The op is
     // rebuilt per frame (its parameters vary by kind, not by setter), but it
-    // never reaches History until commit — see LiveOpPreview.
+    // never reaches History until commit - see LiveOpPreview.
     m_planeOpPreview.retract(*m_document);
 
     auto op = std::make_unique<ConstructionPlaneOp>();
@@ -1713,7 +1708,7 @@ void Application::updateConstructionPlane() {
         case 3:
             if (m_planeOpHaveFace) {
                 // ParallelToFace places the plane at p1 with the base plane's
-                // normal — push p1 along that normal by the offset so the
+                // normal - push p1 along that normal by the offset so the
                 // slider drives it away from the face like the user expects.
                 gp_Dir n = m_planeOpBaseFace.Axis().Direction();
                 gp_Pnt o = m_planeOpBaseFace.Axis().Location();
@@ -1778,7 +1773,8 @@ void Application::updateConstructionPlane() {
     // nudged the offset.
     applyPlaneOpRotation();
     reattachPlaneOpRefImage();
-    m_meshesDirty = true;
+    // Datums draw from the document every frame and the picker keys on them
+    // directly: no body changed, so no mesh rebuild.
 }
 
 // Re-apply the ABSOLUTE rotation to the freshly rebuilt preview plane. Applied
@@ -1818,7 +1814,6 @@ void Application::reattachPlaneOpRefImage() {
     const auto ids = m_document->getAllPlaneIds();
     if (ids.empty()) return;
     m_document->setRefImage(ids.back(), m_planeOpPendingImage);
-    m_meshesDirty = true;
 }
 
 // Choose the file for a plane being created. Attaching immediately is the
@@ -1850,7 +1845,6 @@ void Application::commitConstructionPlane() {
     m_planeOpRotX = m_planeOpRotY = m_planeOpRotZ = 0.0f;
     m_planeOpPreview.commit(*m_history);
     m_planeOpActive = false;
-    m_meshesDirty = true;
 
     // The plane now exists and previewApply auto-selected it, so the id is the
     // most recent one. Attaching here (rather than inside the op) keeps the
@@ -1865,7 +1859,6 @@ void Application::cancelConstructionPlane() {
     m_planeOpPendingImage = RefImageEntry{};
     m_planeOpPreview.clear(*m_document);
     m_planeOpActive = false;
-    m_meshesDirty = true;
 }
 
 void Application::beginPrimitivePopup(int kindIdx) {
@@ -1905,6 +1898,7 @@ void Application::beginPrimitivePopup(int kindIdx) {
 }
 
 void Application::commitPrimitivePopup() {
+    auto trackBodies = trackBodyChanges(); // marks what this edit changed
     using K = materializr::PrimitiveOp::Kind;
     auto op = std::make_unique<materializr::PrimitiveOp>();
     K kind = K::Box;
@@ -1934,7 +1928,6 @@ void Application::commitPrimitivePopup() {
             e.bodyId = ids.back();
             m_selection->select(e);
         }
-        m_meshesDirty = true;
     }
     m_primitivePopupActive = false;
 }
@@ -1945,7 +1938,7 @@ void Application::cancelPrimitivePopup() {
 
 bool Application::computeDerivedPlaneNP(int kindIdx, gp_Dir& outNormal,
                                         gp_Pnt& outPoint) const {
-    if (kindIdx == 4) { // Midplane — centred between the two captured planes
+    if (kindIdx == 4) { // Midplane - centred between the two captured planes
         if (!m_planeOpHaveTwoPlanes) return false;
         gp_Dir nA = m_planeOpPlaneA.Axis().Direction();
         gp_Dir nB = m_planeOpPlaneB.Axis().Direction();
@@ -1977,7 +1970,7 @@ bool Application::computeDerivedPlaneNP(int kindIdx, gp_Dir& outNormal,
         gp_Vec ref(m_planeOpCylRefDir);
         gp_Vec radial = ref - axv * ref.Dot(axv);   // perp-to-axis component
         if (radial.Magnitude() < 1e-9) {
-            // Reference is parallel to the axis — fall back to any perpendicular.
+            // Reference is parallel to the axis - fall back to any perpendicular.
             gp_Ax2 tmp(m_planeOpCylAxis.Location(), m_planeOpCylAxis.Direction());
             radial = gp_Vec(tmp.XDirection());
         }
@@ -2056,7 +2049,7 @@ void Application::beginConstructionAxis() {
                             gp_Pln pln = Handle(Geom_Plane)::DownCast(s)->Pln();
                             planarPlanes.push_back(pln);
                             if (!m_axisOpHaveFaceNormal) {
-                                // Anchor at the FACE CENTROID — the plane's
+                                // Anchor at the FACE CENTROID - the plane's
                                 // parametric origin is wherever the surface
                                 // happens to start, often a corner ("axis on
                                 // lower corner instead of straight out of
@@ -2219,19 +2212,18 @@ void Application::updateConstructionAxis() {
             m_selection->select(e);
         }
     }
-    m_meshesDirty = true;
+    // Datums draw from the document every frame: no body changed, so no
+    // mesh rebuild.
 }
 
 void Application::commitConstructionAxis() {
     m_axisOpPreview.commit(*m_history);
     m_axisOpActive = false;
-    m_meshesDirty = true;
 }
 
 void Application::cancelConstructionAxis() {
     m_axisOpPreview.clear(*m_document);
     m_axisOpActive = false;
-    m_meshesDirty = true;
 }
 
 // ─── Sketch-mode Pattern (Linear / Radial) ─────────────────────────────────
@@ -2298,7 +2290,7 @@ void Application::beginSketchPattern(PatternKind kind) {
 void Application::updateSketchPattern() {
     if (!m_sketchPatternActive || !m_activeSketch || !m_sketchPatternBefore) return;
     // Restore the pre-preview state, then re-apply the transform from
-    // current parameters. This is how every preview frame stays clean —
+    // current parameters. This is how every preview frame stays clean -
     // no leftover copies from earlier preview iterations.
     *m_activeSketch = *m_sketchPatternBefore;
     if (m_sketchPatternCount < 2 || m_sketchPatternPts.empty()) return;
@@ -2383,7 +2375,7 @@ void Application::cancelSketchPattern() {
 
 // ── Rotate Plane About Axis ─────────────────────────────────────────────
 // Build the list of candidate hinge lines for the target plane and open the
-// popup. Each entry is a gp_Ax1 resolved up-front (transient — we never touch
+// popup. Each entry is a gp_Ax1 resolved up-front (transient - we never touch
 // the document's axis list). Order: the plane's own U / V axes (tilt in
 // place), then every construction axis, then a selected straight edge / a
 // selected cylindrical face's centreline if either is in the selection.
@@ -2419,7 +2411,7 @@ void Application::beginRotatePlaneAboutAxis(int planeId) {
     }
 
     // Hinge about real geometry: a co-selected straight edge or cylindrical
-    // face. Default to it when present — a co-selected hinge is almost
+    // face. Default to it when present - a co-selected hinge is almost
     // certainly why the user opened this rather than an in-place tilt.
     if (m_selection) {
         for (const auto& e : m_selection->getSelection()) {
@@ -2504,6 +2496,8 @@ bool Application::launchThreadRecut(ThreadOp& op, int attempts) {
     float rdefl, rang;
     meshQualityParams(rdefl, rang);
     const float recutAng = std::min(rang, 0.15f);
+    p.meshDefl = rdefl;
+    p.meshAng = rang;
     p.fut = std::async(std::launch::async,
                        [worker, body, rdefl, recutAng]() {
                            std::fprintf(stderr, "[Thread] recut worker "
@@ -2513,9 +2507,7 @@ bool Application::launchThreadRecut(ThreadOp& op, int attempts) {
                            if (!r.IsNull()) {
                                try {
                                    BRepMesh_IncrementalMesh mesh(
-                                       r, rdefl, Standard_False,
-                                       recutAng, Standard_True);
-                                   mesh.Perform();
+                                       r, materializr::meshParams(rdefl, recutAng, true));
                                } catch (...) {}
                            }
                            const double secs =
@@ -2535,14 +2527,14 @@ void Application::installThreadRecutHook() {
     ThreadOp::setAsyncRecutHook([this](ThreadOp& op, Document& doc) -> bool {
         // Only the live document (headless/temp docs keep the sync path).
         if (!m_document || &doc != m_document) return false;
-        // Single-flight per op: a request while one is pending stays pending —
+        // Single-flight per op: a request while one is pending stays pending -
         // the landing check sees the body changed since launch and RELAUNCHES
         // against the current state, so the newest edit always wins.
         for (auto& p : m_threadRecuts)
             if (p.op == &op) { p.attempts = 1; return true; } // re-arm budget
         if (!launchThreadRecut(op, 1)) return false;
         // No toast: renderThreadPanel draws the blocking re-cut modal (with
-        // Cancel) while m_threadRecuts is non-empty — the app was effectively
+        // Cancel) while m_threadRecuts is non-empty - the app was effectively
         // unusable during a re-cut anyway, so the modal says so honestly.
         return true;
     });
@@ -2574,13 +2566,13 @@ void Application::pollThreadRecuts() {
         try { cur = m_document->getBody(p.bodyId); } catch (...) {}
 
         if (stepIdx < 0 || cur.IsNull()) {
-            // Step deleted / body gone — drop.
+            // Step deleted / body gone - drop.
             m_threadRecuts.erase(m_threadRecuts.begin() + i);
             continue;
         }
         if (!cur.IsSame(p.launchedFrom)) {
             // The body changed while the worker ran (a second cascade re-ran
-            // the chain and committed a NEW TShape — e.g. the sketch edit
+            // the chain and committed a NEW TShape - e.g. the sketch edit
             // fired two cascades). This result is stale: RELAUNCH against the
             // current body instead of silently dropping it, or the thread
             // never lands ("it said background but nothing happened").
@@ -2593,16 +2585,18 @@ void Application::pollThreadRecuts() {
             continue;
         }
         if (result.IsNull()) {
-            // New geometry can't take the thread — suspend the step with the
+            // New geometry can't take the thread - suspend the step with the
             // standard explainer banner instead of silently no-opping.
             m_history->suspendStep(stepIdx);
-            showToast("Thread couldn't re-cut on the new geometry \xE2\x80\x94 "
+            showToast("Thread couldn't re-cut on the new geometry - "
                       "check the Thread step.");
         } else {
-            std::fprintf(stderr, "[Thread] recut landed — applying to body "
+            std::fprintf(stderr, "[Thread] recut landed - applying to body "
                                  "%d\n", p.bodyId);
+            if (m_shapeRenderer)
+                m_shapeRenderer->notePreMeshed(result, p.meshDefl, p.meshAng);
             m_document->updateBody(p.bodyId, result);
-            m_meshesDirty = true;
+            markBodyDirty(p.bodyId);
         }
         m_threadRecuts.erase(m_threadRecuts.begin() + i);
     }
@@ -2610,10 +2604,15 @@ void Application::pollThreadRecuts() {
 
 void Application::cancelThreadRecuts() {
     if (m_threadRecuts.empty()) return;
+    // Nothing to invalidate: this signals the workers and suspends the Thread
+    // step (which only records an index - so with more than one re-cut in
+    // flight, only the last one gets the explainer banner). The bodies are
+    // already sitting at their pre-thread shapes, put there by whoever
+    // started the re-cut.
     for (auto& p : m_threadRecuts) {
         if (p.cancel) p.cancel->store(true);
         // The body is sitting at its pre-thread state with the Thread step
-        // still claiming to be applied — suspend it (same explainer banner
+        // still claiming to be applied - suspend it (same explainer banner
         // as a failed re-cut) so the history stays honest.
         int stepIdx = -1;
         for (int k = 0; k <= m_history->currentStep(); ++k)
@@ -2622,8 +2621,7 @@ void Application::cancelThreadRecuts() {
         m_threadZombies.push_back(std::move(p.fut));
     }
     m_threadRecuts.clear();
-    m_meshesDirty = true;
-    showToast("Thread re-cut cancelled \xE2\x80\x94 the Thread step is "
+    showToast("Thread re-cut cancelled - the Thread step is "
               "suspended; re-enable it in History to re-cut.");
 }
 

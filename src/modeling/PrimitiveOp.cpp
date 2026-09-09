@@ -73,7 +73,7 @@ bool PrimitiveOp::execute(Document& doc) {
                 break;
             case Kind::Cone:
                 // OCCT allows a zero top radius (true cone tip). Equal radii
-                // would just be a cylinder — accept either way. Both radii
+                // would just be a cylinder - accept either way. Both radii
                 // zero is degenerate and crashes OCCT, so reject explicitly.
                 if (m_radius < 0.0 || m_topRadius < 0.0 || m_height <= 0.0 ||
                     (m_radius <= 0.0 && m_topRadius <= 0.0))
@@ -85,7 +85,7 @@ bool PrimitiveOp::execute(Document& doc) {
                 // R > r is the geometric strict minimum: R = r is the horn-
                 // torus singularity (zero-diameter hole) and R < r is a
                 // self-intersecting spindle torus. Anything strictly greater
-                // gives a clean ring torus that OCCT meshes fine — even
+                // gives a clean ring torus that OCCT meshes fine - even
                 // R = r * 1.001 produces a valid (very-thin-walled) donut.
                 if (m_radius <= 0.0 || m_minorRadius <= 0.0 ||
                     m_radius <= m_minorRadius) return false;
@@ -164,7 +164,7 @@ void PrimitiveOp::renderProperties() {
     materializr::lengthField("Z", &m_oz);
     ImGui::Text(materializr::tr("Body ID: %d"), m_createdBodyId);
 
-    // Same validation feedback the create popup shows — Apply Changes runs
+    // Same validation feedback the create popup shows - Apply Changes runs
     // execute() which short-circuits on invalid params, and History's
     // lastGoodParams rescue restores the previous shape. Without this
     // warning the user has no idea WHY the radius "doesn't take" until

@@ -1,5 +1,5 @@
 // MoveFaceOp on a SHELLED (hollow) body: the loft/shear rebuild can produce a
-// topologically-"valid" but WRONG result — an inside-out solid (negative
+// topologically-"valid" but WRONG result - an inside-out solid (negative
 // volume) on a slide, or a re-solidified body whose cavity was silently
 // discarded on a tilt. Steve hit both in-app ("doing anything to a shelled
 // body makes the shell disappear"). The op must REFUSE cleanly and leave the
@@ -64,7 +64,7 @@ TEST(MoveFaceHollow, SlideRefusesInsteadOfInvertingShell) {
     mv.setKind(MoveFaceOp::Kind::Translate);
     mv.setMoveVector(gp_Vec(0, 2, 0));                      // in-plane slide
     EXPECT_FALSE(mv.execute(doc))
-        << "sliding a hollow body's wall produced garbage before the guard — "
+        << "sliding a hollow body's wall produced garbage before the guard - "
            "it must refuse until the loft engine handles cavities";
     EXPECT_NEAR(vol(doc.getBody(body)), hollowV, 1e-6)
         << "a refusal must leave the hollow body untouched";
@@ -82,15 +82,15 @@ TEST(MoveFaceHollow, TiltRefusesInsteadOfFillingCavity) {
     mv.setRotation(gp_Dir(0, 1, 0), 0.17);                  // ~10 degrees
     EXPECT_FALSE(mv.execute(doc))
         << "tilting a hollow body's wall silently re-solidified it before the "
-           "guard — it must refuse until the loft engine handles cavities";
+           "guard - it must refuse until the loft engine handles cavities";
     EXPECT_NEAR(vol(doc.getBody(body)), hollowV, 1e-6)
         << "a refusal must leave the hollow body untouched";
 }
 
-// THE REAL PATH — History::pushOperation. A face transform on a shelled body
+// THE REAL PATH - History::pushOperation. A face transform on a shelled body
 // AUTO-REFLOWS beneath the Shell step: it applies to the pre-shell solid and
 // the shell re-runs on the moved body ("the order flipped"), so the very
-// operations the direct guards refuse SUCCEED through history — hollow body,
+// operations the direct guards refuse SUCCEED through history - hollow body,
 // moved geometry, no corruption.
 TEST(MoveFaceHollow, SlideReflowsBeneathShellThroughHistory) {
     Document doc;
@@ -144,7 +144,7 @@ TEST(MoveFaceHollow, TiltReflowsBeneathShellThroughHistory) {
     ASSERT_TRUE(hist.pushOperation(std::move(mv), doc))
         << "the tilt must reflow beneath the shell and land";
     EXPECT_LT(vol(doc.getBody(body)), 2000.0 * 0.6)
-        << "tilted body must STILL be hollow — no silently filled cavity";
+        << "tilted body must STILL be hollow - no silently filled cavity";
     ASSERT_EQ(hist.stepCount(), 2);
     EXPECT_EQ(hist.getStep(0)->typeId(), "moveface");
     EXPECT_EQ(hist.getStep(1)->typeId(), "shell");

@@ -9,8 +9,8 @@ namespace materializr {
 struct ProjectHistory; // ProjectIO.h
 
 // Crash/hang recovery for the WHOLE project. SketchRecovery only guards the
-// in-progress (uncommitted) sketch; this guards the committed model — bodies
-// and the full operation history — including an UNSAVED project that has no
+// in-progress (uncommitted) sketch; this guards the committed model - bodies
+// and the full operation history - including an UNSAVED project that has no
 // .materializr path yet (the case that loses the most work). The active project
 // is periodically snapshotted to a sidecar, independent of the user's own save
 // file, so a crash or a hang never costs more than a few seconds of committed
@@ -29,21 +29,21 @@ struct ProjectRecoveryMeta {
 // MULTI-INSTANCE SAFETY: every running instance claims its own recovery SLOT
 // (an OS file lock on recovery/slot<N>.lock, held for the process lifetime and
 // auto-released by the kernel on crash). projectRecoveryPath() is THIS
-// instance's slot file — slot 0 keeps the legacy "autosave.materializr" name,
+// instance's slot file - slot 0 keeps the legacy "autosave.materializr" name,
 // later slots get "autosave-<N>.materializr". Two instances therefore never
 // write (or truncate) each other's snapshot: the old single shared path let
 // instance A's rename/overwrite yank the file out from under instance B
 // (SIGBUS) and made the restore prompt offer the WRONG session's work.
 // PER-SESSION (tab) snapshots: within this instance's slot, session 0 keeps
 // the legacy file name and session K>0 appends "-t<K>". Every open project
-// gets its own snapshot file, so a crash can offer ALL of them back — the
+// gets its own snapshot file, so a crash can offer ALL of them back - the
 // active session writes on the debounce, inactive sessions are written once
 // at tab-deactivation (they cannot change while inactive).
 std::string projectRecoveryPath(int sessionIndex = 0);
 
 // Tabs per instance that get their own snapshot file. Session indices are
 // RECYCLED within 0..kMaxSessionsPerSlot-1 so every snapshot stays inside the
-// startup scan's namespace — a session index past this bound would write a
+// startup scan's namespace - a session index past this bound would write a
 // file no scan ever looks at.
 constexpr int kMaxSessionsPerSlot = 16;
 
@@ -52,7 +52,7 @@ constexpr int kMaxSessionsPerSlot = 16;
 // process owns and no second locking scheme can disagree with this one.
 int recoverySlot();
 
-// Slots whose owning instance is provably dead — their lock can be taken, so
+// Slots whose owning instance is provably dead - their lock can be taken, so
 // whatever they still hold is an orphan safe to offer back. Never includes our
 // own slot: the claim is made first, so our lock is already held.
 std::vector<int> orphanedRecoverySlots();
@@ -65,7 +65,7 @@ bool writeProjectRecovery(const Document& doc, const ProjectHistory* history,
                           const std::string& projectPath, int bodyCount,
                           int stepCount, int sessionIndex = 0);
 
-// Startup scan: true if some ORPHANED recovery snapshot exists — one whose
+// Startup scan: true if some ORPHANED recovery snapshot exists - one whose
 // owning instance is provably dead (its slot lock is acquirable). A snapshot
 // belonging to a live instance (or to us) is never offered. When several
 // orphans exist the newest is chosen; the rest surface on later launches.
@@ -73,7 +73,7 @@ bool writeProjectRecovery(const Document& doc, const ProjectHistory* history,
 bool hasProjectRecovery();
 
 // Path of the orphaned snapshot chosen by hasProjectRecovery() ("" if none).
-// This is what the restore loads — NOT projectRecoveryPath(), which is our
+// This is what the restore loads - NOT projectRecoveryPath(), which is our
 // own (live) slot.
 std::string projectRecoveryRestorePath();
 
@@ -81,7 +81,7 @@ std::string projectRecoveryRestorePath();
 bool readProjectRecoveryMeta(ProjectRecoveryMeta& meta);
 
 // How many orphaned snapshots the startup scan found in total (all dead
-// slots, all their sessions) — one per tab those instances had open.
+// slots, all their sessions) - one per tab those instances had open.
 int projectRecoveryOrphanCount();
 
 // Every orphan the scan found, so a restore can bring back ALL of the dead

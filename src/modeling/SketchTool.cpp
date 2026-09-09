@@ -63,7 +63,7 @@ SketchToolMode SketchTool::getMode() const {
 void SketchTool::onMouseDown(glm::vec2 pos, bool addToSel) {
     if (!m_sketch) return;
     m_lastDownAddedToSel = addToSel;
-    // Placing a point ends this segment's charge — re-hover to charge again.
+    // Placing a point ends this segment's charge - re-hover to charge again.
     m_charged = {};
     m_hoverCandidate = {};
 
@@ -159,7 +159,7 @@ void SketchTool::onMouseDown(glm::vec2 pos, bool addToSel) {
 }
 
 void SketchTool::onMouseMove(glm::vec2 pos) {
-    // Dimension mode has no drag/preview snapping of its own — just record the
+    // Dimension mode has no drag/preview snapping of its own - just record the
     // raw cursor for the ghost-label / hover-highlight overlay and bail before
     // the snapping logic below (which doesn't apply to picking entities).
     if (m_mode == SketchToolMode::Dimension) {
@@ -182,7 +182,7 @@ void SketchTool::onMouseMove(glm::vec2 pos) {
     // Trim uses the raw cursor for picking; snapping would pull the click toward
     // unrelated nearby targets and pick the wrong element.
     glm::vec2 newPos = (m_mode == SketchToolMode::Trim) ? pos : snap(pos);
-    // Select/move only manipulates existing geometry — inference guides are
+    // Select/move only manipulates existing geometry - inference guides are
     // visual noise here. Keep the snapped position (handy when dragging an
     // element onto a grid point/endpoint) but drop the guide markers.
     if (m_mode == SketchToolMode::Select) m_activeInferences.clear();
@@ -253,7 +253,7 @@ void SketchTool::onMouseMove(glm::vec2 pos) {
         // target position so endpoint / midpoint / on-line / axis-from-point
         // guides fire mid-drag (the same as during placement). The dragged
         // point itself is excluded so it doesn't snap to its starting spot.
-        // For multi-point drags we skip inference snap — there's no single
+        // For multi-point drags we skip inference snap - there's no single
         // "cursor follows this point" semantic, and snapping one would slide
         // the others off.
         if (pts.size() == 1 && m_dragPointId >= 0) {
@@ -276,7 +276,7 @@ void SketchTool::onMouseMove(glm::vec2 pos) {
             // adheres to the chosen step (otherwise the offset accumulates
             // sub-grid float drift across many drags).
             // Quantise the DELTA, not each point. Rounding every point to the
-            // lattice teleported anything that was deliberately off it — a line
+            // lattice teleported anything that was deliberately off it - a line
             // with its ends on two circles lost both, 0.6mm off the rim, and
             // came out rotated 30 -> 33.7 degrees and shorter. It also fired on
             // a drag of nearly zero length, so merely pressing and twitching on
@@ -308,7 +308,7 @@ void SketchTool::onMouseUp(glm::vec2 /*pos*/) {
     if (m_isDragging) {
         m_isDragging = false;
         m_dragPointId = -1;
-        // No more drag — clear any drag-time inference guides so the overlay
+        // No more drag - clear any drag-time inference guides so the overlay
         // doesn't linger after the user releases the mouse.
         m_activeInferences.clear();
     }
@@ -383,8 +383,8 @@ void SketchTool::onCancel() {
 
 bool SketchTool::dropLineChainTail() {
     // Surgically remove the chain's LAST segment by the IDs we tracked in
-    // m_lineChain — not by undoing the top history step, which isn't reliably
-    // the last segment — then re-anchor the live chain on the new tail so the
+    // m_lineChain - not by undoing the top history step, which isn't reliably
+    // the last segment - then re-anchor the live chain on the new tail so the
     // next press-drag continues from there. The front (start vertex) is the
     // floor: with only the start left there is no segment to back out.
     // (The caller wraps this in recordSketchMutation, so it's one undo step.)
@@ -401,7 +401,7 @@ bool SketchTool::dropLineChainTail() {
             break;
         }
     }
-    // Delete the tail vertex too, but only if nothing else references it — it
+    // Delete the tail vertex too, but only if nothing else references it - it
     // may have been snapped onto pre-existing geometry we mustn't disturb.
     bool stillUsed = false;
     for (const auto& l : m_sketch->getLines())
@@ -413,7 +413,7 @@ bool SketchTool::dropLineChainTail() {
     if (const SketchPoint* p = m_sketch->getPoint(m_lastPointId)) {
         m_firstClick = p->pos;
         // Collapse the live preview onto the new tail. On touch there's no hover
-        // to move the cursor, so m_currentPos is left at the old release point —
+        // to move the cursor, so m_currentPos is left at the old release point -
         // the rubber-band would otherwise redraw a phantom segment from the new
         // tail back toward the just-removed endpoint (looks like Back left the
         // endpoint behind). Zero-length preview until the user draws again.
@@ -429,7 +429,7 @@ bool SketchTool::applyDimension(float value) {
     if (!m_sketch || !m_isPlacing || value <= 0.0f) return false;
 
     // Offset takes the typed value as a MAGNITUDE and keeps the side the
-    // cursor already chose — a distance cannot express a direction. It only
+    // cursor already chose - a distance cannot express a direction. It only
     // requests the commit; see handleOffsetTool.
     if (m_mode == SketchToolMode::Offset) {
         if (m_offsetPhase != OffsetPhase::Distance || !m_offsetChain.valid())
@@ -511,7 +511,7 @@ bool SketchTool::applyDimension(float value) {
         }
         case SketchToolMode::Polygon: {
             // For polygon the typed value is the SIDE COUNT (≥3), not the
-            // radius. We DON'T commit here — just update m_polygonSides so
+            // radius. We DON'T commit here - just update m_polygonSides so
             // the live preview re-renders with the new count, and the user
             // can keep dragging to size + rotation. The actual placement
             // commits on the second click as for any other polygon.
@@ -547,7 +547,7 @@ bool SketchTool::applyDimension(float value) {
             }
         }
         case SketchToolMode::Arc: {
-            // Click 2 — type the CHORD: the straight-line distance between the
+            // Click 2 - type the CHORD: the straight-line distance between the
             // arc's two ends, exactly like a line's length.
             if (m_clickCount == 1) {
                 handleArcTool(m_firstClick + dir * value);
@@ -555,7 +555,7 @@ bool SketchTool::applyDimension(float value) {
             }
             if (m_clickCount != 2) return false;
 
-            // Click 3 — the chord is already fixed, so ONE number pins the apex.
+            // Click 3 - the chord is already fixed, so ONE number pins the apex.
             // Which way the arc bows is a direction, not a dimension, so it
             // still comes from the side of the chord the cursor is on.
             const glm::vec2 A = m_firstClick, B = m_secondClick;
@@ -570,7 +570,7 @@ bool SketchTool::applyDimension(float value) {
             float d = 0.0f;
             if (m_arcDimMode == ArcDimMode::Sweep) {
                 // Apex sits on the chord's perpendicular bisector at
-                // (L/2)·tan(θ/4) — the same relation snapArcApex uses for its
+                // (L/2)·tan(θ/4) - the same relation snapArcApex uses for its
                 // 15° steps, so a typed 90 lands exactly where the snap would.
                 // A full 360 has no apex to place (tan(90°) is infinite) and
                 // would be a circle, not an arc; clamp just short of it.
@@ -581,7 +581,7 @@ bool SketchTool::applyDimension(float value) {
                 // Radius: the centre lies on the bisector at √(R² − (L/2)²)
                 // from the midpoint, and the MINOR arc's apex is on the far
                 // side of the chord, R minus that, away. Half the chord is the
-                // floor — under it no arc passes through both endpoints at all.
+                // floor - under it no arc passes through both endpoints at all.
                 const float half = L * 0.5f;
                 if (value < half - 1e-4f) return false;
                 const float h =
@@ -606,7 +606,7 @@ glm::vec2 SketchTool::getPreviewStart() const {
     // The renderer + dimension overlay read (start, end) as the circle's
     // (centre, rim) and the rectangle's (corner, opposite corner). Return the
     // EFFECTIVE start for the active draw mode so both visuals match what the
-    // click will actually create — no renderer changes needed.
+    // click will actually create - no renderer changes needed.
     if (m_mode == SketchToolMode::Rectangle && m_rectMode == RectMode::Center)
         return 2.0f * m_firstClick - m_currentPos; // opposite corner
     if (m_mode == SketchToolMode::Circle && m_circleMode == CircleMode::TwoPoint)
@@ -641,7 +641,7 @@ bool SketchTool::directionalAnchor(glm::vec2& out) const {
         return true;
     case SketchToolMode::Spline:
         // m_firstClick stays on control point #1 for the life of the spline,
-        // so it is the wrong anchor from the third point on — measure from the
+        // so it is the wrong anchor from the third point on - measure from the
         // point actually being extended.
         if (m_splinePoints.empty()) return false;
         if (const SketchPoint* p = m_sketch->getPoint(m_splinePoints.back())) {
@@ -650,7 +650,7 @@ bool SketchTool::directionalAnchor(glm::vec2& out) const {
         }
         return false;
     case SketchToolMode::Arc:
-        // Click 2 places the far end of the chord — a direction from the start
+        // Click 2 places the far end of the chord - a direction from the start
         // point, exactly like a line. Click 3 sweeps the apex, which has its
         // own 15-degree sweep snap (arcApexSnap); a directional guide there
         // would pull against it.
@@ -659,13 +659,13 @@ bool SketchTool::directionalAnchor(glm::vec2& out) const {
         return true;
     case SketchToolMode::Polygon:
         // The drag sets the circumradius AND the polygon's rotation, so the
-        // direction is real geometry — snapping it is how you get a hexagon
+        // direction is real geometry - snapping it is how you get a hexagon
         // sitting flat instead of a degree and a half off.
         out = m_firstClick;
         return true;
     case SketchToolMode::Circle:
         // Two-point mode drags a DIAMETER, whose direction is real. In
-        // centre-radius the direction means nothing — only the distance does —
+        // centre-radius the direction means nothing - only the distance does -
         // and steering it would just perturb the radius, which
         // snapRadialToGrid already looks after.
         if (m_circleMode != CircleMode::TwoPoint) return false;
@@ -680,12 +680,12 @@ bool SketchTool::directionalAnchor(glm::vec2& out) const {
 
 glm::vec2 SketchTool::rectifyNearAxis(glm::vec2 target) const {
     // Directional inferences (perpendicular / parallel / tangent / axis /
-    // angle) override grid snap by design — but when the inferred segment
+    // angle) override grid snap by design - but when the inferred segment
     // comes out NEARLY axis-aligned, "nearly" is the bug: 1° over 80 mm is
     // a visibly crooked line the user never asked for, and every later
     // inference aligns to it, breeding more. Rule (Steve's): keep the
     // inference while it's genuinely slanted; once it gets close to
-    // parallel with an axis, the axis wins — flatten exactly, and re-grid
+    // parallel with an axis, the axis wins - flatten exactly, and re-grid
     // the free coordinate so the endpoint is lattice-true again.
     glm::vec2 anchor;
     if (!directionalAnchor(anchor)) return target;
@@ -706,7 +706,7 @@ glm::vec2 SketchTool::rectifyNearAxis(glm::vec2 target) const {
     };
     // With grid on, only flatten genuinely sub-cell drift: if the segment ends
     // a full grid row (or more) off the axis, that's a deliberate 1/X-slope
-    // line, not drift — leave it. Slightly over half a cell so the exact
+    // line, not drift - leave it. Slightly over half a cell so the exact
     // boundary still flattens onto the axis grid line. Grid off keeps the pure
     // 4° rule. (Steve: a 1 mm rise over a long run must not snap to horizontal.)
     const float crossCap = gridOn ? m_gridStep * 0.5f + 1e-3f : 1e30f;
@@ -724,7 +724,7 @@ glm::vec2 SketchTool::rectifyNearAxis(glm::vec2 target) const {
 
 void SketchTool::updateHoverCharge(double tNow, glm::vec2 cursor) {
     // Only charge while actively placing a DIRECTED point at the Full or Max
-    // tier — the charged reference exists to give perpendicular/axis guides off
+    // tier - the charged reference exists to give perpendicular/axis guides off
     // the dwelt-on feature, which is meaningless where no direction is picked.
     glm::vec2 chargeAnchor;
     if (!m_sketch || !directionalAnchor(chargeAnchor) ||
@@ -743,12 +743,12 @@ void SketchTool::updateHoverCharge(double tNow, glm::vec2 cursor) {
     //   - host-face vertices ("corners")
     //   - host-face edge midpoints
     // The face-ref kinds give axis + perpendicular guides off the host
-    // geometry without needing a sketch element there yet — they only
+    // geometry without needing a sketch element there yet - they only
     // exist while the sketch is open, so the cyan ring is naturally
     // hidden in the regular 3D view.
     // Band scales with the grid but gently: the old 0.9x grid band plus a
     // 0.6x linger tolerance meant a SLOW drive-by anywhere near a candidate
-    // charged it at coarse grid steps (zoomed out) — "latching to edges I
+    // charged it at coarse grid steps (zoomed out) - "latching to edges I
     // never hovered". Charging is a deliberate act: tighter catch, and the
     // linger tolerance below is a small fraction of a cell.
     const float band = std::max(0.4f, tolStep() * 0.6f);
@@ -801,7 +801,7 @@ void SketchTool::updateHoverCharge(double tNow, glm::vec2 cursor) {
         }
     }
     if (best.kind == ChargedRef::Kind::None) {
-        // Not hovering any candidate — keep whatever is already charged
+        // Not hovering any candidate - keep whatever is already charged
         // (so the guide survives while you drag away to align against it).
         m_hoverCandidate = {};
         return;
@@ -883,28 +883,28 @@ static bool snapCurveToGrid(glm::vec2 center, float radius, glm::vec2 pos,
 
 // Rim snapping predates the guide overlay and drew nothing, so landing on a
 // circle looked identical to landing nowhere. Publish a guide so it reads like
-// every other inference — same diamond marker as On Line, its own label.
+// every other inference - same diamond marker as On Line, its own label.
 void SketchTool::noteRimGuide(glm::vec2 at, int curveId) const {
     m_activeInferences.push_back({InferenceGuide::OnCircle, at, at, curveId});
 }
 
 glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     m_snapRimId = -1;
-    // Fresh inference set every snap — the renderer treats this as "what's
+    // Fresh inference set every snap - the renderer treats this as "what's
     // active right now".
     m_activeInferences.clear();
 
     // Inference-level gates (sketch toolbar Full/Reduced/Off):
     //   Reduced == the classic inference set (everything below). Full adds the
-    //   hover-charged references on top. Off keeps ONLY grid snap — every point
+    //   hover-charged references on top. Off keeps ONLY grid snap - every point
     //   snap (endpoints, incl. loop closure onto the chain start, plus face-
     //   reference vertices) is now gated too, so "inferences off" means the
     //   cursor never jumps to geometry (Steve: closing a triangle still snapped
-    //   the last vertex to the start with inferences off — that IS an inference).
-    //   allowSnaps       — endpoint / midpoint / on-line / face-ref snaps.
-    //   allowDirectional — perp/parallel-to-prev, angle, on-line-extension,
+    //   the last vertex to the start with inferences off - that IS an inference).
+    //   allowSnaps       - endpoint / midpoint / on-line / face-ref snaps.
+    //   allowDirectional - perp/parallel-to-prev, angle, on-line-extension,
     //                      tangent, axis-from-point. ON for both Full & Reduced.
-    //   allowCharge      — hover-to-charge references (Full only).
+    //   allowCharge      - hover-to-charge references (Full only).
     const bool allowSnaps       = (m_inferenceLevel != InferenceLevel::Off);
     const bool allowDirectional = (m_inferenceLevel != InferenceLevel::Off);
     const bool allowCharge      = (m_inferenceLevel == InferenceLevel::Full ||
@@ -914,13 +914,13 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     // the grid step (0.6× < one increment), so it can never reach past a
     // neighbouring grid intersection. The old absolute 0.25 mm floor meant a
     // fine grid was swamped by it: at a 0.1 mm grid a second point placed one
-    // or two steps (0.1–0.2 mm) from the first snapped straight back onto it —
+    // or two steps (0.1–0.2 mm) from the first snapped straight back onto it -
     // so nothing shorter than ~0.3 mm could be drawn, and an endpoint snap
     // hijacked the cursor within 0.3 mm of any point (Steve's report). Coarse
     // grids are unaffected (gridStep·0.6 already dominated the floor above
     // ~0.42 mm). Grid OFF: the cursor is freehand, so keep an absolute band to
     // grab endpoints reliably.
-    // Master snap band — endpoints, midpoints, face centres, on-line and
+    // Master snap band - endpoints, midpoints, face centres, on-line and
     // extension guides all derive from it, so the touch widening flows to all.
     const bool gridSnapOnForBand = m_snapToGridEnabled && m_gridStep > 0.0f;
     float pointSnapThreshold =
@@ -938,7 +938,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
 
     // Nearest grid point distance, used so the circle/arc PERIMETER snaps
     // below only win when they sit closer to the cursor than the grid does
-    // (grid-snap on). Endpoints still win outright — only the continuous
+    // (grid-snap on). Endpoints still win outright - only the continuous
     // curve competes. (Steve: a rectangle corner dragged near a big circle
     // was snapping to the circle's edge instead of the grid intersection.)
     const bool gridActive = m_snapToGridEnabled && m_gridStep > 0.0f;
@@ -954,26 +954,26 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     // to combine with. Endpoint → circle/arc perimeter → midpoint → face
     // centroid, in priority order.
     // Point snaps (endpoints) are an INFERENCE: gated OFF entirely when the
-    // inference level is Off, so nothing captures the cursor — including loop
+    // inference level is Off, so nothing captures the cursor - including loop
     // closure onto the chain start (Steve: closing a triangle still snapped
     // the last vertex to the start with inferences off). Grid snap at the end
     // of this function is independent and still applies when enabled.
     const auto& points = m_sketch->getPoints();
     if (allowSnaps) for (const auto& pt : points) {
-        // During a drag, skip the points being moved — they'd snap to
+        // During a drag, skip the points being moved - they'd snap to
         // their own starting position and lock the drag in place.
         if (m_snapExcludePoints.count(pt.id)) continue;
         // Don't SELF-WELD the active segment: while positioning the next
-        // vertex, the point just placed (m_lastPointId — the segment's start /
+        // vertex, the point just placed (m_lastPointId - the segment's start /
         // previous chain vertex) must not capture the cursor, or the endpoint
         // band welds the new point straight back onto it and you can't draw a
         // segment shorter than the band. This is grid-INDEPENDENT (the band is
         // 0.25 mm even with snap off), which is why Steve couldn't make a line
         // under ~0.25 mm with grid AND inferences both off. Loop closure welds
-        // to the CHAIN start (m_chainStartPointId — a different id after the
+        // to the CHAIN start (m_chainStartPointId - a different id after the
         // first segment), so auto-close is unaffected.
         if (m_isPlacing && m_lastPointId >= 0 && pt.id == m_lastPointId) continue;
-        // Glyph vertices are never snap targets — a word is hundreds of
+        // Glyph vertices are never snap targets - a word is hundreds of
         // points and drawing near text was impossible.
         if (pt.fromText) continue;
         if (glm::length(pos - pt.pos) < pointSnapThreshold) {
@@ -1012,7 +1012,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
                                     std::max(curveSnapThreshold, tolStep() * 0.6f), gc))
                     { m_snapRimId = c.id; noteRimGuide(gc, c.id); return gc; }
             }
-            // Reduced (and Full/Max fallback): grid wins ties — only land on the
+            // Reduced (and Full/Max fallback): grid wins ties - only land on the
             // bare perimeter when it's genuinely closer than the nearest grid pt.
             if (gridActive && std::abs(dist - r) >= gridDist) continue;
             m_snapRimId = c.id;
@@ -1060,7 +1060,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
                     while (gcA >= TWO_PI) gcA -= TWO_PI;
                     if (gcA <= sweep) { m_snapRimId = a.id; noteRimGuide(gc, a.id); return gc; }
                 }
-                // No grid crossing on the arc — fall through to the plain
+                // No grid crossing on the arc - fall through to the plain
                 // perimeter point so arcs behave like circles (any on-arc point
                 // is reachable even when no grid line crosses the arc span).
                 m_snapRimId = a.id;
@@ -1073,7 +1073,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
               noteRimGuide(rp, a.id); return rp; }
         }
     }
-    // Face-reference circular / arc edges — continuous perimeter snapping for
+    // Face-reference circular / arc edges - continuous perimeter snapping for
     // in-plane host/neighbour circles (hole rims, fillet arcs). Mirrors the
     // sketch-circle behaviour: grid wins ties; never fires when inference is Off.
     if (m_inferenceLevel != InferenceLevel::Off) {
@@ -1136,7 +1136,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     }
     // Centres of face-reference circles (hole rims, and the crest arcs of a
     // threaded rod's cap): the TRUE axis point. Runs before the centroid
-    // snap below — on an asymmetric face (thread runout bites a chunk out
+    // snap below - on an asymmetric face (thread runout bites a chunk out
     // of a cap) the area centroid sits visibly OFF the axis, and Steve
     // hunting the cylinder centre kept landing on that shifted point.
     if (allowSnaps && m_inferenceLevel != InferenceLevel::Off) {
@@ -1146,7 +1146,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
         }
     }
     // The host body's TRUE centre (thread axis ∩ sketch plane, recomputed on
-    // every sketch entry — new AND re-edit). It outranks the area centroid,
+    // every sketch entry - new AND re-edit). It outranks the area centroid,
     // and while it exists the centroid snap is suppressed ENTIRELY: on a
     // threaded cap the centroid sits ~0.3mm off-axis, and with both points
     // live the snap flip-flopped between them ("face center vs object
@@ -1157,7 +1157,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
         glm::length(pos - trueCenter) < pointSnapThreshold) {
         return trueCenter;
     }
-    // Host face centroid (if sketch was started on a face) — only when no
+    // Host face centroid (if sketch was started on a face) - only when no
     // true centre is known.
     glm::vec2 faceCenter;
     if (allowSnaps && !hasTrueCenter &&
@@ -1169,11 +1169,11 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     // Symmetry: snap to the MIRROR image of an existing point across a candidate
     // axis, so you can place geometry symmetric to the other side (the 4th
     // corner hole mirrors the others; an internal feature mirrors across the
-    // centreline). Full / Max only — it's a richer guide, off at Reduced. Axes:
+    // centreline). Full / Max only - it's a richer guide, off at Reduced. Axes:
     //   • the sketch's bounding-box vertical & horizontal centrelines, and
     //   • any axis-aligned existing line (a centreline the user drew).
     // Only axis-aligned mirrors, so the snapped point keeps the source's other
-    // coordinate — predictable and low-noise. Runs after the hard point snaps,
+    // coordinate - predictable and low-noise. Runs after the hard point snaps,
     // so landing exactly on an existing point still wins.
     if (m_inferenceLevel == InferenceLevel::Full ||
         m_inferenceLevel == InferenceLevel::Max) {
@@ -1185,7 +1185,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
             minX = std::min(minX, pt.pos.x); maxX = std::max(maxX, pt.pos.x);
             minY = std::min(minY, pt.pos.y); maxY = std::max(maxY, pt.pos.y);
         }
-        // Skip pathologically large sketches (text/dense splines) — symmetry
+        // Skip pathologically large sketches (text/dense splines) - symmetry
         // inference there is rarely the intent and the scan would add up.
         if (pv.size() >= 2 && pv.size() <= 200) {
             float bestD = pointSnapThreshold;
@@ -1197,7 +1197,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
             // previous point mirrored across the vertical/horizontal line
             // through the anchor (a symmetric V / arch) and its point
             // reflection through the anchor (a smooth S). The bbox-centreline
-            // mirrors below can't express these — with two points they only
+            // mirrors below can't express these - with two points they only
             // ever suggest the degenerate bbox corner.
             {
                 glm::vec2 L(0), prev(0);
@@ -1272,7 +1272,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
                     }
                 }
             };
-            // Bounding-box centrelines — only with 3+ points; with two, the
+            // Bounding-box centrelines - only with 3+ points; with two, the
             // centreline mirror is ALWAYS the degenerate bbox corner (level
             // with one point, above the other), which reads as noise.
             if (pv.size() >= 3) {
@@ -1301,7 +1301,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     // ─── PHASE 2: Collect line-shaped inference candidates ───────────────────
     // Every inference whose shape is a LINE (not a point) registers itself
     // here rather than snapping immediately. The resolver in phase 3 picks
-    // either the intersection of two candidates or a single projection — so
+    // either the intersection of two candidates or a single projection - so
     // "perpendicular to charged point AND on edge" lands on the actual
     // crossing instead of one displacing the other.
     // (Steve's rule: two inferences should take hold at once when they
@@ -1316,7 +1316,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
         float segLen;
         glm::vec2 proj;            // cursor's projection onto this line
         float perpDist;            // |proj - pos|
-        // Can fire as the LONE snap? Incidental axis-from-point is false —
+        // Can fire as the LONE snap? Incidental axis-from-point is false -
         // sketch points + face vertices are dense and a standalone guide
         // for every drift was visual noise. Such cands still participate
         // in pair-intersection (as one half of a useful composite).
@@ -1324,7 +1324,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     };
     std::vector<LineCand> cands;
 
-    // Axis-from-point guide band — same grid-relative treatment as the point
+    // Axis-from-point guide band - same grid-relative treatment as the point
     // snap above: with grid snap on, an absolute 0.2 mm floor would fire a
     // horizontal/vertical guide off a point within 0.2 mm on a fine grid,
     // hijacking the cursor within one increment. Tie it to the grid instead.
@@ -1336,8 +1336,8 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     // at 100 mm = 5 mm of cursor theft). An inference may only pull the
     // cursor a short distance from where the user actually is. Grid-relative
     // when snap is on (same reasoning as the point/axis bands): the old
-    // absolute 1.5 mm floor let a directional guide yank the cursor ~1.5 mm —
-    // 15 increments at a 0.1 mm grid — so once the (now tight) endpoint band
+    // absolute 1.5 mm floor let a directional guide yank the cursor ~1.5 mm -
+    // 15 increments at a 0.1 mm grid - so once the (now tight) endpoint band
     // stopped grabbing, these took over and the preview wouldn't start until
     // ~1.3 mm out. Tie the pull to the grid so it can't reach past ~1.5
     // increments; coarse grids and grid-off keep the absolute cap.
@@ -1353,7 +1353,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
             // (Sketch::buildWires then splits the segment at the contact point,
             // so the loop-walker can route the new loop through it). They stay
             // excluded from endpoint/midpoint/symmetry snaps and every
-            // directional guide, so a dense outline never spams inference — only
+            // directional guide, so a dense outline never spams inference - only
             // this perpendicular on-edge landing, cheap and unambiguous, fires.
             if (m_snapExcludePoints.count(ln.startPointId) ||
                 m_snapExcludePoints.count(ln.endPointId)) continue;
@@ -1449,18 +1449,18 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     }
 
     // Axis-from-point: each near sketch / face-ref point pushes its vertical
-    // and/or horizontal guide. Multiple points contribute — cursor can be
+    // and/or horizontal guide. Multiple points contribute - cursor can be
     // near two points' axes at once and intersect them.
     // Marked standaloneAllowed=false: cursor is almost always incidentally
     // aligned with SOMEONE's coord, so a lone guide for every drift was
     // noise. They still serve as one half of a pair-intersection (the
     // "axis-from-point + perp-to-prev" composite this code originally
     // handled inline via applyDirLock).
-    // Includes the chain anchor itself — drawing horizontal / vertical FROM
+    // Includes the chain anchor itself - drawing horizontal / vertical FROM
     // the anchor is one of the most common cases. Dragged points are
     // skipped (a guide from a point to itself is meaningless).
     // Before the FIRST point of an item there's no chain guide to pair with, so
-    // a lone axis-from-point alignment would never fire — yet aligning the start
+    // a lone axis-from-point alignment would never fire - yet aligning the start
     // point to an existing vertex's X/Y is exactly what you want there. Let these
     // stand alone pre-placement (Full / Max only). During placement they stay
     // pair-only (standaloneAllowed=false) to avoid the "aligned with someone's
@@ -1473,7 +1473,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
             if (m_snapExcludePoints.count(pt.id)) continue;
             if (pt.fromText) continue;
             // Charged ref is added with bigger tolerance + standaloneAllowed
-            // by the charged block below — skip here to avoid two cands for
+            // by the charged block below - skip here to avoid two cands for
             // the same line. Only matters when the charged ref IS this sketch
             // point; midpoint / face-ref charged kinds don't shadow this pt.
             if (allowCharge &&
@@ -1510,7 +1510,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
 
     // Perpendicular / parallel to previous: within ~5° of perp or parallel
     // to the chain's last committed segment, anchored at the current first
-    // click. Geometrically mutually exclusive — whichever is closer fires.
+    // click. Geometrically mutually exclusive - whichever is closer fires.
     glm::vec2 dirAnchor;
     const bool haveDirAnchor = directionalAnchor(dirAnchor);
     // m_hasPrevLineDir is the mode guard here: only the Line chain and the
@@ -1527,7 +1527,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
             float perpOffset = glm::distance(pos, perpProj);
             float parOffset  = glm::distance(pos, parProj);
             // Within ~5° (sin5° ≈ 0.087) of perp / parallel, OR within
-            // axisThresh in absolute world units — whichever is more
+            // axisThresh in absolute world units - whichever is more
             // generous at this segment length.
             float tol = std::max(axisThresh, 0.087f * len) * angleScale();
             bool perpClose = perpOffset < tol;
@@ -1543,7 +1543,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     }
 
     // Tangent-to-circle / arc: cursor direction from anchor within ~3° of
-    // a tangent ray to a circle/arc. The BEST-fitting curve wins — with two
+    // a tangent ray to a circle/arc. The BEST-fitting curve wins - with two
     // holes near the cursor, first-match-wins latched onto whichever happened
     // to be earlier in the list rather than the one being aimed at.
     if (allowDirectional && haveDirAnchor) {
@@ -1584,7 +1584,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
                 float D = glm::length(toC);
                 // Only an anchor strictly INSIDE the circle has no tangent
                 // through it. ON the rim there is exactly one, and the
-                // two-tangent formula degenerates cleanly onto it —
+                // two-tangent formula degenerates cleanly onto it -
                 // asin(R/D) = asin(1) = 90° off the radius, both ways. That
                 // is the case people actually mean by "tangent" (start the
                 // line on the circle and run it off tangentially, or carry on
@@ -1638,7 +1638,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
             // parallel to the local tangent there, i.e. where their cross
             // product changes sign. Walk the samples and interpolate onto each
             // crossing. fromText splines (SVG / Text import) are skipped for
-            // the same reason every other directional guide skips them — an
+            // the same reason every other directional guide skips them - an
             // imported outline is dense enough to spam a guide per stroke.
             for (const auto& sp : m_sketch->getSplines()) {
                 if (sp.controlPointIds.size() < 2) continue;
@@ -1654,7 +1654,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
                 // interpolation onto the crossing supplies the precision.
                 // Measured against control points laid on a known circle, 8
                 // per span puts the guide within a small fraction of a degree
-                // of the true tangent — against a 3-degree catch window — for
+                // of the true tangent - against a 3-degree catch window - for
                 // a third of the sampling work on every mouse move.
                 const std::vector<glm::vec2> samp = m_sketch->sampleSpline2D(sp, 8);
                 if (samp.size() < 3) continue;
@@ -1702,21 +1702,21 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     }
 
     // Corner bisector / corner tangent: the anchor is a VERTEX where two
-    // existing segments meet. Tangency has no single answer at a corner — the
+    // existing segments meet. Tangency has no single answer at a corner - the
     // chain has TWO tangent directions there, one per incident segment, and
     // OnLineExtension already offers both. What a corner does define uniquely
     // are the two directions built from the pair, with a and b the unit rays
     // from the vertex to its neighbours:
     //
-    //   • Bisector — norm(a + b). "The angle directly between the two lines":
+    //   • Bisector - norm(a + b). "The angle directly between the two lines":
     //     the miter direction a corner offset follows, and the axis anything
     //     symmetric about the corner sits on (a centred slot, a witness line
     //     down the middle of a chamfer).
-    //   • Corner tangent — norm(b − a): the average of the two TRAVEL
+    //   • Corner tangent - norm(b − a): the average of the two TRAVEL
     //     directions (in = −a, out = b), i.e. the tangent a smooth curve
     //     through the three points would carry through the vertex. Exactly
     //     perpendicular to the bisector, since (b − a)·(b + a) = |b|² − |a|²
-    //     = 0 for unit vectors — so the two are one pair of guides at right
+    //     = 0 for unit vectors - so the two are one pair of guides at right
     //     angles, not two arbitrary rays.
     //
     // Each is registered as an infinite LINE through the vertex, so pointing
@@ -1731,7 +1731,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
             // Unit rays from the anchor to every neighbour joined to it by a
             // straight segment. Position-matched rather than id-matched so
             // face-reference edges (which carry no ids) contribute the same
-            // way sketch lines do — sketching on a face, the corner you
+            // way sketch lines do - sketching on a face, the corner you
             // anchor on is usually the face's own.
             const float vtxTol = 1e-4f;
             std::vector<glm::vec2> rays;
@@ -1764,7 +1764,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
             // Two or three segments meeting is a corner; a denser hub would
             // publish a bisector for every pair, which is noise, not guidance.
             if (rays.size() >= 2 && rays.size() <= 3) {
-                // A pure 3 deg window, like the tangent guide — deliberately
+                // A pure 3 deg window, like the tangent guide - deliberately
                 // WITHOUT perp/parallel-to-prev's absolute floor. That floor
                 // is a fixed distance, so as the segment shrinks it opens the
                 // angular window up: at a 1 mm grid it means 5.7 deg of catch
@@ -1802,7 +1802,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     // Hover-charged reference (Full level): the dwelt-on reference projects
     // vertical, horizontal, and per-touching-line perpendicular guides AT
     // its position. Wider tolerance than incidental axis-from-point
-    // (posCap, not axisThresh) — the user deliberately charged this — and
+    // (posCap, not axisThresh) - the user deliberately charged this - and
     // standaloneAllowed=true so it can be the lone snap.
     //
     // The set of "touching lines" feeding PerpToRef depends on the charged
@@ -1864,7 +1864,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
             break;
         }
         case ChargedRef::Kind::FacePoint:
-            // Face edges meeting at this corner — matched by endpoint
+            // Face edges meeting at this corner - matched by endpoint
             // position since face refs have no ids.
             for (const auto& fl : m_sketch->getFaceReferences().lines) {
                 const float tol = 1e-4f;
@@ -1888,13 +1888,13 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     }
 
     // ─── PHASE 3: Resolve ────────────────────────────────────────────────────
-    // (a) Pair intersection — if two cands intersect at a point within posCap
+    // (a) Pair intersection - if two cands intersect at a point within posCap
     //     of the cursor (and within each one's segment bounds), prefer the
     //     intersection closest to the cursor. Both guides render. This is the
     //     "perpendicular AND on edge" composite.
-    // (b) Single-line projection — smallest perpDist among standaloneAllowed
+    // (b) Single-line projection - smallest perpDist among standaloneAllowed
     //     cands.
-    // (c) Angle-snap fallback — 15° increment from the chain anchor.
+    // (c) Angle-snap fallback - 15° increment from the chain anchor.
     // (d) Grid snap.
     auto intersect2 = [](glm::vec2 a1, glm::vec2 d1, glm::vec2 a2, glm::vec2 d2,
                          glm::vec2& out, float& outT1, float& outT2) -> bool {
@@ -1939,7 +1939,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     // Land a guide result ON the snap lattice. With snap-to-grid on, the grid
     // is an explicit precision request, and a DIRECTIONAL guide (perpendicular
     // / parallel / axis-from-point / angle / tangent) only says which WAY to
-    // go — it has no business deciding where between two grid lines you end
+    // go - it has no business deciding where between two grid lines you end
     // up. gridAlongLine below only rounds the guide's dominant axis and solves
     // the other one on the line, so the free coordinate came out at whatever
     // the geometry happened to give: a perpendicular off a chain landed at
@@ -1948,7 +1948,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     // 2026-07-31: "I cannot draw a line on that snap grid").
     //
     // CONTACT guides are the exception and must stay exact: an OnLine landing
-    // is a point ON an existing edge, which is a topological claim — buildWires
+    // is a point ON an existing edge, which is a topological claim - buildWires
     // splits that segment at the contact point to route a loop through it, and
     // a point rounded a few microns off the edge silently stops closing the
     // region. Those keep gridAlongLine's on-the-line result.
@@ -1963,12 +1963,12 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     // A guide direction and the snap lattice can only both be honoured when
     // the ray is AXIS-ALIGNED: such a ray passes through lattice points, so
     // rounding both coordinates keeps the point on it. Any other direction
-    // cannot — onLattice moves the point up to half a diagonal cell OFF the
+    // cannot - onLattice moves the point up to half a diagonal cell OFF the
     // ray, and near the anchor that is degrees of angular error (measured on
     // a 1 mm grid: 8.4 deg on a 3 mm leg off a 70 deg corner, 3.4 deg at
     // 5 mm, decaying as 1/length). The guide still highlights, because it
     // fired on DIRECTION, so the tool claims an exact bisector / tangent and
-    // then draws something visibly off it — Steve, 2026-09-03. For a
+    // then draws something visibly off it - Steve, 2026-09-03. For a
     // genuinely diagonal ray the angle IS the user's intent, so stay exactly
     // on it and let gridAlongLine put the dominant coordinate on a step.
     // (A 45 deg ray is unaffected either way: gridAlongLine already lands
@@ -1980,7 +1980,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     // Intersection cap is WIDER than the single-line posCap: each cand only
     // enters the list after passing its own perpDist tolerance, so a two-cand
     // pair is already user-deliberate (both inferences fired cleanly). The
-    // intersection then sits wherever geometry puts it — for a steep edge ×
+    // intersection then sits wherever geometry puts it - for a steep edge ×
     // charged vertical, that can be a few mm off the cursor's perpendicular
     // path. With posCap (1.5 mm) we'd silently fall through to single-line
     // OnLine even though "On Line + On Vertical Axis" both showed as fired,
@@ -1989,18 +1989,18 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     // Both caps are further bounded by the DISPLACEMENT BUDGET: how far any
     // inference may move the placement from where the cursor actually is.
     // Every cap above is absolute (or grid-relative), but the damage a pull
-    // does is relative to the segment being drawn — 1.5 mm off a 100 mm line
+    // does is relative to the segment being drawn - 1.5 mm off a 100 mm line
     // is nothing, 1.5 mm off a 2 mm line is the line. That asymmetry is why
     // short segments came out quantized to whatever geometry happened to sit
     // near the anchor (Steve, 2026-09-03: a 2 mm line placed fine, 1 mm and
-    // 3 mm were unreachable, the only alternatives being no line at all — an
-    // intersection sitting ON the anchor, so the segment collapsed — or a
+    // 3 mm were unreachable, the only alternatives being no line at all - an
+    // intersection sitting ON the anchor, so the segment collapsed - or a
     // 19 mm jump to a farther intersection still inside the 5x pair cap).
     // Capping the pull at a quarter of the extent drawn so far lets an
     // inference REFINE a placement but never REDEFINE it, and scales itself
     // out of the way: past ~6 mm of draw the absolute caps bind again, so
     // nothing changes for normal-sized geometry. Only applies once there's a
-    // drawn extent to measure against — before the first click the absolute
+    // drawn extent to measure against - before the first click the absolute
     // caps stand alone.
     float pullBudget = 1e30f;
     if (haveDirAnchor) pullBudget = 0.25f * glm::length(pos - dirAnchor);
@@ -2039,7 +2039,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     // "Borrowed-direction" inferences copy their angle from an existing feature
     // (a parallel/perp reference, a tangent, the line you're snapping ONTO).
     // rectifyNearAxis must NOT flatten these to the axis: a Parallel guide off a
-    // line that's 3° below horizontal IS a 3° line by intent — flattening it to
+    // line that's 3° below horizontal IS a 3° line by intent - flattening it to
     // horizontal drew the orange line while the cyan "Parallel" guide still
     // showed (a guide/result mismatch). Only the free-drag / pure-axis / angle-
     // snap paths get rectified. (axis-from-point is already exact, so it's
@@ -2055,13 +2055,13 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
                k == InferenceGuide::CornerTangent;
     };
     if (bestI >= 0) {
-        // A pair of purely directional guides is quantized outright — both
+        // A pair of purely directional guides is quantized outright - both
         // relationships are about direction, so the lattice decides position.
         // With ONE contact guide in the pair the point has to stay on that
         // edge, so quantize ALONG it instead (the directional half then holds
         // approximately, which is the right way round: the edge landing is
         // topology, the direction is a hint). Two contacts crossing is a real
-        // vertex — leave it exactly where the geometry puts it.
+        // vertex - leave it exactly where the geometry puts it.
         const bool ci = isContact(cands[bestI].kind);
         const bool cj = isContact(cands[bestJ].kind);
         if (!ci && !cj) {
@@ -2076,7 +2076,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
         }
         emitWithSnap(cands[bestI], bestIsect);
         emitWithSnap(cands[bestJ], bestIsect);
-        // A pair intersection is a deliberate composite of two guides — never
+        // A pair intersection is a deliberate composite of two guides - never
         // flatten it; doing so would break BOTH relationships.
         return bestIsect;
     }
@@ -2102,7 +2102,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
 
     // Angle-snap fallback: cursor direction from anchor within ~3° of a
     // configurable degree increment (Settings). Only fires when nothing above
-    // did — the perp / parallel inferences are stronger semantic intents.
+    // did - the perp / parallel inferences are stronger semantic intents.
     if (allowDirectional && haveDirAnchor && m_angleSnapDeg > 0) {
         glm::vec2 v = pos - dirAnchor;
         float len = glm::length(v);
@@ -2124,14 +2124,14 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
                 // grid cell (slightly over, so the exact half-cell boundary
                 // still lands on the axis grid line). Otherwise a 1-cell rise
                 // over a long run sits inside the horizontal snap band and gets
-                // swallowed — "I can't rise 1mm and go over any amount."
+                // swallowed - "I can't rise 1mm and go over any amount."
                 // (Steve.) Grid off keeps the original mm-based cap.
                 const float angleCap =
                     (m_snapToGridEnabled && m_gridStep > 0.0f)
                         ? m_gridStep * 0.5f + 1e-3f : posCap;
                 if (posOff < angleCap) {
                     // DIAG (sticky-angle report): cursor vs snapped angle, the
-                    // line length and the positional gate — so we can see why a
+                    // line length and the positional gate - so we can see why a
                     // near-axis long line refuses an in-between angle.
                     static float s_lastAngLog = -999.0f;
                     float snDeg = snappedA * 180.0f / static_cast<float>(M_PI);
@@ -2194,11 +2194,11 @@ int SketchTool::findCoincidentPoint(glm::vec2 pos, int excludeId) const {
     if (!m_sketch) return -1;
 
     // A weld radius is a SCREEN distance. As a fixed 0.3 mm it shrank with the
-    // zoom — 15 px in a millimetre view but a fifth of a pixel in a metre one —
+    // zoom - 15 px in a millimetre view but a fifth of a pixel in a metre one -
     // and welding is the ONLY thing that closes a loop into an extrudable
     // region. Grid snap hid that for years: with a stable lattice the closing
     // click lands EXACTLY on the first vertex, so a radius of nearly zero still
-    // welded. Change the lattice underfoot and it stops — switching feet -> mm
+    // welded. Change the lattice underfoot and it stops - switching feet -> mm
     // makes the new lattice incommensurable with a vertex placed on the old one
     // (304.8-based vs 1-based), the closing click snaps elsewhere, and 0.3 mm
     // cannot bridge the gap: "I can't close out a sketch to extrude."
@@ -2212,7 +2212,7 @@ int SketchTool::findCoincidentPoint(glm::vec2 pos, int excludeId) const {
     // Return the NEAREST point within the radius, not the first one found. On
     // dense or small-scale geometry (e.g. an SVG imported small, whose spline
     // control points sit within the weld radius of each other) "first in range"
-    // can weld an arc/line endpoint onto the wrong neighbour — the arc then
+    // can weld an arc/line endpoint onto the wrong neighbour - the arc then
     // renders rotated off its latched endpoints with the wrong bulge. Scaling
     // the artwork up spread the points past the radius, which is why that made
     // the same operation behave; nearest makes it scale-independent.
@@ -2271,7 +2271,7 @@ void SketchTool::handleSelectTool(glm::vec2 pos) {
                 bestD = d;
             }
         }
-        // Circle / arc perimeters — only consulted when no line landed.
+        // Circle / arc perimeters - only consulted when no line landed.
         if (nearLine < 0) {
             float bestCircleD = 0.0f;
             for (const auto& c : m_sketch->getCircles()) {
@@ -2288,7 +2288,7 @@ void SketchTool::handleSelectTool(glm::vec2 pos) {
             for (const auto& a : m_sketch->getArcs()) {
                 const SketchPoint* center = m_sketch->getPoint(a.centerPointId);
                 if (!center) continue;
-                // Approximate as full-circle perimeter — picking on the arc's
+                // Approximate as full-circle perimeter - picking on the arc's
                 // sweep range is overkill for selection feel.
                 float d = std::abs(glm::distance(pos, center->pos) -
                                    static_cast<float>(a.radius));
@@ -2368,20 +2368,20 @@ void SketchTool::handleLineTool(glm::vec2 pos) {
                 m_chainStartPointCreated = true; // brand-new, drop on Esc
             }
         }
-        // Remember where the chain started — closing back onto this point
+        // Remember where the chain started - closing back onto this point
         // auto-completes the loop and ends placement (see below).
         m_chainStartPointId = m_lastPointId;
         m_lineChain.clear();
         m_lineChain.push_back(m_lastPointId);
     } else {
         // Second click: create line and continue chain.
-        // Reject a zero-length segment — a tap/release back onto the anchor (or
+        // Reject a zero-length segment - a tap/release back onto the anchor (or
         // snapped onto it) commits nothing and keeps the chain placing (#25),
         // so press-drag-release / tap-tap can't drop a degenerate line.
         const SketchPoint* anchorPt = m_sketch->getPoint(m_lastPointId);
         if (anchorPt && glm::length(pos - anchorPt->pos) < 1e-4f)
             return;
-        // Reuse an existing vertex when the click lands on one — this is what
+        // Reuse an existing vertex when the click lands on one - this is what
         // CLOSES a loop, by landing the last click on the chain's start.
         //
         // It used to be a hand-rolled scan at 1e-4 mm, which is exact equality
@@ -2406,12 +2406,12 @@ void SketchTool::handleLineTool(glm::vec2 pos) {
         }
 
         int newLineId = m_sketch->addLine(m_lastPointId, endPointId);
-        // Constraints are entirely opt-in — no autoConstrain on creation. The
+        // Constraints are entirely opt-in - no autoConstrain on creation. The
         // user applies Horizontal / Vertical / Coincident / etc. explicitly via
         // the toolbar when they want one.
         (void)newLineId;
 
-        // Remember the direction of the segment we just committed — the
+        // Remember the direction of the segment we just committed - the
         // perpendicular- and parallel-to-previous inferences need it while the
         // user places the next vertex in the chain.
         const SketchPoint* spJustEnded = m_sketch->getPoint(m_lastPointId);
@@ -2427,7 +2427,7 @@ void SketchTool::handleLineTool(glm::vec2 pos) {
 
         // Auto-close: if the chain has at least two committed segments and the
         // endpoint we just placed IS the chain's starting point, the loop is
-        // closed — commit and end the chain so the user doesn't have to hit
+        // closed - commit and end the chain so the user doesn't have to hit
         // Esc/Enter to escape line mode.
         if (m_clickCount >= 2 && endPointId == m_chainStartPointId) {
             m_isPlacing = false;
@@ -2480,7 +2480,7 @@ void SketchTool::handleCircleTool(glm::vec2 pos, bool exact) {
             //
             // Centre mode: the centre IS the user's first click, so the
             // interactive aim radius is right. TwoPoint mode: the centre is
-            // the DERIVED midpoint of two clicks — nothing was aimed at it, and
+            // the DERIVED midpoint of two clicks - nothing was aimed at it, and
             // welding it to a neighbour up to 6 px away would move the centre
             // while `radius` stays measured from the original midpoint, so the
             // rim would no longer pass through the clicks. Same rule the arc
@@ -2524,7 +2524,7 @@ float SketchTool::rimBreakBand(bool wholeSelection) const {
     // the LINE about the circle should keep its end on the circle, while taking
     // the POINT off the circle is how you say you no longer want it there.
     //
-    // So dragging a whole selection gets a generous band — the end rides round
+    // So dragging a whole selection gets a generous band - the end rides round
     // the rim through any normal repositioning and only lets go if the line is
     // hauled somewhere else entirely. Dragging the point alone gets a tight one,
     // so a deliberate pull detaches immediately.
@@ -2532,7 +2532,7 @@ float SketchTool::rimBreakBand(bool wholeSelection) const {
     return wholeSelection ? std::max(tight * 8.0f, 4.0f * tolStep()) : tight;
 }
 
-// Sticky, not locked. While the drag stays near the rim the point rides it —
+// Sticky, not locked. While the drag stays near the rim the point rides it -
 // that is "move the line about the circle and the ends stay on it". Once the
 // drag pulls clear, the attachment is dropped silently and the point goes
 // where it was put. No dialog, no constraint to delete: the user walking away
@@ -2656,10 +2656,10 @@ glm::vec2 SketchTool::arcApexSnap(glm::vec2 rawPos) const {
     if (!m_snapToGridEnabled) return rawPos;
     // Angle first, on the RAW cursor. snapArcApex returns its input unchanged
     // when the sweep isn't near a 15° multiple, so an unequal result means an
-    // angle target (45/90/180/…) was hit — prefer it over the grid.
+    // angle target (45/90/180/…) was hit - prefer it over the grid.
     glm::vec2 angled = snapArcApex(m_firstClick, m_secondClick, rawPos);
     if (angled != rawPos) return angled;
-    return snap(rawPos);   // no clean angle nearby — fall back to the grid
+    return snap(rawPos);   // no clean angle nearby - fall back to the grid
 }
 
 void SketchTool::handleArcTool(glm::vec2 pos) {
@@ -2677,7 +2677,7 @@ void SketchTool::handleArcTool(glm::vec2 pos) {
         glm::vec2 start = m_firstClick;
         glm::vec2 end = m_secondClick;
         // `pos` is already the final apex (onMouseDown ran it through
-        // arcApexSnap — angle preferred over grid), the SAME value the preview
+        // arcApexSnap - angle preferred over grid), the SAME value the preview
         // showed, so the placed arc's centre matches the previewed one.
         glm::vec2 mid = pos;
 
@@ -2704,7 +2704,7 @@ void SketchTool::handleArcTool(glm::vec2 pos) {
                 int existing = findCoincidentPoint(p, -1);
                 return (existing >= 0) ? existing : m_sketch->addPoint(p);
             };
-            // ENDPOINTS weld — that is the point of clicking near existing
+            // ENDPOINTS weld - that is the point of clicking near existing
             // geometry, and both were snapped before they got here, so the weld
             // lands on the same point and moves nothing.
             int startId  = reuseOrAdd(start);
@@ -2718,12 +2718,12 @@ void SketchTool::handleArcTool(glm::vec2 pos) {
             // endpoints while |start-centre| == radius == |end-centre|. Welding
             // moved the centre and left radius computed from the old one, so
             // the arc placed itself a fraction off the ends it was anchored to
-            // — "shifts over and is no longer anchored" (Steve, 2026-07-30).
+            // - "shifts over and is no longer anchored" (Steve, 2026-07-30).
             // Reuse only a point that IS the centre to within float noise,
             // which keeps concentric geometry sharing a point without ever
             // moving the arc.
             int centerId = -1;
-            // `near` is a <windef.h> macro — see MoveHoleOp::classifyRimEdges.
+            // `near` is a <windef.h> macro - see MoveHoleOp::classifyRimEdges.
             // This TU happens not to pull windows.h in today, so it compiles;
             // renamed anyway so an include change can't turn it into a
             // baffling MSVC syntax error later.
@@ -2743,10 +2743,10 @@ void SketchTool::handleArcTool(glm::vec2 pos) {
 
             // Store the endpoints in the order whose CCW sweep passes
             // through the user's MID click. addArc keeps only (center,
-            // start, end) and everything downstream sweeps CCW start→end —
+            // start, end) and everything downstream sweeps CCW start→end -
             // committing the wrong order flips the arc to the complementary
             // side ("comes out weird on first try, inverts after third
-            // click... randomly" — random because it depended on which side
+            // click... randomly" - random because it depended on which side
             // of the chord the bulge was clicked).
             auto ang = [&](glm::vec2 p) {
                 float a = std::atan2(p.y - center.y, p.x - center.x);
@@ -2784,7 +2784,7 @@ void SketchTool::handleSplineTool(glm::vec2 pos) {
         }
     }
 
-    // Finishing flow (this used to not exist — the spline just "kept
+    // Finishing flow (this used to not exist - the spline just "kept
     // going" no matter what you clicked):
     // - clicking the FIRST control point closes the loop and commits
     // - clicking the LAST placed point again commits the open spline
@@ -2801,7 +2801,7 @@ void SketchTool::handleSplineTool(glm::vec2 pos) {
             return;
         }
         if (ptId == m_splinePoints.back()) {
-            // Clicking the last point again ends placement — the spline has
+            // Clicking the last point again ends placement - the spline has
             // been committed and growing since the 2nd point, so there is
             // nothing left to do but reset the tool.
             m_splinePoints.clear();
@@ -2818,7 +2818,7 @@ void SketchTool::handleSplineTool(glm::vec2 pos) {
 
     m_splinePoints.push_back(ptId);
     // COMMIT EARLY, GROW PER CLICK: the spline element exists from the 2nd
-    // point on, so every undo snapshot holds the spline-so-far — undo then
+    // point on, so every undo snapshot holds the spline-so-far - undo then
     // shrinks it one control point at a time ("as though it was committed
     // earlier") instead of deleting the curve and stranding orphan dots.
     if (m_splinePoints.size() == 2)
@@ -2832,7 +2832,7 @@ void SketchTool::handleSplineTool(glm::vec2 pos) {
     }
 
     // Direction of the control leg just laid down, so the perpendicular- and
-    // parallel-to-previous guides work while the NEXT control point is placed —
+    // parallel-to-previous guides work while the NEXT control point is placed -
     // the same continuation the line chain gets. A spline's control polygon is
     // what the user is actually steering, so its last leg is the meaningful
     // "previous direction" even though the curve itself is smooth.
@@ -2860,7 +2860,7 @@ void SketchTool::removeLastSplinePoint() {
     m_splinePoints.pop_back();
 
     // Shrink the committed-and-growing spline too; below 2 points it stops
-    // being a curve — remove the element entirely.
+    // being a curve - remove the element entirely.
     if (m_activeSplineId >= 0) {
         if (!m_sketch->popSplineControlPoint(m_activeSplineId)) {
             m_sketch->removeElement(m_activeSplineId);
@@ -2919,7 +2919,7 @@ void SketchTool::removeLastSplinePoint() {
 //
 // The trim tool removes the segment of a sketch element between its two nearest
 // intersections with any other element. If the element has no intersections,
-// the whole element is removed. Splines and polygons are not split — clicking
+// the whole element is removed. Splines and polygons are not split - clicking
 // one removes it entirely.
 
 namespace {
@@ -3072,7 +3072,7 @@ static int pickSketchElement(const Sketch& sketch, glm::vec2 pos, float threshol
     }
     // Splines: walk the densified curve so a click on the visible green stroke
     // picks the spline, not just clicks landing on a control-point square.
-    // (Steve: couldn't trim/delete a spline by clicking on the curve — old
+    // (Steve: couldn't trim/delete a spline by clicking on the curve - old
     // picker only checked proximity to control points, so clicking between
     // them missed entirely.)
     for (const auto& sp : sketch.getSplines()) {
@@ -3530,7 +3530,7 @@ void SketchTool::handleTrimTool(glm::vec2 pos) {
     if (!a.valid()) return;
     applyTrim(*m_sketch, a);
     // Trimming away a whole element (or an end segment) strands the original
-    // endpoints — sweep them up so no orphan vertices remain.
+    // endpoints - sweep them up so no orphan vertices remain.
     m_sketch->pruneOrphanPoints();
     m_trimHoverPoints.clear(); // stale after mutation; recomputed on next move
 }
@@ -3552,7 +3552,7 @@ void SketchTool::handlePolygonTool(glm::vec2 pos) {
     } else {
         // Second click: set radius + rotation and create polygon. Cursor
         // direction from center defines vertex 0's angle, so the first
-        // vertex lands exactly under the (grid-snapped) cursor — same
+        // vertex lands exactly under the (grid-snapped) cursor - same
         // "corner snaps to grid" behaviour the user gets with circles.
         glm::vec2 delta = pos - m_firstClick;
         float radius = glm::length(delta);
@@ -3561,7 +3561,7 @@ void SketchTool::handlePolygonTool(glm::vec2 pos) {
             int centerId = (existing >= 0) ? existing : m_sketch->addPoint(m_firstClick);
             double rotation = std::atan2(delta.y, delta.x);
             // Diagnostic for the "first polygon comes out scrambled in the
-            // wrong place" dogfood bug — logs what the tool THINKS it is
+            // wrong place" dogfood bug - logs what the tool THINKS it is
             // committing so the discrepancy point is identifiable.
             std::fprintf(stderr, "[Polygon] commit: center=(%.3f, %.3f) "
                                  "reusedPt=%d r=%.3f rot=%.1fdeg sides=%d "
@@ -3793,7 +3793,7 @@ void SketchTool::commitMirror(std::set<int>& outPoints, std::set<int>& outLines)
         if (!p) return -1;
         glm::vec2 np = mirrorReflect(p->pos);
         // Weld a reflected vertex onto an existing coincident one (a point on
-        // the mirror line maps to itself) — same as the one-shot mirror did.
+        // the mirror line maps to itself) - same as the one-shot mirror did.
         // EXACT, not the interactive radius: a reflected vertex is generated,
         // so which existing point it welds to must not depend on the zoom.
         int existing = findExactCoincidentPoint(np, -1);
@@ -3821,7 +3821,7 @@ void SketchTool::commitMirror(std::set<int>& outPoints, std::set<int>& outLines)
         for (const auto& a : m_sketch->getArcs()) if (a.id == aid) {
             int ctr = remapPt(a.centerPointId);
             int s = remapPt(a.startPointId), e = remapPt(a.endPointId);
-            // Reflection reverses winding — swap start/end so the rebuilt arc
+            // Reflection reverses winding - swap start/end so the rebuilt arc
             // keeps the same swept (minor) span on the mirrored side.
             if (ctr >= 0 && s >= 0 && e >= 0) {
                 m_sketch->addArc(ctr, e, s, a.radius);
@@ -3893,7 +3893,7 @@ void SketchTool::handleOffsetTool(glm::vec2 pos) {
         return;
     }
 
-    // Distance phase: the click asks for the commit, it does not perform it —
+    // Distance phase: the click asks for the commit, it does not perform it -
     // the app wraps commitOffset in recordSketchMutation for one undo step.
     updateOffsetDistance(snap(pos));
     if (m_offsetResult.valid) m_offsetCommitRequested = true;
@@ -3912,7 +3912,7 @@ void SketchTool::commitOffset(std::set<int>& outPoints, std::set<int>& outElemen
     const glm::vec2 where = m_currentPos;
     cancelOffset();
     // The cursor is still sitting on the geometry we just made, so the
-    // Pick-phase hover would light it up immediately — the orange ghost turns
+    // Pick-phase hover would light it up immediately - the orange ghost turns
     // cyan ON THE SPOT and the whole commit reads as "nothing happened" (it is
     // exactly what it looked like in testing). Stay quiet until the cursor
     // actually moves off what was just created.
@@ -3934,7 +3934,7 @@ void SketchTool::cancelOffset() {
 
 void SketchTool::undoLastStamp() {
     if (!m_sketch || m_stampStack.empty()) return;
-    // Pop ONE stamp off the top — repeated calls walk back to the original.
+    // Pop ONE stamp off the top - repeated calls walk back to the original.
     const std::vector<int>& ids = m_stampStack.back();
     for (int id : ids) m_sketch->removeElement(id);
     std::fprintf(stderr, "[Stamp] removed last placement (%zu elements, %zu stamp(s) left)\n",
@@ -3949,7 +3949,7 @@ DimPick SketchTool::hitTestDimEntity(glm::vec2 pos) const {
     if (!m_sketch) return out;
     int nearPt = findCoincidentPoint(pos, -1);
     if (nearPt >= 0) {
-        // Text glyph geometry is not dimensionable — fall through and let a
+        // Text glyph geometry is not dimensionable - fall through and let a
         // real line/circle/arc at this position win instead (a fromText hit
         // must not abort the whole hit test).
         const SketchPoint* p = m_sketch->getPoint(nearPt);
@@ -3967,7 +3967,7 @@ DimPick SketchTool::hitTestDimEntity(glm::vec2 pos) const {
         }
     }
     const float tol = std::max(tolStep() * 0.5f, 0.5f) * snapScale();
-    // Lines (segment distance), skipping fromText — same math as handleSelectTool.
+    // Lines (segment distance), skipping fromText - same math as handleSelectTool.
     float bestD = 0.0f; int bestLine = -1;
     for (const auto& l : m_sketch->getLines()) {
         if (l.fromText) continue;
@@ -3982,7 +3982,7 @@ DimPick SketchTool::hitTestDimEntity(glm::vec2 pos) const {
         if (d < tol && (bestLine < 0 || d < bestD)) { bestLine = l.id; bestD = d; }
     }
     if (bestLine >= 0) return {DimEntityKind::Line, bestLine};
-    // Circle then arc perimeters — same as handleSelectTool.
+    // Circle then arc perimeters - same as handleSelectTool.
     float bestCd = 0.0f; int bestCircle = -1;
     for (const auto& c : m_sketch->getCircles()) {
         const SketchPoint* ctr = m_sketch->getPoint(c.centerPointId);
@@ -4027,7 +4027,7 @@ void SketchTool::handleDimensionTool(glm::vec2 pos) {
             DimPick hit = hitTestDimEntity(pos);
             if (hit.kind != DimEntityKind::None) {
                 if (hit.kind == m_dimPickA.kind && hit.id == m_dimPickA.id) {
-                    m_dimRejectReason = "Same entity — pick a different one.";
+                    m_dimRejectReason = "Same entity - pick a different one.";
                     return;
                 }
                 PendingDimension pair = resolveDimension(*m_sketch, m_dimPickA, hit);
@@ -4044,7 +4044,7 @@ void SketchTool::handleDimensionTool(glm::vec2 pos) {
             // Empty space: places the tentative single-entity dim (line length).
             if (m_dimPending.valid) { m_dimLabelPos = pos; m_dimReady = true; return; }
             // Lone point + empty space: nothing to measure yet.
-            m_dimRejectReason = "A single point has no dimension — "
+            m_dimRejectReason = "A single point has no dimension - "
                                 "pick a second entity.";
             return;
         }
@@ -4133,7 +4133,7 @@ PendingDimension SketchTool::resolveDimension(const Sketch& sk, DimPick a, DimPi
         return -1.0;
     };
     // Two circles/arcs → rim-to-rim gap (centre distance minus both radii),
-    // the clearance a machinist reads between the two circle edges — NOT the
+    // the clearance a machinist reads between the two circle edges - NOT the
     // centre distance. entityA/entityB stay the circle ids so the solver can
     // recompute the gap as radii change.
     if (isCurve(a.kind) && isCurve(b.kind)) {
@@ -4151,8 +4151,8 @@ PendingDimension SketchTool::resolveDimension(const Sketch& sk, DimPick a, DimPi
     // A circle/arc paired with a line or a point dimensions from its CENTRE.
     // hitTestDimEntity deliberately resolves a centre-point click to the
     // circle itself (so the rim-gap dim stays reachable), which left the
-    // centre unpickable and made hole-centre-to-edge — the most common
-    // dimension on a machining drawing — impossible to create at all.
+    // centre unpickable and made hole-centre-to-edge - the most common
+    // dimension on a machining drawing - impossible to create at all.
     // Substituting the centre point here recovers it without a modifier key,
     // so it works the same on touch.
     if (isCurve(a.kind) && (b.kind == DimEntityKind::Line ||
@@ -4185,7 +4185,7 @@ PendingDimension SketchTool::resolveDimension(const Sketch& sk, DimPick a, DimPi
             // Reject a point that IS an endpoint of the target line: the
             // perpendicular distance is then 0 by construction, so a
             // DistancePointLine constraint pinned at 0 has no direction to
-            // correct along — applyCorrection's ~value/2 nudge on the point
+            // correct along - applyCorrection's ~value/2 nudge on the point
             // and the line's endpoints cancels itself out every iteration
             // and flings the other endpoint outward instead of converging.
             const SketchLine* bl = lineById(b.id);
@@ -4200,7 +4200,7 @@ PendingDimension SketchTool::resolveDimension(const Sketch& sk, DimPick a, DimPi
         if (!lineEnds(a.id, as, ae) || !lineEnds(b.id, bs, be)) return out;
         glm::vec2 da = ae - as, db = be - bs;
         if (glm::length(da) < 1e-10f || glm::length(db) < 1e-10f) return out;
-        // Signed angle of B relative to A, wrapped to [-π, π] — same
+        // Signed angle of B relative to A, wrapped to [-π, π] - same
         // convention as the solver's Angle error term.
         double ang = std::atan2(db.y, db.x) - std::atan2(da.y, da.x);
         while (ang >  M_PI) ang -= 2.0 * M_PI;
@@ -4220,7 +4220,7 @@ PendingDimension SketchTool::resolveDimension(const Sketch& sk, DimPick a, DimPi
             const SketchLine* la = lineById(a.id);
             if (!lb || !la) return out;
             // Chained segments (sharing a vertex) that read as parallel are
-            // near-collinear polyline continuations — a "distance between
+            // near-collinear polyline continuations - a "distance between
             // these lines" dim is ill-defined there. Reject the pair.
             if (lb->startPointId == la->startPointId || lb->startPointId == la->endPointId ||
                 lb->endPointId == la->startPointId || lb->endPointId == la->endPointId)
@@ -4237,7 +4237,7 @@ PendingDimension SketchTool::resolveDimension(const Sketch& sk, DimPick a, DimPi
                     continue;
                 float t = glm::dot(candPos[i] - as, dA) / lenA2;
                 // Score: distance of the foot parameter from the segment
-                // interior — 0 while inside [0,1], grows outside. Lower wins.
+                // interior - 0 while inside [0,1], grows outside. Lower wins.
                 double outside = (t < 0.0f) ? -t : (t > 1.0f ? t - 1.0f : 0.0);
                 if (bestPt < 0 || outside < bestScore) {
                     bestPt = i;

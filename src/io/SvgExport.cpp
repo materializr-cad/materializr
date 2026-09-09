@@ -18,7 +18,7 @@ namespace {
 // Chaining by EXACT point id (not coordinates) is what lets a drawn loop
 // export as one closed SVG path: the old exporter wrote every line as its own
 // two-point <path>, so a 20-segment logo arrived at re-import as 20 disjoint
-// fragments — duplicate corner points everywhere and no closed loop for the
+// fragments - duplicate corner points everywhere and no closed loop for the
 // importer's circle/spline/region recovery to work with.
 struct Edge {
     enum Kind { Line, Arc, Spline } kind;
@@ -158,7 +158,7 @@ SvgExportResult SvgExport::exportSketch(const std::string& filePath, const Sketc
 
     int pathCount = 0;
 
-    // Circles as REAL <circle> elements — the importer's Kåsa fit recovers a
+    // Circles as REAL <circle> elements - the importer's Kåsa fit recovers a
     // native SketchCircle from them (nanosvg turns them into 4 exact cubics).
     for (const auto& c : sketch.getCircles()) {
         if (c.isConstruction) continue;

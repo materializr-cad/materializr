@@ -1,5 +1,5 @@
 // Steve 2026-08-04: a cylinder extruded from a circle sketch, pushed back
-// DOWN (shorter) with Push/Pull, doesn't shorten cleanly — a sliver of the
+// DOWN (shorter) with Push/Pull, doesn't shorten cleanly - a sliver of the
 // old outer wall survives around ~half the rim. Scale Face on the same body
 // mangles the side wall. Move Face and Tilt are fine. Reproduce both at the
 // modeling level; the UI preview is a real op execution, so if it's real it
@@ -132,7 +132,7 @@ TEST(CirclePushPullScale, ScaleShrinkKeepsWallSane) {
                 v, expect, faceCount(r));
     dumpFaces(r);
     EXPECT_TRUE(BRepCheck_Analyzer(r).IsValid());
-    // Uniform scale of a circle must stay EXACT — an analytic cone wall,
+    // Uniform scale of a circle must stay EXACT - an analytic cone wall,
     // volume to boolean-fuzz precision, cap still on axis.
     EXPECT_NEAR(v, expect, expect * 0.001);
     EXPECT_EQ(faceCount(r), 3);
@@ -165,7 +165,7 @@ TEST(CirclePushPullScale, ScaleGrowKeepsWallSane) {
     dumpFaces(r);
     EXPECT_TRUE(BRepCheck_Analyzer(r).IsValid());
     EXPECT_NEAR(v, expect, expect * 0.001);
-    // ONE cap on top — the Fuse used to leave the original disc AND a
+    // ONE cap on top - the Fuse used to leave the original disc AND a
     // coplanar annulus stacked at z=40 (the gray ring in Steve's shot).
     EXPECT_EQ(faceCount(r), 3);
     TopoDS_Face newTop = planarFaceAtZ(r, 40.0);
@@ -178,8 +178,8 @@ TEST(CirclePushPullScale, ScaleGrowKeepsWallSane) {
 
 // Steve's combined flow: scale first, then push the (now smaller) top face
 // back down. On a frustum the cut prism only spans the top radius, so a
-// conical shoulder remains all the way round — that part is geometry, not a
-// bug — but the result must be valid and symmetric, never the half-moon
+// conical shoulder remains all the way round - that part is geometry, not a
+// bug - but the result must be valid and symmetric, never the half-moon
 // sliver the off-axis bspline cap produced.
 TEST(CirclePushPullScale, ScaleThenPushStaysSymmetric) {
     CircleCyl f;

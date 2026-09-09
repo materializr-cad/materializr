@@ -1,4 +1,4 @@
-// Not a correctness test — a stopwatch. Generates a dense curved STL (UV
+// Not a correctness test - a stopwatch. Generates a dense curved STL (UV
 // sphere, so decimation can't just collapse coplanar facets) and times import
 // at several accuracy values, with per-stage breakdown (MZR_STL_TIMING), so we
 // can choose the accuracy->triangle mapping and confirm import never hangs.

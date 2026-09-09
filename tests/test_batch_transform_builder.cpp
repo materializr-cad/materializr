@@ -1,7 +1,7 @@
 // Regression: a multi-body Move/Rotate must NOT go through
 // BRepBuilderAPI_GTransform.
 //
-// Steve, 2026-07-31: moving objects in a real project closed the app outright —
+// Steve, 2026-07-31: moving objects in a real project closed the app outright -
 // no dialog, no "not responding". The crash handler caught it:
 //
 //   BatchTransformOp::execute
@@ -11,12 +11,12 @@
 //              SIGSEGV 'segmentation violation' detected. Address 0
 //
 // BRepBuilderAPI_GTransform::Perform runs NurbsConvert on the shape FIRST,
-// unconditionally — see OCCT's BRepBuilderAPI_GTransform.cxx. So every
+// unconditionally - see OCCT's BRepBuilderAPI_GTransform.cxx. So every
 // multi-body move rebuilt every surface and pcurve as a NURBS: slow (1.2 s
 // main-loop stalls in his log), lossy (analytic surfaces become splines), and
 // fatal when the converter meets geometry it can't handle. The single-body
-// TransformOp never did this — it uses BRepBuilderAPI_Transform, which only
-// relocates the shape — which is why moving ONE body was fine.
+// TransformOp never did this - it uses BRepBuilderAPI_Transform, which only
+// relocates the shape - which is why moving ONE body was fine.
 //
 // The observable difference, and what this test pins: after a rigid batch
 // move, the faces are still ANALYTIC (a box stays 6 planes, a cylinder stays a
@@ -85,9 +85,9 @@ TEST(BatchTransformBuilder, RigidMoveKeepsAnalyticSurfaces) {
     // The whole point: a move relocates, it does not rebuild. NurbsConvert
     // would have turned all seven of these into B-spline faces.
     EXPECT_EQ(countOfType(f.doc.getBody(f.box), GeomAbs_Plane), 6)
-        << "the box's planes were rebuilt — the move went through GTransform";
+        << "the box's planes were rebuilt - the move went through GTransform";
     EXPECT_EQ(countOfType(f.doc.getBody(f.cyl), GeomAbs_Cylinder), 1)
-        << "the cylinder was rebuilt — the move went through GTransform";
+        << "the cylinder was rebuilt - the move went through GTransform";
     EXPECT_EQ(countOfType(f.doc.getBody(f.box), GeomAbs_BSplineSurface), 0);
 }
 
@@ -105,7 +105,7 @@ TEST(BatchTransformBuilder, RigidRotateKeepsAnalyticSurfaces) {
     EXPECT_EQ(countOfType(f.doc.getBody(f.cyl), GeomAbs_Cylinder), 1);
 }
 
-// Non-uniform scale genuinely needs the general builder — it must still work
+// Non-uniform scale genuinely needs the general builder - it must still work
 // (and it is allowed to convert, because there is no other way to squash a
 // cylinder into an ellipse).
 TEST(BatchTransformBuilder, NonUniformScaleStillApplies) {

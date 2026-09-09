@@ -6,12 +6,12 @@
 
 namespace materializr {
 
-// Split Body — one tool, an axis, an offset, and a ghost plane showing exactly
+// Split Body - one tool, an axis, an offset, and a ghost plane showing exactly
 // where the cut lands before you commit it.
 //
 // This replaces three separate "Split X / Split Y / Split Z" buttons that each
 // cut through the body's bounding-box centre and gave no way to see, or move,
-// the cut. SplitBodyOp always took an arbitrary gp_Pln — only the UI ever
+// the cut. SplitBodyOp always took an arbitrary gp_Pln - only the UI ever
 // assumed the middle.
 //
 // Deliberately NOT a live preview. Previewing a split means executing it, which
@@ -37,7 +37,7 @@ protected:
     bool wantsDeferredCommit(const IopContext&) const override { return false; }
 
 private:
-    // Half-extent of the body along the current axis — how far the plane can
+    // Half-extent of the body along the current axis - how far the plane can
     // travel and still cut anything.
     float axisHalf() const;
     // Plane centre in world space at the current axis + offset.

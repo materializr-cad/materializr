@@ -13,7 +13,7 @@ struct FlatLoop {
     bool isHole = false;          // an inner wire (cutout) vs the outer boundary
 };
 
-// An interior fold line — a shared edge between two placed faces — carrying the
+// An interior fold line - a shared edge between two placed faces - carrying the
 // dihedral fold angle so a material processor can turn it into a bevel/score
 // (foam) or bend line (sheet metal).
 struct FoldLine {
@@ -48,7 +48,7 @@ struct FlatPattern {
 // that don't connect to the root component are dropped (reported in warning).
 FlatPattern unfoldPlanarFaces(const std::vector<TopoDS_Face>& faces);
 
-// Unfold any set of faces — including CURVED (developable) ones — by tessellating
+// Unfold any set of faces - including CURVED (developable) ones - by tessellating
 // them and flattening the triangle mesh. `maxBevelDeg` is the angular tolerance
 // that drives tessellation: each facet turns by at most this angle, so a sharp
 // region gets more, closer score lines and a flat region gets none. The kept
@@ -59,10 +59,10 @@ FlatPattern unfoldPlanarFaces(const std::vector<TopoDS_Face>& faces);
 FlatPattern unfoldFaces(const std::vector<TopoDS_Face>& faces,
                         double maxBevelDeg = 10.0, double minFoldDeg = 1.0);
 
-// Developable face-net unfold — the papercraft path. Unrolls EACH face on its
+// Developable face-net unfold - the papercraft path. Unrolls EACH face on its
 // own (planar → isometric, cylinder/cone/ruled → unrolled, seam kept open so it
 // fans cleanly instead of welding shut and self-overlapping), then hinges whole
-// faces together along their shared edges into a connected net — exactly like a
+// faces together along their shared edges into a connected net - exactly like a
 // box net, but for curved panels too. A face that can't hinge without overlap
 // starts a new piece (laid out alongside). Interior facet bends and inter-face
 // joins past `minFoldDeg` are emitted as score/fold lines. This is the right path
@@ -70,7 +70,7 @@ FlatPattern unfoldFaces(const std::vector<TopoDS_Face>& faces,
 FlatPattern unfoldDevelopableNet(const std::vector<TopoDS_Face>& faces,
                                  double maxBevelDeg = 10.0, double minFoldDeg = 1.0);
 
-// Conformal (Least-Squares Conformal Map) flatten — the Blender-style UV unwrap.
+// Conformal (Least-Squares Conformal Map) flatten - the Blender-style UV unwrap.
 // Tessellates the faces and solves for a single connected 2D layout that
 // minimises ANGLE distortion, spreading the unavoidable AREA distortion across
 // the whole piece. For a doubly-curved surface this yields ONE stretchy outline

@@ -10,7 +10,7 @@
 // and absorbs every other sketch's geometry + constraints (re-id'd to avoid
 // collisions); the others are removed. Undo restores the target's original
 // geometry and re-creates the absorbed sketches. So a "reference" sketch on the
-// same face can be folded into the working one — inferences then see all of it
+// same face can be folded into the working one - inferences then see all of it
 // and there's no overlapping-region ambiguity.
 class CombineSketchesOp : public Operation {
 public:

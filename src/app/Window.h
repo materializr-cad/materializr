@@ -40,7 +40,7 @@ public:
     // backgrounded app uses ~no GPU (and stops contending with the compositor).
     bool isForeground() const;
 
-    // Drawable (framebuffer) size in pixels — may exceed window size on HiDPI.
+    // Drawable (framebuffer) size in pixels - may exceed window size on HiDPI.
     void framebufferSize(int& w, int& h) const;
 
     // Hardware Ctrl state, polled directly so it works even while ImGui owns
@@ -56,18 +56,18 @@ public:
     // Set before the font atlas is built (a change takes effect on restart).
     void setUiScaleOverride(float s) { m_uiScaleOverride = (s > 0.0f ? s : 0.0f); }
     // Linux/X11: size the X theme cursors to match uiScale(). Must be called
-    // once the scale is final and BEFORE ImGui creates its system cursors —
+    // once the scale is final and BEFORE ImGui creates its system cursors -
     // Xcursor reads XCURSOR_SIZE as it loads each one, and never again.
     void applyCursorScale();
 
     // Raise/lower the soft keyboard to match ImGui's WantTextInput. The
     // SDL2 backend no longer calls SDL_StartTextInput itself, which is what shows
-    // the keyboard on Android — so we drive it each frame. No-op on desktop.
+    // the keyboard on Android - so we drive it each frame. No-op on desktop.
     //
     // retapPulse: the user tapped this frame and a text field is STILL focused
     // afterwards (i.e. the tap landed in a field). The raise below is edge-
     // triggered, and the OS can dismiss the keyboard behind our back (Android
-    // back gesture, iOS dismiss key) with the field still focused — no falling
+    // back gesture, iOS dismiss key) with the field still focused - no falling
     // edge, so re-tapping the field did nothing. The pulse re-raises even when
     // the latch says the keyboard is already up.
     void updateTextInput(bool wantTextInput, bool retapPulse = false);
@@ -83,7 +83,7 @@ public:
     bool consumeTouchPan(float& dx, float& dy);   // centroid movement, pixels
     bool consumeTouchZoom(float& dz);             // pinch delta, wheel-equivalent
     bool consumeDoubleTap();                      // true once after two quick taps (touch "double-click")
-    // true once (with the tap position) after a GENUINE single tap lifts — not a
+    // true once (with the tap position) after a GENUINE single tap lifts - not a
     // hold, drag, or 2-finger gesture. Selection commits off THIS instead of the
     // press frame so a following nav gesture (one-finger orbit / two-finger
     // pan-zoom) can't re-pick or clear it before the drag is recognized (#68).
@@ -105,7 +105,7 @@ public:
 
     // True once a one-finger press has been held stationary past the hold
     // threshold AND then dragged. The viewport uses this to start a box/drag-
-    // select instead of orbiting — the touch equivalent of the desktop empty-
+    // select instead of orbiting - the touch equivalent of the desktop empty-
     // space left-drag, which trackpad mode otherwise reserves for orbit. A hold
     // that never drags is a long-press (context menu) instead, not a box-select.
     bool isTouchHoldSelect() const { return m_holdSelect && m_movedBeyondHold; }
@@ -117,7 +117,7 @@ public:
 
     // The app reports each frame whether the current touch is over the 3D
     // viewport canvas (vs a panel/slider/overlay). The long-press only arms over
-    // the canvas — otherwise slowly dragging a slider popped the context-menu
+    // the canvas - otherwise slowly dragging a slider popped the context-menu
     // ring + a stray right-click.
     void setTouchOverViewport(bool v) { m_touchOverViewport = v; }
     // Strictly the 3D canvas (NOT the Items panel, unlike setTouchOverViewport
@@ -133,7 +133,7 @@ private:
     bool m_shouldClose = false;
     int m_width;
     int m_height;
-    // iOS only: SDL's color renderbuffer for the window — swapBuffers()
+    // iOS only: SDL's color renderbuffer for the window - swapBuffers()
     // re-binds it before presenting (see Window.cpp). Stays 0 elsewhere.
     unsigned int m_windowRenderbuffer = 0;
 

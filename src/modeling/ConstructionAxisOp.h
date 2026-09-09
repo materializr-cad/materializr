@@ -5,7 +5,7 @@
 #include <gp_Dir.hxx>
 #include <string>
 
-// Construction axis creation modes — mirror the plane catalogue. World X /
+// Construction axis creation modes - mirror the plane catalogue. World X /
 // Y / Z give an axis along that world direction through a chosen origin
 // point; TwoPoints picks origin + direction from a pair of world points;
 // ThroughFaceNormal aligns to a picked face's normal.
@@ -56,8 +56,8 @@ private:
     std::string m_axisName = "Axis";
     int m_createdAxisId = -1;
 
-    // Reload support: params persist the COMPUTED (origin, direction) — the
-    // picked-geometry inputs aren't reconstructable — so a rehydrated op
+    // Reload support: params persist the COMPUTED (origin, direction) - the
+    // picked-geometry inputs aren't reconstructable - so a rehydrated op
     // re-executes from this literal. m_type is kept for the history label.
     gp_Pnt m_literalOrigin{0, 0, 0};
     gp_Dir m_literalDir{0, 0, 1};

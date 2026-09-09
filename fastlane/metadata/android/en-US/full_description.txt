@@ -1,9 +1,9 @@
-Materializr is open-source 3D CAD for makers — the middle ground between dead-simple tools like Tinkercad and full professional suites like FreeCAD. Enough genuine solid modeling to make real parts, without a steep learning curve, a subscription, or an account.
+Materializr is open-source 3D CAD for makers - the middle ground between dead-simple tools like Tinkercad and full professional suites like FreeCAD. Enough genuine solid modeling to make real parts, without a steep learning curve, a subscription, or an account.
 
-Sketch on a plane, pull it into a solid (extrude, revolve, loft, sweep), fillet and chamfer, run boolean operations, cut threads, and edit any step of the history later — even after closing and reopening the project.
+Sketch on a plane, pull it into a solid (extrude, revolve, loft, sweep), fillet and chamfer, run boolean operations, cut threads, and edit any step of the history later - even after closing and reopening the project.
 
 Sketches export to SVG at 1:1 millimeters for laser cutters and 2.5D CNC. It also imports STEP and IGES, and exports STEP, STL, IGES and glTF.
 
-The geometry kernel is OpenCASCADE — real B-rep solids, not meshes. The interface is touch-capable on Android, designed for tablets and larger screens (on a small phone the panels and toolbars are cramped). File open/save use the system document picker (Storage Access Framework); no broad storage permission is requested.
+The geometry kernel is OpenCASCADE - real B-rep solids, not meshes. The interface is touch-capable on Android, designed for tablets and larger screens (on a small phone the panels and toolbars are cramped). File open/save use the system document picker (Storage Access Framework); no broad storage permission is requested.
 
-Young software built quickly, so expect rough edges. Operations validate their results and refuse rather than silently produce garbage, so a failed action leaves your model untouched — but save often, and please report bugs.
+Young software built quickly, so expect rough edges. Operations validate their results and refuse rather than silently produce garbage, so a failed action leaves your model untouched - but save often, and please report bugs.

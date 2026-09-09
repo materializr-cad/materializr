@@ -1,6 +1,6 @@
 // The gizmo's in-plane axes must not depend on which way a face normal
 // happens to point. Steve, 2026-08-03: holes moving in x/z and y/z were fine
-// but x/y "the gizmo buttons are reversed" — because axis B used to be
+// but x/y "the gizmo buttons are reversed" - because axis B used to be
 // cross(N, A), which flips with N, and buildVoid resolved those holes' entry
 // mouth to the underside (N = -Z), putting the green arrow on -Y.
 #include <gtest/gtest.h>

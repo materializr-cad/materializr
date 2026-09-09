@@ -4,7 +4,7 @@
 // Root cause (project-box.materializr, 2026-06): boolean & delete ops carried
 // no serialised params, so on reload they came back as baked ReplayOps that
 // replay a stale saved shape. Editing a fillet feeding a downstream union thus
-// rebuilt the fillet but the baked union overwrote it — the change vanished and
+// rebuilt the fillet but the baked union overwrote it - the change vanished and
 // the "Edit Fillet" affordance disappeared (its regenerated faces matched
 // nothing in the stale body). The fix makes BooleanOp/DeleteOp rehydrate as
 // real, re-executable ops (and restore consumed bodies under their original id
@@ -82,7 +82,7 @@ gp_Pnt centreOfMass(Document& d, int id) {
 } // namespace
 
 // The headline regression: a reloaded Boolean Union downstream of an editable
-// fillet must RECOMPUTE when the fillet is edited — not bake over the change.
+// fillet must RECOMPUTE when the fillet is edited - not bake over the change.
 TEST(ReloadEdit, EditingFilletUpstreamOfReloadedBooleanPropagates) {
     // --- 1. Produce the "saved" geometry by running the real ops once. Two
     //        disjoint boxes; fillet an edge of the tool (B), then union into A.
@@ -150,7 +150,7 @@ TEST(ReloadEdit, EditingFilletUpstreamOfReloadedBooleanPropagates) {
     ASSERT_NE(f, nullptr) << "fillet step must reload as a real, editable FilletOp";
     f->setRadius(3.0);
     ASSERT_TRUE(H.editStep(0, doc))
-        << "editStep must succeed — re-running the fillet and the downstream union";
+        << "editStep must succeed - re-running the fillet and the downstream union";
 
     const double vAfter = volume(doc, A);
 
@@ -165,7 +165,7 @@ TEST(ReloadEdit, EditingFilletUpstreamOfReloadedBooleanPropagates) {
 // come back EDITABLE. The other ReloadEdit tests simulate reload in memory (they
 // hand-build the params + reload shapes), so they can't see a BREP edge-ordering
 // change across the file write/read that would make the saved edge index resolve
-// to the WRONG edge — which would silently un-edit every reloaded fillet. This
+// to the WRONG edge - which would silently un-edit every reloaded fillet. This
 // test actually writes the file and reads it back.
 TEST(ReloadEdit, FilletSurvivesRealFileRoundTrip) {
     // 1. Box + fillet, run for real.
@@ -215,7 +215,7 @@ TEST(ReloadEdit, FilletSurvivesRealFileRoundTrip) {
     ASSERT_EQ(loaded.steps[0].changed.size(), 1u);
     const TopoDS_Shape Bfr = loaded.steps[0].changed[0].second;    // filleted, from file
 
-    // 5. Rehydrate the fillet from the LOADED params + LOADED shapes — this is
+    // 5. Rehydrate the fillet from the LOADED params + LOADED shapes - this is
     //    exactly where an edge-index mismatch after BREP read would fail.
     auto op = std::make_unique<FilletOp>();
     ASSERT_TRUE(op->deserializeParams(loaded.steps[0].params));
@@ -223,18 +223,18 @@ TEST(ReloadEdit, FilletSurvivesRealFileRoundTrip) {
     rs.modifiedBefore = {{B, B0r}};
     rs.modifiedAfter  = {{B, Bfr}};
     ASSERT_TRUE(op->rehydrateFromReload(rs, doc))
-        << "reloaded fillet failed to rehydrate — edge identity lost across save";
+        << "reloaded fillet failed to rehydrate - edge identity lost across save";
 
     // 6. Edit flow mirrors History::editStep: roll the body back to its
     //    pre-fillet state, then re-run. With the SAME radius it must rebuild the
-    //    ORIGINAL filleted body — proving the saved index resolved the RIGHT edge
+    //    ORIGINAL filleted body - proving the saved index resolved the RIGHT edge
     //    from the file, not just any edge. (execute() reads doc.getBody, so the
     //    rollback is required; without it the sharp edge is already consumed.)
     doc.updateBody(B, B0r);
     ASSERT_TRUE(op->execute(doc))
         << "reloaded fillet couldn't re-execute against its pre-fillet body";
     EXPECT_NEAR(volume(doc, B), vSaved, 1e-6)
-        << "reloaded fillet rebuilt a DIFFERENT shape — wrong edge resolved from file";
+        << "reloaded fillet rebuilt a DIFFERENT shape - wrong edge resolved from file";
 
     // And it's genuinely editable: a bigger radius removes more material.
     doc.updateBody(B, B0r);
@@ -246,7 +246,7 @@ TEST(ReloadEdit, FilletSurvivesRealFileRoundTrip) {
 
 // REAL file round-trip for a MOVE-HOLE: it must reload as a real, editable op
 // (seed wall resolved from the file) instead of baked geometry. Move-hole used
-// to have no reload support at all, so every move-hole baked on reload — which
+// to have no reload support at all, so every move-hole baked on reload - which
 // also tripped the "frozen feature" warning on brand-new projects.
 TEST(ReloadEdit, MoveHoleSurvivesRealFileRoundTrip) {
     using materializr::ProjectHistory;
@@ -307,7 +307,7 @@ TEST(ReloadEdit, MoveHoleSurvivesRealFileRoundTrip) {
         << "move-hole params lost in the file round-trip";
     const TopoDS_Shape B0r = loaded.initialState[0].second;
 
-    // 3. Rehydrate from the LOADED params + shapes — the seed-wall index must
+    // 3. Rehydrate from the LOADED params + shapes - the seed-wall index must
     //    resolve against the box read back from BREP.
     auto op = std::make_unique<MoveHoleOp>();
     ASSERT_TRUE(op->deserializeParams(loaded.steps[0].params));
@@ -315,10 +315,10 @@ TEST(ReloadEdit, MoveHoleSurvivesRealFileRoundTrip) {
     rs.modifiedBefore = {{B, B0r}};
     rs.modifiedAfter  = {{B, loaded.steps[0].changed[0].second}};
     ASSERT_TRUE(op->rehydrateFromReload(rs, doc))
-        << "reloaded move-hole failed to rehydrate — seed wall lost across save";
+        << "reloaded move-hole failed to rehydrate - seed wall lost across save";
 
     // 4. Re-run against the rolled-back body (what editStep does); the hole must
-    //    land in the SAME place — proving the seed wall + vector survived.
+    //    land in the SAME place - proving the seed wall + vector survived.
     doc.updateBody(B, B0r);
     ASSERT_TRUE(op->execute(doc)) << "reloaded move-hole couldn't re-execute";
     EXPECT_LT(centreOfMass(doc, B).Distance(cmSaved), 1e-6)
@@ -389,7 +389,7 @@ TEST(SmartCut, TwoBodiesCutSeparately) {
 }
 
 // A cut whose sketch IS attached to a body (sourceBodyId set) must still cut
-// THROUGH to the other bodies in its path — the original bug report: a sketch
+// THROUGH to the other bodies in its path - the original bug report: a sketch
 // drawn on the lid, cut downward, only cut the lid and ignored the box.
 TEST(SmartCut, AttachedCutGoesThroughOtherBodies) {
     Document d;
@@ -425,7 +425,7 @@ TEST(ReloadEdit, BooleanParamsRoundTrip) {
     }
 }
 
-// Editing a fillet UPSTREAM of a reloaded transform must propagate — the
+// Editing a fillet UPSTREAM of a reloaded transform must propagate - the
 // transform re-applies to the edited live body instead of baking its stale
 // result over the change.
 TEST(ReloadEdit, EditUpstreamOfReloadedTransformPropagates) {
@@ -512,7 +512,7 @@ TEST(SketchHistory, MeaningfulDescriptions) {
         return SketchEditOp(after, before, after).description();
     };
     // Every quantity carries its own unit suffix (fmtLength), so a caption reads
-    // correctly whatever display unit is active — it is formatted at render
+    // correctly whatever display unit is active - it is formatted at render
     // time from mm, never stored. Expectations are built the same way rather
     // than spelled out, so they hold in any unit.
     using materializr::fmtLength;
@@ -529,7 +529,7 @@ TEST(SketchHistory, MeaningfulDescriptions) {
                                   b = s.addPoint({0,8}); s.addArc(c,a,b,8.0); }),
               "Arc R" + fmtLength(8));
 
-    // And the same caption re-renders in the new unit after a switch — nothing
+    // And the same caption re-renders in the new unit after a switch - nothing
     // is cached in mm text.
     materializr::setCurrentUnit(materializr::LengthUnit::In);
     EXPECT_EQ(desc([](Sketch& s){ int a = s.addPoint({0,0}), b = s.addPoint({25.4f,0});
@@ -538,7 +538,7 @@ TEST(SketchHistory, MeaningfulDescriptions) {
 }
 
 // A transactional editStep whose replay fails must restore the model to its
-// last-good state — never leave a half-built body. (The fix for "editing a
+// last-good state - never leave a half-built body. (The fix for "editing a
 // circle dropped my hollow and fillets and left a broken cube".)
 TEST(EditStep, TransactionalRevertOnFailure) {
     Document d;
@@ -589,7 +589,7 @@ TEST(SketchHistory, CircleDiameterEditableFromHistory) {
 
 // A sketch is stored as a chain of FULL snapshots (one per sketchedit step).
 // Editing a circle's diameter at the step that introduced it must carry forward
-// into every later snapshot of the same sketch — otherwise the next step's
+// into every later snapshot of the same sketch - otherwise the next step's
 // snapshot overwrites the change on replay before any extrude/pushpull reads it,
 // and the edit silently "applies" with no visible effect. (The fix for
 // "circle edit applied but the hole didn't change size".)
@@ -601,7 +601,7 @@ TEST(SketchHistory, CircleDiameterEditPropagatesThroughLaterSnapshots) {
     auto live = std::make_shared<Sketch>();
     doc.addSketch(live, "Sketch 1");
 
-    // step 0: add the circle (Ø20). step 1: add a line — its full snapshot
+    // step 0: add the circle (Ø20). step 1: add a line - its full snapshot
     // still carries the circle, at the ORIGINAL radius.
     auto before0 = std::make_shared<Sketch>();             // empty
     auto after0  = std::make_shared<Sketch>();
@@ -641,7 +641,7 @@ TEST(SketchHistory, CircleDiameterEditPropagatesThroughLaterSnapshots) {
 }
 
 // Duplicating a sketch produces an INDEPENDENT copy: editing the copy must not
-// touch the original (the box/lid use case — same layout, different hole sizes).
+// touch the original (the box/lid use case - same layout, different hole sizes).
 // Undo removes the copy cleanly; redo brings it back with its geometry intact.
 TEST(SketchHistory, DuplicateSketchIsIndependentAndUndoable) {
     using materializr::Sketch;

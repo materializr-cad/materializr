@@ -30,9 +30,9 @@ public:
 
     /// Render the grid on `plane`. `minorStep` is the minor line spacing in world
     /// units (major lines every 10×). The grid fades with distance from
-    /// `fadeCenter` over `fadeDistance` world units — distance-based so it stays
+    /// `fadeCenter` over `fadeDistance` world units - distance-based so it stays
     /// visible under orthographic projection (unlike the old depth-based fade).
-    /// `minorAlpha` (0..1) scales the 1× tier opacity — set to 0 to hide minor
+    /// `minorAlpha` (0..1) scales the 1× tier opacity - set to 0 to hide minor
     /// lines on big projects where they read as clutter. `globalAlpha` (0..1)
     /// scales the final grid opacity so geometry below stays visible.
     /// Every tier carries a screen-space density fade in the shader, so a tier

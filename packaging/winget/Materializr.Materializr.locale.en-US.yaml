@@ -12,9 +12,9 @@ PackageUrl: https://github.com/materializr-cad/materializr
 License: GPL-3.0
 LicenseUrl: https://github.com/materializr-cad/materializr/blob/HEAD/LICENSE
 Copyright: Copyright (C) Steve Bushwa
-ShortDescription: Maker 3D CAD — the middle ground between Tinkercad and FreeCAD.
+ShortDescription: Maker 3D CAD - the middle ground between Tinkercad and FreeCAD.
 Description: |-
-  Materializr is open-source 3D CAD for makers — the middle ground between
+  Materializr is open-source 3D CAD for makers - the middle ground between
   dead-simple tools like Tinkercad and full professional suites like FreeCAD.
   Sketch on a plane, pull it into a solid (extrude, revolve, loft, sweep),
   fillet and chamfer, run booleans, cut threads, and edit any step of the
@@ -35,7 +35,7 @@ Tags:
 ReleaseNotes: |-
   Materializr 1.6.4
   Added
-  - Repair tools grouped in one place: Patch (fit a surface across picked edges, optionally tangent or curvature-continuous), Sew (join loose surfaces into a solid and report how many edges are still open), Merge Faces, and Remove Feature (formerly "Repair Geometry" — the old name promised a general fixer and only ever deleted a face and healed the gap)
+  - Repair tools grouped in one place: Patch (fit a surface across picked edges, optionally tangent or curvature-continuous), Sew (join loose surfaces into a solid and report how many edges are still open), Merge Faces, and Remove Feature (formerly "Repair Geometry" - the old name promised a general fixer and only ever deleted a face and healed the gap)
   - Move Face > Rotate can rebuild only the faces that touch the moved one instead of shearing the whole body, so a bore keeps its axis
   - Aerofoil import: Selig and Lednicer coordinate files become sketch splines, placed by leading edge, quarter chord or centre
   - Offset a sketch chain at a fixed distance, including splines

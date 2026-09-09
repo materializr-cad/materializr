@@ -20,7 +20,7 @@ models and project files stay on your device.
   optional update check that contacts the GitHub API
   (`api.github.com`) to compare your version against the latest release. This
   request carries no personal information beyond what any web request
-  technically includes (such as your IP address, which we never see — the
+  technically includes (such as your IP address, which we never see - the
   request goes to GitHub, governed by
   [GitHub's privacy statement](https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement)).
   It can be turned off in Settings, and is off in safe mode.

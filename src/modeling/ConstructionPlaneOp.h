@@ -10,7 +10,7 @@ enum class PlaneCreationType {
     OffsetFromPlane,       // parallel at distance
     ThroughThreePoints,    // defined by 3 points
     ParallelToFace,        // parallel to a face, through a point
-    // The three below are all "plane with normal N through point P" — the
+    // The three below are all "plane with normal N through point P" - the
     // host computes (N, P) from the selection and feeds them via
     // setBasePlane (carries N) + setPoints (P), exactly like ParallelToFace.
     // They exist as distinct types only so the history label reads correctly.
@@ -52,7 +52,7 @@ private:
     int m_createdPlaneId = -1;
 
     // Reload support: the params blob stores the COMPUTED plane (the creation
-    // inputs — picked faces/points — aren't reconstructable across sessions),
+    // inputs - picked faces/points - aren't reconstructable across sessions),
     // so a rehydrated op re-executes from this literal instead of
     // computePlane(). m_type is still restored for the history label.
     gp_Pln m_literalPlane;

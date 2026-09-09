@@ -10,10 +10,10 @@ namespace materializr {
 // The THIRD preview model: live-editing a step that is ALREADY on History.
 //
 // Neither of the others fits an existing fillet whose radius is being dragged.
-// PreviewModel::SnapshotBody restores one body and runs a transient op — but a
+// PreviewModel::SnapshotBody restores one body and runs a transient op - but a
 // committed fillet has downstream steps (a chamfer stacked on it, a cut through
 // it) that must recompute too, or they flicker out for the length of the drag.
-// PreviewModel::LiveOp toggles an UNRECORDED instance — but this op is already
+// PreviewModel::LiveOp toggles an UNRECORDED instance - but this op is already
 // recorded, and its parameter is the very thing being dragged.
 //
 // So the preview IS the real replay: mutate the step's parameter in place and
@@ -27,7 +27,7 @@ namespace materializr {
 //   2. The preview frames run editStep NON-transactionally, so every op
 //      re-resolves its edges and refs against the PREVIEW bodies. If the
 //      snapshot is later restored without also restoring that resolution state,
-//      the step wedges — silently failing on every subsequent edit until the
+//      the step wedges - silently failing on every subsequent edit until the
 //      project is reloaded. Hence History::snapshotAllEditState() alongside the
 //      body snapshot, and restoreAllEditState() alongside the body restore.
 //
@@ -42,7 +42,7 @@ public:
     bool active() const { return m_active; }
 
     // Replay the edited step. On failure the snapshot is restored for you and
-    // this returns false — so a caller that gets `false` knows the model is
+    // this returns false - so a caller that gets `false` knows the model is
     // back at its pre-edit state, not stranded mid-replay.
     bool replay(int stepIndex, Document& doc, History& hist);
 

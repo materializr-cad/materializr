@@ -14,6 +14,7 @@
 #include <Poly_Triangulation.hxx>
 #include <TopLoc_Location.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
+#include "core/MeshParams.h"
 #include <TopoDS_Edge.hxx>
 #include <BRepAdaptor_Curve.hxx>
 #include <GCPnts_TangentialDeflection.hxx>
@@ -26,6 +27,7 @@
 #include <iterator>
 #include <limits>
 #include <unordered_set>
+#include <utility>
 
 namespace materializr {
 
@@ -59,9 +61,20 @@ void Picker::screenToRay(float sx, float sy, float vpW, float vpH,
 bool Picker::rayIntersectsBBox(const glm::vec3& origin, const glm::vec3& dir,
                                const TopoDS_Shape& shape, float& tMin)
 {
-    Bnd_Box bbox;
-    BRepBndLib::Add(shape, bbox);
-
+    // The box is built once per body and reused until the body's shape or
+    // location changes (bodyCache() re-validates with IsSame), so it must stay
+    // valid when the renderer later re-meshes the body at another quality.
+    // OCCT's triangulation box is enlarged by each face's achieved deflection
+    // plus tolerance, so it contains the exact surface and therefore every
+    // mesh the shape can have (a sphere of radius 10 meshed at Low reports
+    // nodes out to 9.93 and a box out to 10.55). Faces with no triangulation
+    // fall back to the geometry box, which is exact as well.
+    BodyCacheEntry& entry = bodyCache(shape);
+    if (!entry.haveBox) {
+        BRepBndLib::Add(shape, entry.box);
+        entry.haveBox = true;
+    }
+    const Bnd_Box& bbox = entry.box;
     if (bbox.IsVoid()) return false;
 
     double xMin, yMin, zMin, xMax, yMax, zMax;
@@ -143,9 +156,15 @@ int Picker::findNearestFace(const glm::vec3& origin, const glm::vec3& dir,
                             const TopoDS_Shape& shape, float& bestDist,
                             glm::vec3& hitPt, TopoDS_Shape& hitFace)
 {
-    // Ensure the shape is tessellated
-    BRepMesh_IncrementalMesh meshGen(shape, 0.1);
-    meshGen.Perform();
+    // Pick against the renderer's triangulation and NEVER run the mesher
+    // here. Every visible body is tessellated by rebuildMeshes before a pick
+    // can reach it, and a body the renderer could not mesh is not drawn, so
+    // it must not be pickable either. BRepMesh_IncrementalMesh on an already
+    // meshed shape rebuilds its whole data model per call even when it
+    // changes nothing (9 ms on a 54-face part, 66 ms on a 1683-face part),
+    // and this runs every rendered frame the cursor rests on a body; at Low
+    // quality it even re-meshed the body finer than the renderer asked for.
+    // A face without a triangulation is simply skipped below.
 
     int faceIndex = -1;
     int currentFace = 0;
@@ -226,12 +245,11 @@ int Picker::pickMeshBody(const glm::vec3& origin, const glm::vec3& dir,
     auto it = m_meshCache.find(key);
     if (it == m_meshCache.end() || !it->second.shape.IsEqual(shape)) {
         // Build (or rebuild after a pose change) the flat world-space triangle
-        // list, each tagged with its owning face. Coarse deflection — this is
+        // list, each tagged with its owning face. Coarse deflection - this is
         // only for hit-testing, and a mesh body's facets are already the limit.
         MeshCacheEntry entry;
         entry.shape = shape;
-        BRepMesh_IncrementalMesh meshGen(shape, 0.5);
-        meshGen.Perform();
+        BRepMesh_IncrementalMesh meshGen(shape, materializr::meshParams(0.5, 0.5, false));
         int faceIdx = 0;
         for (TopExp_Explorer ex(shape, TopAbs_FACE); ex.More(); ex.Next(), ++faceIdx) {
             TopoDS_Face face = TopoDS::Face(ex.Current());
@@ -272,6 +290,46 @@ int Picker::pickMeshBody(const glm::vec3& origin, const glm::vec3& dir,
     return hitFaceIdx;
 }
 
+Picker::BodyCacheEntry& Picker::bodyCache(const TopoDS_Shape& shape)
+{
+    const void* key = shape.TShape().get();
+    auto it = m_bodyCache.find(key);
+    if (it == m_bodyCache.end() || !it->second.shape.IsSame(shape)) {
+        BodyCacheEntry fresh;
+        fresh.shape = shape;
+        it = m_bodyCache.insert_or_assign(key, std::move(fresh)).first;
+    }
+    return it->second;
+}
+
+const std::vector<Picker::EdgePolyline>&
+Picker::edgePolylines(const TopoDS_Shape& shape)
+{
+    BodyCacheEntry& entry = bodyCache(shape);
+    if (entry.haveEdges) return entry.edges;
+    for (TopExp_Explorer exp(shape, TopAbs_EDGE); exp.More(); exp.Next()) {
+        EdgePolyline pl;
+        pl.edge = TopoDS::Edge(exp.Current());
+        try {
+            BRepAdaptor_Curve curve(pl.edge);
+            GCPnts_TangentialDeflection discretizer(curve, 0.1, 0.1);
+            const int nPts = discretizer.NbPoints();
+            pl.pts.reserve(nPts > 0 ? static_cast<size_t>(nPts) : 0);
+            for (int i = 1; i <= nPts; ++i) {
+                gp_Pnt p = discretizer.Value(i);
+                pl.pts.emplace_back(static_cast<float>(p.X()),
+                                    static_cast<float>(p.Y()),
+                                    static_cast<float>(p.Z()));
+            }
+        } catch (...) {
+            continue;
+        }
+        if (pl.pts.size() >= 2) entry.edges.push_back(std::move(pl));
+    }
+    entry.haveEdges = true;
+    return entry.edges;
+}
+
 void Picker::findNearestEdge(const TopoDS_Shape& shape, const glm::vec3& hitPt,
                              const glm::vec3& facePlaneNormal,
                              float screenX, float screenY, float vpW, float vpH,
@@ -294,52 +352,87 @@ void Picker::findNearestEdge(const TopoDS_Shape& shape, const glm::vec3& hitPt,
     // is oriented camera-side by the caller, so signed distance against the
     // plane is positive in front and negative behind. The 0.3 mm slack covers
     // tessellation noise on curved silhouettes while rejecting any wall ≥ 0.3 mm
-    // — and it's camera-angle-independent, unlike a view-direction depth check.
+    // - and it's camera-angle-independent, unlike a view-direction depth check.
     bool havePlaneCheck = glm::length(facePlaneNormal) > 0.5f;
     glm::vec3 planeN = havePlaneCheck ? glm::normalize(facePlaneNormal) : glm::vec3(0.0f);
     const float planeTol = 0.3f;
 
-    for (TopExp_Explorer exp(shape, TopAbs_EDGE); exp.More(); exp.Next()) {
-        TopoDS_Edge edge = TopoDS::Edge(exp.Current());
-        try {
-            BRepAdaptor_Curve curve(edge);
-            GCPnts_TangentialDeflection discretizer(curve, 0.1, 0.1);
-            int nPts = discretizer.NbPoints();
+    for (const EdgePolyline& pl : edgePolylines(shape)) {
+        for (size_t i = 0; i + 1 < pl.pts.size(); ++i) {
+            const glm::vec3& w1 = pl.pts[i];
+            const glm::vec3& w2 = pl.pts[i + 1];
 
-            for (int i = 1; i < nPts; i++) {
-                gp_Pnt p1 = discretizer.Value(i);
-                gp_Pnt p2 = discretizer.Value(i + 1);
-                glm::vec3 w1(p1.X(), p1.Y(), p1.Z());
-                glm::vec3 w2(p2.X(), p2.Y(), p2.Z());
+            glm::vec2 s1 = worldToScreen(w1);
+            glm::vec2 s2 = worldToScreen(w2);
 
-                glm::vec2 s1 = worldToScreen(w1);
-                glm::vec2 s2 = worldToScreen(w2);
-
-                glm::vec2 seg = s2 - s1;
-                float segLen2 = glm::dot(seg, seg);
-                float t = 0.0f;
-                float d;
-                if (segLen2 < 1e-6f) {
-                    d = glm::length(mouse - s1);
-                } else {
-                    t = glm::clamp(glm::dot(mouse - s1, seg) / segLen2, 0.0f, 1.0f);
-                    d = glm::length(mouse - (s1 + t * seg));
-                }
-
-                // Skip edge segments hidden behind the picked face's plane.
-                glm::vec3 wp = w1 + t * (w2 - w1);
-                if (havePlaneCheck &&
-                    glm::dot(wp - hitPt, planeN) < -planeTol) continue;
-
-                if (d < screenDist) {
-                    screenDist = d;
-                    nearestEdge = edge;
-                }
+            glm::vec2 seg = s2 - s1;
+            float segLen2 = glm::dot(seg, seg);
+            float t = 0.0f;
+            float d;
+            if (segLen2 < 1e-6f) {
+                d = glm::length(mouse - s1);
+            } else {
+                t = glm::clamp(glm::dot(mouse - s1, seg) / segLen2, 0.0f, 1.0f);
+                d = glm::length(mouse - (s1 + t * seg));
             }
-        } catch (...) {
-            continue;
+
+            // Skip edge segments hidden behind the picked face's plane.
+            glm::vec3 wp = w1 + t * (w2 - w1);
+            if (havePlaneCheck &&
+                glm::dot(wp - hitPt, planeN) < -planeTol) continue;
+
+            if (d < screenDist) {
+                screenDist = d;
+                nearestEdge = pl.edge;
+            }
         }
     }
+}
+
+void Picker::gatherInputs(PickInputs& out, float sx, float sy, float vpW, float vpH,
+                          const Camera& camera, const Document& doc)
+{
+    out.sx = sx; out.sy = sy; out.vpW = vpW; out.vpH = vpH;
+    out.view = camera.getViewMatrix();
+    out.proj = camera.getProjectionMatrix();
+    out.bodies.clear();
+    for (int id : doc.getAllBodyIds()) {
+        if (!doc.isBodyVisible(id)) continue;
+        out.bodies.emplace_back(id, doc.getBody(id));
+    }
+    out.datums.clear();
+    for (int id : doc.getAllPlaneIds()) {
+        const auto* e = doc.getPlane(id);
+        if (!e || !doc.isPlaneVisible(id)) continue;
+        const gp_Ax3& ax = e->plane.Position();
+        const gp_Pnt& o = ax.Location();
+        const gp_Dir& n = ax.Direction();
+        const gp_Dir& x = ax.XDirection();
+        out.datums.insert(out.datums.end(),
+                          {double(id), o.X(), o.Y(), o.Z(), n.X(), n.Y(), n.Z(),
+                           x.X(), x.Y(), x.Z(), e->halfSize});
+    }
+    for (int id : doc.getAllAxisIds()) {
+        const auto* e = doc.getAxis(id);
+        if (!e || !doc.isAxisVisible(id)) continue;
+        out.datums.insert(out.datums.end(),
+                          {double(id), e->origin.X(), e->origin.Y(), e->origin.Z(),
+                           e->direction.X(), e->direction.Y(), e->direction.Z(),
+                           e->halfLength});
+    }
+}
+
+bool Picker::sameInputs(const PickInputs& a, const PickInputs& b)
+{
+    if (a.sx != b.sx || a.sy != b.sy || a.vpW != b.vpW || a.vpH != b.vpH) return false;
+    if (a.view != b.view || a.proj != b.proj) return false;
+    if (a.datums != b.datums || a.bodies.size() != b.bodies.size()) return false;
+    for (size_t i = 0; i < a.bodies.size(); ++i) {
+        if (a.bodies[i].first != b.bodies[i].first ||
+            !a.bodies[i].second.IsSame(b.bodies[i].second))
+            return false;
+    }
+    return true;
 }
 
 PickResult Picker::pick(float screenX, float screenY,
@@ -348,6 +441,20 @@ PickResult Picker::pick(float screenX, float screenY,
 {
     PickResult result;
 
+    // Unchanged frame: answer from the previous result. The verbose
+    // diagnostic re-pick exists for its per-body prints, so it always runs.
+    m_lastCached = false;
+    if (!s_verbose) {
+        gatherInputs(m_nextInputs, screenX, screenY, viewportWidth, viewportHeight,
+                     camera, doc);
+        if (m_lastValid && sameInputs(m_nextInputs, m_lastInputs)) {
+            m_lastCached = true;
+            return m_lastResult;
+        }
+        std::swap(m_lastInputs, m_nextInputs);
+    }
+    m_lastValid = false; // set again once the walk below completes
+
     glm::vec3 rayOrigin, rayDir;
     screenToRay(screenX, screenY, viewportWidth, viewportHeight, camera, rayOrigin, rayDir);
 
@@ -355,19 +462,20 @@ PickResult Picker::pick(float screenX, float screenY,
 
     std::vector<int> bodyIds = doc.getAllBodyIds();
 
-    // Drop mesh-pick cache entries whose body is gone or was rebuilt with a new
-    // TShape (delete, transform-copy, decimate, boolean). Without this the cache
-    // would pin every imported/edited mesh's shape + triangle list alive for the
-    // whole session. Cheap: there are only ever a handful of mesh bodies.
-    if (!m_meshCache.empty()) {
+    // Drop cache entries whose body is gone or was rebuilt with a new TShape
+    // (delete, transform-copy, decimate, boolean). Without this the caches
+    // would pin every edited body's shape + triangle / polyline lists alive
+    // for the whole session. Cheap: one pointer per body.
+    if (!m_meshCache.empty() || !m_bodyCache.empty()) {
         std::unordered_set<const void*> live;
         for (int id : bodyIds) {
-            if (!doc.isBodyMesh(id)) continue;
             const TopoDS_Shape& s = doc.getBody(id);
             if (!s.IsNull()) live.insert(s.TShape().get());
         }
         for (auto it = m_meshCache.begin(); it != m_meshCache.end();)
             it = live.count(it->first) ? std::next(it) : m_meshCache.erase(it);
+        for (auto it = m_bodyCache.begin(); it != m_bodyCache.end();)
+            it = live.count(it->first) ? std::next(it) : m_bodyCache.erase(it);
     }
 
     for (int bodyId : bodyIds) {
@@ -398,7 +506,7 @@ PickResult Picker::pick(float screenX, float screenY,
             continue;
         }
 
-        // Imported meshes: cached, face-resolving ray test — no per-frame
+        // Imported meshes: cached, face-resolving ray test - no per-frame
         // re-mesh, no O(edges) edge/vertex refinement. Still returns a real
         // TopoDS_Face so face selection + "Sketch on Face" work; we just skip
         // edge/corner promotion (meaningless on a faceted mesh anyway).
@@ -469,6 +577,17 @@ PickResult Picker::pick(float screenX, float screenY,
                     if (proj.NbPoints() > 0) {
                         proj.LowerDistanceParameters(un, vn);
                         haveUV = true;
+                        // Snap the hit onto the exact surface. The pick mesh
+                        // is the renderer's (chords up to 0.5 mm at Low
+                        // quality) and the measure tool consumes this point.
+                        // The bound rejects a projection that wandered off
+                        // to a far sheet of the untrimmed surface.
+                        constexpr double kSnapMaxMm = 1.0;
+                        if (proj.LowerDistance() < kSnapMaxMm) {
+                            gp_Pnt on = proj.NearestPoint();
+                            faceHitPt = glm::vec3(on.X(), on.Y(), on.Z());
+                            result.hitPoint = faceHitPt;
+                        }
                     }
                 }
                 if (!haveUV) {
@@ -533,7 +652,7 @@ PickResult Picker::pick(float screenX, float screenY,
     // Planes are rendered as finite quads (halfSize × halfSize around the
     // origin in the plane's local X/Y). Ray-vs-plane gives t; checking
     // |u|,|v| ≤ halfSize bounds it to the visible quad. A plane only wins
-    // over a body if it's closer (smaller t) — bodies still take priority
+    // over a body if it's closer (smaller t) - bodies still take priority
     // at the same point, so clicking through a body to a plane behind it
     // requires hiding the body first (consistent with Items panel filter).
     {
@@ -587,7 +706,7 @@ PickResult Picker::pick(float screenX, float screenY,
     }
 
     // ─── Construction-axis hit-test ──────────────────────────────────────
-    // Axes are 1D so a strict ray-line intersection almost never hits —
+    // Axes are 1D so a strict ray-line intersection almost never hits -
     // instead we measure the minimum distance from the cursor ray to the
     // axis line and accept any axis whose closest approach is within ~6 px
     // on screen at the hit depth. The closest-approach formula uses the
@@ -600,7 +719,9 @@ PickResult Picker::pick(float screenX, float screenY,
             // pixel of horizontal extent at depth d to world units via the
             // perspective frustum's half-width. Cheap and good enough for a
             // pickability band.
-            float fovRad = camera.getFov() * (float)M_PI / 180.0f;
+            // glm::radians, not M_PI: this file is also in materializr_core, which
+            // lacks the app target's _USE_MATH_DEFINES on MSVC.
+            float fovRad = glm::radians(camera.getFov());
             float pxPerWorldRef = viewportHeight / (2.0f * std::tan(fovRad * 0.5f));
             for (int aid : axisIds) {
                 if (!doc.isAxisVisible(aid)) continue;
@@ -651,6 +772,10 @@ PickResult Picker::pick(float screenX, float screenY,
         }
     }
 
+    if (!s_verbose) {
+        m_lastResult = result;
+        m_lastValid = true;
+    }
     return result;
 }
 

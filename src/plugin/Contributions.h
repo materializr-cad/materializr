@@ -58,12 +58,12 @@ struct IOFormatContribution {
     bool canExport = false;
     std::function<bool(PluginContext&, const std::string& path)> importFn;
     std::function<bool(PluginContext&, const std::string& path)> exportFn;
-    // Export a SPECIFIC document to an explicit path — no picker, no reading
+    // Export a SPECIFIC document to an explicit path - no picker, no reading
     // the live document. This is what "export just these bodies" runs: the
     // host builds a scratch Document holding copies of the chosen bodies and
     // hands it over. exportFn can't serve that, because it owns its own file
     // dialog whose callback fires frames later and reads ctx.document() at
-    // that point — by then the host has moved on. Optional: a format without
+    // that point - by then the host has moved on. Optional: a format without
     // it simply doesn't appear in the per-body export menu.
     std::function<bool(const Document&, const std::string& path)> exportDocFn;
 };
@@ -83,7 +83,7 @@ struct PropertyContribution {
 };
 
 // A free-floating, per-frame ImGui overlay. The host calls `render` every frame
-// (after the docked panels, so it draws on top) inside the ImGui frame — the
+// (after the docked panels, so it draws on top) inside the ImGui frame - the
 // plugin is free to Begin/End its own window(s). Unlike an InteractiveTool this
 // is non-modal: it doesn't capture input or get cancelled when a tool starts, so
 // it suits persistent, optional UI like a tutorial/onboarding panel.

@@ -1,6 +1,6 @@
 #pragma once
 // Relative-nudge stepper row for op-preview dialogs (push/pull, extrude,
-// fillet, chamfer, …) — a row of tap targets that replaces a fiddly slider.
+// fillet, chamfer, …) - a row of tap targets that replaces a fiddly slider.
 //
 // Each ± button ADDS its magnitude to *value; the "0" button zeroes it, which
 // the op previews treat as "no change" (they guard against ~0 and fall back to
@@ -12,7 +12,7 @@
 // exactly 0 so the "remove the change" fallback is reachable even when
 // minV > 0. Returns true when *value changed this frame (caller re-previews).
 //
-// The clamp only ever stops a nudge that would LEAVE the range — it never drags
+// The clamp only ever stops a nudge that would LEAVE the range - it never drags
 // a value that is already outside back in. The bounds exist so the buttons stay
 // sane, not to police what you can type: the text field beside them accepts any
 // value, and pulling an 80 mm extrude down to 50 because you pressed +1 loses
@@ -27,7 +27,7 @@
 namespace materializr {
 
 // One nudge, clamped. Split out from the button row so the rule is testable
-// without an ImGui context — see tests/test_stepper_nudge.cpp.
+// without an ImGui context - see tests/test_stepper_nudge.cpp.
 //
 // `before` outside [minV, maxV] is normal: the paired text field takes any
 // value. In that case the bound in the direction of travel is not applied,

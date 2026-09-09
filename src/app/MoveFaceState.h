@@ -26,7 +26,7 @@ inline glm::mat3 rodrigues(const glm::vec3& axisIn, float angle) {
 // Application; it belongs with the state it describes.
 enum class FaceXform { Translate, Rotate, Scale };
 
-// Everything the Move Face tool holds while a gesture is live — the three
+// Everything the Move Face tool holds while a gesture is live - the three
 // interleaved transforms (slide / tilt+twist / scale), the silhouette ghost,
 // the on-face sketches that ride along, and the hole sub-modes (Slide, Tilt,
 // EdgeMove) that reuse the same gizmo.
@@ -46,7 +46,7 @@ struct MoveFaceState {
     MoveHoleOp::Mode moveHoleOpMode = MoveHoleOp::Mode::Slide;
     TopoDS_Edge moveHoleRimEdge;
     // Which mouth of the bore the user grabbed (buildVoid's own entry/exit
-    // naming is unrelated to what was clicked — see MoveHoleOp::setNearIsEntry).
+    // naming is unrelated to what was clicked - see MoveHoleOp::setNearIsEntry).
     bool moveHoleNearIsEntry = true;
     TopoDS_Face moveHoleWall;              // the clicked hole-wall seed face
     int  moveFaceBodyId = -1;
@@ -85,7 +85,7 @@ struct MoveFaceState {
     bool  moveFaceRotSnap = true;    // snap tilt to whole degrees (default on)
     // TWIST = the THIRD rotation ring, about the face NORMAL (lies in the face
     // plane). Lives under FaceXform::Rotate: grabbing this ring (grab 2) spins
-    // the face relative to its base and commits a MoveFaceOp::Kind::Twist —
+    // the face relative to its base and commits a MoveFaceOp::Kind::Twist -
     // distinct from the two tilt rings. Mutually exclusive with a tilt within a
     // session (moveFaceIsTwist picks which op the gesture builds).
     float moveFaceTwist = 0.0f;      // accumulated twist (radians) about the normal
@@ -105,8 +105,8 @@ struct MoveFaceState {
     bool moveFaceMoveOuter = true;
     std::vector<bool> moveFaceHoleSlant;     // top edge picked → top ring follows
     std::vector<bool> moveFaceHoleVertical;  // cylinder wall picked → tube follows
-    // LOCAL TILT. Route the gesture through the FaceTweak engine — which
-    // rebuilds only the faces meeting this one — instead of MoveFaceOp's
+    // LOCAL TILT. Route the gesture through the FaceTweak engine - which
+    // rebuilds only the faces meeting this one - instead of MoveFaceOp's
     // whole-body GTransform shear. Tilt only: an in-plane slide has no local
     // answer at all (a plane translated along itself is the same plane), and
     // Scale/Twist have no three-plane formulation. See FaceTweak.h.
@@ -114,7 +114,7 @@ struct MoveFaceState {
     // Why the last local attempt declined, for the panel to print. Points at a
     // static string owned by tweak::refusalText; null = nothing to report.
     const char* moveFaceLocalRefusal = nullptr;
-    // Sketches sitting ON the moved face — they slide with it. Original planes
+    // Sketches sitting ON the moved face - they slide with it. Original planes
     // snapshotted so the live preview / cancel can restore them.
     std::vector<int>    moveFaceSketchIds;
     std::vector<gp_Pln> moveFaceSketchPlanes0;

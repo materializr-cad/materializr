@@ -5,7 +5,7 @@
 #include <algorithm>
 
 void SelectionManager::publishChanged() {
-    // Every mutation funnels through here — the revision counter rides along
+    // Every mutation funnels through here - the revision counter rides along
     // so per-selection memoizations (see revision()) invalidate exactly when
     // the selection actually changes.
     ++m_revision;
@@ -29,7 +29,7 @@ void SelectionManager::addToSelection(const SelectionEntry& entry) {
     if (findEntry(entry) >= 0) return;
 
     // A Body selection subsumes any Face / Edge / Vertex from the same
-    // body — otherwise the user ends up with stale face highlights stuck
+    // body - otherwise the user ends up with stale face highlights stuck
     // to the wireframe after a Ctrl+double-click promotes face to body.
     if (entry.type == SelectionType::Body && entry.bodyId >= 0) {
         m_selection.erase(
@@ -49,7 +49,7 @@ void SelectionManager::addToSelection(const SelectionEntry& entry) {
         // Touch only: picking a Face / Edge / Vertex while the whole body is
         // already selected drops the Body in favour of the sub-shape, so a tap
         // gives one unambiguous target to push/pull/fillet. With a mouse the
-        // desktop/upstream model keeps both — a body and its sub-shapes coexist
+        // desktop/upstream model keeps both - a body and its sub-shapes coexist
         // in the selection (so an Android device with a mouse/keyboard attached,
         // running with touch mode off, behaves like the desktop).
         m_selection.erase(
@@ -177,8 +177,8 @@ int SelectionManager::findEntry(const SelectionEntry& entry) const {
             e.sketchId != entry.sketchId) {
             continue;
         }
-        // Edge picks share subShapeIndex (-1) on the same body — and so would
-        // any future selection type that doesn't carry a sub-shape index — so
+        // Edge picks share subShapeIndex (-1) on the same body - and so would
+        // any future selection type that doesn't carry a sub-shape index - so
         // also disambiguate by shape identity when both shapes are present.
         // Otherwise Ctrl+clicking a second edge on the same body would look
         // "already selected" and silently get dropped. (Plane/Axis also lean on

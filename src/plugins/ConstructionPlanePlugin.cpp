@@ -36,7 +36,7 @@ static std::unique_ptr<PlaneRenderState> g_state;
 } // namespace
 
 REGISTER_PLUGIN(ConstructionPlane, [](materializr::PluginContext& ctx) {
-    // Toolbar button + Command Palette entry — both hand the actual workflow
+    // Toolbar button + Command Palette entry - both hand the actual workflow
     // over to Application's interactive-op popup. The popup pushes a
     // ConstructionPlaneOp onto history; doc.addPlane fires PlaneAddedEvent
     // (subscribed below) which flips this plugin's dirty flag so the next
@@ -67,7 +67,7 @@ REGISTER_PLUGIN(ConstructionPlane, [](materializr::PluginContext& ctx) {
             if (g_state) g_state->dirty = true;
         });
     // A different TAB is now in front: this cache belongs to the old
-    // document. No Plane event fires for that (neither document changed —
+    // document. No Plane event fires for that (neither document changed -
     // the active one did), so without this the previous project's planes
     // keep drawing over the new one.
     ctx.events().subscribe<materializr::ActiveDocumentChangedEvent>(
@@ -75,7 +75,7 @@ REGISTER_PLUGIN(ConstructionPlane, [](materializr::PluginContext& ctx) {
             if (g_state) g_state->dirty = true;
         });
 
-    // Render pass — Application iterates registered passes once per frame
+    // Render pass - Application iterates registered passes once per frame
     // after the body / edge / grid layer but before the gizmo overlay.
     // initialize() runs once on the GL thread before the first render.
     materializr::RenderPassContribution pass;
@@ -89,7 +89,7 @@ REGISTER_PLUGIN(ConstructionPlane, [](materializr::PluginContext& ctx) {
     pass.render = [](materializr::PluginContext& c,
                      const glm::mat4& view, const glm::mat4& proj) {
         if (!g_state) return;
-        // Hide planes entirely while the user is sketching in ortho —
+        // Hide planes entirely while the user is sketching in ortho -
         // the canvas should be clean for drawing, the construction plane
         // they're sketching on is implied by the camera framing. Outside
         // ortho the plane stays visible so the user can find their way
@@ -99,7 +99,7 @@ REGISTER_PLUGIN(ConstructionPlane, [](materializr::PluginContext& ctx) {
         }
         // Resolve the currently-selected plane id once per frame; the
         // renderer marks that one with a brighter highlight. Selection is
-        // cheap to query, so we don't bother dirty-flagging on it — just
+        // cheap to query, so we don't bother dirty-flagging on it - just
         // resync the render list every frame the selection changes.
         int selectedPlaneId = -1;
         for (const auto& sel : c.selection().getSelection()) {
@@ -119,7 +119,7 @@ REGISTER_PLUGIN(ConstructionPlane, [](materializr::PluginContext& ctx) {
                 if (!entry || !entry->visible) continue;
                 // Planes hosting a reference image are drawn by
                 // RefImagePlugin as textured quads (with their own selection
-                // border) — the translucent blue fill would wash the photo out.
+                // border) - the translucent blue fill would wash the photo out.
                 if (doc.getRefImage(pid)) continue;
                 glm::vec4 col(0.30f, 0.55f, 0.95f, 0.30f);
                 g_state->renderer.addPlane(entry->plane, entry->name, col,

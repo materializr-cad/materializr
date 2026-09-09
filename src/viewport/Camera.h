@@ -23,7 +23,7 @@ public:
     /// Dolly: move closer/further from target.
     void zoom(float delta);
 
-    /// Dolly toward (or away from) a specific world-space focus point — both
+    /// Dolly toward (or away from) a specific world-space focus point - both
     /// camera and target move so the focus stays put on screen. Used by the
     /// mouse-wheel handler with `focus` set to the world point under the
     /// cursor (ray-pick onto geometry, fallback to the target-plane). Solves
@@ -96,7 +96,7 @@ public:
     void setLevelOrbit(bool level) { m_levelOrbit = level; }
     bool isLevelOrbit() const { return m_levelOrbit; }
 
-    /// Uniform multiplier on orbit / pan / zoom input deltas — one user-facing
+    /// Uniform multiplier on orbit / pan / zoom input deltas - one user-facing
     /// sensitivity knob, so a slow trackpad doesn't whip the camera around at
     /// the same time as the desktop mouse cursor stays slow. 1.0 = the
     /// hard-coded baseline (m_orbitSpeed / m_panSpeed / m_zoomSpeed); below 1
@@ -106,14 +106,14 @@ public:
 
     /// Viewport height in the same units the pan deltas arrive in (ImGui
     /// points). With this set, pan() moves the world EXACTLY one
-    /// world-size-of-a-pixel per pixel dragged — the point under the cursor
+    /// world-size-of-a-pixel per pixel dragged - the point under the cursor
     /// stays under the cursor at any zoom. Unset (<= 0) keeps the legacy
     /// distance-fraction pan. Refreshed every frame by the app.
     void setViewHeightPx(float px) { m_viewHeightPx = px; }
 
     /// Depth anchor for perspective pan: distance from the camera to the
     /// content the user is grabbing (the hover pick at drag start). The
-    /// camera TARGET distance is a bad proxy on large projects — cursor-zoom
+    /// camera TARGET distance is a bad proxy on large projects - cursor-zoom
     /// can leave the target metres from (or millimetres in front of) the
     /// geometry on screen, making pan frozen or twitchy. <= 0 falls back to
     /// the target distance. Cleared when the pan gesture ends.

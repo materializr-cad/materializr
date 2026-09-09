@@ -101,32 +101,42 @@ add_library(materializr_core STATIC
     ${CMAKE_SOURCE_DIR}/src/core/ThrowTrace.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/Unfold.cpp
     ${CMAKE_SOURCE_DIR}/src/viewport/SectionCap.cpp
+    ${CMAKE_SOURCE_DIR}/src/viewport/MeshWorker.cpp
+    # Picker + Camera are GL-free (pure OCCT + glm), so the hover-pick
+    # regression test (test_picker.cpp) can drive them headless.
+    ${CMAKE_SOURCE_DIR}/src/viewport/Picker.cpp
+    ${CMAKE_SOURCE_DIR}/src/viewport/Camera.cpp
     # Op editors call materializr::inputNumber (ui/NumField.h), whose touch
-    # branch lands in touchui::numberField. Tests never take that branch —
-    # touchMode() is off — but the symbol still has to resolve at link time,
+    # branch lands in touchui::numberField. Tests never take that branch -
+    # touchMode() is off - but the symbol still has to resolve at link time,
     # and this list is separate from the app's, so it does not inherit it.
     # The interactive-op controller base: its handle latch gates camera orbit
     # and pan, so the invariant needs a test (see test_iop_latch.cpp). Pulls in
     # only Document / History / SelectionManager / Operation + imgui.
     ${CMAKE_SOURCE_DIR}/src/app/InteractiveOpController.cpp
+    ${CMAKE_SOURCE_DIR}/src/app/PushPullPreview.cpp
+    ${CMAKE_SOURCE_DIR}/src/app/SnapshotPreview.cpp
+    ${CMAKE_SOURCE_DIR}/src/app/GhostMesh.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/TouchWidgets.cpp
-    # Installs OCCT's signal handler for every test binary — see the file for
+    # Installs OCCT's signal handler for every test binary - see the file for
     # why tests must run in the app's signal environment.
     ${CMAKE_CURRENT_SOURCE_DIR}/TestSignalInit.cpp
 )
 
 # The other half of that mechanism, and the one that was missing: the app
 # defines OCC_CONVERT_SIGNALS on ITS target, but ShellOp.cpp & co. are compiled
-# AGAIN into this library, which never got it — so every OCC_CATCH_SIGNALS in
+# AGAIN into this library, which never got it - so every OCC_CATCH_SIGNALS in
 # the code under test expanded to nothing and a kernel fault killed the test
 # binary outright (issue #80, visible on OCCT 7.7.0). It has to be set here,
 # where those sources are actually compiled; setting it on a test EXECUTABLE
 # does nothing for them, since executables only link this library.
 if(NOT WIN32)
     target_compile_definitions(materializr_core PRIVATE OCC_CONVERT_SIGNALS)
+
+
     # And force TestSignalInit.cpp's object INTO every test binary. Its
     # initialiser is referenced by nothing, and a static archive contributes
-    # only the members whose symbols are needed — so the linker dropped it and
+    # only the members whose symbols are needed - so the linker dropped it and
     # the handler was never installed (nm showed no OSD::SetSignal in the test
     # binary at all). `-u` on the consumer's link line makes ld pull the member
     # in. An OBJECT library would also fix it, but this archive RELIES on
@@ -136,12 +146,27 @@ if(NOT WIN32)
     # Mach-O prefixes C symbols with an underscore, ELF does not. Passing the
     # ELF spelling to Apple's ld fails the link outright with
     # "Undefined symbols ... mzrInstallOcctSignalHandler, referenced from
-    # <initial-undefines>" — it looks for a symbol that cannot exist there.
+    # <initial-undefines>" - it looks for a symbol that cannot exist there.
     if(APPLE)
         target_link_options(materializr_core INTERFACE "-u" "_mzrInstallOcctSignalHandler")
     else()
         target_link_options(materializr_core INTERFACE "-u" "mzrInstallOcctSignalHandler")
     endif()
+endif()
+
+# MSVC only. The app target sets these (see the MSVC block in the top-level
+# CMakeLists.txt) but materializr_core never did, and that gap has broken the
+# Windows build twice now: once when a lean core header used M_PI directly, and
+# once when a test included core/Units.h (which pulls <cmath>) BEFORE an OCCT
+# header. OCCT defines M_PI only via "#ifndef _USE_MATH_DEFINES / #define /
+# #include <math.h>" in Standard_Real.hxx, which is a no-op once <math.h> has
+# already been included, so the inline bodies in gp_Vec.hxx and gp_Dir.hxx then
+# fail to compile.
+#
+# PUBLIC, not PRIVATE: the test targets link materializr_core and must inherit
+# it, since they are where the bad include order actually appears.
+if(MSVC)
+    target_compile_definitions(materializr_core PUBLIC _USE_MATH_DEFINES NOMINMAX)
 endif()
 
 target_include_directories(materializr_core PUBLIC
@@ -156,7 +181,7 @@ target_include_directories(materializr_core SYSTEM PUBLIC
 # OCCT 7.8 renamed the data-exchange toolkits (TKSTL -> TKDESTL). The app target
 # version-gates this (see the top-level CMakeLists); the test lib must too, or it
 # won't link on the pre-refactor OCCT that distros like Ubuntu 24.04 ship (7.6.3,
-# where the STL toolkit is still TKSTL). Gate on MAJOR/MINOR — the config sets
+# where the STL toolkit is still TKSTL). Gate on MAJOR/MINOR - the config sets
 # those even when it leaves the combined OpenCASCADE_VERSION string empty.
 if(OpenCASCADE_MAJOR_VERSION EQUAL 7 AND OpenCASCADE_MINOR_VERSION LESS 8)
     set(OCCT_STL_LIB TKSTL)
@@ -181,8 +206,8 @@ target_link_libraries(materializr_core PUBLIC
     TKOffset
     TKBO
     TKBin
-    ${OCCT_STL_LIB}  # RWStl (STL read) for StlIO — TKSTL (<7.8) / TKDESTL (>=7.8)
-    ${OCCT_IGES_LIB} # IGESControl for IgesIO (test_exchange_io) — same version gate
+    ${OCCT_STL_LIB}  # RWStl (STL read) for StlIO - TKSTL (<7.8) / TKDESTL (>=7.8)
+    ${OCCT_IGES_LIB} # IGESControl for IgesIO (test_exchange_io) - same version gate
     TKXSBase     # exchange base for the IGES reader/writer
     TKShHealing  # ShapeUpgrade_UnifySameDomain for StlIO
     TKMesh       # BRepMesh_IncrementalMesh for Unfold (curved faces)
@@ -270,20 +295,80 @@ add_executable(test_section_cap test_section_cap.cpp)
 target_link_libraries(test_section_cap PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_section_cap COMMAND test_section_cap)
 
+# test_ghost_mesh - the push/pull ghost is built from the profile's triangulation, never the mesher
+add_executable(test_ghost_mesh test_ghost_mesh.cpp)
+target_link_libraries(test_ghost_mesh PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_ghost_mesh COMMAND test_ghost_mesh)
+
+# test_pushpull_preview - the off-thread preview equals a direct execute and never touches the live document
+add_executable(test_pushpull_preview test_pushpull_preview.cpp)
+target_link_libraries(test_pushpull_preview PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_pushpull_preview COMMAND test_pushpull_preview)
+
+# test_async_job - one owned worker job at a time, parked when replaced, joined by the destructor
+add_executable(test_async_job test_async_job.cpp)
+target_link_libraries(test_async_job PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_async_job COMMAND test_async_job)
+
+# test_snapshot_preview - a snapshot-body op run on a private copy equals the inline execute and never touches the snapshot
+add_executable(test_snapshot_preview test_snapshot_preview.cpp)
+target_link_libraries(test_snapshot_preview PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_snapshot_preview COMMAND test_snapshot_preview)
+
+# test_op_progress - cancelling a heavy op from its progress reporter aborts the kernel algorithm and leaves the document untouched
+add_executable(test_op_progress test_op_progress.cpp)
+target_link_libraries(test_op_progress PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_op_progress COMMAND test_op_progress)
+
+# test_iop_async_preview - the SnapshotBody engine's off-thread preview: inline until slow, trails the slider, cancel/commit mid-job
+add_executable(test_iop_async_preview test_iop_async_preview.cpp)
+target_link_libraries(test_iop_async_preview PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_iop_async_preview COMMAND test_iop_async_preview)
+
+# test_pushpull_dispatch - inline until slow, one job at a time, land then relaunch when the arrow moved
+add_executable(test_pushpull_dispatch test_pushpull_dispatch.cpp)
+target_link_libraries(test_pushpull_dispatch PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_pushpull_dispatch COMMAND test_pushpull_dispatch)
+
+# test_body_changes - which bodies an edit changed, so a preview re-tessellates only those
+add_executable(test_body_changes test_body_changes.cpp)
+target_link_libraries(test_body_changes PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_body_changes COMMAND test_body_changes)
+
+# test_mesh_dispatch - in-frame, worker or wait: never asks the worker twice for one request
+add_executable(test_mesh_dispatch test_mesh_dispatch.cpp)
+target_link_libraries(test_mesh_dispatch PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_mesh_dispatch COMMAND test_mesh_dispatch)
+
+# test_mesh_tag - when the renderer may skip the mesher, including bodies with a face it cannot triangulate
+add_executable(test_mesh_tag test_mesh_tag.cpp)
+target_link_libraries(test_mesh_tag PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_mesh_tag COMMAND test_mesh_tag)
+
+# test_mesh_worker - off-thread meshing lands the same triangulation as a direct run
+add_executable(test_mesh_worker test_mesh_worker.cpp)
+target_link_libraries(test_mesh_worker PRIVATE materializr_core gtest gtest_main Threads::Threads)
+add_test(NAME test_mesh_worker COMMAND test_mesh_worker)
+
+# test_picker - hover picking reuses the renderer mesh, never re-runs the mesher
+add_executable(test_picker test_picker.cpp)
+target_link_libraries(test_picker PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_picker COMMAND test_picker)
+
 # test_history
 add_executable(test_history test_history.cpp)
 target_link_libraries(test_history PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_history COMMAND test_history)
 
-# test_recovery — multi-instance recovery slots (flock claim/probe/orphan scan)
+# test_recovery - multi-instance recovery slots (flock claim/probe/orphan scan)
 add_executable(test_recovery test_recovery.cpp)
 target_link_libraries(test_recovery PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_recovery COMMAND test_recovery)
 
-# test_recovery_popup_turntaking — headless dear imgui popup-stack regression
+# test_recovery_popup_turntaking - headless dear imgui popup-stack regression
 # for the "Recover Sketch?" modal rendering empty/stuck when it collides with
 # another raw-every-frame OpenPopup (the launch update-check popup). Pure
-# ImGui mechanics — links imgui_lib directly, no OCCT/materializr_core needed.
+# ImGui mechanics - links imgui_lib directly, no OCCT/materializr_core needed.
 add_executable(test_recovery_popup_turntaking test_recovery_popup_turntaking.cpp)
 target_link_libraries(test_recovery_popup_turntaking PRIVATE imgui_lib gtest gtest_main)
 add_test(NAME test_recovery_popup_turntaking COMMAND test_recovery_popup_turntaking)
@@ -357,89 +442,89 @@ add_executable(test_selection test_selection.cpp)
 target_link_libraries(test_selection PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_selection COMMAND test_selection)
 
-# test_reload_edit — boolean/delete rehydrate so edits upstream of them propagate
+# test_reload_edit - boolean/delete rehydrate so edits upstream of them propagate
 add_executable(test_reload_edit test_reload_edit.cpp)
 target_link_libraries(test_reload_edit PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_reload_edit COMMAND test_reload_edit)
 
-# test_move_hole — moving a through-hole (round/square) re-cuts cleanly
+# test_move_hole - moving a through-hole (round/square) re-cuts cleanly
 add_executable(test_move_hole test_move_hole.cpp)
 target_link_libraries(test_move_hole PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_move_hole COMMAND test_move_hole)
 
-# test_pushpull_normal — outward-normal correction on holed/annular faces
+# test_pushpull_normal - outward-normal correction on holed/annular faces
 add_executable(test_pushpull_normal test_pushpull_normal.cpp)
 target_link_libraries(test_pushpull_normal PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_pushpull_normal COMMAND test_pushpull_normal)
 
-# test_pushpull_through — a cut consuming the whole body must be refused
+# test_pushpull_through - a cut consuming the whole body must be refused
 add_executable(test_pushpull_through test_pushpull_through.cpp)
 target_link_libraries(test_pushpull_through PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_pushpull_through COMMAND test_pushpull_through)
 
-# test_duplicate_sketch — a duplicated sketch is severed from the source's body (#21)
+# test_duplicate_sketch - a duplicated sketch is severed from the source's body (#21)
 add_executable(test_duplicate_sketch test_duplicate_sketch.cpp)
 target_link_libraries(test_duplicate_sketch PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_duplicate_sketch COMMAND test_duplicate_sketch)
 
-# test_stl_import — STL triangle soup sews into a clean 6-face solid (parked feature)
+# test_stl_import - STL triangle soup sews into a clean 6-face solid (parked feature)
 add_executable(test_stl_import test_stl_import.cpp)
 target_link_libraries(test_stl_import PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_stl_import COMMAND test_stl_import)
 
-# test_unfold — planar-net flatten engine (box -> area-preserving net)
+# test_unfold - planar-net flatten engine (box -> area-preserving net)
 add_executable(test_unfold test_unfold.cpp)
 target_link_libraries(test_unfold PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_unfold COMMAND test_unfold)
 
-# test_generative_edges — fillet corner anchored to sketch vertex survives resize
+# test_generative_edges - fillet corner anchored to sketch vertex survives resize
 add_executable(test_generative_edges test_generative_edges.cpp)
 target_link_libraries(test_generative_edges PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_generative_edges COMMAND test_generative_edges)
 
-# test_topo_name — unified naming layer: best-first resolve, unknown-scheme
+# test_topo_name - unified naming layer: best-first resolve, unknown-scheme
 # skip + preservation, ordinal round-trip (experiment/face-anchors)
 add_executable(test_topo_name test_topo_name.cpp)
 target_link_libraries(test_topo_name PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_topo_name COMMAND test_topo_name)
 
-# test_topo_edge — EdgeAnchor migrated behind the registry ("sketchedge"):
+# test_topo_edge - EdgeAnchor migrated behind the registry ("sketchedge"):
 # resolveSet distinctness + survives-resize through the unified layer
 add_executable(test_topo_edge test_topo_edge.cpp)
 target_link_libraries(test_topo_edge PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_topo_edge COMMAND test_topo_edge)
 
-# test_topo_thread — a live op (ThreadOp) follows an upstream cylinder move by
+# test_topo_thread - a live op (ThreadOp) follows an upstream cylinder move by
 # re-resolving its target-face topo::Ref and re-deriving axis/radius (rung 3)
 add_executable(test_topo_thread test_topo_thread.cpp)
 target_link_libraries(test_topo_thread PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_topo_thread COMMAND test_topo_thread)
 
-# test_topo_gen — generation-map lineage naming: a prism side face named by its
+# test_topo_gen - generation-map lineage naming: a prism side face named by its
 # generating profile edge resolves correctly after a profile edit (rung 4)
 add_executable(test_topo_gen test_topo_gen.cpp)
 target_link_libraries(test_topo_gen PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_topo_gen COMMAND test_topo_gen)
 
-# bench_stl_import — manual stopwatch for STL import stages (not run by ctest)
+# bench_stl_import - manual stopwatch for STL import stages (not run by ctest)
 add_executable(bench_stl_import bench_stl_import.cpp)
 target_link_libraries(bench_stl_import PRIVATE materializr_core)
 
-# probe_anchor_coverage — diagnostic: anchor classification of a real project's
+# probe_anchor_coverage - diagnostic: anchor classification of a real project's
 # fillets against every sketch (experiment/generative-edges, not run by ctest)
 add_executable(probe_anchor_coverage probe_anchor_coverage.cpp)
 target_link_libraries(probe_anchor_coverage PRIVATE materializr_core)
 
-# probe_face_coverage — diagnostic: generative FACE naming coverage of a real
+# probe_face_coverage - diagnostic: generative FACE naming coverage of a real
 # project's bodies against every sketch (experiment/face-anchors)
 add_executable(probe_face_coverage probe_face_coverage.cpp)
 target_link_libraries(probe_face_coverage PRIVATE materializr_core)
 
-# test_sketch_offset — Offset tool geometry core: chain walk, offsetting,
+# test_sketch_offset - Offset tool geometry core: chain walk, offsetting,
 # corner fix-up and the "every offset point is exactly |d| from the source"
 # validity invariant. Headless: no GL, no window.
 # The state-machine cases pull in SketchTool.h/.cpp, which needs TextSketchOp
-# (handleTextTool) and SvgImport (handleSvgTool) — same extra sources and
+# (handleTextTool) and SvgImport (handleSvgTool) - same extra sources and
 # Font_* libraries test_sketch_dimension links for the same reason.
 add_executable(test_sketch_offset test_sketch_offset.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/TextSketchOp.cpp
@@ -448,132 +533,132 @@ target_link_libraries(test_sketch_offset PRIVATE materializr_core gtest gtest_ma
     TKV3d TKService)
 add_test(NAME test_sketch_offset COMMAND test_sketch_offset)
 
-# test_sketch_regions — multi-loop interior selection (wire-orientation fix)
+# test_sketch_regions - multi-loop interior selection (wire-orientation fix)
 add_executable(test_sketch_regions test_sketch_regions.cpp)
 target_link_libraries(test_sketch_regions PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_sketch_regions COMMAND test_sketch_regions)
 
-# probe_shell — diagnostic: reproduce Shell crash/failure headless (not ctest)
+# probe_shell - diagnostic: reproduce Shell crash/failure headless (not ctest)
 add_executable(probe_shell probe_shell.cpp)
 target_link_libraries(probe_shell PRIVATE materializr_core)
 target_compile_definitions(probe_shell PRIVATE OCC_CONVERT_SIGNALS)
 
-# test_shell — ShellOp over-thick fails fast (no hang) + open-face rebind
+# test_shell - ShellOp over-thick fails fast (no hang) + open-face rebind
 add_executable(test_shell test_shell.cpp)
 target_link_libraries(test_shell PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_shell COMMAND test_shell)
 
-# probe_rebuild — repro: does fillet re-execution stack a phantom fillet
+# probe_rebuild - repro: does fillet re-execution stack a phantom fillet
 add_executable(probe_rebuild probe_rebuild.cpp)
 target_link_libraries(probe_rebuild PRIVATE materializr_core)
 
-# probe_fillet_repair — recover a fillet-corrupted project from its clean params
+# probe_fillet_repair - recover a fillet-corrupted project from its clean params
 add_executable(probe_fillet_repair probe_fillet_repair.cpp)
 target_link_libraries(probe_fillet_repair PRIVATE materializr_core)
 
-# probe_undoredo — repro: phantom fillet via undo/redo cascade
+# probe_undoredo - repro: phantom fillet via undo/redo cascade
 add_executable(probe_undoredo probe_undoredo.cpp)
 target_link_libraries(probe_undoredo PRIVATE materializr_core)
 
-# probe_twist_face — de-risk: does a ruled ThruSections base->rotated-top loft
+# probe_twist_face - de-risk: does a ruled ThruSections base->rotated-top loft
 # produce a genuine twist, and at what angle does OCCT refuse?
 add_executable(probe_twist_face probe_twist_face.cpp)
 target_link_libraries(probe_twist_face PRIVATE materializr_core)
 
-# test_twist_face — MoveFaceOp Kind::Twist: valid, twisted, volume-preserving
+# test_twist_face - MoveFaceOp Kind::Twist: valid, twisted, volume-preserving
 add_executable(test_twist_face test_twist_face.cpp)
 target_link_libraries(test_twist_face PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_twist_face COMMAND test_twist_face)
 
 
-# test_topo_fillet_gen — FilletOp publishes a generation ledger; a blend face
+# test_topo_fillet_gen - FilletOp publishes a generation ledger; a blend face
 # named by lineage survives a corner-moving resize (general-kernel on real op)
 add_executable(test_topo_fillet_gen test_topo_fillet_gen.cpp)
 target_link_libraries(test_topo_fillet_gen PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_topo_fillet_gen COMMAND test_topo_fillet_gen)
 
-# test_topo_chamfer_gen — ChamferOp generation ledger; bevel face named by lineage
+# test_topo_chamfer_gen - ChamferOp generation ledger; bevel face named by lineage
 add_executable(test_topo_chamfer_gen test_topo_chamfer_gen.cpp)
 target_link_libraries(test_topo_chamfer_gen PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_topo_chamfer_gen COMMAND test_topo_chamfer_gen)
 
 
-# test_topo_pushpull — PushPullOp face-driven target via topo::Ref survives a resize
+# test_topo_pushpull - PushPullOp face-driven target via topo::Ref survives a resize
 add_executable(test_topo_pushpull test_topo_pushpull.cpp)
 target_link_libraries(test_topo_pushpull PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_topo_pushpull COMMAND test_topo_pushpull)
 
-# test_topo_pushpull_lineage — PushPull must PROPAGATE face lineage (updateBody
+# test_topo_pushpull_lineage - PushPull must PROPAGATE face lineage (updateBody
 # clears it); without it every downstream fillet drifts on replay (body-412 bug)
 add_executable(test_topo_pushpull_lineage test_topo_pushpull_lineage.cpp)
 target_link_libraries(test_topo_pushpull_lineage PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_topo_pushpull_lineage COMMAND test_topo_pushpull_lineage)
 
-# test_batch_transform_reload — multi-body gizmo transform must reload as a REAL
+# test_batch_transform_reload - multi-body gizmo transform must reload as a REAL
 # op that re-applies to live geometry, not a baked snapshot (batchtransform bakes)
 add_executable(test_batch_transform_reload test_batch_transform_reload.cpp)
 target_link_libraries(test_batch_transform_reload PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_batch_transform_reload COMMAND test_batch_transform_reload)
 
-# test_topo_shell — ShellOp opened faces via topo::Ref through a REAL history
+# test_topo_shell - ShellOp opened faces via topo::Ref through a REAL history
 # replay (stale-sketch rollback + cascade override) on an L-body where the
 # geometric fallback mis-picks
 add_executable(test_topo_shell test_topo_shell.cpp)
 target_link_libraries(test_topo_shell PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_topo_shell COMMAND test_topo_shell)
 
-# probe_moveface_shell — diagnostic: does MoveFaceOp keep a shelled body's cavity?
+# probe_moveface_shell - diagnostic: does MoveFaceOp keep a shelled body's cavity?
 add_executable(probe_moveface_shell probe_moveface_shell.cpp)
 target_link_libraries(probe_moveface_shell PRIVATE materializr_core)
 
-# test_moveface_hollow — MoveFace on a shelled body refuses cleanly instead of
+# test_moveface_hollow - MoveFace on a shelled body refuses cleanly instead of
 # inverting the shell / silently filling the cavity (Steve's in-app corruption)
 add_executable(test_moveface_hollow test_moveface_hollow.cpp)
 target_link_libraries(test_moveface_hollow PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_moveface_hollow COMMAND test_moveface_hollow)
 
-# probe_thread_loft — diagnostic: native twist-loft thread build timing/quality
+# probe_thread_loft - diagnostic: native twist-loft thread build timing/quality
 add_executable(probe_thread_loft probe_thread_loft.cpp)
 target_link_libraries(probe_thread_loft PRIVATE materializr_core)
 
-# probe_thread_chunk — diagnostic: >40-turn rods as chunked swept segments
+# probe_thread_chunk - diagnostic: >40-turn rods as chunked swept segments
 add_executable(probe_thread_chunk probe_thread_chunk.cpp)
 target_link_libraries(probe_thread_chunk PRIVATE materializr_core)
 
-# probe_thread_hole — diagnostic: boolean-path cost for internal threads
+# probe_thread_hole - diagnostic: boolean-path cost for internal threads
 add_executable(probe_thread_hole probe_thread_hole.cpp)
 target_link_libraries(probe_thread_hole PRIVATE materializr_core)
 
-# test_topo_boolean_gen — boolean seam edge named by two-input gen lineage
+# test_topo_boolean_gen - boolean seam edge named by two-input gen lineage
 # survives an upstream sketch edit (the unnameable-seam breakthrough)
 add_executable(test_topo_boolean_gen test_topo_boolean_gen.cpp)
 target_link_libraries(test_topo_boolean_gen PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_topo_boolean_gen COMMAND test_topo_boolean_gen)
 
-# probe_owns_face — diagnostic: which faces fillet/chamfer steps claim on reload
+# probe_owns_face - diagnostic: which faces fillet/chamfer steps claim on reload
 add_executable(probe_owns_face probe_owns_face.cpp)
 target_link_libraries(probe_owns_face PRIVATE materializr_core)
 
-# test_full_replay — THE contract: every op type reloads editable through the
+# test_full_replay - THE contract: every op type reloads editable through the
 # real ProjectIO and the whole chain replays from step 0 after a sketch edit
 add_executable(test_full_replay test_full_replay.cpp)
 target_link_libraries(test_full_replay PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_full_replay COMMAND test_full_replay)
 
-# test_svg_roundtrip — sketch -> SVG -> sketch: loops stay closed, corners
+# test_svg_roundtrip - sketch -> SVG -> sketch: loops stay closed, corners
 # shared, circles native (Steve's re-import-the-logo breakage)
 add_executable(test_svg_roundtrip test_svg_roundtrip.cpp
     ${CMAKE_SOURCE_DIR}/src/io/SvgExport.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/SvgImport.cpp)
 # SvgImport renders SVG text to outline wires via StdPrs_BRepFont /
-# StdPrs_BRepTextBuilder (TKV3d) on Font_* base classes (TKService) — the same
+# StdPrs_BRepTextBuilder (TKV3d) on Font_* base classes (TKService) - the same
 # font toolkits the app target links. materializr_core doesn't carry them, so
 # this target must add them itself or it won't link.
 target_link_libraries(test_svg_roundtrip PRIVATE materializr_core gtest gtest_main
     TKV3d TKService)
 add_test(NAME test_svg_roundtrip COMMAND test_svg_roundtrip)
 
-# probe_kernel_matrix — one-line-per-case battery of kernel-sensitive modeling
+# probe_kernel_matrix - one-line-per-case battery of kernel-sensitive modeling
 # ops for diffing behavior across OCCT versions (7.6.x apt vs 7.9.3 vs 8.0.0);
 # fork-isolated cases so crashes/hangs report instead of killing the battery.
 # POSIX-only (fork/waitpid is the crash containment); neither is a ctest, so
@@ -582,20 +667,20 @@ if(NOT WIN32)
 add_executable(probe_kernel_matrix probe_kernel_matrix.cpp)
 target_link_libraries(probe_kernel_matrix PRIVATE materializr_core)
 
-# probe_validity_fuzz — deterministic randomized validity sweep (same seed =>
+# probe_validity_fuzz - deterministic randomized validity sweep (same seed =>
 # identical case stream on every OCCT version, for cross-kernel diffing).
 add_executable(probe_validity_fuzz probe_validity_fuzz.cpp)
 target_link_libraries(probe_validity_fuzz PRIVATE materializr_core)
 endif()
 
-# test_blend_cut — #55: chamfer across a surface feature via the swept-wedge
+# test_blend_cut - #55: chamfer across a surface feature via the swept-wedge
 # cut fallback matches chamfer-then-cut exactly; native-success path untouched
 add_executable(test_blend_cut test_blend_cut.cpp)
 target_link_libraries(test_blend_cut PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_blend_cut COMMAND test_blend_cut)
 
 
-# test_audit_hardening — audit residual-finding fixes: settings clamping and
+# test_audit_hardening - audit residual-finding fixes: settings clamping and
 # .cfg injection, transactional-on-failure ProjectIO::load, SVG vertex budget
 add_executable(test_audit_hardening test_audit_hardening.cpp
     ${CMAKE_SOURCE_DIR}/src/io/Settings.cpp
@@ -604,13 +689,13 @@ target_link_libraries(test_audit_hardening PRIVATE materializr_core gtest gtest_
     TKV3d TKService)
 add_test(NAME test_audit_hardening COMMAND test_audit_hardening)
 
-# test_brepio_dos — the BREP length-prefix DoS guard (impossible section count
+# test_brepio_dos - the BREP length-prefix DoS guard (impossible section count
 # rejected fast, valid file still round-trips, truncated file fails cleanly)
 add_executable(test_brepio_dos test_brepio_dos.cpp)
 target_link_libraries(test_brepio_dos PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_brepio_dos COMMAND test_brepio_dos)
 
-# test_param_parse_bounds — the untrusted length/index fields in operation
+# test_param_parse_bounds - the untrusted length/index fields in operation
 # parameter blobs: the atoll wrap that defeated the `colon + 1 + n` bound, the
 # topo::readTok cursor rewind that made Ref::parse hang, and the h<N>/p<N>/count
 # fields that sized allocations straight from the file.
@@ -621,7 +706,7 @@ target_link_libraries(test_param_parse_bounds PRIVATE materializr_core gtest gte
 add_test(NAME test_param_parse_bounds COMMAND test_param_parse_bounds)
 set_tests_properties(test_param_parse_bounds PROPERTIES TIMEOUT 60)
 
-# test_import_budgets — the DXF and image-decode input budgets (F6/F7): the
+# test_import_budgets - the DXF and image-decode input budgets (F6/F7): the
 # over-long line that used to be allocated before its length was checked, the
 # spline degree that signed-overflowed `n + degree + 1`, and the tiny PNG that
 # declares 30000x30000 (~3.6 GB) which must be refused at the probe, before
@@ -631,10 +716,10 @@ target_link_libraries(test_import_budgets PRIVATE materializr_core gtest gtest_m
 add_test(NAME test_import_budgets COMMAND test_import_budgets)
 set_tests_properties(test_import_budgets PROPERTIES TIMEOUT 120)
 
-# test_sketch_dimension — DistancePointLine solver, dimension pair resolution,
+# test_sketch_dimension - DistancePointLine solver, dimension pair resolution,
 # and K-line label-offset persistence (Onshape-style dimension tool).
 # Pulls in SketchTool.h/.cpp (the Dimension pick state machine), which in turn
-# needs TextSketchOp.cpp (handleTextTool) and SvgImport.cpp (handleSvgTool) —
+# needs TextSketchOp.cpp (handleTextTool) and SvgImport.cpp (handleSvgTool) -
 # neither is in materializr_core, and SvgImport renders SVG text to outline
 # wires via Font_* (TKV3d/TKService), same as test_svg_roundtrip above.
 add_executable(test_sketch_dimension test_sketch_dimension.cpp
@@ -649,57 +734,57 @@ add_executable(test_project_thumbnail test_project_thumbnail.cpp)
 target_link_libraries(test_project_thumbnail PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_project_thumbnail COMMAND test_project_thumbnail)
 
-# test_settings_sessions — tab-list persistence + the indexed-list SHRINK trap
+# test_settings_sessions - tab-list persistence + the indexed-list SHRINK trap
 # (the writer preserves keys it didn't emit, which resurrected closed tabs).
-# Settings.cpp is not in materializr_core — compiled in directly, same as
+# Settings.cpp is not in materializr_core - compiled in directly, same as
 # test_audit_hardening does.
 add_executable(test_settings_sessions test_settings_sessions.cpp
     ${CMAKE_SOURCE_DIR}/src/io/Settings.cpp)
 target_link_libraries(test_settings_sessions PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_settings_sessions COMMAND test_settings_sessions)
 
-# test_multibody_export — several disjoint solids export as ONE file with
+# test_multibody_export - several disjoint solids export as ONE file with
 # their spacing intact (print-in-place), and visibility selects the subset.
-# StlExport.cpp is not in materializr_core — compiled in directly.
+# StlExport.cpp is not in materializr_core - compiled in directly.
 add_executable(test_multibody_export test_multibody_export.cpp
     ${CMAKE_SOURCE_DIR}/src/io/StlExport.cpp)
 target_link_libraries(test_multibody_export PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_multibody_export COMMAND test_multibody_export)
 
-# test_batch_transform_builder — a multi-body Move/Rotate relocates the shapes
+# test_batch_transform_builder - a multi-body Move/Rotate relocates the shapes
 # instead of NURBS-converting them (the GTransform path that crashed the app).
 add_executable(test_batch_transform_builder test_batch_transform_builder.cpp)
 target_link_libraries(test_batch_transform_builder PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_batch_transform_builder COMMAND test_batch_transform_builder)
 
-# test_face_centroid — the face-centroid snap (the green centre marker) follows
+# test_face_centroid - the face-centroid snap (the green centre marker) follows
 # the sketch when the sketch plane is moved or rotated.
 add_executable(test_face_centroid test_face_centroid.cpp)
 target_link_libraries(test_face_centroid PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_face_centroid COMMAND test_face_centroid)
 
-# test_stepper_nudge — a stepper clamp must never reverse the nudge.
+# test_stepper_nudge - a stepper clamp must never reverse the nudge.
 add_executable(test_stepper_nudge test_stepper_nudge.cpp)
 target_link_libraries(test_stepper_nudge PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_stepper_nudge COMMAND test_stepper_nudge)
 
-# test_project_compression — both gzip levels round-trip a project unchanged.
+# test_project_compression - both gzip levels round-trip a project unchanged.
 add_executable(test_project_compression test_project_compression.cpp)
 target_link_libraries(test_project_compression PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_project_compression COMMAND test_project_compression)
 
-# test_hole_tilt — MoveHoleOp Tilt (pin the far rim) and EdgeMove (drag one
+# test_hole_tilt - MoveHoleOp Tilt (pin the far rim) and EdgeMove (drag one
 # straight side); round + square holes, and the refusals for curves and folds.
 add_executable(test_hole_tilt test_hole_tilt.cpp)
 target_link_libraries(test_hole_tilt PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_hole_tilt COMMAND test_hole_tilt)
 
-# test_mesh_guard — imported meshes are reference bodies; modelling ops decline.
+# test_mesh_guard - imported meshes are reference bodies; modelling ops decline.
 add_executable(test_mesh_guard test_mesh_guard.cpp)
 target_link_libraries(test_mesh_guard PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_mesh_guard COMMAND test_mesh_guard)
 
-# test_grid_snap — with snap-to-grid on, clicks land on the lattice and the
+# test_grid_snap - with snap-to-grid on, clicks land on the lattice and the
 # drawn grid IS that lattice. Needs TextSketchOp/SvgImport stubs (in the test).
 add_executable(test_grid_snap test_grid_snap.cpp)
 target_link_libraries(test_grid_snap PRIVATE materializr_core gtest gtest_main)
@@ -709,14 +794,14 @@ add_executable(test_scale_face_range test_scale_face_range.cpp)
 target_link_libraries(test_scale_face_range PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_scale_face_range COMMAND test_scale_face_range)
 
-# test_scale_face_exact — a uniformly scaled circle stays a CIRCLE (cone wall,
+# test_scale_face_exact - a uniformly scaled circle stays a CIRCLE (cone wall,
 # centred cap, exact volume), grow leaves ONE cap; and push/pull shortens an
 # extruded cylinder cleanly, alone and after a scale.
 add_executable(test_scale_face_exact test_scale_face_exact.cpp)
 target_link_libraries(test_scale_face_exact PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_scale_face_exact COMMAND test_scale_face_exact)
 
-# test_disabled_thread — a DISABLED Thread step must not leave its body
+# test_disabled_thread - a DISABLED Thread step must not leave its body
 # counting as threaded (isBodyThreaded skipped the isEnabled() check its
 # isBodyShelled sibling always had).
 add_executable(test_disabled_thread test_disabled_thread.cpp)
@@ -727,59 +812,59 @@ add_executable(test_plane_axes test_plane_axes.cpp)
 target_link_libraries(test_plane_axes PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_plane_axes COMMAND test_plane_axes)
 
-# test_cut_target_pick — Subtract-from-sketch picks the body it actually cuts
+# test_cut_target_pick - Subtract-from-sketch picks the body it actually cuts
 # (geometry, not the sketch's source-body link), so a free-floating sketch stops
 # being a silent no-op and a sweep that misses can't land an empty History step.
 add_executable(test_cut_target_pick test_cut_target_pick.cpp)
 target_link_libraries(test_cut_target_pick PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_cut_target_pick COMMAND test_cut_target_pick)
 
-# test_tangent_inference — the tangent guide fires at the FULL inference level
+# test_tangent_inference - the tangent guide fires at the FULL inference level
 # from an anchor ON a circle/arc (D == R), honours an arc's real span, and
 # names the curve actually aimed at
 add_executable(test_tangent_inference test_tangent_inference.cpp)
 target_link_libraries(test_tangent_inference PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_tangent_inference COMMAND test_tangent_inference)
 
-# test_sketch_draft_slot — the in-progress sketch draft is per-instance, so two
+# test_sketch_draft_slot - the in-progress sketch draft is per-instance, so two
 # running copies can't overwrite (or be offered) each other's unfinished sketch
 add_executable(test_sketch_draft_slot test_sketch_draft_slot.cpp)
 target_link_libraries(test_sketch_draft_slot PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_sketch_draft_slot COMMAND test_sketch_draft_slot)
 
-# test_sketch_draft_tab — a restored in-progress sketch comes back in the tab
+# test_sketch_draft_tab - a restored in-progress sketch comes back in the tab
 # it was drawn in, not grafted onto whatever project tab 0 happens to hold
 add_executable(test_sketch_draft_tab test_sketch_draft_tab.cpp)
 target_link_libraries(test_sketch_draft_tab PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_sketch_draft_tab COMMAND test_sketch_draft_tab)
 
-# test_corner_inference — the corner bisector / corner tangent guides at a
+# test_corner_inference - the corner bisector / corner tangent guides at a
 # vertex of two segments (Full / Max only), and the displacement budget that
 # stops a nearby inference from quantizing a short segment's length
 add_executable(test_corner_inference test_corner_inference.cpp)
 target_link_libraries(test_corner_inference PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_corner_inference COMMAND test_corner_inference)
 
-# test_mode_inference — the directional inference family (angle snap, tangent,
+# test_mode_inference - the directional inference family (angle snap, tangent,
 # perpendicular/parallel-to-previous) works in the arc, circle, polygon and
 # spline tools too, anchored on the point actually being extended
 add_executable(test_mode_inference test_mode_inference.cpp)
 target_link_libraries(test_mode_inference PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_mode_inference COMMAND test_mode_inference)
 
-# test_arc_typed_dimension — the arc tool takes a typed chord, then a typed
+# test_arc_typed_dimension - the arc tool takes a typed chord, then a typed
 # sweep angle or radius for the apex (SketchTool::ArcDimMode)
 add_executable(test_arc_typed_dimension test_arc_typed_dimension.cpp)
 target_link_libraries(test_arc_typed_dimension PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_arc_typed_dimension COMMAND test_arc_typed_dimension)
 
-# test_i18n — the translation layer: ImGui ##id suffixes survive translation,
+# test_i18n - the translation layer: ImGui ##id suffixes survive translation,
 # and every shipped string fits the glyph range the font atlas is built with
 add_executable(test_i18n test_i18n.cpp)
 target_link_libraries(test_i18n PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_i18n COMMAND test_i18n)
 
-# test_airfoil_import — Selig + Lednicer airfoil coordinate files, blunt
+# test_airfoil_import - Selig + Lednicer airfoil coordinate files, blunt
 # trailing edges, decimation, and placement as two interpolating splines
 add_executable(test_airfoil_import test_airfoil_import.cpp)
 target_link_libraries(test_airfoil_import PRIVATE materializr_core gtest gtest_main)
@@ -814,7 +899,7 @@ add_test(NAME test_sew COMMAND test_sew)
 # regression until you open the log.
 #
 # A build RPATH does NOT fix this. The linker emits DT_RUNPATH, and DT_RUNPATH
-# is not transitive — it resolves the binary's own DT_NEEDED entries, but not
+# is not transitive - it resolves the binary's own DT_NEEDED entries, but not
 # the libs those pull in, and most of the OCCT toolkits arrive that way. So
 # hand the path to ctest instead, which covers every dependency at once and
 # leaves the shipped binaries untouched.
@@ -829,7 +914,7 @@ if(DEFINED MZR_OCCT_PREFIX)
     endif()
 endif()
 
-# test_grid_scale — the sketch grid's drawn lattice vs its snap lattice.
+# test_grid_scale - the sketch grid's drawn lattice vs its snap lattice.
 # GridScale.h is header-only and deliberately GL-free, so this links against
 # neither the viewport nor ImGui.
 add_executable(test_grid_scale test_grid_scale.cpp)

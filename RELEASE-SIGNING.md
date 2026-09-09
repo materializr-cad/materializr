@@ -27,10 +27,10 @@ keytool -list -v -keystore ~/materializr-release.jks
 ## Build a signed release APK
 
 `android/app/build.gradle` reads the signing config from environment variables
-(preferred — nothing stored at rest) or, failing that, a gitignored
+(preferred - nothing stored at rest) or, failing that, a gitignored
 `android/keystore.properties`. The key alias defaults to `materializr`.
 
-### Option 1 — environment variables (recommended)
+### Option 1 - environment variables (recommended)
 
 ```bash
 cd android
@@ -47,7 +47,7 @@ Available env vars: `MATERIALIZR_KEYSTORE`, `MATERIALIZR_STORE_PASSWORD`,
 `MATERIALIZR_KEY_ALIAS` (default `materializr`), `MATERIALIZR_KEY_PASSWORD`
 (defaults to the store password).
 
-### Option 2 — gitignored properties file
+### Option 2 - gitignored properties file
 
 Create `android/keystore.properties` (already gitignored):
 

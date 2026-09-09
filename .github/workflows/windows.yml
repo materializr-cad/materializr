@@ -46,7 +46,7 @@ jobs:
       # READ-ONLY on pull requests. A PR from a fork gets a read-only
       # GITHUB_TOKEN, so a `readwrite` push would fail the step; and PR builds
       # shouldn't be able to write the cache that later main builds consume
-      # anyway — that would let an untrusted PR poison a trusted build.
+      # anyway - that would let an untrusted PR poison a trusted build.
       VCPKG_BINARY_SOURCES: >-
         clear;nuget,GitHub,${{ github.event_name == 'pull_request' && 'read' || 'readwrite' }}
       # Where the NuGet feed lives. Per-org URL; ${{ github.repository_owner }}
@@ -63,7 +63,7 @@ jobs:
       #
       # Skipped for PRs from a FORK: that token cannot authenticate to this
       # org's feed at all, so configuring the source would only produce 401s on
-      # every restore. Those runs compile the dependencies from source instead —
+      # every restore. Those runs compile the dependencies from source instead -
       # slow (OCCT is ~1h cold) but correct. Same-repo PRs keep the cache and
       # stay fast.
       - name: Configure vcpkg binary cache (GitHub Packages NuGet feed)
@@ -108,7 +108,7 @@ jobs:
 
       # -C Release: the Visual Studio generator is multi-config, so ctest needs
       # the configuration named explicitly or it finds no tests to run and
-      # exits 0 — a green check that verified nothing.
+      # exits 0 - a green check that verified nothing.
       - name: Test
         shell: pwsh
         run: ctest --test-dir build -C Release --output-on-failure
@@ -126,14 +126,14 @@ jobs:
           Copy-Item "$($exe.Directory.FullName)/*.dll" $stage/ -ErrorAction SilentlyContinue
           # Manifest mode installs into ./vcpkg_installed (not the global tree).
           Copy-Item "vcpkg_installed/x64-windows/bin/*.dll" $stage/ -ErrorAction SilentlyContinue
-          # Bundled fonts (UI font + the sketch Text tool's picker) — the app
+          # Bundled fonts (UI font + the sketch Text tool's picker) - the app
           # resolves `<exe>/assets/fonts/` in its candidate list.
           Copy-Item -Recurse assets $stage/assets
           Get-ChildItem $stage | Format-Table Name,Length
 
       # Launch smoke test. CI has always BUILT this exe and never RUN it, which
       # is how a crash on the FIRST LINE of main() shipped in two releases
-      # (#82 — setvbuf with a size MSVC's UCRT rejects, fail-fasting before any
+      # (#82 - setvbuf with a size MSVC's UCRT rejects, fail-fasting before any
       # output). --help returns before a window or GL context exists, so it runs
       # fine on a headless runner while still covering static init, the CRT
       # calls, and every DLL the exe imports.
@@ -144,7 +144,7 @@ jobs:
           $p = Start-Process -FilePath .\materializr.exe -ArgumentList '--help' `
                  -NoNewWindow -PassThru -Wait
           if ($p.ExitCode -ne 0) {
-            throw ("materializr.exe --help exited {0} (0x{1:X8}) — the app cannot start" -f $p.ExitCode, $p.ExitCode)
+            throw ("materializr.exe --help exited {0} (0x{1:X8}) - the app cannot start" -f $p.ExitCode, $p.ExitCode)
           }
           Write-Host "materializr.exe --help exited 0"
 
@@ -162,7 +162,7 @@ jobs:
       # APPVERSION goes through the environment, not through `${{ }}` inline in
       # the command line. Actions expands `${{ }}` textually BEFORE pwsh parses
       # the line, and git ref names may legally contain `"`, `;`, `$` and
-      # backticks — enough to close the quoted string and append a statement, in
+      # backticks - enough to close the quoted string and append a statement, in
       # a job that holds contents/packages write. Reading $env: instead removes
       # that path entirely. (It also keeps the ref out of the command line now
       # that PRs run this, where ref_name is "<number>/merge".)

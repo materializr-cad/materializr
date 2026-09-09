@@ -1,5 +1,7 @@
 #include "ui/LengthField.h"
 #include "PushPullController.h"
+#include "PushPullPreview.h"
+#include "GhostMesh.h"
 #include "../core/Document.h"
 #include "../core/History.h"
 #include "../core/NumParse.h"
@@ -13,7 +15,12 @@
 #include "../ui/UiTheme.h"       // viewportBanner
 #include "../touch_mode.h"
 #include <imgui.h>
+#include <chrono>
+#include <cstddef>
+#include <optional>
 #include <BRep_Builder.hxx>
+#include <TopLoc_Location.hxx>
+#include <gp_Trsf.hxx>
 #include <BRep_Tool.hxx>
 #include <BRepGProp_Face.hxx>
 #include <BRepPrimAPI_MakePrism.hxx>
@@ -58,6 +65,22 @@ bool PushPullController::beginPushPull(const IopContext& ctx) {
 
 // Scan the selection into targets, then work out the arrow frame and whether
 // this gesture has to fall back to the ghost preview.
+// Does any body the tool could reach right now carry a thread? Wider than the
+// target list on purpose: a cut-intersecting push/pull booleans into every
+// VISIBLE body in the prism's path, and visibility is read when the operation
+// executes.
+bool PushPullController::anyVisibleBodyThreaded(const IopContext& ctx) {
+    for (int id : ctx.doc.getAllBodyIds()) {
+        if (!ctx.doc.isBodyVisible(id)) continue;
+        if (ctx.history.isBodyThreaded(id)) return true;
+    }
+    return false;
+}
+
+bool PushPullController::wantsDeferredCommit(const IopContext& ctx) const {
+    return m_st.heavyPreview && !anyVisibleBodyThreaded(ctx);
+}
+
 int PushPullController::onBegin(const IopContext& ctx) {
     bool curvedFaceSkipped = false;   // a rounded/fillet face was picked (#28)
     for (const auto& e : ctx.selection.getSelection()) {
@@ -78,7 +101,7 @@ int PushPullController::onBegin(const IopContext& ctx) {
             // A DETACHED sketch has been deliberately broken away from its
             // former host (moved independently in 3D). Keeping the stale
             // source-body id fused the new prism into a body that can be
-            // hundreds of mm away — a push/pull on an unlinked sketch must
+            // hundreds of mm away - a push/pull on an unlinked sketch must
             // behave like a free-floating sketch and make its own body.
             t.sourceBodyId = sketch->isDetachedFromBody()
                                  ? -1
@@ -88,7 +111,7 @@ int PushPullController::onBegin(const IopContext& ctx) {
             // PUSH/PULL adopts the body the sketch sits flat ON. A sketch with
             // no body link (e.g. drawn on a construction plane and used to cut
             // a hole) that lies coplanar-and-over a visible body's face should
-            // fuse/cut that body in place — not spawn a separate solid that
+            // fuse/cut that body in place - not spawn a separate solid that
             // overlaps and z-fights it. (Extrude From keeps its always-new-
             // body semantics; a new body from this sketch is one Extrude
             // away.) A DETACHED sketch was deliberately unlinked, so it stays
@@ -112,16 +135,16 @@ int PushPullController::onBegin(const IopContext& ctx) {
             if (t.profile.IsNull()) continue;
             // Push/Pull only works on FLAT faces. Sweeping a prism from a
             // curved face (fillet / round / cylinder wall) and booling it
-            // produces self-intersecting garbage — skip it (and toast below).
+            // produces self-intersecting garbage - skip it (and toast below).
             // Same planarity test as "Sketch on face"; a flat face bounded by
-            // fillets still pushes fine — this only rejects the rounded face
+            // fillets still pushes fine - this only rejects the rounded face
             // itself. #28
             if (!faceIsPlanar(t.profile)) { curvedFaceSkipped = true; continue; }
             m_st.targets.push_back(t);
         } else if (e.type == SelectionType::Sketch && e.sketchId >= 0) {
             // Whole-sketch push/pull (selected from the Items panel, no
             // specific region): push/pull EVERY region of the sketch. Mirrors
-            // the SketchRegion branch above, per region — so a body-attached
+            // the SketchRegion branch above, per region - so a body-attached
             // sketch picked from the panel edits its host body, matching
             // Extrude's whole-sketch behaviour. The rail only offers Push here
             // for an attached sketch, so sourceBodyId resolves to the real host.
@@ -149,9 +172,9 @@ int PushPullController::onBegin(const IopContext& ctx) {
         }
     }
 
-    // A rounded/fillet face was picked — tell the user why it was ignored (#28).
+    // A rounded/fillet face was picked - tell the user why it was ignored (#28).
     if (curvedFaceSkipped && ctx.toast)
-        ctx.toast("Push/Pull works on flat faces \xE2\x80\x94 not curved or "
+        ctx.toast("Push/Pull works on flat faces - not curved or "
                   "fillet faces.");
     if (m_st.targets.empty()) {
         if (!curvedFaceSkipped)
@@ -170,7 +193,7 @@ int PushPullController::onBegin(const IopContext& ctx) {
     //
     // For a flat face the UV-midpoint surface normal IS the face normal, but
     // for a CURVED face (chamfer cone, fillet torus, side of a cylinder, etc.)
-    // that normal is the surface tangent perpendicular at one specific point —
+    // that normal is the surface tangent perpendicular at one specific point -
     // sloped for a cone, twisted for a torus. The push/pull arrow then looks
     // like it "follows the polygon clicked" instead of a stable axis.
     //
@@ -190,7 +213,7 @@ int PushPullController::onBegin(const IopContext& ctx) {
             gp_Pnt c; gp_Vec n;
             prop.Normal((u1 + u2) * 0.5, (v1 + v2) * 0.5, c, n);
             if (n.Magnitude() > 1e-10) {
-                // NO outward correction — BRepGProp_Face::Normal() already
+                // NO outward correction - BRepGProp_Face::Normal() already
                 // applies face orientation; this IS outward. MUST mirror
                 // PushPullOp::execute (see the war-story comment there).
                 gp_Vec dir = n;
@@ -234,7 +257,7 @@ int PushPullController::onBegin(const IopContext& ctx) {
     m_st.inputFocus = true;
 
     // Dense bodies (a threaded rod has hundreds of helical faces) cannot
-    // afford a real boolean per drag frame — and since push/pull now
+    // afford a real boolean per drag frame - and since push/pull now
     // triggers the thread-last reflow, each preview frame would re-thread
     // the whole rod (Steve: drag "a no go, non-responsive ~10s"). Those
     // bodies get a GHOST preview (tinted tool volume) and run the real
@@ -251,20 +274,29 @@ int PushPullController::onBegin(const IopContext& ctx) {
     }
     // Cut-intersecting push/pulls (a free-space sketch, or any drag that
     // goes negative mid-gesture) boolean into EVERY visible body in the
-    // tool's path — the source-body face count above never sees those. If
+    // tool's path - the source-body face count above never sees those. If
     // any visible body is threaded, the light path would run that boolean
     // over the thread's helicoid faces per preview frame ("stacked discs"
     // + not-responding, 2026-07-21). Ghost preview + one real boolean at
     // commit, where the thread reflow handles it once.
-    if (!m_st.heavyPreview) {
-        for (int id : ctx.doc.getAllBodyIds()) {
-            if (!ctx.doc.isBodyVisible(id)) continue;
-            if (ctx.history.isBodyThreaded(id)) { m_st.heavyPreview = true; break; }
-        }
-    }
+    //
+    // Scanned unconditionally, not just when the face-count pass found
+    // nothing: a dense body can be threaded too, and the answer decides more
+    // than the preview. wantsDeferredCommit reads it to keep the commit
+    // inline on a threaded body, where History reflows this op beneath the
+    // Thread step.
+    m_st.threadedPath = anyVisibleBodyThreaded(ctx);
+    if (m_st.threadedPath) m_st.heavyPreview = true;
+
+    // The async preview computes every frame from the bodies as they are NOW,
+    // before any preview touched them (the live document carries the previous
+    // preview frame).
+    m_originals = snapshotBodies(ctx.doc);
+    m_ppDispatch.reset();
+    m_ppJob.abandon();
 
     // Push/Pull may edit several bodies at once, and a free-space one CREATES
-    // its body — there is no single body to snapshot. The live instance's own
+    // its body - there is no single body to snapshot. The live instance's own
     // undo() is the restore path.
     return kNoTargetBody;
 }
@@ -318,7 +350,7 @@ bool PushPullController::syncLiveOp(Operation& op) {
     return std::abs(m_st.distance) > 1e-6;
 }
 
-// Tinted, renderer-only tool volume for the heavy path — the swept prism, with
+// Tinted, renderer-only tool volume for the heavy path - the swept prism, with
 // no boolean and no Document body behind it.
 void PushPullController::updateGhost(const IopContext& ctx) const {
     if (!ctx.showGhost || !ctx.clearGhost) return;
@@ -329,10 +361,36 @@ void PushPullController::updateGhost(const IopContext& ctx) const {
     if (std::abs(m_st.distance) > 1e-6) {
         gp_Vec pv(m_st.normal.x, m_st.normal.y, m_st.normal.z);
         pv *= static_cast<double>(m_st.distance);
+        // Symmetric sweeps both ways, as the op does: start a full distance
+        // behind the profile and sweep twice as far. Moved() keeps the
+        // profile's triangulation, so the fast path below still applies.
+        gp_Vec sweep = pv;
+        TopLoc_Location base;
+        if (m_st.symmetric) {
+            gp_Trsf back;
+            back.SetTranslation(pv.Reversed());
+            base = TopLoc_Location(back);
+            sweep = pv * 2.0;
+        }
+        // Preferred: triangles straight from each profile's own triangulation
+        // (no mesher; the mesher paid per side wall, 26 ms on a 300-hole
+        // profile). Every target must manage it, else the whole ghost goes
+        // the shape way below.
+        if (ctx.showGhostMesh) {
+            std::vector<float> verts;
+            bool all = !m_st.targets.empty();
+            for (const auto& t : m_st.targets)
+                if (t.profile.IsNull() ||
+                    !ghostPrismMesh(TopoDS::Face(t.profile.Moved(base)), sweep, verts)) { all = false; break; }
+            if (all && !verts.empty()) {
+                ctx.showGhostMesh(verts, m_st.distance < 0.0f);
+                return;
+            }
+        }
         for (const auto& t : m_st.targets) {
             if (t.profile.IsNull()) continue;
             try {
-                BRepPrimAPI_MakePrism mk(t.profile, pv);
+                BRepPrimAPI_MakePrism mk(t.profile.Moved(base), sweep);
                 mk.Build();
                 if (mk.IsDone()) { bb.Add(comp, mk.Shape()); any = true; }
             } catch (...) {}
@@ -349,7 +407,7 @@ void PushPullController::updatePushPull(const IopContext& ctx, bool applySnap) {
     // Snap the live distance to the corner-widget grid step before applying.
     // Mutating m_st.distance itself (rather than just the value handed to
     // setDistance) means the dim-arrow readout, the InputText field, and the
-    // stepper all reflect the snapped value — there's no "type 5.3, see 5.3 in
+    // stepper all reflect the snapped value - there's no "type 5.3, see 5.3 in
     // the field, body extrudes to 5.0" discrepancy. Toggling snap off mid-drag
     // immediately frees the distance to fine values on the next frame.
     if (applySnap && ctx.snapToGrid && ctx.gridStep > 0.0f) {
@@ -365,23 +423,121 @@ void PushPullController::updatePushPull(const IopContext& ctx, bool applySnap) {
         updateGhost(ctx);
         return;
     }
+    if (m_ppDispatch.async()) {
+        if (std::abs(m_st.distance) <= 1e-6) {
+            // Back at zero: nothing to preview, and the last landed preview
+            // must not stay on the body (no job runs for zero, so nothing
+            // else would take it off).
+            retractLivePreview(ctx);
+            m_ppDispatch.retracted(); // coming back to the old distance must ask again
+            updateGhost(ctx); // clears it
+            return;
+        }
+        // The ghost follows the arrow this frame; the real boolean runs on a
+        // worker and lands through pollPreview(). The last landed preview
+        // stays on the body until then.
+        updateGhost(ctx);
+        launchPreviewIfWanted(ctx);
+        return;
+    }
+    const auto t0 = std::chrono::steady_clock::now();
     update(ctx);
+    m_ppDispatch.inlinePreviewTook(std::chrono::duration<double, std::milli>(
+                                     std::chrono::steady_clock::now() - t0).count());
+}
+
+void PushPullController::launchPreviewIfWanted(const IopContext& ctx) {
+    const PushPullKey want{static_cast<double>(m_st.distance), m_st.symmetric};
+    if (std::abs(m_st.distance) <= 1e-6) return; // a zero gesture previews nothing
+    if (!m_ppDispatch.shouldLaunch(want)) return;
+    std::vector<PreviewTarget> targets;
+    for (const auto& t : m_st.targets) {
+        PreviewTarget pt;
+        pt.profile = t.profile;
+        pt.sourceBodyId = t.sourceBodyId;
+        pt.sketchId = t.sketchId;
+        pt.regionIndex = t.regionIndex;
+        targets.push_back(pt);
+    }
+    PreviewParams params;
+    params.distance = want.distance;
+    params.symmetric = want.symmetric;
+    params.cutIntersecting = allFreeSketchTargets() || m_st.distance < 0.0f;
+    std::unique_ptr<PreviewJob> job = PreviewJob::prepare(m_originals, targets, params);
+    if (!job) {
+        // Nothing can be previewed at this distance: the body must not keep
+        // showing the previous one. The ghost stays, it is what is being
+        // dragged. Not retried until the arrow moves.
+        retractLivePreview(ctx);
+        m_ppDispatch.refused(want);
+        return;
+    }
+    // A refused thread is the same as a refused prepare(): nothing will be
+    // previewed at this distance, so the previous preview must not stay on
+    // the body. A job still running is parked by the launch and reaped once
+    // it finishes; nothing in a frame ever waits on it.
+    std::shared_ptr<PreviewJob> shared = std::move(job);
+    if (!m_ppJob.launch([shared] { return shared->run(); })) {
+        retractLivePreview(ctx);
+        m_ppDispatch.refused(want);
+        return;
+    }
+    m_ppDispatch.launched(want);
+}
+
+void PushPullController::pollPreview(const IopContext& ctx) {
+    m_ppJob.reap(); // abandoned jobs finish whether or not a gesture is active
+    if (!active()) return;
+    std::optional<PreviewResult> result = m_ppJob.take();
+    if (!result) return;
+    const PushPullKey now{static_cast<double>(m_st.distance), m_st.symmetric};
+    const bool current = m_ppDispatch.finished(now);
+    if (current) {
+        if (result->ok && liveOp()) {
+            PushPullOp::Precomputed pre;
+            pre.bodies = std::move(result->bodies);
+            pre.created = std::move(result->created);
+            static_cast<PushPullOp*>(liveOp())->setPrecomputed(std::move(pre));
+            // Base engine: undo the previous preview, sync, execute (which
+            // applies the precomputed result), mark the changed bodies.
+            update(ctx);
+        } else {
+            // The op refused this distance (a cut that would remove the whole
+            // body, say): show the gesture-start state, not the last landed
+            // preview at some other distance. Not retried until the arrow
+            // moves (PushPullDispatch::finished).
+            retractLivePreview(ctx);
+        }
+        if (ctx.clearGhost) ctx.clearGhost();
+        return;
+    }
+    // The arrow moved while the job ran: that result is stale, ask again.
+    launchPreviewIfWanted(ctx);
+}
+
+bool PushPullController::previewPending() const {
+    // Pending until POLLED, not until done: a job finishing between the poll
+    // and the frame loop's active-work check must still earn the next frame.
+    // Abandoned jobs do NOT count: the loop keeps iterating at the idle floor
+    // and polls every iteration, so they are reaped within a tick of
+    // finishing without rendering frames for a preview nobody wants.
+    return m_ppJob.running();
 }
 
 // Mark only what the push/pull actually touched. On a 100+ body project this
 // turns each preview frame from "re-tessellate every visible body" into
 // "re-tessellate 1-2 bodies", which is the difference between unusable and
-// smooth — and it keeps the full rebuild (which clears the renderer) away from
+// smooth - and it keeps the full rebuild (which clears the renderer) away from
 // the ghost slot.
 void PushPullController::markPreviewDirty(const IopContext& ctx) const {
     if (m_st.heavyPreview) return;   // nothing was previewed; the ghost stands
     if (!ctx.markBodyDirty) { ctx.markMeshesDirty(); return; }
     for (const auto& t : m_st.targets)
         if (t.sourceBodyId >= 0) ctx.markBodyDirty(t.sourceBodyId);
-    // Free-floating push/pull creates new bodies — mark them too so they
+    // Free-floating push/pull creates new bodies - mark them too so they
     // appear / refresh. Restrict to VISIBLE bodies: invisible ones never get a
     // renderer slot (full-rebuild skips them), so without the visibility check
-    // they'd be marked dirty every preview frame forever — pure waste.
+    // they'd be marked dirty every preview frame forever - pure waste.
     if (!ctx.bodyHasRenderSlot) return;
     for (int id : ctx.doc.getAllBodyIds()) {
         if (!ctx.doc.isBodyVisible(id)) continue;
@@ -394,13 +550,24 @@ std::unique_ptr<Operation> PushPullController::buildCommitOp(const IopContext& c
     // clears it.
     if (ctx.clearGhost) ctx.clearGhost();
 
+    if (m_ppDispatch.async()) {
+        // Async path: the applied preview has no face lineage and may trail
+        // the arrow by one job, so it is never what gets recorded; the base
+        // undoes it and runs this fresh op once, at the arrow's distance.
+        // Zero distance included: the last landed preview may still be
+        // applied at zero (no job runs for zero), and returning null here
+        // would record it. The fresh op refuses zero and History drops it.
+        std::fprintf(stdout, "Push/Pull committed at %.2f mm\n", m_st.distance);
+        return makeOp();
+    }
+
     const bool moved = std::abs(m_st.distance) > 1e-6;
     if (!moved) return nullptr;   // nothing applied, nothing to record
 
     if (m_st.heavyPreview) {
         // Ghost path: the document was never previewed, so hand the base a
         // real op to push. This is where the thread reflow runs for dense
-        // bodies — a single synchronous recompute instead of one per frame.
+        // bodies - a single synchronous recompute instead of one per frame.
         std::fprintf(stdout, "Push/Pull committed at %.2f mm\n", m_st.distance);
         return makeOp();
     }
@@ -409,7 +576,7 @@ std::unique_ptr<Operation> PushPullController::buildCommitOp(const IopContext& c
     // subtracts from them (each separately) instead of making an overlapping
     // new body; so does ANY cut-direction push/pull (it cuts the source body
     // AND every other visible body in its path). The preview always showed the
-    // new-body extrusion, so hand back a fresh cut-enabled op — the base undoes
+    // new-body extrusion, so hand back a fresh cut-enabled op - the base undoes
     // the preview before pushing it. The op itself falls back to a new body if
     // it hits nothing, so "no intersection" is still today's behaviour.
     if (allFreeSketchTargets() || m_st.distance < 0.0f) {
@@ -425,12 +592,15 @@ std::unique_ptr<Operation> PushPullController::buildCommitOp(const IopContext& c
 }
 
 void PushPullController::cancel(const IopContext& ctx) {
-    if (ctx.clearGhost) ctx.clearGhost();   // ghost only — nothing was pushed
+    if (ctx.clearGhost) ctx.clearGhost();   // ghost only - nothing was pushed
     InteractiveOpController::cancel(ctx);
 }
 
 void PushPullController::onCleanup() {
     m_st = PushPullState{};
+    m_ppDispatch.reset();
+    m_ppJob.abandon(); // finishes on its own, reaped later
+    m_originals.clear();
 }
 
 void PushPullController::applyDrag(const IopViewport& vp) {
@@ -439,9 +609,9 @@ void PushPullController::applyDrag(const IopViewport& vp) {
     materializr::formatLengthDigits(m_st.inputBuf, sizeof(m_st.inputBuf), m_st.distance);
 }
 
-// Drag the arrow: a one-finger drag in the viewport (touch — orbit is
+// Drag the arrow: a one-finger drag in the viewport (touch - orbit is
 // suppressed while push/pull is active) or a mouse left-drag. No handle to
-// latch — the whole viewport is the drag surface — so draggingHandle() stays
+// latch - the whole viewport is the drag surface - so draggingHandle() stays
 // false and the camera keeps its own claim (the dispatch loop skips this while
 // the camera is dragging).
 void PushPullController::onViewportInput(const IopViewport& vp,
@@ -457,7 +627,7 @@ void PushPullController::onViewportInput(const IopViewport& vp,
     // single click in the viewport flips the sticky flag; while sticky, every
     // frame's mouse delta feeds the arrow with no button held. Clicks consumed
     // by ImGui widgets don't count. Sticky is a DESKTOP-trackpad model (move
-    // the cursor with no button held) — vp.trackpadInput is already false under
+    // the cursor with no button held) - vp.trackpadInput is already false under
     // touch, where a tap would toggle it on and then feed BOTH it and the
     // direct drag above (double distance).
     // Toggle on a click that never became a drag -- the press frame is too
@@ -529,7 +699,7 @@ void PushPullController::renderPushPullPanel(const IopContext& ctx) {
     bool doCommit = false, doCancel = false;
     if (imTouch) {
         // im-touch: the panel is the value well (+ the Symmetric toggle below
-        // when it applies) — no header, hint or steppers.
+        // when it applies) - no header, hint or steppers.
         if (materializr::amountLengthField("ppAmt", m_st.symmetric ? "Per side" : "Distance", &m_st.distance, /*allowSign=*/!m_st.symmetric)) {
             m_st.distanceRaw = m_st.distance;
             materializr::formatLengthDigits(m_st.inputBuf, sizeof(m_st.inputBuf), m_st.distance);
@@ -549,7 +719,7 @@ void PushPullController::renderPushPullPanel(const IopContext& ctx) {
             updatePushPull(ctx);
             doCommit = true;
         } else if (materializr::lengthBufferIsActive("##ppdist")) {
-            // Only while typing — see the shell controller for why.
+            // Only while typing - see the shell controller for why.
             float parsed = m_st.distance;
             if (materializr::parseLength(m_st.inputBuf, parsed) &&
                 std::abs(parsed - m_st.distance) > 0.01f) {
@@ -563,8 +733,8 @@ void PushPullController::renderPushPullPanel(const IopContext& ctx) {
     }
 
     // Quick-nudge stepper (replaces the slider). Symmetric sweeps both ways, so
-    // a negative distance is meaningless there — drop the minus buttons and
-    // clamp positive while ticked. 0 clears the change. Desktop only —
+    // a negative distance is meaningless there - drop the minus buttons and
+    // clamp positive while ticked. 0 clears the change. Desktop only -
     // im-touch stays a single well.
     if (!imTouch &&
         materializr::lengthStepperRow("ppStep", &m_st.distance,
@@ -576,7 +746,7 @@ void PushPullController::renderPushPullPanel(const IopContext& ctx) {
     }
 
     // Symmetric: one prism swept the distance to BOTH sides of the sketch plane
-    // (plane sketches only — on a body face it would push into and out of the
+    // (plane sketches only - on a body face it would push into and out of the
     // body at once). Single body, no mid-plane seam.
     {
         bool allFree = !m_st.targets.empty();
@@ -604,7 +774,7 @@ void PushPullController::renderPushPullPanel(const IopContext& ctx) {
             doCancel = true;
     }
     ImGui::End();
-    // Commit/cancel AFTER End() — they tear the controller's state down, and
+    // Commit/cancel AFTER End() - they tear the controller's state down, and
     // the window has to be closed first. (The hand-written version called them
     // from inside; same fix Extrude got on extraction.)
     if (doCommit) commit(ctx);

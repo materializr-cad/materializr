@@ -1,5 +1,5 @@
 // Tail: FilletOp publishes a GenerationLedger (input edge -> blend face), so
-// the "gen" strategy can name a BLEND face — an op-GENERATED face no geometric
+// the "gen" strategy can name a BLEND face - an op-GENERATED face no geometric
 // (sketch) scheme can name. The blend's name references the filleted edge,
 // which is itself sketch-anchored (EdgeAnchor corner), so the blend-face name
 // survives a dimension edit that MOVES the corner. This is the general kernel

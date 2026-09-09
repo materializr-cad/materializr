@@ -26,12 +26,12 @@ public:
 
     // True while the host Application has the sketch editor active. Plugins
     // can use this to suppress decorations that would clutter the sketch
-    // canvas — the Construction Plane plugin hides plane quads when
+    // canvas - the Construction Plane plugin hides plane quads when
     // sketching in ortho so the user has a clean drawing surface.
     bool isInSketchMode() const;
 
     // Request that the host Application start an interactive popup-driven op
-    // (which the plugin can't run on its own — those need viewport + UI plumbing
+    // (which the plugin can't run on its own - those need viewport + UI plumbing
     // that lives in Application). Application picks it up via
     // takeRequestedInteractiveOp() once per frame and dispatches. Calling this
     // from a toolbar action defers the actual popup to the next frame, which is

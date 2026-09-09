@@ -1,5 +1,5 @@
 #pragma once
-// im-touch widget kit (docs/im-touch-ui-plan.md, Phase 1) — the five
+// im-touch widget kit (docs/im-touch-ui-plan.md, Phase 1) - the five
 // primitives the mockup is built from, so shell screens stay declarative.
 // All sizes scale with uiScale(); every hit target is >= 44pt. Render inside
 // a touchui::Scope (TouchTheme.h) for the intended look.
@@ -11,7 +11,7 @@ namespace materializr {
 namespace touchui {
 
 // Vertical rail entry: icon over a small label, accent-filled rounded rect
-// when active. Fills the current content width (or `width` when > 0 — used
+// when active. Fills the current content width (or `width` when > 0 - used
 // by the lite shell's horizontal tool bar). `solid` gives the inactive state
 // a panel-coloured fill too, so the button reads as solid standing alone on
 // the viewport (not just when hovered/active) without a separate backing
@@ -35,7 +35,7 @@ bool twoRowButton(const char* id, const char* caption, const char* value,
                   bool accent = false);
 float twoRowButtonWidth(const char* caption, const char* value);
 
-// Exact width pillButton(icon, label) will occupy — for right-aligned layout
+// Exact width pillButton(icon, label) will occupy - for right-aligned layout
 // math (the top bar). Shares the sizing code so the two can't drift.
 float pillButtonWidth(const char* icon, const char* label = nullptr);
 
@@ -70,7 +70,7 @@ float numberPadWidth(float keyW = 0.0f);
 
 // In-app numeric keypad (7 8 9 / 4 5 6 / 1 2 3 / . 0 ⌫) editing `buf` in
 // place. Exists because the NATIVE mobile keyboard is a dead end for the
-// im-touch dimension fields — raising iOS's keyboard from the SDL loop
+// im-touch dimension fields - raising iOS's keyboard from the SDL loop
 // starved/froze the app, and a CAD dimension only ever needs digits and a
 // dot anyway. Pure ImGui buttons: no SDL_StartTextInput, no IME, no focus.
 // `allowSign` adds a full-width ± key (push/pull's negative = cut).
@@ -88,7 +88,7 @@ bool numberPad(const char* id, char* buf, size_t bufSize, float keyW = 0.0f,
 // Callers keep their InputText path for the other layouts and call this
 // only when im-touch hosts the panel. minV<maxV clamps the committed value.
 // The pad popup is PINNED: below the field's own well by default, or at
-// `padPos` (screen coords) when given — multi-field dialogs (rectangle
+// `padPos` (screen coords) when given - multi-field dialogs (rectangle
 // W/H) pass one shared anchor so the pad never jumps between fields.
 bool amountField(const char* id, const char* label, double* v,
                  const char* suffix = "mm", int decimals = 1,
@@ -100,15 +100,15 @@ bool amountField(const char* id, const char* label, double* v,
 //
 // Fourth attempt, and each earlier one ruled something out:
 //
-//  1. A full self-designed keyboard — clunky once it had to cover digits AND
+//  1. A full self-designed keyboard - clunky once it had to cover digits AND
 //     symbols AND letters, and it appeared whenever a dialog opened rather
 //     than when a field was focused. Hence digits only (letters keep the
 //     native keyboard, see inputNumber), and it unfolds only on a tap.
-//  2. The native keyboard (aab4bfb) — fixed a field-width bug but left
+//  2. The native keyboard (aab4bfb) - fixed a field-width bug but left
 //     tablets at the mercy of whatever the OS shows: a half-screen slab on
 //     stock Android, and on iOS one that froze the app when raised from the
 //     SDL loop.
-//  3. A pad in an ImGui popup — the popup had to be positioned by hand, which
+//  3. A pad in an ImGui popup - the popup had to be positioned by hand, which
 //     meant computing its height to keep it on screen (it was clipped off the
 //     bottom when that estimate ran low), flipping it above the field so it
 //     didn't cover the value being edited, and it could not be moved. On
@@ -122,13 +122,13 @@ bool amountField(const char* id, const char* label, double* v,
 // ✗ (collapse, leaving the value untouched).
 // `opened`, when non-null, is set true on the frame the pad UNFOLDS. Some
 // callers must snapshot state at the moment editing begins rather than when it
-// commits — the sketch constraint fields take a copy of the whole sketch there
+// commits - the sketch constraint fields take a copy of the whole sketch there
 // to serve as the undo "before". That was ImGui::IsItemActivated() on the
 // InputText they used to be; this is the equivalent.
 // `hint`, when non-null, marks a field whose EMPTY state is meaningful (the
 // im-touch circle bubble: no typed value = keep the dragged diameter). While
 // *v <= 0 the collapsed well shows the hint dimmed instead of "0", and the
-// pad unfolds with an EMPTY entry — Enter with nothing typed commits nothing
+// pad unfolds with an EMPTY entry - Enter with nothing typed commits nothing
 // and just folds, preserving the "keep the drag" contract.
 bool numberField(const char* id, const char* label, double* v,
                  const char* fmt = "%g", bool* opened = nullptr,
@@ -139,7 +139,7 @@ bool amountField(const char* id, const char* label, float* v,
                  const ImVec2* padPos = nullptr);
 
 // Fusion-style browser tree rows (the im-touch transparent Items overlay).
-// Group header: disclosure triangle + label + count. Returns true on tap —
+// Group header: disclosure triangle + label + count. Returns true on tap -
 // the caller flips its open flag. When rightClicked is non-null it reports a
 // right-click / long-press on the header. trailingLabel, when set, draws a
 // visible action pill (e.g. "+ Folder") on the right with its own hit area;

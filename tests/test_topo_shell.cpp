@@ -2,11 +2,11 @@
 // History::editStep replay with a SketchEditOp in the chain (what
 // cascadeFromSketchEdit runs). The replay rolls the LIVE sketch back to its
 // stale pre-edit state mid-replay while the final state is pinned as the
-// cascade override — the exact hazard that broke the first attempt in-app.
+// cascade override - the exact hazard that broke the first attempt in-app.
 //
 // The body is L-SHAPED with TWO +X walls (A big at x=20, B small at x=18) and
 // the edit moves A far away (x=40): the geometric normal+point rebind then
-// prefers B (2mm from the stale anchor point) over the true A' (20mm away) —
+// prefers B (2mm from the stale anchor point) over the true A' (20mm away) -
 // so a simple box can't mask the sketch-anchored path here. Only a correct
 // topo resolution against the OVERRIDE sketch opens the right wall.
 
@@ -93,7 +93,7 @@ TopoDS_Face wallAt(const TopoDS_Shape& body, double xp, double yLo, double yHi) 
 
 // The direct fix test: topo::resolveSet must read the CASCADE OVERRIDE sketch,
 // not the (rolled-back, stale) live one. Fails if the override plumbing in
-// TopoName::sketchRefs is removed — verified by reverting the fix.
+// TopoName::sketchRefs is removed - verified by reverting the fix.
 TEST(TopoShell, ResolveReadsCascadeOverrideNotStaleSketch) {
     Document doc;
     int pid[6];
@@ -114,7 +114,7 @@ TEST(TopoShell, ResolveReadsCascadeOverrideNotStaleSketch) {
 
     // Rebuild the body 40-wide (as the cascade's extrude does, from the FINAL
     // sketch), pin the final sketch as the override, then roll the LIVE sketch
-    // back to its stale 20-wide state — the mid-replay condition.
+    // back to its stale 20-wide state - the mid-replay condition.
     sk->movePoint(pid[1], {40.0f, 0.0f});
     sk->movePoint(pid[2], {40.0f, 8.0f});
     ASSERT_TRUE(ext.rebuildProfileFromSketch(doc));
@@ -143,7 +143,7 @@ TEST(TopoShell, ResolveReadsCascadeOverrideNotStaleSketch) {
 // THE IN-APP FLOW, end to end: extrude -> shell(open wall A) -> SketchEditOp,
 // then the cascade replay (editStep, transactional, override pinned). The
 // widened body must still be hollow with wall A' OPEN (rim only at x=40) and
-// wall B INTACT (full 20mm^2 face at x=18) — the geometric fallback alone
+// wall B INTACT (full 20mm^2 face at x=18) - the geometric fallback alone
 // would open B instead.
 TEST(TopoShell, OpenedWallFollowsResizeThroughHistoryReplay) {
     Document doc;
@@ -191,11 +191,11 @@ TEST(TopoShell, OpenedWallFollowsResizeThroughHistoryReplay) {
     const double wideSolid = (40.0 * 8.0 + 18.0 * 2.0) * 10.0; // 3560
     EXPECT_LT(volumeOf(shelled), wideSolid * 0.5)
         << "widened body must still be hollow (opening not silently dropped)";
-    // Wall B (x=18, area 20) must be INTACT — opening it instead of A is the
+    // Wall B (x=18, area 20) must be INTACT - opening it instead of A is the
     // geometric fallback's wrong answer.
     EXPECT_GT(plusXAreaAt(shelled, 18.0), 15.0)
         << "wall B must remain closed (full face at x=18)";
-    // Wall A' (x=40, would be area 80 closed) must be OPEN — only a thin rim
+    // Wall A' (x=40, would be area 80 closed) must be OPEN - only a thin rim
     // band (perimeter x thickness ~ 33) may remain at x=40.
     EXPECT_LT(plusXAreaAt(shelled, 40.0), 50.0)
         << "wall A' must be the opened one (rim only at x=40)";

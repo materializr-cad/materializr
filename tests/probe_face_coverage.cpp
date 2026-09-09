@@ -3,7 +3,7 @@
 // coverage by kind, then self-resolve the anchors against the same body (the
 // sanity floor: each anchored face must re-find a distinct face even with the
 // sketch unchanged). This is the ground-truth loop for gauging how well
-// generative FACE naming covers real geometry — the dual of
+// generative FACE naming covers real geometry - the dual of
 // probe_anchor_coverage.
 //
 // Usage: probe_face_coverage <project.materializr>
@@ -56,7 +56,7 @@ int main(int argc, char** argv) {
     std::vector<FaceAnchor::SketchRef> refs;
     for (int sid : doc.getAllSketchIds())
         if (auto sk = doc.getSketch(sid)) refs.push_back({ sid, sk.get() });
-    if (refs.empty()) { std::printf("no sketches — nothing to attribute\n"); return 0; }
+    if (refs.empty()) { std::printf("no sketches - nothing to attribute\n"); return 0; }
 
     int grandTot = 0, grandNamed = 0;
     for (int bid : doc.getAllBodyIds()) {
@@ -84,7 +84,7 @@ int main(int argc, char** argv) {
                     bid, doc.getBodyName(bid).c_str(), faces.size(),
                     wall, cyl, cwall, cap, none, named, faces.size());
 
-        // Categorize the unattributed faces by surface type — this is what
+        // Categorize the unattributed faces by surface type - this is what
         // separates "add another face kind" (cone/torus) from "needs the
         // general generation-map kernel" (blend/boolean/loft/revolve faces a
         // sketch scheme fundamentally can't name).

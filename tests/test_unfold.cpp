@@ -171,7 +171,7 @@ TEST(Unfold, ConformalDevelopableHasLowDistortion) {
 TEST(Unfold, ConeLateralUnrollsToOneSectorNotShards) {
     // A full cone's lateral surface is developable but CLOSED (a seam from apex to
     // base). The face-net engine keeps that seam open, so it must fan into ONE
-    // clean sector — not shatter into shards (the old 3D-weld bug closed the seam
+    // clean sector - not shatter into shards (the old 3D-weld bug closed the seam
     // and the greedy unroll wrapped past 2π and self-overlapped).
     const double R = 20, H = 40;
     TopoDS_Shape cone = BRepPrimAPI_MakeCone(R, 0.0, H).Shape();
@@ -187,7 +187,7 @@ TEST(Unfold, ConeLateralUnrollsToOneSectorNotShards) {
     EXPECT_EQ(fp.piecesPlaced, 1) << "cone seam must stay open → one sector";
     EXPECT_LT(fp.curvatureDeg, 5.0);   // developable
     ASSERT_EQ(fp.faces.size(), 1u);
-    EXPECT_EQ(fp.faces[0].loops.size(), 1u) << "apex must collapse — no spurious tip hole";
+    EXPECT_EQ(fp.faces[0].loops.size(), 1u) << "apex must collapse - no spurious tip hole";
 
     // Unrolled area ≈ cone lateral area π·R·slant (within tessellation error).
     const double slant = std::sqrt(H * H + R * R);
@@ -200,7 +200,7 @@ TEST(Unfold, ConeLateralUnrollsToOneSectorNotShards) {
 
 TEST(Unfold, MultiFaceDevelopableNetHingesAndPreservesArea) {
     // A closed cylinder (lateral + two circular caps): the net engine must unroll
-    // each face and hinge them along shared edges, preserving total area — not
+    // each face and hinge them along shared edges, preserving total area - not
     // tangle the way the old single-soup BFS did once >2 faces were selected.
     const double R = 15, H = 30;
     TopoDS_Shape cyl = BRepPrimAPI_MakeCylinder(R, H).Shape();
@@ -353,12 +353,12 @@ TEST(Unfold, LoftCircleCapDoesNotNestInsidePanels) {
         if (inside) worstCover = std::max(worstCover, double(covered) / inside);
     }
     // The round cap meets the net only along arcs, which can't fold flat cleanly,
-    // so it's slid just clear of the panel edge — no overlap at all.
+    // so it's slid just clear of the panel edge - no overlap at all.
     EXPECT_LT(worstCover, 0.02) << "a face overlaps another (cap not cleared)";
 }
 
 TEST(Unfold, PlanarFaceWithHoleKeepsHoleLoop) {
-    // A plate with a through-hole — the flattened panel must keep the hole loop.
+    // A plate with a through-hole - the flattened panel must keep the hole loop.
     TopoDS_Shape plate = BRepPrimAPI_MakeBox(40.0, 30.0, 2.0).Shape();
     gp_Ax2 ax(gp_Pnt(20, 15, -1), gp_Dir(0, 0, 1));
     TopoDS_Shape pin = BRepPrimAPI_MakeCylinder(ax, 5.0, 4.0).Shape();
@@ -385,7 +385,7 @@ TEST(Unfold, PlanarFaceWithHoleKeepsHoleLoop) {
 
 TEST(Unfold, ConformalConeUnwrapsToSectorNotDisk) {
     // A cone is developable. Conformal must slit its apex (a high angle-defect
-    // interior vertex) and unwrap it to a near-isometric SECTOR — not wrap the
+    // interior vertex) and unwrap it to a near-isometric SECTOR - not wrap the
     // surface 360° around the apex into a full disk, which read ~12000% stretch
     // (the "conformal outputs a blob/circle" bug).
     TopoDS_Shape cone = BRepPrimAPI_MakeCone(20.0, 0.0, 40.0).Shape();

@@ -1,4 +1,5 @@
 #include "ui/LengthField.h"
+#include "core/Units.h"
 #include "AlignOp.h"
 #include <BRepBuilderAPI_Transform.hxx>
 #include <gp_Trsf.hxx>
@@ -64,13 +65,10 @@ bool AlignOp::undo(Document& doc) {
 }
 
 std::string AlignOp::description() const {
-    return "Align body " + std::to_string(m_bodyId) +
-           " from (" + std::to_string(m_source.X()) + ", " +
-           std::to_string(m_source.Y()) + ", " +
-           std::to_string(m_source.Z()) + ") to (" +
-           std::to_string(m_target.X()) + ", " +
-           std::to_string(m_target.Y()) + ", " +
-           std::to_string(m_target.Z()) + ")";
+    return "Align body " + std::to_string(m_bodyId) + " from " +
+           materializr::fmtVec3(m_source.X(), m_source.Y(), m_source.Z()) +
+           " to " +
+           materializr::fmtVec3(m_target.X(), m_target.Y(), m_target.Z());
 }
 
 void AlignOp::renderProperties() {

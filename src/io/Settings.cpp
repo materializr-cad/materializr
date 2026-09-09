@@ -30,7 +30,7 @@ void readInt(const std::map<std::string, std::string>& kv, const char* key, int&
     try { out = std::stoi(it->second); } catch (...) { /* keep default */ }
 }
 
-// Range-clamped variant for ints that index arrays or select fixed enums —
+// Range-clamped variant for ints that index arrays or select fixed enums -
 // a hand-edited (or injected) out-of-range value must not survive load.
 // orbitButton=99 would otherwise index past ImGui's MouseDown[5] on every
 // drag frame (IM_ASSERT is a no-op under NDEBUG).
@@ -64,7 +64,7 @@ void readBool(const std::map<std::string, std::string>& kv, const char* key, boo
     // anything else: keep default
 }
 
-// Serialized names for the UiLayout enum — what `uiLayout = ...` holds in
+// Serialized names for the UiLayout enum - what `uiLayout = ...` holds in
 // the settings file (readable, order-independent, extensible).
 const char* uiLayoutName(UiLayout l) {
     switch (l) {
@@ -145,7 +145,7 @@ void applyKv(const std::map<std::string, std::string>& kv, AppSettings& s) {
     readBool(kv, "supporter",            s.supporter);
     readBool(kv, "snapToGrid",           s.snapToGrid);
     // Normalised HERE, before anything reads it. An out-of-range value means
-    // millimetres, never a clamp to the nearest legal index — clamping made 99
+    // millimetres, never a clamp to the nearest legal index - clamping made 99
     // mean Feet during the grid-step migration below while the same 99 meant
     // millimetres for the setting itself, so one file was read two ways.
     { int v = s.displayUnit; readInt(kv, "displayUnit", v);
@@ -181,7 +181,7 @@ void applyKv(const std::map<std::string, std::string>& kv, AppSettings& s) {
                 // foot: finer than the smallest preset and a lattice the
                 // renderer fades to nothing. The presets are labelled with bare
                 // numbers, so someone who picked "1" meant one of something.
-                // Only where a CONVERSION made it impractical — never under
+                // Only where a CONVERSION made it impractical - never under
                 // millimetres, where a deliberate 0.05 mm grid is a real choice
                 // and not something to overwrite.
                 if (s.displayUnit != 0 && s.sketchGridStep < 0.1f)
@@ -229,7 +229,7 @@ void applyKv(const std::map<std::string, std::string>& kv, AppSettings& s) {
 // Strip control characters from a string value before it's written to the
 // `.cfg`. The file format is line-oriented `key = value`; a value carrying an
 // embedded newline (legal in a POSIX filename) would otherwise be re-parsed as
-// extra `key = value` lines on the next load — an injection channel into every
+// extra `key = value` lines on the next load - an injection channel into every
 // other setting. Control chars have no business in a path/name; drop them.
 std::string sanitizeValue(const std::string& v) {
     std::string out;
@@ -251,7 +251,7 @@ void ensureParentDir(const std::string& path) {
 // Minimal reader for a flat JSON object of scalar values. Returns each
 // "key": value pair as raw text (numbers/booleans verbatim; strings unquoted
 // and unescaped) so applyKv can interpret them exactly like the `.cfg` map.
-// Not a general JSON parser — nested objects/arrays are not expected here.
+// Not a general JSON parser - nested objects/arrays are not expected here.
 std::map<std::string, std::string> parseFlatJson(const std::string& text) {
     std::map<std::string, std::string> kv;
     size_t i = 0, n = text.size();
@@ -381,7 +381,7 @@ bool SettingsIO::save(const std::string& path, const AppSettings& s) {
         }
         // Legacy layout keys this build superseded (read via applyKv's
         // migration, re-written as uiLayout/imTouchTree/imTouchTimeline).
-        // Don't round-trip them as "another version's" keys — a stale
+        // Don't round-trip them as "another version's" keys - a stale
         // imTouchUi=true would override a later uiLayout=classic in any
         // pre-rename build still lying around.
         oldKv.erase("imTouchUi");
@@ -477,7 +477,7 @@ bool SettingsIO::save(const std::string& path, const AppSettings& s) {
         }
         // Indexed LIST keys (recentN_*, sessionN_path) are rewritten whole on
         // every save, so a key this build didn't emit means the list SHRANK.
-        // Preserving it resurrects the removed entry — a phantom tab on the
+        // Preserving it resurrects the removed entry - a phantom tab on the
         // next launch after closing one (found on the rig, 2026-07-28).
         auto isIndexedListKey = [](const std::string& k) {
             for (const char* p : {"recent", "session"}) {

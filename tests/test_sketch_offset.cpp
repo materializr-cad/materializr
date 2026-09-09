@@ -1,4 +1,4 @@
-// Sketch Offset tool — geometry core.
+// Sketch Offset tool - geometry core.
 //
 // Task 1 coverage: the chain walk. Adjacency is by shared point id, the walk
 // extends both ways while the shared endpoint has degree exactly 2, and stops
@@ -209,7 +209,7 @@ TEST(SketchOffsetWalk, ArcTraversedBackwardsCarriesNegativeSweep) {
     sk.addArc(c, s, e, 5.0);
     // Stored t->e, so the walk starts at t, reaches the arc at its stored END
     // and must traverse it backwards. (The chain's overall travel direction is
-    // arbitrary — it falls out of the start element's stored point order. Only
+    // arbitrary - it falls out of the start element's stored point order. Only
     // self-consistency matters; the offset SIDE comes from the cursor, not from
     // the direction the walk happened to take.)
     sk.addLine(t, e);
@@ -626,7 +626,7 @@ TEST(SketchOffsetApply, WeldCallbackReusesExistingPoints) {
 
 // ─── Task 4: the tool state machine ─────────────────────────────────────────
 //
-// Drives SketchTool directly — no GL, no window. Covers the wiring the
+// Drives SketchTool directly - no GL, no window. Covers the wiring the
 // geometry tests cannot: phases, the cursor picking the side, and the fact
 // that a click REQUESTS the commit rather than performing it (the app wraps
 // commitOffset in recordSketchMutation for one undo step).
@@ -701,7 +701,7 @@ TEST(SketchOffsetTool, ClickRequestsTheCommitButDoesNotMutate) {
 
     EXPECT_TRUE(tool.offsetReadyToCommit());
     EXPECT_EQ(sk.getLines().size(), linesBefore)
-        << "the click must not mutate — the app commits inside recordSketchMutation";
+        << "the click must not mutate - the app commits inside recordSketchMutation";
 
     std::set<int> pts, els;
     tool.commitOffset(pts, els);
@@ -772,7 +772,7 @@ TEST(SketchOffsetTool, TheCursorCannotAskForAnImpossibleInwardOffset) {
     tool.onMouseDown({5.0f, 0.0f});
 
     // 6 mm inside a 10 mm square is only 4 mm from the NEAREST wall, and the
-    // distance is measured to the nearest part of the chain — so dragging can
+    // distance is measured to the nearest part of the chain - so dragging can
     // never request more than half the width on a convex closed profile. Nice
     // property: the impossible case is unreachable by cursor, only by typing.
     tool.onMouseMove({5.0f, 6.0f});
@@ -807,7 +807,7 @@ TEST(SketchOffsetTool, AnOverlargeTypedOffsetIsRefusedWithAReason) {
 //
 // There is no exact offset of a B-spline: the curve is sampled, offset along
 // its normal point by point, and re-fitted to a spline at commit. So these
-// cases assert the invariant to a FIT tolerance, not the analytic one — and
+// cases assert the invariant to a FIT tolerance, not the analytic one - and
 // the tolerance is the honest measure of how good the approximation is.
 
 namespace {
@@ -852,7 +852,7 @@ TEST(SketchOffsetSpline, OffsetOfACircularArcSplineHasTheExpectedRadius) {
     ASSERT_TRUE(ch.valid());
 
     // Offsetting a curve that lies on a circle must give one that lies on a
-    // concentric circle — an independent check on the normal direction.
+    // concentric circle - an independent check on the normal direction.
     const float d = 3.0f;
     OffsetResult res = offsetChain(ch, d, OffsetCorners::Round);
     pruneOffset(res, ch, d);
@@ -865,7 +865,7 @@ TEST(SketchOffsetSpline, OffsetOfACircularArcSplineHasTheExpectedRadius) {
             rMin = std::min(rMin, rr);
             rMax = std::max(rMax, rr);
         }
-    // Either 23 (outward) or 17 (inward) — the side depends on the walk's
+    // Either 23 (outward) or 17 (inward) - the side depends on the walk's
     // travel direction, which is arbitrary. Both must be uniform.
     const bool outward = (rMin > 20.0f);
     const float want = outward ? 23.0f : 17.0f;

@@ -20,12 +20,12 @@ static const char* s_edgeVertSource = R"(
 #version 330 core
 layout(location = 0) in vec3 a_position;
 // Same three matrices as the SURFACE shader, multiplied in the SAME order, and
-// gl_Position declared invariant in both — so an edge vertex produces the
+// gl_Position declared invariant in both - so an edge vertex produces the
 // bit-identical depth value its face produced. The old path premultiplied one
 // MVP on the CPU while faces multiplied P*V*M on the GPU; float32 rounds the
 // two differently, and the divergence is view-dependent. With no working line
 // bias (POLYGON_OFFSET_LINE never applies to GL_LINES), edges landed a hair in
-// front of or behind their own surface depending on camera angle — "sinking"
+// front of or behind their own surface depending on camera angle - "sinking"
 // into bodies, and popping through thin walls when the error exceeded the
 // wall's depth footprint (the corvus see-through bug). Invariance kills the
 // mismatch at the root; the edge pass then draws with GL_LEQUAL so equal
@@ -142,6 +142,8 @@ int EdgeRenderer::addShape(const TopoDS_Shape& shape, float deflection) {
 
     EdgeMesh mesh;
     mesh.vertexCount = static_cast<int>(vertices.size() / 3);
+    mesh.shape = shape;
+    mesh.deflection = deflection;
 
     glGenVertexArrays(1, &mesh.vao);
     glGenBuffers(1, &mesh.vbo);
@@ -164,7 +166,21 @@ int EdgeRenderer::addShape(const TopoDS_Shape& shape, float deflection) {
 
 void EdgeRenderer::setBodyEdges(int bodyId, const TopoDS_Shape& shape,
                                  float deflection) {
-    int appendedSlot = addShape(shape, deflection);
+    // Reclaim the slot retireAll() kept for this exact shape, if any, before
+    // paying for a fresh discretization + upload.
+    int appendedSlot = -1;
+    for (size_t i = 0; i < m_retired.size(); ++i) {
+        EdgeMesh& r = m_retired[i];
+        if (r.vao && r.deflection == deflection && r.shape.IsSame(shape)) {
+            r.modelMatrix = glm::mat4(1.0f);
+            appendedSlot = static_cast<int>(m_meshes.size());
+            m_meshes.push_back(r);
+            m_retired[i] = m_retired.back();
+            m_retired.pop_back();
+            break;
+        }
+    }
+    if (appendedSlot < 0) appendedSlot = addShape(shape, deflection);
     if (appendedSlot < 0) return; // tessellation produced no edges
     auto it = m_bodyToSlot.find(bodyId);
     if (it == m_bodyToSlot.end()) {
@@ -197,6 +213,7 @@ void EdgeRenderer::removeBody(int bodyId) {
     if (m.vao) glDeleteVertexArrays(1, &m.vao);
     if (m.vbo) glDeleteBuffers(1, &m.vbo);
     m.vao = 0; m.vbo = 0; m.vertexCount = 0; m.bodyId = -1;
+    m.shape.Nullify(); // do not pin a deleted body's geometry through m_retired
 }
 
 void EdgeRenderer::render(const glm::mat4& view, const glm::mat4& projection) {
@@ -216,7 +233,7 @@ void EdgeRenderer::render(const glm::mat4& view, const glm::mat4& projection) {
     // Depth: edges compute the exact same depth as their faces (invariant
     // shader above), so LEQUAL lets an edge win the tie against its own
     // surface while anything genuinely behind a wall still loses. No bias:
-    // the old glPolygonOffset(GL_POLYGON_OFFSET_LINE) was a no-op here —
+    // the old glPolygonOffset(GL_POLYGON_OFFSET_LINE) was a no-op here -
     // polygon offset applies to polygons rasterized in line MODE, never to
     // GL_LINES primitives.
     glEnable(GL_DEPTH_TEST);
@@ -242,13 +259,40 @@ void EdgeRenderer::render(const glm::mat4& view, const glm::mat4& projection) {
     glUseProgram(0);
 }
 
+void EdgeRenderer::retireAll() {
+    // Keep the buffers: the full rebuild that follows may hand the same
+    // shapes straight back (see setBodyEdges). Anything retired last time
+    // and never reclaimed dies here.
+    freeRetired();
+    m_retired.swap(m_meshes);
+    m_meshes.clear();
+    m_bodyToSlot.clear();
+}
+
 void EdgeRenderer::clear() {
-    for (auto& mesh : m_meshes) {
+    retireAll();
+    freeRetired();
+}
+
+void EdgeRenderer::freeRetired() {
+    for (auto& mesh : m_retired) {
         if (mesh.vao) glDeleteVertexArrays(1, &mesh.vao);
         if (mesh.vbo) glDeleteBuffers(1, &mesh.vbo);
     }
-    m_meshes.clear();
-    m_bodyToSlot.clear();
+    m_retired.clear();
+}
+
+bool EdgeRenderer::reclaimStale(int bodyId) {
+    for (size_t i = 0; i < m_retired.size(); ++i) {
+        if (m_retired[i].bodyId != bodyId || !m_retired[i].vao) continue;
+        const int slot = static_cast<int>(m_meshes.size());
+        m_meshes.push_back(m_retired[i]);
+        m_retired[i] = m_retired.back();
+        m_retired.pop_back();
+        m_bodyToSlot[bodyId] = slot;
+        return true;
+    }
+    return false;
 }
 
 int EdgeRenderer::findSlotByBody(int bodyId) const {

@@ -1,6 +1,6 @@
 // Regression (issue #21): a duplicated sketch must be INDEPENDENT of the source
 // sketch's body. Application::duplicateSketch deep-copies the sketch, which
-// carries the source's m_sourceBodyId AND its bound host face — so without
+// carries the source's m_sourceBodyId AND its bound host face - so without
 // intervention the copy cascaded edits into the original body, re-bound that
 // host face (a stray filled region over the body), and aimed push/pull + extrude
 // at the wrong body (no new solid; perimeter fused flat, holes inverted).
@@ -24,7 +24,7 @@
 using materializr::Sketch;
 
 namespace {
-// A closed square in the sketch plane — one region from the sketch's own loops.
+// A closed square in the sketch plane - one region from the sketch's own loops.
 void addSquare(Sketch& sk, float s) {
     int p0 = sk.addPoint(glm::vec2(0, 0));
     int p1 = sk.addPoint(glm::vec2(s, 0));
@@ -66,7 +66,7 @@ TEST(DuplicateSketch, CopyIsSeveredFromSourceBody) {
     EXPECT_FALSE(copy->isDetachedFromBody())
         << "a duplicate is a clean free sketch, not a detached-from-body one";
 
-    // The original is untouched — it still drives its body.
+    // The original is untouched - it still drives its body.
     EXPECT_EQ(src->getSourceBody(), 7);
     EXPECT_FALSE(src->getSourceFace().IsNull());
 

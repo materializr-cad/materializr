@@ -1,6 +1,6 @@
 // THUMB_PNG round-trip: the embedded-thumbnail section must survive
 // save → peekThumbnail byte-identically, must not disturb a normal load
-// (older loaders skip it as an unknown section — same dispatch path), and
+// (older loaders skip it as an unknown section - same dispatch path), and
 // peek must fail cleanly on thumb-less and legacy files.
 #include <gtest/gtest.h>
 #include "core/Document.h"
@@ -27,7 +27,7 @@ std::string tmpPath(const char* name) {
 #endif
 }
 
-// Not a real PNG — ProjectIO treats the thumbnail as an opaque byte blob, so
+// Not a real PNG - ProjectIO treats the thumbnail as an opaque byte blob, so
 // the test exercises binary fidelity (every byte value, including newlines
 // and nulls, which is what base64 exists to protect in the line parser).
 std::vector<uint8_t> syntheticBytes(size_t n) {
@@ -100,7 +100,7 @@ TEST(ProjectThumbnail, PeekFailsOnGarbageAndMissingFiles) {
 
 TEST(ProjectThumbnail, PeekHandlesEmptyProject) {
     // Zero bodies: the body-skip loop runs zero times and the tail begins
-    // immediately — both with and without a thumbnail.
+    // immediately - both with and without a thumbnail.
     const std::string path = tmpPath("mzr_thumb_empty.materializr");
     Document doc;
     std::vector<uint8_t> thumb = syntheticBytes(500);

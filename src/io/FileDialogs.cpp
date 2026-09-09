@@ -49,7 +49,7 @@ static bool dlgIsDir(const std::string& p) {
 #if defined(MZ_MOBILE)
 #if defined(__ANDROID__)
 // True if the directory can actually be listed (read permission), not just that
-// it exists — distinguishes "All-files access granted" from "not yet".
+// it exists - distinguishes "All-files access granted" from "not yet".
 static bool dlgCanList(const char* p) {
     DIR* d = opendir(p);
     if (!d) return false;
@@ -247,7 +247,7 @@ std::vector<std::string> pfdFilters(const std::vector<FileFilter>& filters) {
 #endif
 
 // Async pfd dialog state. FileDialogs::render() polls .ready(0) every
-// frame — without that the main thread blocks inside .result() until the
+// frame - without that the main thread blocks inside .result() until the
 // picker closes and the WM throws a "not responding" warning on top of
 // our window. Polling keeps the frame loop running so the OS keeps
 // seeing input / draw activity. (Steve: "while the file explorer is
@@ -332,7 +332,7 @@ static void launchInAppBrowser(const std::string& title, bool isSave,
             start = (ext && dlgIsDir(ext)) ? ext : "/";
         }
 #else
-        // iOS: the sandboxed Documents directory — user-visible in the Files
+        // iOS: the sandboxed Documents directory - user-visible in the Files
         // app via UIFileSharingEnabled, and always readable.
         const char* home = std::getenv("HOME");
         std::string docs = std::string(home ? home : ".") + "/Documents";
@@ -364,7 +364,7 @@ void FileDialogs::openFile(const std::string& title,
     s_saf.active = true;
     s_saf.isSave = false;
     s_saf.callback = std::move(callback);
-    // "*/*" — don't hide files behind non-standard CAD MIME types; the user picks.
+    // "*/*" - don't hide files behind non-standard CAD MIME types; the user picks.
     materializr::mobileStartOpenDocument("*/*");
 #else
     if (s_async.active()) return; // one picker at a time
@@ -379,7 +379,7 @@ void FileDialogs::openFile(const std::string& title,
     // Only seed with a directory that still EXISTS. macOS resolves it through
     // `POSIX file ... as alias`, which fails outright on a stale path (a
     // project opened from a volume that has since been unmounted), and that
-    // failure takes the whole dialog down silently — see the pfd patch and
+    // failure takes the whole dialog down silently - see the pfd patch and
     // issue #74. Everywhere else an unseeded picker just opens at its default.
     std::string seed = dlgIsDir(s_lastDir) ? s_lastDir : std::string();
     if (!seed.empty() && seed.back() != '/' && seed.back() != '\\') {
@@ -410,7 +410,7 @@ void FileDialogs::saveFile(const std::string& title,
 #else
     if (s_async.active()) return;
     if (!dialogsAvailable()) { if (s_unavailableNotifier) s_unavailableNotifier(); return; }
-    // pfd's save_file wants a path-ish default — concat the last-used dir
+    // pfd's save_file wants a path-ish default - concat the last-used dir
     // with the supplied filename so the picker opens IN that folder with
     // the suggested filename already in the field.
     //
@@ -442,7 +442,7 @@ bool FileDialogs::isOpen() {
 }
 
 // Unified export. The platform split lives here so callers (the IO plugins)
-// stay #if-free — see the header note about REGISTER_PLUGIN stringification.
+// stay #if-free - see the header note about REGISTER_PLUGIN stringification.
 void FileDialogs::exportFile(const std::string& title,
                              const std::string& defaultName,
                              const std::string& mime,
@@ -552,7 +552,7 @@ void FileDialogs::render() {
         }
         if (done) {
             // Remember the directory of the successful pick so the next
-            // open / save lands here. Empty result = the user cancelled —
+            // open / save lands here. Empty result = the user cancelled -
             // we leave s_lastDir as it was.
             if (!result.empty()) {
                 try {

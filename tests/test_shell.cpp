@@ -1,4 +1,4 @@
-// Regression tests for ShellOp on a FILLETED body — the covus-nose failure:
+// Regression tests for ShellOp on a FILLETED body - the covus-nose failure:
 //  1. An over-thick wall (>= a concave fillet radius) must fail CLEANLY and
 //     FAST. Previously the arc-join threw and the intersection-join fallback
 //     spun in an unbounded internal loop ("Cote PT2PT3 nul"), freezing the app.
@@ -66,7 +66,7 @@ TopoDS_Shape filletedBox(Document& doc, int& bodyId) {
     return doc.getBody(bodyId);
 }
 
-// A 20mm box with ALL 12 edges filleted to radius R — the opened face ends up
+// A 20mm box with ALL 12 edges filleted to radius R - the opened face ends up
 // ringed by fillets on every side, the case that used to no-op silently (#30).
 TopoDS_Shape allFilletedBox(Document& doc, int& bodyId, double R) {
     TopoDS_Shape box = BRepPrimAPI_MakeBox(gp_Pnt(0, 0, 0), 20, 20, 20).Shape();
@@ -81,7 +81,7 @@ TopoDS_Shape allFilletedBox(Document& doc, int& bodyId, double R) {
 
 } // namespace
 
-// An over-thick wall fails cleanly and quickly — never hangs.
+// An over-thick wall fails cleanly and quickly - never hangs.
 TEST(Shell, OverThickWallFailsFastNotHang) {
     Document doc;
     int body; TopoDS_Shape solid = filletedBox(doc, body);
@@ -99,7 +99,7 @@ TEST(Shell, OverThickWallFailsFastNotHang) {
                      std::chrono::steady_clock::now() - t0).count();
 
     EXPECT_FALSE(ok) << "an impossible wall thickness must fail";
-    EXPECT_LT(sec, 10.0) << "must fail FAST — a multi-second run means the "
+    EXPECT_LT(sec, 10.0) << "must fail FAST - a multi-second run means the "
                             "intersection-join hang wasn't avoided";
     // The body must be untouched on failure (execute must not commit garbage).
     EXPECT_NEAR(vol(doc.getBody(body)), vol(solid), 1e-6);
@@ -118,7 +118,7 @@ TEST(Shell, ReasonableWallShells) {
     EXPECT_GT(vol(doc.getBody(body)), 0.0);
 }
 
-// A face ringed by fillets on every edge CANNOT be opened by OCCT's offset —
+// A face ringed by fillets on every edge CANNOT be opened by OCCT's offset -
 // it seals the cavity into a closed void (2 shells) instead of an open cup, or
 // no-ops outright. Both disguise as "valid" with reduced volume, so ShellOp
 // insists on a single-shell OPEN cup and otherwise fails HONESTLY, leaving the

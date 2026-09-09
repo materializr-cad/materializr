@@ -1,5 +1,5 @@
 // A chamfer/fillet whose saved params carry no generated-face indices (a
-// fill-fallback whose `gen=` was dropped during heavy undo/redo churn — the
+// fill-fallback whose `gen=` was dropped during heavy undo/redo churn - the
 // light cover's steps 68/69) must still recover its bevel faces on reload, or
 // the history-hover highlight is blank. rehydrateFromReload falls back to "the
 // faces present in the result but not the input" (facesCreatedVsPrev).
@@ -36,7 +36,7 @@ TEST(EdgeOpHighlightReload, ChamferRecoversFacesWithoutGenIndices) {
     const TopoDS_Shape pre = BRepPrimAPI_MakeBox(20.0, 20.0, 10.0).Shape();
     int id = doc.addBody(pre, "box");
 
-    // Chamfer the top-front edge (y=0, z=10) — native, one bevel face.
+    // Chamfer the top-front edge (y=0, z=10) - native, one bevel face.
     TopoDS_Edge e;
     for (TopExp_Explorer ex(doc.getBody(id), TopAbs_EDGE); ex.More(); ex.Next()) {
         const TopoDS_Edge& c = TopoDS::Edge(ex.Current());
@@ -59,7 +59,7 @@ TEST(EdgeOpHighlightReload, ChamferRecoversFacesWithoutGenIndices) {
     ASSERT_FALSE(op.getGeneratedFaces().empty());
     const TopoDS_Shape post = doc.getBody(id);
 
-    // Serialize, then DROP the gen= indices — the churn-corruption case.
+    // Serialize, then DROP the gen= indices - the churn-corruption case.
     const std::string params = stripGen(op.serializeParams());
     ASSERT_EQ(params.find(";gen="), std::string::npos);
 
@@ -74,7 +74,7 @@ TEST(EdgeOpHighlightReload, ChamferRecoversFacesWithoutGenIndices) {
     // The geometric fallback must have recovered the bevel face(s) so the
     // history-hover highlight has something to draw.
     EXPECT_FALSE(reloaded.getGeneratedFaces().empty())
-        << "bevel faces not recovered without gen= indices — highlight blank";
+        << "bevel faces not recovered without gen= indices - highlight blank";
 }
 
 namespace {
@@ -96,7 +96,7 @@ TopoDS_Edge findLineEdge(const TopoDS_Shape& body, Pred pred) {
 
 // Chamfering a SECOND edge adjacent to the first trims a slice off the first
 // bevel, shifting that face's centroid. The reload fallback must recover only
-// the second chamfer's OWN bevel — matching by surface, not centroid, so the
+// the second chamfer's OWN bevel - matching by surface, not centroid, so the
 // earlier bevel isn't misread as newly created and lit up on hover. (Regresses
 // the over-highlight: the old centroid match returned the trimmed first bevel
 // too.)
@@ -119,7 +119,7 @@ TEST(EdgeOpHighlightReload, AdjacentChamferDoesNotRecoverEarlierBevel) {
     ASSERT_TRUE(op1.execute(doc));
     const TopoDS_Shape mid = doc.getBody(id);
 
-    // Second chamfer: top-right edge (x=20, z=10) — meets the first bevel at the
+    // Second chamfer: top-right edge (x=20, z=10) - meets the first bevel at the
     // shared corner and clips it.
     TopoDS_Edge e2 = findLineEdge(mid, [](const gp_Pnt& a, const gp_Pnt& b) {
         return std::abs(a.X() - 20.0) < 1e-7 && std::abs(b.X() - 20.0) < 1e-7 &&
@@ -143,8 +143,8 @@ TEST(EdgeOpHighlightReload, AdjacentChamferDoesNotRecoverEarlierBevel) {
     rs.modifiedAfter.push_back({id, post});
     ASSERT_TRUE(reloaded.rehydrateFromReload(rs, doc));
 
-    // Only the second bevel — not the trimmed first one.
+    // Only the second bevel - not the trimmed first one.
     EXPECT_EQ(reloaded.getGeneratedFaces().size(), realGen)
         << "fallback recovered " << reloaded.getGeneratedFaces().size()
-        << " faces vs " << realGen << " truly generated — earlier bevel lit up";
+        << " faces vs " << realGen << " truly generated - earlier bevel lit up";
 }

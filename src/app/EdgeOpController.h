@@ -20,12 +20,12 @@ void refreshAllEdgeOpFaces(History& hist, Document& doc);
 // Interactive Fillet / Chamfer.
 //
 // The one op that needs BOTH a create path and an edit path, on two different
-// preview models — which is why it was extracted last:
+// preview models - which is why it was extracted last:
 //
-//   CREATE  — plain PreviewModel::SnapshotBody. One body is snapshotted, a
+//   CREATE  - plain PreviewModel::SnapshotBody. One body is snapshotted, a
 //             transient FilletOp/ChamferOp runs against it per preview frame,
 //             and commit pushes a real op. The base already does exactly this.
-//   EDIT    — clicking a face an existing fillet produced re-opens that step.
+//   EDIT    - clicking a face an existing fillet produced re-opens that step.
 //             The preview cannot be transient: downstream ops (a chamfer
 //             stacked on this fillet, a cut through it) have to recompute or
 //             they flicker out for the drag. So the preview mutates the real
@@ -34,14 +34,14 @@ void refreshAllEdgeOpFaces(History& hist, Document& doc);
 //
 // The mode is fixed at begin (editingIndex() >= 0 means edit) and never
 // changes mid-gesture, so previewModel() answering differently per mode is
-// safe — begin/commit/cancel each read it once.
+// safe - begin/commit/cancel each read it once.
 class EdgeOpController : public InteractiveOpController {
 public:
     // Create: fillet/chamfer the selected edges. Returns false when nothing
     // usable is selected (or the selection is an imported mesh).
     bool beginEdgeOp(const IopContext& ctx, EdgeOpKind kind);
     // Edit: re-open the FilletOp/ChamferOp at `historyIndex`. `pickedBodyId` is
-    // the body whose blend FACE was clicked — used only to detect a baked
+    // the body whose blend FACE was clicked - used only to detect a baked
     // feature (one whose geometry never changes) and say so.
     bool beginEdgeOpEdit(const IopContext& ctx, int historyIndex,
                          int pickedBodyId);
@@ -53,13 +53,13 @@ public:
 
     // The value panel (banner + well + the chamfer's A/B controls). Called from
     // renderViewport where the viewport window is current, because it anchors
-    // to that window's rect — same arrangement as Extrude and Push/Pull.
+    // to that window's rect - same arrangement as Extrude and Push/Pull.
     void renderEdgeOpPanel(const IopContext& ctx);
     // Enter-to-confirm from the global key handler (no scaffold panel).
     void confirmFromKey(const IopContext& ctx);
 
     EdgeOpKind kind() const { return m_kind; }
-    // The edge midpoint — Application latches the im-touch panel anchor to it.
+    // The edge midpoint - Application latches the im-touch panel anchor to it.
     const glm::vec3& mid() const { return m_mid; }
     bool hasHandle() const { return m_hasHandle; }
     // A handle is claimed this drag; the viewport suppresses camera orbit.
@@ -79,6 +79,7 @@ protected:
     }
     int onBegin(const IopContext& ctx) override;
     std::unique_ptr<Operation> buildOp(const IopContext& ctx) override;
+    bool previewOffThread() const override { return true; }
     void panelBody(const IopContext& ctx, bool& changed) override;
     void markPreviewDirty(const IopContext& ctx) const override;
     // The panel is renderEdgeOpPanel (viewport-anchored), so the scaffold's
@@ -106,11 +107,11 @@ private:
 
     EdgeOpKind m_kind = EdgeOpKind::None;
     std::vector<TopoDS_Shape> m_edges;
-    // The body onBegin will return — captured by the two entry points, which
+    // The body onBegin will return - captured by the two entry points, which
     // resolve it from the selection (create) or the op (edit).
     int m_pendingBody = -1;
     // EDIT only: the edited op's own getPreviousShape(), which is its
-    // pre-state — NOT the current body. onBegin installs it as the snapshot so
+    // pre-state - NOT the current body. onBegin installs it as the snapshot so
     // the handle frame and the chamfer face directions are computed against
     // the geometry the op was originally applied to.
     TopoDS_Shape m_editPreShape;
@@ -140,7 +141,7 @@ private:
 
     // Set on the left-click frame iff the cursor was near the arrow line;
     // cleared on release. Without the click claim, trackpad-mode left-orbit
-    // grabbed the drag-threshold frame and the arrows felt dead — and
+    // grabbed the drag-threshold frame and the arrows felt dead - and
     // conversely, dragging from empty space now orbits instead of yanking the
     // value. (Steve: chamfer/fillet arrows didn't grab the cursor in trackpad
     // mode.)
@@ -151,7 +152,7 @@ private:
     int m_editingIndex = -1;
     // The body whose blend FACE was clicked. If its geometry doesn't change
     // after the edit, the op drives a different/deleted body and the clicked
-    // geometry has no editable op behind it — we say so instead of silently
+    // geometry has no editable op behind it - we say so instead of silently
     // doing nothing.
     int m_pickedBodyId = -1;
     // That body's geometry BEFORE the first preview replay. Measured here

@@ -1,8 +1,8 @@
 #pragma once
 // Shared surface of the interface layouts (Settings → Appearance → Interface).
 //
-// Materializr ships three layouts — classic, modern and im-touch (see
-// UiLayout in io/Settings.h) — and may grow more. They are presentation
+// Materializr ships three layouts - classic, modern and im-touch (see
+// UiLayout in io/Settings.h) - and may grow more. They are presentation
 // SKINS over one set of fundamentals, and must never drift apart in what the
 // user can DO:
 //
@@ -19,7 +19,7 @@
 //     (renderContent()), hosted by classic's docks, modern's side panel, and
 //     im-touch's overlays.
 //
-// If a feature can only be reached in one layout, that's a bug — either move
+// If a feature can only be reached in one layout, that's a bug - either move
 // it into one of the shared lists above, or add it to each layout's chrome
 // (src/app/layout/<name>/) in the same change.
 
@@ -29,7 +29,7 @@ namespace materializr::layoutui {
 
 // Window flags for the fixed chrome windows (bars, rails, panels) of the
 // modern and im-touch layouts. All shell windows are ##-named +
-// NoSavedSettings so they never touch imgui.ini — switching back to the
+// NoSavedSettings so they never touch imgui.ini - switching back to the
 // classic layout restores its saved dock arrangement untouched.
 constexpr ImGuiWindowFlags kShellWindowFlags =
     ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |

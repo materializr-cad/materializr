@@ -19,7 +19,7 @@ struct SimpleMesh {
 // resulting triangle count.
 //
 // QEM naturally collapses flat regions first (their quadric error is ~0) while
-// preserving edges/corners — so it both bounds the cost of the downstream B-rep
+// preserving edges/corners - so it both bounds the cost of the downstream B-rep
 // build (sewing N facets is the import bottleneck) and pre-merges fairly-flat
 // regions, which is exactly what makes them sketchable after import.
 int decimateMesh(SimpleMesh& mesh, int targetTriangles);

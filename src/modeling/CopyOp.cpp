@@ -1,4 +1,5 @@
 #include "ui/LengthField.h"
+#include "core/Units.h"
 #include "CopyOp.h"
 #include <BRepBuilderAPI_Transform.hxx>
 #include <gp_Trsf.hxx>
@@ -65,8 +66,7 @@ bool CopyOp::undo(Document& doc) {
 
 std::string CopyOp::description() const {
     return "Duplicate body " + std::to_string(m_sourceBodyId) +
-           " offset (" + std::to_string(m_dx) + ", " +
-           std::to_string(m_dy) + ", " + std::to_string(m_dz) + ")";
+           " offset " + materializr::fmtVec3(m_dx, m_dy, m_dz);
 }
 
 void CopyOp::renderProperties() {

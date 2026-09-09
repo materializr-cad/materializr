@@ -1,4 +1,5 @@
 #include "ui/LengthField.h"
+#include "core/Units.h"
 #include "../core/NumFormat.h"
 #include "ChamferOp.h"
 #include "BlendCut.h"
@@ -48,14 +49,14 @@ bool faceCenter(const TopoDS_Face& face, gp_Pnt& out) {
     } catch (...) { return false; }
 }
 
-// Faces present in `result` but NOT in `prev` — i.e. the faces this op CREATED.
+// Faces present in `result` but NOT in `prev` - i.e. the faces this op CREATED.
 // Reload fallback for the history-hover highlight when a save carries no
 // generated-face indices (an older/churn-corrupted file where the fill
 // chamfer's `gen=` was dropped): the bevel faces are exactly the new ones.
 //
 // Matched by the unbounded SURFACE, not the centroid: when this chamfer trims a
 // corner off an adjacent earlier bevel, that face keeps its surface but its
-// centroid shifts — a centroid test would wrongly flag it as new and light up
+// centroid shifts - a centroid test would wrongly flag it as new and light up
 // earlier steps' bevels on hover. Non-analytic faces (no cheap surface
 // signature) fall back to the centroid test, unchanged.
 std::vector<TopoDS_Shape> facesCreatedVsPrev(const TopoDS_Shape& result,
@@ -179,7 +180,7 @@ TopoDS_Face ChamferOp::sharedReferenceFace(const TopoDS_Shape& body,
     return TopoDS::Face(cands.front());
 }
 
-// See FilletOp::anchorSketches — anchoring consults every sketch in the doc,
+// See FilletOp::anchorSketches - anchoring consults every sketch in the doc,
 // preferring the cascade override (the edited sketch's final state) over the
 // live sketch, which is rolled back through its snapshots mid-replay.
 static std::vector<EdgeAnchor::SketchRef> anchorSketches(
@@ -220,7 +221,7 @@ bool ChamferOp::execute(Document& doc) {
 
     // FAILURE MUST NOT POISON THE OP. Resolution below rewrites m_edges (and
     // can rewrite anchors/refs) against the current body; if the build then
-    // fails, those half-resolved members would feed the NEXT attempt — which
+    // fails, those half-resolved members would feed the NEXT attempt - which
     // is how one failed edit wedged every later edit until reload (probe:
     // fail at d2=14, then even the fresh-working d2=16 refused). Snapshot the
     // resolution state and roll it back on every non-success exit.
@@ -257,7 +258,7 @@ bool ChamferOp::execute(Document& doc) {
                                     [&doc]() { return doc.mintFaceId(); });
 
         // Lineage-FIRST edge resolution (#52): each edge is named by its two
-        // adjacent faces' ancestry ids — immune to ordinal drift and to the
+        // adjacent faces' ancestry ids - immune to ordinal drift and to the
         // geometric divergence of a replayed body. All-or-nothing; on miss,
         // fall through to the classic rebind → anchors → topo-refs chain.
         const char* dbgTier = "rebind";
@@ -284,7 +285,7 @@ bool ChamferOp::execute(Document& doc) {
                     if (!hasA || !hasB) continue;
                     // DISTINCT-CLAIM (EdgeAnchor's rule): fragment edges of
                     // one span share the SAME face-id pair, so first-hit
-                    // handed every pair the same edge — collapsing a
+                    // handed every pair the same edge - collapsing a
                     // 3-fragment selection to 1 and starving the rebuild
                     // (Steve's "17 works fresh, fails after an edit").
                     bool claimed = false;
@@ -305,17 +306,17 @@ bool ChamferOp::execute(Document& doc) {
         }
 
         // Re-bind stored edges to the (possibly regenerated) body before
-        // chamfering — see FilletOp::execute. Without this, editing an
+        // chamfering - see FilletOp::execute. Without this, editing an
         // upstream fillet's radius left every chamfer edge stale: the
         // edge-face map silently skipped them all and the chamfer vanished.
         if (!edgesResolvedByLineage &&
             !SubShapeIndex::rebindEdges(m_previousShape, m_edges)) {
             // Ordinal/carrier match failed (a sketch dimension edit moved the
-            // edges) — re-find them by their sketch feature. See EdgeAnchor.
+            // edges) - re-find them by their sketch feature. See EdgeAnchor.
             dbgTier = "anchors";
             if (!resolveAnchors(doc, m_previousShape)) {
                 dbgTier = "toporefs";
-                // LAST RESORT: topological names — the boolean-SEAM case,
+                // LAST RESORT: topological names - the boolean-SEAM case,
                 // where anchors fail by construction. Mirrors FilletOp.
                 bool topoOk = false;
                 if (!m_edgeRefs.empty() &&
@@ -345,7 +346,7 @@ bool ChamferOp::execute(Document& doc) {
             }
         }
         // Deduplicate: on a body whose fragmented faces were later unified,
-        // several stored fragment edges rebind onto ONE clean edge — feeding
+        // several stored fragment edges rebind onto ONE clean edge - feeding
         // MakeChamfer the same edge repeatedly fails the whole build (#53's
         // light-cover replay). Chamfering it once is the original intent.
         {
@@ -357,7 +358,7 @@ bool ChamferOp::execute(Document& doc) {
             }
             if (uniq.size() != m_edges.size()) {
                 std::fprintf(stderr, "[Chamfer] %zu stored edges resolved to "
-                             "%zu distinct — fragmented topology was unified "
+                             "%zu distinct - fragmented topology was unified "
                              "upstream\n", m_edges.size(), uniq.size());
                 m_edges = std::move(uniq);
             }
@@ -391,7 +392,7 @@ bool ChamferOp::execute(Document& doc) {
 
         // Everything below re-derives from m_edges, so the whole build is a
         // retryable unit: if it fails, the caller may RE-RESOLVE the edges
-        // (anchors — the upstream-re-derivation case) and attempt again.
+        // (anchors - the upstream-re-derivation case) and attempt again.
         TopTools_IndexedDataMapOfShapeListOfShape edgeFaceMap;
         TopoDS_Face sharedRef;
         auto prepare = [&]() {
@@ -426,7 +427,7 @@ bool ChamferOp::execute(Document& doc) {
         // asymmetric reference face is NOT persisted: on a replayed body,
         // sharedReferenceFace / faces.First() can pick the OTHER adjacent
         // face than the original session did, and a 11.4 mm setback aimed
-        // along a 2 mm face simply cannot build (!IsDone) — the "two-distance
+        // along a 2 mm face simply cannot build (!IsDone) - the "two-distance
         // chamfer dies on replay / turns into a regular face" bug. When the
         // first orientation fails, retrying with the distances swapped is the
         // SAME chamfer measured from the other face, and recovers the
@@ -471,7 +472,7 @@ bool ChamferOp::execute(Document& doc) {
                 c = tryBuild(m_distance2, m_distance);
                 if (!c.IsNull())
                     std::fprintf(stderr, "[Chamfer] asymmetric reference "
-                                 "flipped on this body — rebuilt with "
+                                 "flipped on this body - rebuilt with "
                                  "distances swapped (d=%.2f/%.2f)\n",
                                  m_distance, m_distance2);
             }
@@ -480,10 +481,10 @@ bool ChamferOp::execute(Document& doc) {
         TopoDS_Shape candidate = attemptBoth();
         if (candidate.IsNull() && !edgesResolvedByLineage) {
             // The edges rebind found carriers, but the chamfer can't BUILD
-            // there — the tell of an upstream PARAMETRIC re-derivation (a
+            // there - the tell of an upstream PARAMETRIC re-derivation (a
             // sketch edit changed the body; stale carriers still exist but
             // the rim moved). Re-find the edges by their sketch features and
-            // try once more — this is what the anchors are for (#52).
+            // try once more - this is what the anchors are for (#52).
             std::vector<TopoDS_Edge> keepEdges = m_edges;
             if (resolveAnchors(doc, m_previousShape)) {
                 candidate = attemptBoth();
@@ -495,7 +496,7 @@ bool ChamferOp::execute(Document& doc) {
             if (candidate.IsNull()) m_edges = std::move(keepEdges);
         }
         // IsDone() is necessary but NOT sufficient: native can "succeed" with
-        // topologically INVALID output (self-intersections, dropped faces) —
+        // topologically INVALID output (self-intersections, dropped faces) -
         // classically many-adjacent-edges, but also a big ramp chamfer whose
         // blend collides with a feature (#57: A=16 across the square hole).
         // NULL such a candidate here so the fallbacks below get their chance;
@@ -504,16 +505,16 @@ bool ChamferOp::execute(Document& doc) {
         if (!candidate.IsNull() && !BRepCheck_Analyzer(candidate).IsValid()) {
             std::fprintf(stderr,
                 "[Chamfer] native result failed BRepCheck_Analyzer "
-                "(d=%.2f, %zu edges) — trying the cut/fill fallbacks.\n",
+                "(d=%.2f, %zu edges) - trying the cut/fill fallbacks.\n",
                 m_distance, m_edges.size());
             candidate.Nullify();
         }
-        // Valid is STILL not sufficient: ChFi3d can return a PARTIAL blend —
+        // Valid is STILL not sufficient: ChFi3d can return a PARTIAL blend -
         // it runs the bevel up to an obstacle (a hole, a countersink), tapers
         // out, and never resumes, leaving most of the edge untouched (#57:
         // the ramp dying mid-run with a pointed taper). Detect it by
         // COVERAGE: the generated faces must reach both ends of every
-        // selected edge (interior gaps are fine — a through-feature's
+        // selected edge (interior gaps are fine - a through-feature's
         // stop-faces are legitimate). A short native result is benched, the
         // fallbacks get their chance, and it is restored only if they can't
         // build either.
@@ -535,7 +536,7 @@ bool ChamferOp::execute(Document& doc) {
                 // Per-face covered interval along the edge, then union.
                 // Ends-only (min/max) let native fragments AT the corners
                 // mask a dead middle: ChFi3d blended a few mm at each end
-                // (against neighbouring caps) and skipped the whole centre —
+                // (against neighbouring caps) and skipped the whole centre -
                 // ends "covered", gate passed, fill never ran. An interior
                 // gap on a single continuous edge is never legitimate (the
                 // stop-face through-hole case only arises on FRAGMENTED
@@ -575,7 +576,7 @@ bool ChamferOp::execute(Document& doc) {
             if (shortCoverage) {
                 std::fprintf(stderr,
                     "[Chamfer] native blend only covers part of the edge "
-                    "(partial taper) — trying the cut/fill fallbacks "
+                    "(partial taper) - trying the cut/fill fallbacks "
                     "(d=%.2f/%.2f).\n", m_distance, dB);
                 nativeBench = candidate;
                 candidate.Nullify();
@@ -585,7 +586,7 @@ bool ChamferOp::execute(Document& doc) {
             // #55: the native blend can't resolve against a surface feature
             // crossing the edge (a drilled hole or pocket fragments it and
             // ChFi3d gives up at the feature walls). Build the same removal
-            // as a swept-wedge boolean cut instead — collinear fragment
+            // as a swept-wedge boolean cut instead - collinear fragment
             // selections merge into one span, so the bevel passes straight
             // through the feature, exactly as if the chamfer had preceded it
             // in history. Only reached after every native attempt failed, so
@@ -598,7 +599,7 @@ bool ChamferOp::execute(Document& doc) {
                     m_ledger, cutRes, blends)) {
                 candidate = cutRes;
                 m_generatedFaces = std::move(blends);
-                std::fprintf(stderr, "[Chamfer] native blend failed — built "
+                std::fprintf(stderr, "[Chamfer] native blend failed - built "
                              "as a swept-wedge cut across the feature "
                              "(#55, d=%.2f/%.2f)\n", m_distance, dB);
             } else if (materializr::blendcut::fillChamfer(
@@ -609,18 +610,18 @@ bool ChamferOp::execute(Document& doc) {
                             m_previousShape, m_edges, dB, m_distance, sharedRef,
                             m_ledger, cutRes, blends))) {
                 // Interior corner: the chamfer is a RAMP (adds material), and
-                // its footprint crosses a feature native can't resolve — fuse
+                // its footprint crosses a feature native can't resolve - fuse
                 // the ramp and re-pierce the feature (#57). Asymmetric retries
                 // with the distances swapped, mirroring the native retry.
                 candidate = cutRes;
                 m_generatedFaces = std::move(blends);
-                std::fprintf(stderr, "[Chamfer] native blend failed — built "
+                std::fprintf(stderr, "[Chamfer] native blend failed - built "
                              "as a corner-fill ramp across the feature "
                              "(#57, d=%.2f/%.2f)\n", m_distance, dB);
             }
         }
         if (candidate.IsNull() && !nativeBench.IsNull()) {
-            // No fallback could build — the partial native blend is still
+            // No fallback could build - the partial native blend is still
             // better than failing the whole op.
             candidate = nativeBench;
             std::fprintf(stderr, "[Chamfer] keeping the partial native blend "
@@ -628,7 +629,7 @@ bool ChamferOp::execute(Document& doc) {
         }
         // LAST RESORT before failing: if the caller asked for EXACTLY the
         // parameters of a previously-successful build on EXACTLY the same
-        // input body, that stored result IS the answer — adopt it. This is
+        // input body, that stored result IS the answer - adopt it. This is
         // the "put the value back" case: rebuilding at the original value
         // fails because the new blend is everywhere coincident with features
         // built on the original bevel (worst case for the boolean fallback),
@@ -643,7 +644,7 @@ bool ChamferOp::execute(Document& doc) {
                 candidate = it->result;
                 m_generatedFaces = it->genFaces;
                 std::fprintf(stderr, "[Chamfer] rebuild failed at known-good "
-                             "params — adopting the stored result (same "
+                             "params - adopting the stored result (same "
                              "input body, same values, d=%.2f/%.2f)\n",
                              m_distance, m_distance2);
                 break;
@@ -660,7 +661,7 @@ bool ChamferOp::execute(Document& doc) {
             return false;
         }
 
-        // IsDone() is necessary but NOT sufficient — see FilletOp::execute.
+        // IsDone() is necessary but NOT sufficient - see FilletOp::execute.
         // Chamfering many adjacent edges at once can yield a result OCCT
         // reports as done but is topologically INVALID (self-intersections,
         // dropped faces): the "faces disappear" bug. BRepCheck_Analyzer is the
@@ -669,7 +670,7 @@ bool ChamferOp::execute(Document& doc) {
         if (!BRepCheck_Analyzer(candidate).IsValid()) {
             std::fprintf(stderr,
                 "[Chamfer] result failed BRepCheck_Analyzer (d=%.2f, %zu edges) "
-                "— invalid topology, refusing to commit.\n",
+                "- invalid topology, refusing to commit.\n",
                 m_distance, m_edges.size());
             return false;
         }
@@ -680,7 +681,7 @@ bool ChamferOp::execute(Document& doc) {
         // sliver of material in the corner.
         {
             // AddOptimal walks the actual geometry rather than tolerance-
-            // padded extents — see FilletOp::execute for the full story.
+            // padded extents - see FilletOp::execute for the full story.
             Bnd_Box bbIn, bbOut;
             BRepBndLib::AddOptimal(m_previousShape, bbIn);
             BRepBndLib::AddOptimal(candidate,       bbOut);
@@ -741,7 +742,7 @@ bool ChamferOp::execute(Document& doc) {
         doc.setBodyLedger(m_bodyId, &m_ledger);
 
         // Face lineage: carry the input body's ancestry through, then stamp
-        // this chamfer's bevel faces with STABLE ids — reused across
+        // this chamfer's bevel faces with STABLE ids - reused across
         // re-executes (replay/edit) so downstream references and saves stay
         // consistent; minted fresh only when the bevel count changes.
         {
@@ -760,7 +761,7 @@ bool ChamferOp::execute(Document& doc) {
         }
         // Remember this build for the adopt-stored-result path (see above).
         rememberResult(m_previousShape, m_resultShape);
-        guard.committed = true;   // success — keep the (re)resolved state
+        guard.committed = true;   // success - keep the (re)resolved state
         return true;
     } catch (...) {
         return false;
@@ -774,7 +775,7 @@ bool ChamferOp::undo(Document& doc) {
 
     try {
         doc.updateBody(m_bodyId, m_previousShape);
-        // Restore the input lineage captured at execute — updateBody wiped
+        // Restore the input lineage captured at execute - updateBody wiped
         // it, and a partial replay won't re-run the op that minted it.
         if (!m_prevFaceIds.empty())
             doc.setBodyFaceIds(m_bodyId, m_prevFaceIds);
@@ -786,10 +787,10 @@ bool ChamferOp::undo(Document& doc) {
 
 std::string ChamferOp::description() const {
     if (m_distance2 > 0.0)
-        return "Chamfer D" + materializr::numStr(m_distance) + "/" +
-               materializr::numStr(m_distance2) + " on " +
+        return "Chamfer D" + materializr::fmtLength(m_distance) + "/" +
+               materializr::fmtLength(m_distance2) + " on " +
                std::to_string(m_edges.size()) + " edge(s)";
-    return "Chamfer D" + materializr::numStr(m_distance) + " on " +
+    return "Chamfer D" + materializr::fmtLength(m_distance) + " on " +
            std::to_string(m_edges.size()) + " edge(s)";
 }
 
@@ -852,7 +853,7 @@ std::string ChamferOp::serializeParams() const {
     }
     std::string anc = EdgeAnchor::serialize(m_edgeAnchors);
     if (!anc.empty()) blob += ";anchor=" + anc;
-    // Topological edge names (additive, LAST — length-prefixed opaque blobs
+    // Topological edge names (additive, LAST - length-prefixed opaque blobs
     // read to end-of-string). Persisting them keeps a SEAM fillet/chamfer
     // re-derivable after reload; absent in old files.
     if (!m_edgeRefs.empty()) {
@@ -877,7 +878,7 @@ bool ChamferOp::deserializeParams(const std::string& blob) {
         size_t end = blob.find(';', eq);
         if (end == std::string::npos) end = blob.size();
         std::string key = blob.substr(pos, eq - pos);
-        // edgerefs holds length-prefixed opaque blobs, written last — read to
+        // edgerefs holds length-prefixed opaque blobs, written last - read to
         // end-of-string (not to the next ';').
         if (key == "edgerefs") {
             std::string rest = blob.substr(eq + 1);
@@ -947,8 +948,8 @@ bool ChamferOp::rehydrateFromReload(const ReloadState& state, Document& /*doc*/)
     }
     // Fallback: a save without generated-face indices (a fill chamfer whose
     // `gen=` was dropped during heavy undo/redo churn) leaves the history-hover
-    // highlight blank. Recover the bevel faces geometrically — the faces the
-    // chamfer added to the result — so the step still previews.
+    // highlight blank. Recover the bevel faces geometrically - the faces the
+    // chamfer added to the result - so the step still previews.
     if (m_generatedFaces.empty() && !m_resultShape.IsNull() &&
         !m_previousShape.IsNull())
         m_generatedFaces = facesCreatedVsPrev(m_resultShape, m_previousShape);
@@ -962,7 +963,7 @@ void ChamferOp::refreshGeneratedFaces(const TopoDS_Shape& currentBody,
                                       const materializr::topo::FaceIdMap* lineage) {
     if (currentBody.IsNull()) return;
     // Lineage first (exact, split-aware): every current face whose ancestry
-    // contains one of this chamfer's bevel ids IS a piece of this chamfer —
+    // contains one of this chamfer's bevel ids IS a piece of this chamfer -
     // including pieces a downstream boolean cut the bevel into (#51), which
     // no geometric matcher can trace. Falls through to geometry when the
     // body has no lineage (old saves, non-propagating downstream ops).
@@ -978,7 +979,7 @@ void ChamferOp::refreshGeneratedFaces(const TopoDS_Shape& currentBody,
     // The saved ordinal indices are only meaningful against THIS chamfer's own
     // result shape (SubShapeIndex's documented limitation). Resolving them
     // straight against the final body drifts onto unrelated faces the moment a
-    // downstream op reorders the face map — which made a chamfer claim faces
+    // downstream op reorders the face map - which made a chamfer claim faces
     // all over the part, and let an earlier fillet's drift steal a chamfer's
     // bevel (#49). Resolve against the result shape to get the TRUE bevel
     // faces as geometry, then map each to the current body by centre + surface
@@ -1021,11 +1022,11 @@ bool ChamferOp::ownsFace(const TopoDS_Shape& face) const {
 int ChamferOp::ownsFaceScore(const TopoDS_Shape& face) const {
     if (face.IsNull() || face.ShapeType() != TopAbs_FACE) return 0;
     // (No plane rejection here, unlike FilletOp: a chamfer bevel IS a flat
-    // plane — rejecting planes would make chamfers un-editable.)
+    // plane - rejecting planes would make chamfers un-editable.)
     for (const auto& f : m_generatedFaces) {
         if (f.IsSame(face)) return 2;   // exact identity on the live body
     }
-    // Weaker geometric fallback (post-rebuild) — an exact owner wins over it (#49).
+    // Weaker geometric fallback (post-rebuild) - an exact owner wins over it (#49).
     gp_Pnt q;
     if (!faceCenter(TopoDS::Face(face), q)) return 0;
     for (const auto& f : m_generatedFaces) {

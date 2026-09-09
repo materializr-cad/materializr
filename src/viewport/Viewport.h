@@ -34,7 +34,7 @@ public:
     unsigned int getTextureID() const { return m_colorTexture; }
 
     /// Re-assert THIS framebuffer's aspect on the camera. Tab switches copy a
-    /// whole Camera in (carrying the aspect it had when stashed — or a fresh
+    /// whole Camera in (carrying the aspect it had when stashed - or a fresh
     /// session's default), and resize()'s same-size early-return would never
     /// correct it, leaving the scene stretched until a real resize happens.
     void syncCameraAspect() {

@@ -1,45 +1,16 @@
 #include "gl_common.h"
 #include "SectionView.h"
 #include "SectionCap.h"
-#include "../core/Document.h"
 
 #include <glm/gtc/type_ptr.hpp>
 
-#include <BRepAlgoAPI_Section.hxx>
-#include <TopExp_Explorer.hxx>
-#include <TopoDS.hxx>
-#include <TopoDS_Edge.hxx>
-#include <BRepAdaptor_Curve.hxx>
-#include <GCPnts_TangentialDeflection.hxx>
-#include <BRep_Tool.hxx>
-#include <gp_Pnt.hxx>
 #include <gp_Dir.hxx>
-#include <gp_Vec.hxx>
-#include <gp_Ax3.hxx>
 
-#include <BRepBuilderAPI_MakeFace.hxx>
-#include <Message_ProgressIndicator.hxx>
-#include <Message_ProgressRange.hxx>
-#include <Message_ProgressScope.hxx>
-#include <TopTools_ListOfShape.hxx>
-#include <TopoDS_Face.hxx>
 
 #include <cstdio>
 
 namespace materializr {
 
-namespace {
-class SectionCancelBreak : public Message_ProgressIndicator {
-public:
-    DEFINE_STANDARD_RTTI_INLINE(SectionCancelBreak, Message_ProgressIndicator)
-    explicit SectionCancelBreak(const std::atomic<bool>* f) : m_f(f) {}
-    Standard_Boolean UserBreak() override { return m_f && m_f->load(); }
-protected:
-    void Show(const Message_ProgressScope&, const Standard_Boolean) override {}
-private:
-    const std::atomic<bool>* m_f;
-};
-} // namespace
 
 static const char* s_sectionVertSource = R"(
 #version 330 core
@@ -180,9 +151,9 @@ bool SectionView::isEnabled() const {
     return m_enabled;
 }
 
-SectionView::Result SectionView::compute(
-    const std::vector<std::pair<TopoDS_Shape, glm::vec3>>& bodies,
-    const gp_Pln& cuttingPlane, const std::atomic<bool>* cancel) {
+SectionView::Result SectionView::compute(const std::vector<BodyMesh>& bodies,
+                                         const gp_Pln& cuttingPlane,
+                                         const std::atomic<bool>* cancel) {
     Result out;
     {
         gp_Dir cn = cuttingPlane.Axis().Direction();
@@ -190,75 +161,19 @@ SectionView::Result SectionView::compute(
                                   static_cast<float>(cn.Y()),
                                   static_cast<float>(cn.Z()));
     }
-    for (const auto& [shape, color] : bodies) {
+    for (const BodyMesh& body : bodies) {
         if (cancel && cancel->load()) return out;
-        if (shape.IsNull()) continue;
-        try {
-            // BRepAlgoAPI_Section derives from the boolean machinery, so the
-            // cancel token can abort MID-boolean via OCCT user-break — a
-            // superseded/disabled 100-second section dies quickly instead of
-            // finishing into the void.
-            BRepAlgoAPI_Section section;
-            TopTools_ListOfShape args, tools;
-            args.Append(shape);
-            TopoDS_Face planeFace =
-                BRepBuilderAPI_MakeFace(cuttingPlane).Face();
-            tools.Append(planeFace);
-            section.SetArguments(args);
-            section.SetTools(tools);
-            section.SetRunParallel(Standard_True);
-            if (cancel) {
-                Handle(SectionCancelBreak) brk =
-                    new SectionCancelBreak(cancel);
-                section.Build(brk->Start());
-            } else {
-                section.Build();
-            }
-            if (!section.IsDone()) continue;
-
-            const TopoDS_Shape& result = section.Shape();
-
-            // Discretize each edge in the section result
-            for (TopExp_Explorer exp(result, TopAbs_EDGE); exp.More(); exp.Next()) {
-                const TopoDS_Edge& edge = TopoDS::Edge(exp.Current());
-                if (BRep_Tool::Degenerated(edge)) continue;
-
-                try {
-                    BRepAdaptor_Curve curve(edge);
-                    GCPnts_TangentialDeflection discretizer(curve, 0.1, 0.1);
-
-                    int nbPoints = discretizer.NbPoints();
-                    if (nbPoints < 2) continue;
-
-                    for (int i = 1; i < nbPoints; ++i) {
-                        gp_Pnt p1 = discretizer.Value(i);
-                        gp_Pnt p2 = discretizer.Value(i + 1);
-
-                        SectionLine line;
-                        line.start = glm::vec3(
-                            static_cast<float>(p1.X()),
-                            static_cast<float>(p1.Y()),
-                            static_cast<float>(p1.Z()));
-                        line.end = glm::vec3(
-                            static_cast<float>(p2.X()),
-                            static_cast<float>(p2.Y()),
-                            static_cast<float>(p2.Z()));
-                        out.lines.push_back(line);
-                    }
-                } catch (...) {
-                    continue;
-                }
-            }
-
-            if (cancel && cancel->load()) return out;
-            // --- Cross-section cap ---
-            // Without a filled cap the clipped solid reads as a hollow shell.
+        SectionSlice slice;
+        if (!sliceSection(body.faces, cuttingPlane, slice)) continue;
+        for (size_t i = 0; i + 6 <= slice.lines.size(); i += 6) {
+            out.lines.push_back({glm::vec3(slice.lines[i], slice.lines[i + 1], slice.lines[i + 2]),
+                                 glm::vec3(slice.lines[i + 3], slice.lines[i + 4], slice.lines[i + 5])});
+        }
+        if (!slice.cap.empty()) {
             CapMesh cap;
-            cap.color = color;
-            if (computeSectionCap(shape, cuttingPlane, cap.positions))
-                out.caps.push_back(std::move(cap));
-        } catch (...) {
-            continue;
+            cap.color = body.color;
+            cap.positions = std::move(slice.cap);
+            out.caps.push_back(std::move(cap));
         }
     }
     return out;
@@ -268,33 +183,6 @@ void SectionView::apply(Result&& r) {
     m_lines = std::move(r.lines);
     m_caps = std::move(r.caps);
     m_capNormal = r.capNormal;
-}
-
-void SectionView::update() {
-    m_lines.clear();
-    m_caps.clear();
-
-    if (!m_enabled || !m_document) return;
-
-    // Build the actual cutting plane with offset applied along the normal
-    gp_Pln cuttingPlane = m_plane;
-    if (m_offset != 0.0f) {
-        gp_Pnt origin = cuttingPlane.Location();
-        gp_Dir normal = cuttingPlane.Axis().Direction();
-        origin.Translate(gp_Vec(normal) * static_cast<double>(m_offset));
-        cuttingPlane.SetLocation(origin);
-    }
-
-    std::vector<std::pair<TopoDS_Shape, glm::vec3>> bodies;
-    for (int id : m_document->getAllBodyIds()) {
-        if (!m_document->isBodyVisible(id)) continue;
-        try {
-            const TopoDS_Shape& shape = m_document->getBody(id);
-            if (shape.IsNull()) continue;
-            bodies.emplace_back(shape, m_document->getBodyColor(id));
-        } catch (...) { continue; }
-    }
-    apply(compute(bodies, cuttingPlane, nullptr));
 }
 
 void SectionView::render(const glm::mat4& view, const glm::mat4& projection) {

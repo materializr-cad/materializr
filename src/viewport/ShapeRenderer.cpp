@@ -6,6 +6,8 @@
 
 #include <TopoDS_Shape.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
+#include "core/MeshParams.h"
+#include <chrono>
 #include <TopExp_Explorer.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Face.hxx>
@@ -206,25 +208,42 @@ bool ShapeRenderer::initialize()
     return true;
 }
 
+void ShapeRenderer::notePreMeshed(const TopoDS_Shape& shape,
+                                  float requestedDeflection,
+                                  float requestedAngularDeflection) {
+    if (!shape.IsNull())
+        m_meshedAt[shape.TShape().get()] =
+            materializr::makeMeshTag(shape, requestedDeflection, requestedAngularDeflection);
+}
+
 int ShapeRenderer::tessellate(const TopoDS_Shape& shape, float deflection,
                               float angularDeflection)
 {
-    // A worker thread may have PRE-MESHED this shape at the current quality
-    // (heavy results like a swept thread — meshing its 35-turn helicoid faces
-    // on the main thread froze the app for ~10s). Reuse that cache only when
-    // every face carries a triangulation at EXACTLY the requested linear
-    // deflection — any other value re-meshes below, so the quality slider
-    // still takes effect in BOTH directions (a finer-than-requested cache
-    // must NOT survive a quality lowering; that was a real bug once).
-    bool preMeshed = true;
-    for (TopExp_Explorer fx(shape, TopAbs_FACE); fx.More() && preMeshed;
-         fx.Next()) {
-        TopLoc_Location l;
-        Handle(Poly_Triangulation) t =
-            BRep_Tool::Triangulation(TopoDS::Face(fx.Current()), l);
-        if (t.IsNull() || std::abs(t->Deflection() - deflection) > 1e-4)
-            preMeshed = false;
+    // Skip the mesher when this exact TShape was already meshed for the
+    // requested (linear, angular) deflection - by an earlier tessellate (a full rebuild
+    // re-runs setBodyMesh for every body, not just the ones the last
+    // operation touched) or by a worker thread that pre-meshed a heavy result
+    // (a swept thread's 35-turn helicoid took ~10 s on the main thread; see
+    // notePreMeshed). The tag lives in m_meshedAt because OCCT stores only the
+    // ACHIEVED deflection on each Poly_Triangulation (0 on a plane, ~0.007 on
+    // a small cylinder asked for 0.1), never the requested value; comparing
+    // that against the request could never match, so the old pre-mesh check
+    // re-meshed every time. The quality slider still takes effect in BOTH
+    // directions: a different value never matches, so a finer-than-requested
+    // mesh cannot survive a quality lowering (that was a real bug once).
+    // The tag also records which faces the mesher left bare, so a body with
+    // a face it cannot triangulate is not Cleaned and re-meshed on every
+    // rebuild, while a fresh shape at a recycled address (every face bare)
+    // is never trusted - see meshTagCovers().
+    const void* key = shape.TShape().get();
+    auto tag = m_meshedAt.find(key);
+    if (tag == m_meshedAt.end()) {
+        auto prev = m_meshedAtPrev.find(key);
+        if (prev != m_meshedAtPrev.end()) tag = m_meshedAt.insert(*prev).first;
     }
+    const bool preMeshed = tag != m_meshedAt.end() &&
+                           materializr::meshTagCovers(tag->second, deflection,
+                                                      angularDeflection, shape);
     if (!preMeshed) {
         // Drop any cached triangulation first. BRepMesh_IncrementalMesh only
         // ever refines an existing mesh, so without this a previously finer
@@ -237,9 +256,12 @@ int ShapeRenderer::tessellate(const TopoDS_Shape& shape, float deflection,
         // surfaces by normal angle, so rounded edges/holes get more facets
         // (smoother) while flat faces stay cheap. Run in parallel to absorb
         // the extra triangles.
-        BRepMesh_IncrementalMesh meshGen(shape, deflection, Standard_False,
-                                         angularDeflection, Standard_True);
-        meshGen.Perform();
+        const auto t0 = std::chrono::steady_clock::now();
+        BRepMesh_IncrementalMesh meshGen(
+            shape, materializr::meshParams(deflection, angularDeflection, true));
+        m_lastMeshMs = std::chrono::duration<double, std::milli>(
+                           std::chrono::steady_clock::now() - t0).count();
+        m_meshedAt[key] = materializr::makeMeshTag(shape, deflection, angularDeflection);
     }
 
     // Collect all triangle vertices (position + normal)
@@ -324,6 +346,17 @@ int ShapeRenderer::tessellate(const TopoDS_Shape& shape, float deflection,
         }
     }
 
+    const int slot = appendVertices(vertices);
+    if (slot >= 0) {
+        m_meshes[slot].shape = shape;
+        m_meshes[slot].deflection = deflection;
+        m_meshes[slot].angularDeflection = angularDeflection;
+    }
+    return slot;
+}
+
+int ShapeRenderer::appendVertices(const std::vector<float>& vertices)
+{
     if (vertices.empty()) {
         return -1;
     }
@@ -358,24 +391,108 @@ int ShapeRenderer::tessellate(const TopoDS_Shape& shape, float deflection,
     return index;
 }
 
+bool ShapeRenderer::isPreMeshed(const TopoDS_Shape& shape, float deflection,
+                                float angularDeflection) const
+{
+    // Same rule as tessellate(): the tag for this TShape, in either map, must
+    // still cover the shape at exactly these parameters.
+    const void* key = shape.TShape().get();
+    auto tag = m_meshedAt.find(key);
+    if (tag == m_meshedAt.end()) {
+        tag = m_meshedAtPrev.find(key);
+        if (tag == m_meshedAtPrev.end()) return false;
+    }
+    return materializr::meshTagCovers(tag->second, deflection, angularDeflection, shape);
+}
+
+bool ShapeRenderer::reclaimStale(int bodyId)
+{
+    for (size_t i = 0; i < m_retired.size(); ++i) {
+        if (m_retired[i].bodyId != bodyId || !m_retired[i].vao) continue;
+        const int slot = static_cast<int>(m_meshes.size());
+        m_meshes.push_back(m_retired[i]);
+        m_retired[i] = m_retired.back();
+        m_retired.pop_back();
+        m_bodyToSlot[bodyId] = slot;
+        return true;
+    }
+    return false;
+}
+
+bool ShapeRenderer::hasMeshFor(int bodyId) const
+{
+    auto it = m_bodyToSlot.find(bodyId);
+    if (it != m_bodyToSlot.end() && it->second >= 0 &&
+        it->second < static_cast<int>(m_meshes.size()) && m_meshes[it->second].vao)
+        return true;
+    for (const MeshData& r : m_retired)
+        if (r.bodyId == bodyId && r.vao) return true;
+    return false;
+}
+
 int ShapeRenderer::setBodyMesh(int bodyId, const TopoDS_Shape& shape,
                                float deflection, float angularDeflection)
 {
-    // Tessellate first so we don't free the old slot's GL resources unless
-    // the new tessellation actually succeeds.
-    int appendedSlot = tessellate(shape, deflection, angularDeflection);
+    m_lastMeshMs = -1.0;
+    // Reclaim the slot retireAll() kept for this exact shape at this quality,
+    // if any: no mesher, no vertex collection, no upload. It comes back as a
+    // fresh slot (default colour / flags / matrix), exactly like a new
+    // tessellation would; the caller re-applies colour and previews.
+    int appendedSlot = -1;
+    for (size_t i = 0; i < m_retired.size(); ++i) {
+        const MeshData& r = m_retired[i];
+        if (r.vao && r.deflection == deflection &&
+            r.angularDeflection == angularDeflection && r.shape.IsEqual(shape)) {
+            MeshData fresh;
+            fresh.vao = r.vao;
+            fresh.vbo = r.vbo;
+            fresh.vertexCount = r.vertexCount;
+            fresh.shape = r.shape;
+            fresh.deflection = r.deflection;
+            fresh.angularDeflection = r.angularDeflection;
+            appendedSlot = static_cast<int>(m_meshes.size());
+            m_meshes.push_back(fresh);
+            m_retired[i] = m_retired.back();
+            m_retired.pop_back();
+            // The tag stays authoritative for this TShape even though
+            // tessellate() did not run; recount what is bare on the live shape.
+            m_meshedAt[shape.TShape().get()] =
+                materializr::makeMeshTag(shape, deflection, angularDeflection);
+            break;
+        }
+    }
+    // Otherwise tessellate first so we don't free the old slot's GL resources
+    // unless the new tessellation actually succeeds.
+    if (appendedSlot < 0)
+        appendedSlot = tessellate(shape, deflection, angularDeflection);
     if (appendedSlot < 0) {
-        // Failed — leave the existing slot (if any) in place. LOUDLY: a
+        // Failed - leave the existing slot (if any) in place. LOUDLY: a
         // kept stale slot means the screen shows geometry the document no
         // longer has (phantom bodies, "unclickable" faces).
         auto it = m_bodyToSlot.find(bodyId);
         std::fprintf(stderr,
-                     "[Mesh] tessellation FAILED for body %d — %s\n", bodyId,
+                     "[Mesh] tessellation FAILED for body %d - %s\n", bodyId,
                      (it == m_bodyToSlot.end())
                          ? "no previous mesh, body will not render"
                          : "KEEPING STALE MESH (render != document!)");
         return (it == m_bodyToSlot.end()) ? -1 : it->second;
     }
+    return placeSlot(bodyId, appendedSlot);
+}
+
+int ShapeRenderer::setBodyVertices(int bodyId, const std::vector<float>& vertices)
+{
+    m_lastMeshMs = -1.0;
+    const int appendedSlot = appendVertices(vertices);
+    if (appendedSlot < 0) {
+        auto it = m_bodyToSlot.find(bodyId);
+        return (it == m_bodyToSlot.end()) ? -1 : it->second;
+    }
+    return placeSlot(bodyId, appendedSlot);
+}
+
+int ShapeRenderer::placeSlot(int bodyId, int appendedSlot)
+{
     auto it = m_bodyToSlot.find(bodyId);
     if (it == m_bodyToSlot.end()) {
         // New body; the appended slot is its home.
@@ -383,12 +500,12 @@ int ShapeRenderer::setBodyMesh(int bodyId, const TopoDS_Shape& shape,
         m_bodyToSlot[bodyId] = appendedSlot;
         return appendedSlot;
     }
-    // Existing slot — relocate the new mesh's GL data into it so callers
+    // Existing slot - relocate the new mesh's GL data into it so callers
     // that cached the slot index keep working (setColor / setSelected use
     // index lookups). Carry over cosmetic state.
     int oldSlot = it->second;
     if (oldSlot < 0 || oldSlot >= static_cast<int>(m_meshes.size())) {
-        // Stale mapping — treat as fresh insert.
+        // Stale mapping - treat as fresh insert.
         m_meshes[appendedSlot].bodyId = bodyId;
         m_bodyToSlot[bodyId] = appendedSlot;
         return appendedSlot;
@@ -423,6 +540,7 @@ void ShapeRenderer::removeBody(int bodyId)
     if (m.vao) glDeleteVertexArrays(1, &m.vao);
     if (m.vbo) glDeleteBuffers(1, &m.vbo);
     m.vao = 0; m.vbo = 0; m.vertexCount = 0; m.bodyId = -1;
+    m.shape.Nullify(); // do not pin a deleted body's geometry through m_retired
     // Slot stays in the vector so other slots' indices don't shift.
     // render() skips slots with vertexCount==0.
 }
@@ -440,7 +558,7 @@ void ShapeRenderer::render(const glm::mat4& view, const glm::mat4& projection,
 
     glEnable(GL_DEPTH_TEST);
 
-    // Section-view clip uniforms. Set before BOTH passes — the outline pass
+    // Section-view clip uniforms. Set before BOTH passes - the outline pass
     // below also runs the mesh program for its stencil fill, and it must
     // clip identically or the selection glow paints over the removed half.
     glUseProgram(m_meshProgram);
@@ -476,11 +594,11 @@ void ShapeRenderer::render(const glm::mat4& view, const glm::mat4& projection,
     // Coincident-face tie-break, third generation. Overlapping bodies can
     // share exactly coplanar faces (Extrude From leaves the new body's base on
     // the source face) and shimmer as they z-fight. 878b7ca resolved that with
-    // a per-body glPolygonOffset(rank, 2*rank) — but rank grew with BODY COUNT,
+    // a per-body glPolygonOffset(rank, 2*rank) - but rank grew with BODY COUNT,
     // and the slope term multiplies each face's per-pixel depth gradient, so on
     // a 68-body assembly old bodies drew centimetres behind their true position
     // (worse zoomed out, where the per-pixel gradient grows). Their GL_LINES
-    // edges — which polygon offset cannot move — stayed put, so whole bodies
+    // edges - which polygon offset cannot move - stayed put, so whole bodies
     // degenerated into edges floating over displaced or invisible faces (the
     // corvus ghost bug). Clamping the rank only shrank the wedge: faces still
     // visibly recessed close up, and interior edges still popped through thin
@@ -489,12 +607,12 @@ void ShapeRenderer::render(const glm::mat4& view, const glm::mat4& projection,
     //
     // Instead: bodies draw in slot order (creation order, oldest first) with
     // GL_LEQUAL, so wherever two faces produce EQUAL depth the newest body
-    // deterministically wins by drawing last — the exact semantics the offset
+    // deterministically wins by drawing last - the exact semantics the offset
     // was built for, with zero geometric displacement. The invariant vertex
     // shaders (shared with EdgeRenderer) make coplanar faces genuinely hit
     // equal depths. Residual risk: differently-tessellated coplanar faces can
     // still disagree by a few depth quanta at extreme grazing angles and
-    // sparkle there — minor and localized, where the offset's failure mode was
+    // sparkle there - minor and localized, where the offset's failure mode was
     // structural and scene-wide.
     glDepthFunc(GL_LEQUAL);
     const int slotCount = static_cast<int>(m_meshes.size());
@@ -590,14 +708,32 @@ void ShapeRenderer::setSubtractPreview(int meshIndex, bool subtractPreview)
     }
 }
 
+void ShapeRenderer::retireAll()
+{
+    // Keep the buffers: the full rebuild that follows may hand the same
+    // shapes straight back (see setBodyMesh). Anything retired last time
+    // and never reclaimed dies here.
+    freeRetired();
+    m_retired.swap(m_meshes);
+    m_meshes.clear();
+    m_bodyToSlot.clear();
+    m_meshedAtPrev.swap(m_meshedAt);
+    m_meshedAt.clear();
+}
+
 void ShapeRenderer::clear()
 {
-    for (auto& mesh : m_meshes) {
+    retireAll();
+    freeRetired();
+}
+
+void ShapeRenderer::freeRetired()
+{
+    for (auto& mesh : m_retired) {
         if (mesh.vao) glDeleteVertexArrays(1, &mesh.vao);
         if (mesh.vbo) glDeleteBuffers(1, &mesh.vbo);
     }
-    m_meshes.clear();
-    m_bodyToSlot.clear();
+    m_retired.clear();
 }
 
 void ShapeRenderer::debugDumpSlots() const

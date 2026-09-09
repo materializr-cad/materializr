@@ -3,12 +3,12 @@
 
 // Primitives plugin: one toolbar button per OCCT primitive (Box / Cylinder /
 // Sphere / Cone / Torus). Each button fires a requestInteractiveOp that
-// Application picks up and opens a parameter popup for — same flow the
+// Application picks up and opens a parameter popup for - same flow the
 // Construction Plane / Axis plugins use. The actual PrimitiveOp construction
 // happens in Application::commitPrimitivePopup so we only have to maintain
 // one place that knows about the kind-specific parameter set.
 
-// No toolbar buttons here — the empty-canvas "Primitives..." fold-out lives
+// No toolbar buttons here - the empty-canvas "Primitives..." fold-out lives
 // in Toolbar::renderPrimitivesMenu so the five kinds don't sprawl across the
 // sidebar. The plugin still owns: the PrimitiveOp registration (via
 // ForceLink + OperationFactory) AND the Command Palette entries so power

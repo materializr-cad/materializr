@@ -27,19 +27,19 @@ public:
     virtual std::string name() const = 0;
     virtual std::string description() const = 0;
 
-    // For the properties panel — each operation renders its own ImGui editor
+    // For the properties panel - each operation renders its own ImGui editor
     virtual void renderProperties() = 0;
 
     // Unique type identifier for SERIALIZATION. These strings are the on-disk
-    // format keys — ProjectIO writes `TYPE <typeId>` and OperationFactory
-    // rebuilds from them — so a value here can never change without breaking
+    // format keys - ProjectIO writes `TYPE <typeId>` and OperationFactory
+    // rebuilds from them - so a value here can never change without breaking
     // every saved project. Use kind() to make DECISIONS about an op; see below.
     virtual std::string typeId() const = 0;
 
     // The same identity, typed, for behaviour that branches on op type.
     //
     // Dispatch used to compare typeId() against string literals scattered
-    // across History, Application and the Toolbar — "thread", "shell",
+    // across History, Application and the Toolbar - "thread", "shell",
     // "moveface", "fillet", "chamfer". Every one of those is a silent failure
     // waiting to happen: misspell it and the compare simply never matches, so
     // a thread quietly stops reflowing (or, as in isBodyThreaded, keeps
@@ -66,7 +66,7 @@ public:
     // body), 1 = a post-rebuild geometric-centre fallback match. The picker
     // prefers the highest score so a fuzzy over-match from an unrelated op
     // (e.g. a big multi-edge fillet whose blend sits near a later countersink
-    // chamfer) can't steal a face its true owner claims exactly — the old
+    // chamfer) can't steal a face its true owner claims exactly - the old
     // first-op-in-history-wins loop mis-attributed exactly that case (#49).
     // Default mirrors ownsFace() so non-fillet/chamfer ops need no override.
     virtual int ownsFaceScore(const TopoDS_Shape& face) const {
@@ -86,7 +86,7 @@ public:
     // True only for a reloaded step the user should be WARNED about: one that
     // lost its editable parameters AND shapes body geometry (a baked fillet,
     // boolean, etc.). A sketch-only step that reloaded without params is inert
-    // — the sketch itself loads fine and there is nothing to "repair" — so it
+    // - the sketch itself loads fine and there is nothing to "repair" - so it
     // is deliberately NOT a frozen feature and must not raise the amber banner.
     virtual bool isFrozenFeature() const { return false; }
 
@@ -94,7 +94,7 @@ public:
     // a single-line opaque text blob. Empty default = nothing to save (sketch
     // edits, replay ops, simple ops without parameters). Read back by
     // deserializeParams; returns true on a clean parse. The format is up to
-    // each op — keep it stable per typeId or version it inside the blob.
+    // each op - keep it stable per typeId or version it inside the blob.
     virtual std::string serializeParams() const { return ""; }
     virtual bool deserializeParams(const std::string& /*blob*/) { return true; }
 
@@ -107,12 +107,12 @@ public:
     // restore them.
     struct ReloadState {
         std::vector<int> created;
-        // The created bodies' shapes AFTER this step — lets a sketch-driven
+        // The created bodies' shapes AFTER this step - lets a sketch-driven
         // extrude derive WHICH regions it originally used from its own saved
         // result's footprint on the sketch plane (#53, old-file recovery).
         std::vector<std::pair<int, TopoDS_Shape>> createdAfter;
         std::vector<std::pair<int, TopoDS_Shape>> modifiedBefore;
-        // The same modified bodies AFTER this step — sub-shape-referencing ops
+        // The same modified bodies AFTER this step - sub-shape-referencing ops
         // resolve their generated-geometry indices (e.g. fillet blend faces
         // for click-to-edit) against the result shape.
         std::vector<std::pair<int, TopoDS_Shape>> modifiedAfter;
@@ -143,20 +143,28 @@ public:
         return nullptr;
     }
 
-    // Body ids this op will read/modify when executed — known BEFORE
+    // Body ids this op will read/modify when executed - known BEFORE
     // execution for ops that carry explicit target ids. Used by the
     // thread-last reflow: an op that touches a threaded body is inserted
     // BEFORE the trailing Thread steps so its boolean runs against clean
     // geometry (OCCT can't classify cuts along helical groove fields), and
     // the thread re-cuts parametrically afterwards. Empty (the default)
-    // means "unknown / not boolean-sensitive" — no reflow.
+    // means "unknown / not boolean-sensitive" - no reflow.
     virtual std::vector<int> plannedBodyIds() const { return {}; }
 
+    // The sub-shapes this op was handed as parameters (the faces to remove,
+    // the edges to fillet) while it still holds them as live references, so
+    // an off-thread preview can point them at a private copy of the body
+    // before execute() runs there (SnapshotPreview). An op that returns
+    // nothing while it does hold such references is not eligible for that
+    // preview and keeps running in the frame. Default: no shape parameters.
+    virtual std::vector<TopoDS_Shape*> shapeParams() { return {}; }
+
     // Maintained by History: the serialised parameter set from this op's last
-    // SUCCESSFUL execute. Used to roll a rejected edit back — the UI mutates
+    // SUCCESSFUL execute. Used to roll a rejected edit back - the UI mutates
     // params in place before editStep runs, so "the values that worked" must
     // be captured at execute time, not edit time. Empty for ops without
-    // parameter serialisation (no rescue possible — they fail-and-suspend).
+    // parameter serialisation (no rescue possible - they fail-and-suspend).
     const std::string& lastGoodParams() const { return m_lastGoodParams; }
     void rememberGoodParams() { m_lastGoodParams = serializeParams(); }
 
@@ -192,7 +200,7 @@ public:
 protected:
     // Call from inside a long execute() loop. Returns true if the user
     // cancelled, so the op can bail and report failure. No-op (returns false)
-    // when no reporter is set — ops work exactly as before.
+    // when no reporter is set - ops work exactly as before.
     bool reportProgress(float fraction, const char* label) {
         return m_progress ? m_progress(fraction, label) : false;
     }
@@ -204,7 +212,7 @@ protected:
 };
 
 // The one place a type-id string is turned into a decision. Keep these values
-// EXACTLY as each op's typeId() returns them — they are the saved-file keys
+// EXACTLY as each op's typeId() returns them - they are the saved-file keys
 // (see typeId() above). Adding a Kind means adding it here and nowhere else.
 inline Operation::Kind Operation::kind() const {
     const std::string id = typeId();

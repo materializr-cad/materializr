@@ -32,7 +32,7 @@ struct AirfoilProfile {
     bool  bluntTrailingEdge = false;
     float trailingGap = 0.0f;         // normalised chord units, 0 = sharp
     bool empty() const { return upper.size() < 2 || lower.size() < 2; }
-    // Max thickness and camber as fractions of chord — what the section is
+    // Max thickness and camber as fractions of chord - what the section is
     // usually identified by, and a cheap sanity check on a parse.
     float thickness() const;
     float camber() const;

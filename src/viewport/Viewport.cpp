@@ -35,7 +35,7 @@ void Viewport::bind()
     if (m_samples > 0 && m_msaaFbo) {
         glBindFramebuffer(GL_FRAMEBUFFER, m_msaaFbo);
 #if !defined(MZ_GLES)
-        // GL ES has no GL_MULTISAMPLE toggle — MSAA is implied by the
+        // GL ES has no GL_MULTISAMPLE toggle - MSAA is implied by the
         // multisampled renderbuffer/EGL config and is always active.
         glEnable(GL_MULTISAMPLE);
 #endif

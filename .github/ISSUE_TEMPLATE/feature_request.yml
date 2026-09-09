@@ -6,7 +6,7 @@ body:
     attributes:
       value: |
         Materializr aims for the middle ground between dead-simple and
-        fully-featured — genuine parametric modeling without the bloat. Ideas
+        fully-featured - genuine parametric modeling without the bloat. Ideas
         that fit that spirit are very welcome.
   - type: textarea
     id: problem

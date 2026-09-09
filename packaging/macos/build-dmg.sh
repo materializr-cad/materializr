@@ -2,7 +2,7 @@
 # Build Materializr.app and a distributable .dmg on macOS (Apple Silicon).
 #
 # Prereqs:
-#   - a Release build in $BUILD_DIR (default: build/) — see BUILD.md (macOS)
+#   - a Release build in $BUILD_DIR (default: build/) - see BUILD.md (macOS)
 #   - brew install dylibbundler
 #
 # The result is self-contained: every Homebrew/OpenCASCADE dylib the binary
@@ -28,9 +28,9 @@ VERSION="$(grep -m1 'project(Materializr VERSION' CMakeLists.txt | sed -E 's/.*V
 DMG="$BUILD_DIR/Materializr-${VERSION}-arm64.dmg"
 BREW="$(brew --prefix)"
 
-[ -x "$BIN" ] || { echo "error: $BIN not found — build first: cmake --build $BUILD_DIR"; exit 1; }
+[ -x "$BIN" ] || { echo "error: $BIN not found - build first: cmake --build $BUILD_DIR"; exit 1; }
 [ -n "$VERSION" ] || { echo "error: could not parse version from CMakeLists.txt"; exit 1; }
-command -v dylibbundler >/dev/null || { echo "error: dylibbundler not found — brew install dylibbundler"; exit 1; }
+command -v dylibbundler >/dev/null || { echo "error: dylibbundler not found - brew install dylibbundler"; exit 1; }
 
 # One scratch dir for the iconset + dmg staging, cleaned up on any exit.
 WORK="$(mktemp -d)"
@@ -42,7 +42,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/assets" "$APP/Contents/F
 
 cp "$BIN" "$APP/Contents/MacOS/materializr"
 
-# Bundled fonts — resolveBundledFont() looks in <exe>/../Resources/assets/fonts.
+# Bundled fonts - resolveBundledFont() looks in <exe>/../Resources/assets/fonts.
 cp -R assets/fonts "$APP/Contents/Resources/assets/"
 
 # Icon: icon.png -> Materializr.icns (build a full iconset so Finder/Dock scale).
@@ -83,7 +83,7 @@ for dylib in "$APP/Contents/Frameworks/"*.dylib; do
 done
 
 # Effective minimum macOS = the highest LC_BUILD_VERSION 'minos' across the main
-# binary and every bundled dylib — a load fails if the OS is older than ANY of
+# binary and every bundled dylib - a load fails if the OS is older than ANY of
 # them. Homebrew bottles are built for the host's macOS, so this reports what the
 # .dmg actually requires instead of a fictional floor. Falls back to 11.0 only if
 # nothing carries a build-version load command (very old toolchains).
@@ -114,7 +114,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>LSMinimumSystemVersion</key><string>${MINOS}</string>
   <key>LSApplicationCategoryType</key><string>public.app-category.graphics-design</string>
   <key>NSHighResolutionCapable</key><true/>
-  <key>NSHumanReadableCopyright</key><string>Materializr contributors — GNU GPL v3.</string>
+  <key>NSHumanReadableCopyright</key><string>Materializr contributors - GNU GPL v3.</string>
   <key>CFBundleDocumentTypes</key>
   <array>
     <dict>
@@ -130,11 +130,11 @@ PLIST
 
 # Ad-hoc sign inside-out: every nested dylib first, then the bundle. Apple
 # deprecated --deep and signs nested code in an unspecified order with it; signing
-# leaf-first is the supported way. Not notarized — see the header note.
+# leaf-first is the supported way. Not notarized - see the header note.
 echo "==> Ad-hoc signing"
 find "$APP/Contents/Frameworks" -name '*.dylib' -exec codesign --force --sign - {} +
 codesign --force --sign - "$APP"
-# Gate on verification — on its own line so `set -e` aborts a broken seal. (The
+# Gate on verification - on its own line so `set -e` aborts a broken seal. (The
 # previous `... && echo OK` form let a failed verify slide straight into shipping,
 # because the left side of && is exempt from errexit.)
 codesign --verify --strict --verbose=2 "$APP"

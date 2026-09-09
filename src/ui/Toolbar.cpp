@@ -27,7 +27,7 @@ namespace materializr {
 Toolbar::Toolbar() = default;
 
 // Tooltip helper. Wraps long descriptions across multiple lines instead of
-// the single-line behaviour ImGui::SetItemTooltip gives by default — tooltip
+// the single-line behaviour ImGui::SetItemTooltip gives by default - tooltip
 // strings can run to a couple of sentences and used to truncate awkwardly.
 // BeginItemTooltip handles the hover-delay; PushTextWrapPos gives us the
 // width cap (in pixels, roughly 28em at the current font size).
@@ -68,7 +68,7 @@ ToolAction Toolbar::renderCatalogRemainder(
 ToolAction Toolbar::render() {
     ToolAction action = ToolAction::None;
 
-    // Snapshot the catalogue for this frame — see catalogOffers() in the
+    // Snapshot the catalogue for this frame - see catalogOffers() in the
     // header for why classic reads it at all.
     m_catalog = railTools();
 
@@ -92,7 +92,7 @@ ToolAction Toolbar::render() {
             // Body tools (gizmos + Mirror) stay available when a face is
             // selected so the user can move/rotate/scale the whole body, but
             // the whole-body plugin contributions (Split / Duplicate / Pattern)
-            // are skipped — they don't apply in face-selection context.
+            // are skipped - they don't apply in face-selection context.
             action = renderBodyTools(/*primaryContext=*/false);
         }
     } else if (m_selection->hasSelectedBodies()) {
@@ -108,7 +108,7 @@ ToolAction Toolbar::render() {
 }
 
 // THE tool catalogue: which tools the current selection context offers.
-// All three layouts read this — the rails render it directly, and classic
+// All three layouts read this - the rails render it directly, and classic
 // gates its own buttons on catalogOffers() (see Toolbar.h). Add a tool HERE
 // and every layout gets it. The dispatch below mirrors render()'s.
 std::vector<Toolbar::RailTool> Toolbar::railTools() const {
@@ -118,7 +118,7 @@ std::vector<Toolbar::RailTool> Toolbar::railTools() const {
         t.push_back({icon, label, a, active, tip});
     };
 
-    // Plugin toolbar contributions for the given context mask — the rail twin
+    // Plugin toolbar contributions for the given context mask - the rail twin
     // of renderPluginButtons, so Boolean / Delete / Duplicate / Pattern / Loft
     // / Split / Construction reach every layout, and future plugins land here
     // automatically. Icons/short labels are matched by contribution name
@@ -130,7 +130,7 @@ std::vector<Toolbar::RailTool> Toolbar::railTools() const {
             if (!((1 << static_cast<int>(c.context)) & contextMask)) continue;
             // Base construction creation is covered by the shared Construct
             // menu ("New Plane/Axis…", renderConstructionMenuItems) which the
-            // rail's Construct group and the im-touch + FAB both host — rail
+            // rail's Construct group and the im-touch + FAB both host - rail
             // buttons for them just duplicated the + menu (Steve).
             if (c.name == "Construction Plane" ||
                 c.name == "Construction Axis") continue;
@@ -163,7 +163,7 @@ std::vector<Toolbar::RailTool> Toolbar::railTools() const {
         add(MZ_ICON_CIRCLE,  "Circle",  ToolAction::Circle,       m_activeSketchMode == 3,
             "Draw a circle: press the centre, drag to the radius.");
         // Draw-origin toggle directly under the ACTIVE circle/rect tool, same
-        // as the classic toolbar — label shows the current mode.
+        // as the classic toolbar - label shows the current mode.
         if (m_activeSketchMode == 3)
             add(MZ_ICON_CIRCLE, m_circleMode == 0 ? "Center" : "2-Point",
                 ToolAction::SketchToggleDrawOrigin, false,
@@ -201,7 +201,7 @@ std::vector<Toolbar::RailTool> Toolbar::railTools() const {
         add(MZ_ICON_MEASURE, "Dimension", ToolAction::SketchDimension,
             m_activeSketchMode == 12,
             "Dimension: tap entities, tap to place the label, type the value.");
-        // Sketch-element transforms — mirror the classic sketch toolbar so all
+        // Sketch-element transforms - mirror the classic sketch toolbar so all
         // three layouts behave identically. Like classic, they're always here
         // in a sketch and simply no-op if nothing is selected. (The rail
         // renderer opens a sides popout for Polygon above; these fire directly.)
@@ -213,7 +213,7 @@ std::vector<Toolbar::RailTool> Toolbar::railTools() const {
             "Linear pattern: copy the selected sketch elements N times along the sketch X axis.");
         add(MZ_ICON_PATTERN_CIRCULAR, "Circular", ToolAction::SketchRadialPattern, false,
             "Circular pattern: copy the selected sketch elements around an origin you specify.");
-        // Live inference-level cycle (Full → Reduced → Off → Max) — the label
+        // Live inference-level cycle (Full → Reduced → Off → Max) - the label
         // shows the CURRENT level. Same Settings gate as the classic toolbar.
         if (m_showInferenceToggle) {
             const char* lvl = m_inferenceLevel == 0 ? "Full"
@@ -246,7 +246,7 @@ std::vector<Toolbar::RailTool> Toolbar::railTools() const {
         // BOTH, always. Attachment picks the ORDER, not the menu: a region
         // whose sketch still drives a body leads with Push (modify in place),
         // a standalone one leads with Extrude (new body). It used to be
-        // either/or, which hid Extrude from every sketch drawn on a face —
+        // either/or, which hid Extrude from every sketch drawn on a face -
         // exactly when "make this a separate body instead of fusing it" is
         // wanted (Steve, 2026-08-05). The face branch below and the classic
         // layout already offered both; only this rail didn't.
@@ -284,7 +284,7 @@ std::vector<Toolbar::RailTool> Toolbar::railTools() const {
     } else if (m_selection->hasSelectedSketches()) {
         add(MZ_ICON_EDIT,     "Edit",     ToolAction::EditSketch, false,
             "Reopen the selected sketch for editing.");
-        // Both, ordered by attachment — mirrors the region case above.
+        // Both, ordered by attachment - mirrors the region case above.
         if (m_selSketchAttached) {
             add(MZ_ICON_PUSHPULL, "Push",    ToolAction::PushPull, false,
                 "Push/pull the sketch's regions into or out of the host body.");
@@ -320,8 +320,8 @@ std::vector<Toolbar::RailTool> Toolbar::railTools() const {
                 "Extrude the face into new material.");
             add(MZ_ICON_SHELL,    "Shell",   ToolAction::Shell, false,
                 "Hollow the body, leaving this face open.");
-            // THE face-scale tool. There used to be a second one — the
-            // Transform "Scale" button, which ran MoveFaceOp::Scale — and the
+            // THE face-scale tool. There used to be a second one - the
+            // Transform "Scale" button, which ran MoveFaceOp::Scale - and the
             // two were not merely similar: measured on a 20mm box scaled to
             // 50%, both return the identical 4666.667 frustum, because Scale
             // is exactly this op with the blend length pinned to the full
@@ -338,10 +338,10 @@ std::vector<Toolbar::RailTool> Toolbar::railTools() const {
             "Draft angle for moulding or printing: tilt the selected face(s) "
             "by an angle about a fixed neutral plane. Unlike Rotate it takes "
             "SEVERAL faces at one angle (all four walls of a box) and works on "
-            "curved faces too \xE2\x80\x94 a cylinder drafts into a cone.");
+            "curved faces too - a cylinder drafts into a cone.");
         // Named for what it does. It was "Repair Geometry", which promises a
         // general fixer and delivers one specific act: delete the picked face
-        // and heal the neighbours over the gap — which is how you take a baked
+        // and heal the neighbours over the gap - which is how you take a baked
         // fillet or chamfer back to a sharp edge. The Repair GROUP is the
         // general fixer now, and this is one member of it.
         add(MZ_ICON_REPAIR,   "Remove Feature", ToolAction::RemoveFace, false,
@@ -354,10 +354,10 @@ std::vector<Toolbar::RailTool> Toolbar::railTools() const {
             add(MZ_ICON_CIRCLE, "Diameter", ToolAction::EditDiameter, false,
                 "Set the hole or boss to an exact diameter.");
             add(MZ_ICON_THREAD, "Thread", ToolAction::Thread, false,
-                "Cut a helical screw thread into the picked cylindrical face — "
+                "Cut a helical screw thread into the picked cylindrical face - "
                 "external on a boss, internal in a hole.");
         }
-        // "Edit Fillet / Chamfer" when the picked face was produced by one —
+        // "Edit Fillet / Chamfer" when the picked face was produced by one -
         // same ownsFace() probe as the classic Face Operations section.
         if (m_selection && m_history) {
             TopoDS_Shape pickedFace;
@@ -366,7 +366,7 @@ std::vector<Toolbar::RailTool> Toolbar::railTools() const {
                     pickedFace = e.shape; break;
                 }
             if (!pickedFace.IsNull()) {
-                // Pick the op that BEST owns the face — highest ownsFaceScore
+                // Pick the op that BEST owns the face - highest ownsFaceScore
                 // (exact IsSame beats the geometric fallback), latest on ties.
                 // The old first-match loop let an earlier fuzzy over-match (a
                 // big fillet) win over the actual chamfer (#49).
@@ -388,19 +388,19 @@ std::vector<Toolbar::RailTool> Toolbar::railTools() const {
             }
         }
         // Move/Rotate/Scale transform a flat face (its feature follows); on a
-        // curved/fillet face they freak out or do nothing — hide them. #28
+        // curved/fillet face they freak out or do nothing - hide them. #28
         if (m_selFacePlanar) {
             add(MZ_ICON_MOVE,   "Move",   ToolAction::Move, false,
                 "Move the face (its feature follows).");
             add(MZ_ICON_ROTATE, "Rotate", ToolAction::Rotate, false,
-                "Tilt the face — or twist it with the ring about its normal.");
+                "Tilt the face - or twist it with the ring about its normal.");
             // No "Scale" here: it did the same thing as Scale Face above.
         } else if (m_selFaceIsHoleWall) {
             // The one curved face #28 shouldn't hide Move on: a hole's bore.
             // Clicking the inside wall means the whole hole (both rims travel
             // together); grabbing a rim EDGE is how you move just one side.
             add(MZ_ICON_MOVE,   "Move",   ToolAction::Move, false,
-                "Slide the whole hole across the face it pierces \xE2\x80\x94 "
+                "Slide the whole hole across the face it pierces - "
                 "select a rim edge instead to tilt or reshape one end.");
         }
         // Two or more picked faces is the user asserting "these are one face",
@@ -408,7 +408,7 @@ std::vector<Toolbar::RailTool> Toolbar::railTools() const {
         if (m_selection->selectedFaceCount() >= 2)
             add(MZ_ICON_REPAIR, "Merge Faces", ToolAction::MergeFaces, false,
                 "Merge the selected faces into one. Use this on the seam lines "
-                "across a flat face that an imported STEP part arrives with \xE2\x80\x94 "
+                "across a flat face that an imported STEP part arrives with - "
                 "they also confuse Unfold and sketch-on-face. Refuses if the "
                 "faces aren't really one surface.");
         add(MZ_ICON_UNFOLD, "Unfold", ToolAction::Unfold, false,
@@ -424,7 +424,7 @@ std::vector<Toolbar::RailTool> Toolbar::railTools() const {
         add(MZ_ICON_MIRROR, "Mirror", ToolAction::Mirror, false,
             "Mirror the body across a plane you'll place next.");
         add(MZ_ICON_SPLIT, "Split", ToolAction::Split, false,
-            "Cut the body in two. Pick the axis and slide the cut off centre — "
+            "Cut the body in two. Pick the axis and slide the cut off centre - "
             "a ghost plane shows where it lands before you commit.");
         add(MZ_ICON_LATHE,  "Revolve", ToolAction::Revolve, false,
             "Rotate the body around an axis (watch a fan spin or a hinge open).");
@@ -434,7 +434,7 @@ std::vector<Toolbar::RailTool> Toolbar::railTools() const {
         add(MZ_ICON_REPAIR, "Merge Faces", ToolAction::MergeFaces, false,
             "Sweep the body for faces that are exactly coplanar and merge them. "
             "Imported STEP parts arrive with flat surfaces split into pieces "
-            "\xE2\x80\x94 the seam lines across an otherwise flat face, which also "
+            "- the seam lines across an otherwise flat face, which also "
             "confuse Unfold and sketch-on-face. For a seam this leaves behind, "
             "select the two faces either side of it and merge those instead.");
         add(MZ_ICON_MEASURE, "Measure", ToolAction::Measure, false,
@@ -454,7 +454,7 @@ std::vector<Toolbar::RailTool> Toolbar::railTools() const {
             "Cut the selected edges to a flat bevel.");
         // Move on an EDGE selection means the hole that rim belongs to. #28
         // hides Move on curved FACES, which is why a round hole's wall isn't
-        // clickable — but its rim is a single circular EDGE, so selecting that
+        // clickable - but its rim is a single circular EDGE, so selecting that
         // is unambiguous. Only offered when the edges resolve to exactly one
         // hole; an ordinary edge gets nothing rather than a surprise body move.
         // Sits UNDER Fillet/Chamfer (Steve, 2026-08-03): those two are what an
@@ -470,7 +470,7 @@ std::vector<Toolbar::RailTool> Toolbar::railTools() const {
                 "Set the hole or boss to an exact diameter.");
         addPlugins(1 << static_cast<int>(SelectionContext::HasEdges));
     } else {
-        // Fallback (vertex or other selection): same rule as no-selection —
+        // Fallback (vertex or other selection): same rule as no-selection -
         // no bare "Sketch" (it duplicated Sketch on… > world plane).
         add(MZ_ICON_MEASURE, "Measure", ToolAction::Measure, false,
             "Measure distance, length, or angle between picked features.");
@@ -531,7 +531,7 @@ void Toolbar::renderPrimitivesMenu() {
     if (!m_pluginCtx) return;
     if (ImGui::Button(materializr::tr("Primitives..."), ImVec2(-1, bh(30))))
         ImGui::OpenPopup("PrimitivesMenu");
-    tip(materializr::tr("Create a stock OCCT primitive (box / cylinder / sphere / cone / torus). Picking one opens its parameter popup — defaults land a 10 mm / R5 mm shape at the world origin."));
+    tip(materializr::tr("Create a stock OCCT primitive (box / cylinder / sphere / cone / torus). Picking one opens its parameter popup - defaults land a 10 mm / R5 mm shape at the world origin."));
     if (ImGui::BeginPopup("PrimitivesMenu")) {
         if (ImGui::MenuItem(materializr::tr("Box")))
             m_pluginCtx->requestInteractiveOp(InteractiveOp::PrimitiveBox);
@@ -649,7 +649,7 @@ ToolAction Toolbar::renderSketchTools() {
     ToolAction action = ToolAction::None;
 
     ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Sketch Tools"));
-    // Constraint status badge — only appears once the sketch has constraints.
+    // Constraint status badge - only appears once the sketch has constraints.
     // Green = Fully constrained, blue = Under (free DOF), red = Over
     // (contradictory). Hover shows the precise degree-of-freedom count.
     if (m_sketchSolverState >= 0) {
@@ -670,7 +670,7 @@ ToolAction Toolbar::renderSketchTools() {
     ImGui::Separator();
 
     // Snap on/off + step both live in the corner widget next to the ViewCube
-    // now — single source of truth. The duplicate grid-step row used to sit
+    // now - single source of truth. The duplicate grid-step row used to sit
     // here but was removed once the corner widget proved sufficient.
 
     // Render a sketch-tool button with a thick light-grey border when it's
@@ -777,7 +777,7 @@ ToolAction Toolbar::renderSketchTools() {
     if (ImGui::Button(materializr::tr("Circular Pattern"), ImVec2(-1, bh(28)))) action = ToolAction::SketchRadialPattern;
     tip(materializr::tr("Copy the selected sketch elements around an origin you specify."));
 
-    // Drawing-inference level — a live Full → Reduced → Off toggle. Lets the
+    // Drawing-inference level - a live Full → Reduced → Off toggle. Lets the
     // user calm the ghost guides (and the hover-charged references) in a busy
     // area without leaving the sketch. Constraints now live exclusively on the
     // sketch-viewport right-click "Add Constraint" menu. Hidden when the user
@@ -816,7 +816,7 @@ ToolAction Toolbar::renderSketchTools() {
     tip(materializr::tr("Leave sketch mode and return to the 3D viewport. Keeps the sketch."));
     if (ImGui::Button(materializr::tr("Exit Sketch"), ImVec2(-1, bh(30))))
         action = ToolAction::ExitSketchDiscard;
-    tip(materializr::tr("Discard the current sketch entirely and leave sketch mode. Rewinds history to before the sketch was entered; the body returns to its pre-sketch state. Useful when you've started a sketch you don't want to keep — Esc-while-placing only cancels the in-progress shape, this clears everything."));
+    tip(materializr::tr("Discard the current sketch entirely and leave sketch mode. Rewinds history to before the sketch was entered; the body returns to its pre-sketch state. Useful when you've started a sketch you don't want to keep - Esc-while-placing only cancels the in-progress shape, this clears everything."));
 
     // Plugin buttons for InSketchMode context
     renderPluginButtons(1 << static_cast<int>(SelectionContext::InSketchMode));
@@ -827,7 +827,7 @@ ToolAction Toolbar::renderSketchTools() {
 ToolAction Toolbar::renderNoSelectionTools() {
     ToolAction action = ToolAction::None;
 
-    // Start a sketch on a base plane — lets you model from scratch with no body.
+    // Start a sketch on a base plane - lets you model from scratch with no body.
     ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Create"));
     ImGui::Separator();
     if (ImGui::Button(materializr::tr("Sketch on XY"), ImVec2(-1, bh(30)))) action = ToolAction::StartSketchXY;
@@ -842,7 +842,7 @@ ToolAction Toolbar::renderNoSelectionTools() {
     // Each menu item fires a requestInteractiveOp the PrimitivesPlugin
     // wired up; Application opens the per-kind parameter popup.
     // (Steve: "Primitives button, pop-out side menu, then continue as
-    //  normal — keeps the Create section uncluttered".)
+    //  normal - keeps the Create section uncluttered".)
     renderPrimitivesMenu();
 
     // Axis from a vertex selection (two vertices → through-points axis). This
@@ -868,7 +868,7 @@ ToolAction Toolbar::renderBodyTools(bool primaryContext) {
     // Gizmo modes side by side, then Mirror.
     //
     // Under a FACE selection these three become the face verbs (Move Face,
-    // tilt, scale) — the selection picks body-vs-face, not the button. Scale is
+    // tilt, scale) - the selection picks body-vs-face, not the button. Scale is
     // dropped there because Face Operations already offers Scale Face, and they
     // are the same operation: measured, a 20mm box top at 50% comes back as the
     // identical frustum either way. Two buttons, one behaviour, is the thing
@@ -918,7 +918,7 @@ ToolAction Toolbar::renderBodyTools(bool primaryContext) {
     }
 
     // Fabrication: flatten the selected body into a 2D pattern (laser / CNC /
-    // cut-out templates). Body context only — under a FACE selection this
+    // cut-out templates). Body context only - under a FACE selection this
     // renderer is a fall-through for the Transform row, and the face's own
     // "Unfold Faces" button already covers it.
     if (primaryContext && m_selection && m_selection->selectedBodyCount() == 1) {
@@ -935,7 +935,7 @@ ToolAction Toolbar::renderBodyTools(bool primaryContext) {
     //
     // Only when this IS the body context. Under a face selection render()
     // falls through to here purely for the Transform row, and the catalogue
-    // is then full of FACE tools that renderFaceTools has already placed —
+    // is then full of FACE tools that renderFaceTools has already placed -
     // running the net would render every one of them a second time.
     if (primaryContext && action == ToolAction::None)
         action = renderCatalogRemainder({ToolAction::Move, ToolAction::Rotate,
@@ -954,7 +954,7 @@ ToolAction Toolbar::renderFaceTools() {
 
     // Every gate below is the catalogue's (railTools()); the wording, order
     // and the Transform row are classic's own. The face branch is where the
-    // two lists diverged most — Push/Pull, Extrude and Shell are flat-face
+    // two lists diverged most - Push/Pull, Extrude and Shell are flat-face
     // only, Taper is not, and each rule used to be written out twice.
     auto btn = [&](ToolAction a, const char* label, const char* t) {
         if (!catalogOffers(a)) return;
@@ -975,13 +975,13 @@ ToolAction Toolbar::renderFaceTools() {
     btn(ToolAction::Shell, "Shell",
         "Hollow the body, removing the picked face. Wall thickness in the popup.");
     btn(ToolAction::ScaleFace, "Scale Face",
-        "Re-slope the side walls toward a scaled copy of this face \xE2\x80\x94 under "
+        "Re-slope the side walls toward a scaled copy of this face - under "
         "100% tapers it in, over 100% flares it out. Blend length in the popup.");
     btn(ToolAction::Taper, "Draft",
         "Draft angle for moulding or printing: tilt the picked face(s) by an "
         "angle about a fixed neutral plane. Unlike Rotate it takes SEVERAL "
         "faces at one angle (all four walls of a box) and works on cylindrical "
-        "and conical faces too \xE2\x80\x94 a cylinder drafts into a cone.");
+        "and conical faces too - a cylinder drafts into a cone.");
     btn(ToolAction::ProjectSketch, "Projection",
         "Project a sketch onto this face along the sketch's normal, then "
         "engrave (cut in) or emboss (raise out) to a depth - wrap a logo "
@@ -990,13 +990,13 @@ ToolAction Toolbar::renderFaceTools() {
     btn(ToolAction::EditDiameter, "Edit Diameter",
         "Resize a cylindrical hole / pin to an exact diameter.");
     btn(ToolAction::Thread, "Thread",
-        "Cut a helical screw thread into the picked cylindrical face \xE2\x80\x94 "
+        "Cut a helical screw thread into the picked cylindrical face - "
         "external on a boss, internal in a hole. Pitch / depth / handedness "
         "in the popup.");
     btn(ToolAction::Unfold, "Unfold Faces",
         "Flatten the SELECTED faces into a 2D pattern (cut + fold lines) for a "
         "laser/CNC/printed template. Pick the faces of one panel (e.g. a skin) "
-        "\xE2\x80\x94 unfolding a whole closed body rarely makes sense.");
+        "- unfolding a whole closed body rarely makes sense.");
     // "Edit Fillet / Chamfer" - the catalogue already ran the ownsFaceScore
     // probe that decides whether the picked face came from one, and which.
     // Classic used to run a second, identical probe of its own.
@@ -1015,8 +1015,8 @@ ToolAction Toolbar::renderFaceTools() {
     // The fixing-up verbs, gathered. They were scattered: Remove Feature sat
     // mid-way through Face Operations under the name "Repair Geometry", Merge
     // Faces only ever appeared as a catalogue leftover at the end, and Patch and
-    // Sew each had a section of their own. They are one job — make geometry that
-    // is wrong right again — and mostly wanted on imported parts, so they belong
+    // Sew each had a section of their own. They are one job - make geometry that
+    // is wrong right again - and mostly wanted on imported parts, so they belong
     // together. Each still appears only when the selection can use it: that gate
     // is catalogOffers(), i.e. the same catalogue the rails read.
     if (catalogOffers(ToolAction::RemoveFace) || catalogOffers(ToolAction::MergeFaces)) {
@@ -1025,11 +1025,11 @@ ToolAction Toolbar::renderFaceTools() {
         ImGui::Separator();
         btn(ToolAction::RemoveFace, "Remove Feature",
             "Delete the picked face(s) and heal the surrounding faces back "
-            "together \xE2\x80\x94 take a baked fillet/chamfer back to a sharp edge so "
+            "together - take a baked fillet/chamfer back to a sharp edge so "
             "it can be re-applied, or clean a round/hole off an imported part.");
         btn(ToolAction::MergeFaces, "Merge Faces",
             "Merge faces that are really one surface into one face. Imported "
-            "STEP parts arrive with flat surfaces split into pieces \xE2\x80\x94 the seam "
+            "STEP parts arrive with flat surfaces split into pieces - the seam "
             "lines across an otherwise flat face, which also confuse Unfold and "
             "sketch-on-face.");
     }
@@ -1048,7 +1048,7 @@ ToolAction Toolbar::renderFaceTools() {
 
     // Frozen-round hint: a fillet-shaped face with no editable op behind it
     // (an older save's baked geometry). "Edit Fillet" can't appear for it, so
-    // point the user at Remove Feature — restore the edge, then re-fillet.
+    // point the user at Remove Feature - restore the edge, then re-fillet.
     if (m_selFrozenRound) {
         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 240.0f);
         ImGui::TextColored(materializr::dimText(), "%s", materializr::tr("This round is frozen (saved before edit support). Use Remove Feature above to restore the sharp edge, then re-fillet."));
@@ -1079,14 +1079,14 @@ ToolAction Toolbar::renderSketchSelectedTools() {
         tip(materializr::tr("Re-enter sketch mode to revise this sketch's geometry."));
     }
     // Push/Pull before Extrude From, matching this layout's Region and Face
-    // panels. It was missing here entirely — the mirror of the rail's old
-    // "attached sketch gets no Extrude" gap (see railTools) — so a whole
+    // panels. It was missing here entirely - the mirror of the rail's old
+    // "attached sketch gets no Extrude" gap (see railTools) - so a whole
     // sketch could only ever spawn a new body, never modify its host in
     // place. Both tools now exist in every layout for every sketch selection.
     if (catalogOffers(ToolAction::PushPull)) {
         if (ImGui::Button(materializr::tr("Push / Pull"), ImVec2(-1, bh(30))))
             action = ToolAction::PushPull;
-        tip(materializr::tr("Drag the arrow to push the sketch's regions into the body beneath them, or pull them out of it. Modifies that body in place — use Extrude From for a separate body."));
+        tip(materializr::tr("Drag the arrow to push the sketch's regions into the body beneath them, or pull them out of it. Modifies that body in place - use Extrude From for a separate body."));
     }
     if (catalogOffers(ToolAction::ExtrudeSketch) &&
         ImGui::Button(materializr::tr("Extrude From"), ImVec2(-1, bh(30))))
@@ -1095,11 +1095,11 @@ ToolAction Toolbar::renderSketchSelectedTools() {
     if (catalogOffers(ToolAction::SubtractSketch)) {
         if (ImGui::Button(materializr::tr("Subtract Sketch"), ImVec2(-1, bh(30))))
             action = ToolAction::SubtractSketch;
-        tip(materializr::tr("Extrude the sketch's regions and cut the result out of the body they\nrun into \xE2\x80\x94 the host body when the sketch sits on one, otherwise\nwhichever body the sweep reaches."));
+        tip(materializr::tr("Extrude the sketch's regions and cut the result out of the body they\nrun into - the host body when the sketch sits on one, otherwise\nwhichever body the sweep reaches."));
     }
     ImGui::TextWrapped("%s", materializr::tr("Subtract sweeps the profile like Extrude, then cuts that volume out of the body it reaches."));
 
-    // Move / Rotate gizmo modes — appear here so a selected sketch behaves
+    // Move / Rotate gizmo modes - appear here so a selected sketch behaves
     // like a movable construction plane. Bodies have these in renderBodyTools;
     // sketches need their own entry point. The Transform header matches the
     // "Sketch" / "Loft" section-label convention so the toolbar reads as a
@@ -1114,7 +1114,7 @@ ToolAction Toolbar::renderSketchSelectedTools() {
         action = ToolAction::Rotate;
     tip(materializr::tr("Show the Rotate gizmo on the selected sketch. Drag a ring to spin the sketch around its centroid."));
 
-    // Whatever else the catalogue offers here — Lathe (Revolve) lived in the
+    // Whatever else the catalogue offers here - Lathe (Revolve) lived in the
     // rails only until this net existed.
     if (action == ToolAction::None)
         action = renderCatalogRemainder({ToolAction::EditSketch, ToolAction::PushPull,
@@ -1133,7 +1133,7 @@ ToolAction Toolbar::renderPlaneSelectedTools() {
     ImGui::Separator();
     if (ImGui::Button(materializr::tr("Sketch on this Plane"), ImVec2(-1, bh(30))))
         action = ToolAction::SketchOnFace; // dispatched on Plane in handler
-    tip(materializr::tr("Start a new sketch lying on this construction plane — same workflow as Sketch on Face, just with the plane as the host."));
+    tip(materializr::tr("Start a new sketch lying on this construction plane - same workflow as Sketch on Face, just with the plane as the host."));
 
     ImGui::Separator();
     ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Transform"));
@@ -1158,7 +1158,7 @@ ToolAction Toolbar::renderAxisSelectedTools() {
     ToolAction action = ToolAction::None;
     ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Construction Axis"));
     ImGui::Separator();
-    ImGui::TextWrapped("%s", materializr::tr("Axes are 1-D primitives — they'll feed Revolve and future Pattern-Around-Axis ops. For now you can move them; rotate isn't meaningful on a line."));
+    ImGui::TextWrapped("%s", materializr::tr("Axes are 1-D primitives - they'll feed Revolve and future Pattern-Around-Axis ops. For now you can move them; rotate isn't meaningful on a line."));
 
     ImGui::Separator();
     ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Transform"));
@@ -1183,7 +1183,7 @@ ToolAction Toolbar::renderSketchRegionTools() {
     ImGui::Spacing();
 
     // Push/Pull routes through the app's interactive arrow gizmo (default 0,
-    // drag to extrude/cut) — same as a body face.
+    // drag to extrude/cut) - same as a body face.
     if (catalogOffers(ToolAction::PushPull)) {
         if (ImGui::Button(materializr::tr("Push / Pull"), ImVec2(-1, bh(30))))
             action = ToolAction::PushPull;
@@ -1205,14 +1205,14 @@ ToolAction Toolbar::renderSketchRegionTools() {
     // Any remaining HasSketchRegions plugin buttons.
     renderPluginButtons(1 << static_cast<int>(SelectionContext::HasSketchRegions));
 
-    // Edit the sketch this region belongs to — re-enter sketch mode to revise it.
+    // Edit the sketch this region belongs to - re-enter sketch mode to revise it.
     if (catalogOffers(ToolAction::EditSketch)) {
         if (ImGui::Button(materializr::tr("Edit Sketch"), ImVec2(-1, bh(30))))
             action = ToolAction::EditSketch;
         tip(materializr::tr("Re-enter sketch mode to revise this region's parent sketch."));
     }
 
-    // Move / Rotate the region's PARENT sketch in 3D — same gizmo path as
+    // Move / Rotate the region's PARENT sketch in 3D - same gizmo path as
     // the whole-sketch case. A region selection is just a finger pointing at
     // its sketch for these ops. Hidden in ortho view (gizmo's own rule) but
     // the buttons stay visible so the user understands the action exists.

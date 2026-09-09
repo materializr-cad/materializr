@@ -47,7 +47,7 @@ CylindricalPick detectCylindricalPick(const Document& doc,
     // Apply Changes bumps the history revision: a replay retires the body it
     // rebuilds, while the selection still holds the OLD id for one more frame.
     // Unguarded, getBody's throw escaped the frame, reached main()'s handler
-    // and — on Android — made SDL_main return, which finishes the activity, so
+    // and - on Android - made SDL_main return, which finishes the activity, so
     // the app silently VANISHED with the user's unsaved work. (Steve's tablet,
     // "Body not found: 1"; found via the throw-site backtrace in ThrowTrace.h.)
     // Nothing to detect on a body that's gone; the next frame re-runs this
@@ -92,7 +92,7 @@ CylindricalPick detectCylindricalPick(const Document& doc,
     if (cylSurf.IsNull()) return p;
 
     // Bounded parametric range. U = angular wrap, V = along axis. Must be a
-    // CLOSED cylinder (full 2π) — partial sleeves (fillet faces) don't have
+    // CLOSED cylinder (full 2π) - partial sleeves (fillet faces) don't have
     // a meaningful single diameter.
     double u1, u2, v1, v2;
     BRepTools::UVBounds(cylFace, u1, u2, v1, v2);
@@ -110,7 +110,7 @@ CylindricalPick detectCylindricalPick(const Document& doc,
     // Hole vs solid boundary, from the face's outward normal at its centre.
     // Normal toward axis → material is OUTSIDE → hole. Away → solid boundary.
     // BRepGProp_Face::Normal() already applies the face's orientation
-    // internally — don't reverse again (doing so double-negates and makes
+    // internally - don't reverse again (doing so double-negates and makes
     // every hole look like a solid boundary).
     BRepGProp_Face prop(cylFace);
     gp_Pnt centerPt; gp_Vec normVec;

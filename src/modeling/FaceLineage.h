@@ -1,14 +1,14 @@
 #pragma once
-// Face lineage — the "gen" coverage for op-PRODUCED faces (TopoName.h's
+// Face lineage - the "gen" coverage for op-PRODUCED faces (TopoName.h's
 // designed-but-unimplemented general kernel), scoped to the question that
 // actually bites: which op made the face under the cursor, after downstream
 // ops (booleans especially) modified, SPLIT or merged it? (#49/#51)
 //
-// Model: every body carries a FaceIdMap — face → the stable int ids of its
+// Model: every body carries a FaceIdMap - face → the stable int ids of its
 // ANCESTRY. A fillet/chamfer mints fresh ids for its blend/bevel faces and
 // records them; every downstream op PROPAGATES the map through its
 // GenerationLedger's modified-map (a split bevel's pieces all inherit the
-// bevel's id — the case no geometric scheme can trace). Ownership is then a
+// bevel's id - the case no geometric scheme can trace). Ownership is then a
 // set-intersection, not a geometry hunt.
 //
 // STRICTLY ADDITIVE: ops that don't propagate simply leave the next map empty
@@ -58,10 +58,10 @@ FaceIdMap propagate(
 
 // Carry a completed FaceIdMap through a post-build rewrite described by a
 // BRepTools_History (e.g. ShapeUpgrade_UnifySameDomain merging coplanar faces)
-// onto `result`: each face passes its ids to its successor(s) — a merge unions
+// onto `result`: each face passes its ids to its successor(s) - a merge unions
 // both parents' ids, a removed face drops out, an unchanged face carries
 // through. Handles the faces the PRODUCING op left untouched (absent from its
-// ledger) that the rewrite nonetheless rebuilt — the case propagate()'s
+// ledger) that the rewrite nonetheless rebuilt - the case propagate()'s
 // membership guard silently drops, re-minting fresh ids (the union / push-pull
 // face-id drift). Returns `in` unchanged when `hist` is null.
 FaceIdMap carryThrough(const FaceIdMap& in,

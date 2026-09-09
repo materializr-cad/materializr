@@ -28,7 +28,7 @@ WelcomeScreen::Action WelcomeScreen::render() {
 
     // Cond_Always, not Appearing: on iOS the window can first appear on a
     // frame with a degenerate viewport (splash → UI handoff), and an
-    // Appearing-only position lands wrong ONCE and NoMove pins it there —
+    // Appearing-only position lands wrong ONCE and NoMove pins it there -
     // a 45px sliver at ImGui's (60,60) cascade default while the modal dim
     // blocks all input (the "second launch locks up" report). Re-asserting
     // the centre every frame makes a bad first frame self-heal.
@@ -40,7 +40,7 @@ WelcomeScreen::Action WelcomeScreen::render() {
                                ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
                                    ImGuiWindowFlags_AlwaysAutoResize)) {
 
-        // App name — slightly larger via font scaling, same as the About dialog.
+        // App name - slightly larger via font scaling, same as the About dialog.
         float origScale = ImGui::GetFont()->Scale;
         ImGui::GetFont()->Scale = 2.0f;
         ImGui::PushFont(ImGui::GetFont());
@@ -58,7 +58,7 @@ WelcomeScreen::Action WelcomeScreen::render() {
         ImGui::Spacing();
 
         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + uiSz(400, 0).x);
-        ImGui::TextWrapped("%s", materializr::tr("Materializr is free and open source, and always will be. If it has earned a place in your workflow, please consider supporting development — it keeps the project moving."));
+        ImGui::TextWrapped("%s", materializr::tr("Materializr is free and open source, and always will be. If it has earned a place in your workflow, please consider supporting development - it keeps the project moving."));
         ImGui::PopTextWrapPos();
 
         ImGui::Spacing();
@@ -101,7 +101,7 @@ WelcomeScreen::Action WelcomeScreen::render() {
         ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.85f, 0.74f, 0.00f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_Text,          ImVec4(0.10f, 0.10f, 0.10f, 1.0f));
         ImGui::SetCursorPosX((ImGui::GetWindowWidth() - btnW) * 0.5f);
-        if (ImGui::Button(materializr::tr("Support us — Buy us a Coffee"), ImVec2(btnW, 0))) {
+        if (ImGui::Button(materializr::tr("Support us - Buy us a Coffee"), ImVec2(btnW, 0))) {
             materializr::openUrl(bmcUrl);
         }
         ImGui::PopStyleColor(4);
@@ -127,7 +127,7 @@ WelcomeScreen::Action WelcomeScreen::render() {
         if (ImGui::IsItemClicked()) iosStoreRestore();
 #else
         // Honor-system Supporter switch: silences the prompt permanently.
-        const char* already = "I already support — don't show this again";
+        const char* already = "I already support - don't show this again";
         ImGui::SetCursorPosX((ImGui::GetWindowWidth() - ImGui::CalcTextSize(already).x) * 0.5f);
         ImGui::TextDisabled("%s", already);
         if (ImGui::IsItemClicked()) {

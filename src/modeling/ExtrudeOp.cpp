@@ -65,12 +65,13 @@ void ExtrudeOp::setProfile(const TopoDS_Shape& wire) {
 #include "../i18n.h"
 #include "../i18n.h"
 #include "ParamParse.h"
+#include "BoolArgs.h"
 
 namespace {
 // Interior points of `face`, up to `maxPts`, spread over a UV grid. MANY
 // points per original region on purpose (#53): if later-drawn sketch
 // geometry SUBDIVIDED that region, each fragment holds some of the points,
-// so region selection picks every fragment — reproducing the original
+// so region selection picks every fragment - reproducing the original
 // sweep. One point would pick a single fragment (a fraction of the body).
 int pointsInsideFace(const TopoDS_Face& face, std::vector<gp_Pnt>& out,
                      int maxPts = 12) {
@@ -96,7 +97,7 @@ int pointsInsideFace(const TopoDS_Face& face, std::vector<gp_Pnt>& out,
 
 // Footprint of `shape` on (or parallel to) the sketch plane, as 2D points.
 // Parallel planar faces are grouped by signed offset from the plane; the
-// nearest group wins — a both-ways extrude has caps at ±distance and no
+// nearest group wins - a both-ways extrude has caps at ±distance and no
 // face ON the plane at all (#53). Interior points project along the normal.
 // The min-offset group of planar faces parallel to `pln`, TRANSLATED onto
 // it (a both-ways extrude's caps sit at ±distance, never on the plane).
@@ -140,7 +141,7 @@ std::vector<TopoDS_Face> footprintFacesOnPlane(const TopoDS_Shape& shape,
 }
 
 // Merge coplanar fragments of a recovered footprint back into whole region
-// faces — sweeping the raw fragment compound leaves internal seam walls in
+// faces - sweeping the raw fragment compound leaves internal seam walls in
 // the body (face-count divergence downstream, and chamfer walks fail at the
 // fragment boundaries).
 TopoDS_Shape unifyProfile(const TopoDS_Shape& comp) {
@@ -181,7 +182,7 @@ bool ExtrudeOp::rebuildProfileFromSketch(Document& doc) {
         bb.MakeCompound(keep);
         int kept = 0;
         // Track how many of the RECORDED points found a home: a partial match
-        // means part of the original area is gone from the sketch — selecting
+        // means part of the original area is gone from the sketch - selecting
         // just the surviving fragments would silently shrink the body, so the
         // historically-exact recovered profile wins instead (below).
         std::vector<bool> hit(m_regionPts.size(), false);
@@ -199,7 +200,7 @@ bool ExtrudeOp::rebuildProfileFromSketch(Document& doc) {
         size_t matched = 0;
         for (bool h : hit) if (h) ++matched;
         // Area sanity: if the ORIGINAL region's boundary lines were later
-        // deleted, its area gets absorbed into a bigger region — every point
+        // deleted, its area gets absorbed into a bigger region - every point
         // still matches, but the selected region is far larger than what was
         // extruded. Compare areas against the saved footprint and prefer it
         // when the match balloons.
@@ -213,7 +214,7 @@ bool ExtrudeOp::rebuildProfileFromSketch(Document& doc) {
             double aKeep = areaOf(keep), aOrig = areaOf(m_recoveredProfile);
             if (aOrig > 1e-9 && aKeep > aOrig * 1.5) {
                 std::fprintf(stderr, "[Extrude] matched region area %.0f far "
-                             "exceeds the original footprint %.0f — using the "
+                             "exceeds the original footprint %.0f - using the "
                              "saved footprint profile\n", aKeep, aOrig);
                 m_profile = m_recoveredProfile;
                 return true;
@@ -222,7 +223,7 @@ bool ExtrudeOp::rebuildProfileFromSketch(Document& doc) {
         if (kept > 0 && matched < m_regionPts.size() &&
             !m_recoveredProfile.IsNull()) {
             std::fprintf(stderr, "[Extrude] only %zu/%zu recorded region "
-                         "points found — using the saved footprint profile\n",
+                         "points found - using the saved footprint profile\n",
                          matched, m_regionPts.size());
             m_profile = m_recoveredProfile;
             return true;
@@ -237,18 +238,18 @@ bool ExtrudeOp::rebuildProfileFromSketch(Document& doc) {
             // moved). Sweep the historically-correct footprint instead of
             // every region the sketch now has.
             std::fprintf(stderr, "[Extrude] recorded regions missing from the "
-                         "sketch — using the saved footprint profile\n");
+                         "sketch - using the saved footprint profile\n");
             m_profile = m_recoveredProfile;
             return true;
         }
         std::fprintf(stderr, "[Extrude] recorded regions not found in the "
-                     "sketch's current shape — falling back to ALL regions\n");
+                     "sketch's current shape - falling back to ALL regions\n");
     } else if (!m_recoveredProfile.IsNull()) {
         // No recorded points at all (old file whose footprint faces were
-        // recovered but couldn't be point-sampled) — the recovered faces are
+        // recovered but couldn't be point-sampled) - the recovered faces are
         // still the exact historical profile; sweep them, never ALL regions.
         m_profile = m_recoveredProfile;
-        std::fprintf(stderr, "[Extrude] no region points — using the saved "
+        std::fprintf(stderr, "[Extrude] no region points - using the saved "
                      "footprint profile directly\n");
         return true;
     }
@@ -351,7 +352,7 @@ bool ExtrudeOp::execute(Document& doc) {
         TopoDS_Shape extrudedShape;
 
         // Compute extrude direction from the profile face's normal. A
-        // compound profile (multi-island extrude) uses its first face —
+        // compound profile (multi-island extrude) uses its first face -
         // all islands of one sketch are coplanar. Falling through to the
         // old default-Z here swept sketches whose plane contains Z along
         // their own plane: flat "2D projection" bodies.
@@ -373,7 +374,7 @@ bool ExtrudeOp::execute(Document& doc) {
             }
         }
 
-        // Own TShapes for this extrusion — same TShape-sharing hazard as
+        // Own TShapes for this extrusion - same TShape-sharing hazard as
         // PushPullOp (see comment there).
         TopoDS_Shape ownProfile = BRepBuilderAPI_Copy(m_profile).Shape();
 
@@ -390,7 +391,8 @@ bool ExtrudeOp::execute(Document& doc) {
             prismDown.Build();
             if (!prismDown.IsDone()) return false;
 
-            BRepAlgoAPI_Fuse fuse(prismUp.Shape(), prismDown.Shape());
+            BRepAlgoAPI_Fuse fuse;
+            materializr::setBooleanShapes(fuse, prismUp.Shape(), prismDown.Shape());
             fuse.Build();
             if (!fuse.IsDone()) return false;
             extrudedShape = fuse.Shape();
@@ -402,7 +404,7 @@ bool ExtrudeOp::execute(Document& doc) {
             if (!prism.IsDone()) {
                 return false;
             }
-            // Result copy: see PushPullOp — prism caps share a TShape
+            // Result copy: see PushPullOp - prism caps share a TShape
             // otherwise, ghosting the selection highlight.
             extrudedShape = BRepBuilderAPI_Copy(prism.Shape()).Shape();
 
@@ -433,7 +435,7 @@ bool ExtrudeOp::execute(Document& doc) {
                         extrudedShape = drafter.Shape();
                     }
                 } catch (...) {
-                    // Draft failed — keep the undrafted shape
+                    // Draft failed - keep the undrafted shape
                 }
             }
         }
@@ -537,7 +539,8 @@ bool ExtrudeOp::execute(Document& doc) {
                 m_prevFaceIds.clear();
                 if (const auto* im = doc.bodyFaceIds(m_targetBodyId))
                     m_prevFaceIds = *im;
-                BRepAlgoAPI_Common common(m_previousTargetShape, extrudedShape);
+                BRepAlgoAPI_Common common;
+                materializr::setBooleanShapes(common, m_previousTargetShape, extrudedShape);
                 common.Build();
                 if (!common.IsDone()) {
                     return false;
@@ -570,7 +573,7 @@ bool ExtrudeOp::undo(Document& doc) {
             // Restore previous target shape for boolean operations
             if (m_targetBodyId >= 0 && !m_previousTargetShape.IsNull()) {
                 doc.updateBody(m_targetBodyId, m_previousTargetShape);
-                // And its face lineage — a partial replay (editStep starting
+                // And its face lineage - a partial replay (editStep starting
                 // after the map's producer) never re-runs the minters.
                 if (!m_prevFaceIds.empty())
                     doc.setBodyFaceIds(m_targetBodyId, m_prevFaceIds);
@@ -585,7 +588,7 @@ bool ExtrudeOp::undo(Document& doc) {
 std::string ExtrudeOp::serializeParams() const {
     // Sketch-sourced profiles are re-derived from the sketch on reload. A
     // face-driven extrude has no sketch to rebuild from, so its picked
-    // profile persists as an ASCII BREP blob (length-prefixed, LAST — the
+    // profile persists as an ASCII BREP blob (length-prefixed, LAST - the
     // PARAMS_LEN container is binary-safe) so the step still reloads
     // editable instead of freezing the project.
     char buf[160];
@@ -670,9 +673,9 @@ bool ExtrudeOp::deserializeParams(const std::string& blob) {
 bool ExtrudeOp::rehydrateFromReload(const ReloadState& state, Document& doc) {
     // Re-derive the profile from the persistent source sketch; a face-driven
     // extrude instead reloads the picked profile from its params BREP blob
-    // (a geometric snapshot — editable scalars, replayable, though it won't
+    // (a geometric snapshot - editable scalars, replayable, though it won't
     // follow an upstream edit of the source face).
-    // (Profile re-derivation happens at the END of this function — the
+    // (Profile re-derivation happens at the END of this function - the
     // old-file footprint recovery below must set m_regionPts FIRST, or the
     // rebuild grabs every region of the sketch's final state, #53.)
     if (m_sketchId < 0 && m_profile.IsNull()) return false; // pre-fix save: no blob
@@ -684,7 +687,7 @@ bool ExtrudeOp::rehydrateFromReload(const ReloadState& state, Document& doc) {
         if (state.created.empty()) return false;
         m_createdBodyId = state.created.front();
 
-        // Footprint recovery from the SAVED result body — its planar faces
+        // Footprint recovery from the SAVED result body - its planar faces
         // lying ON the sketch plane are exactly the regions this extrude
         // swept. ALWAYS recover the profile (not just for pre-regions saves):
         // it is the historically-exact fallback when the stored region seeds
@@ -727,10 +730,10 @@ bool ExtrudeOp::rehydrateFromReload(const ReloadState& state, Document& doc) {
         if (m_previousTargetShape.IsNull()) return false;
 
         // Footprint recovery, boolean modes: the swept material is the
-        // before/after DELTA — added for Union, removed for Subtract/Intersect.
+        // before/after DELTA - added for Union, removed for Subtract/Intersect.
         // Its planar faces on the sketch plane are the regions this extrude
         // used. ALWAYS recover the profile (the historically-exact fallback
-        // when stored seeds fail to re-match — see the NewBody note above);
+        // when stored seeds fail to re-match - see the NewBody note above);
         // derive seeds only for old files that lack them.
         if (m_sketchId >= 0) {
             TopoDS_Shape after;

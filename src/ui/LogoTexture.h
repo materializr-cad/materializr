@@ -1,5 +1,5 @@
 #pragma once
-// Materializr logo, 64x64 RGBA — generated from icon.png (letterboxed square,
+// Materializr logo, 64x64 RGBA - generated from icon.png (letterboxed square,
 // Lanczos downscale) for the im-touch shell's top-bar chip. Regenerate with
 // the PIL snippet in the git history if icon.png changes.
 namespace materializr {

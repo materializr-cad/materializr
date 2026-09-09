@@ -31,7 +31,7 @@ void main() {
     vec3 p = gridPlane[gl_VertexID];
     // Use the true near plane (NDC z = -1), not z = 0. Under orthographic
     // projection depth is linear, so z = 0 is the mid-depth point, which can sit
-    // behind the target plane and make the ray parameter negative — discarding
+    // behind the target plane and make the ray parameter negative - discarding
     // the whole grid. The near plane is always in front of the camera.
     v_nearPoint = unprojectPoint(p.x, p.y, -1.0);
     v_farPoint  = unprojectPoint(p.x, p.y,  1.0);
@@ -71,7 +71,7 @@ float computeDepth(vec3 pos) {
 
 // Grid line coverage with a CONSTANT pixel width and a flat (box) profile, so a
 // line keeps the same thickness at every opacity and simply dims uniformly when
-// the alpha is lowered — instead of a bright-cored triangle whose sides get
+// the alpha is lowered - instead of a bright-cored triangle whose sides get
 // eaten as you fade, which reads as lines changing thickness ("plaid"). `coord`
 // is in cell units (one integer step = one grid cell); `widthPx` is the line
 // width in pixels. When cells go sub-pixel the line just widens to fill and the
@@ -82,7 +82,7 @@ float gridCoverage(vec2 coord, float widthPx) {
     vec2 halfW = deriv * (widthPx * 0.5);             // half line width, cell units
     vec2 aa = deriv;                                  // one-pixel anti-alias band
     // Flat top out to `halfW`, then a one-pixel linear ramp to 0. Constant width,
-    // uniform brightness across the line — dims cleanly under a global alpha.
+    // uniform brightness across the line - dims cleanly under a global alpha.
     vec2 cov = clamp((halfW + aa - toLine) / aa, 0.0, 1.0);
     return max(cov.x, cov.y);
 }
@@ -97,7 +97,7 @@ void main() {
     vec3 fragPos3D = v_nearPoint + t * dir;
     // Bias the grid's depth slightly toward the camera so it doesn't z-fight
     // with geometry that lies on the plane (the common "sketch on a face"
-    // case). The bias is computed in world space — a fixed NDC offset would
+    // case). The bias is computed in world space - a fixed NDC offset would
     // drift with depth and make the grid appear to lift off the plane as you
     // zoom out. We push the world position toward the near point by a fraction
     // of the ray length, so the bias stays visually tight at any scale.
@@ -126,7 +126,7 @@ void main() {
     bool lightBg     = u_lightBg > 0.5;
     // Sketch grid: a fixed mid-grey fine line with a noticeably DARKER every-10th
     // so the decade lines read clearly while sketching. (Was a user "shade"
-    // slider — dropped: it only affected this grid and read as doing nothing in
+    // slider - dropped: it only affected this grid and read as doing nothing in
     // the normal 3D view.)
     vec3 sketchCol   = vec3(0.50);
     vec3 sketchMajor = vec3(0.26);
@@ -142,8 +142,8 @@ void main() {
     if (u_sketchGrid > 0.5) {
         // SKETCH GRID: a uniform fine tier PLUS a heavier every-10th line so the
         // user can gauge scale (count decades) while sketching. The every-10th
-        // tier is just a stronger shade of the SAME colour drawn a touch wider —
-        // not the bright/dim "plaid" of the old tiered grid — and since the grid
+        // tier is just a stronger shade of the SAME colour drawn a touch wider -
+        // not the bright/dim "plaid" of the old tiered grid - and since the grid
         // now blends over geometry (no depth punch-through) it reads cleanly. The
         // pristine-grid coverage still greys each tier out evenly when it gets
         // dense, so no moiré; the opacity slider dims the whole sheet together.
@@ -153,7 +153,7 @@ void main() {
         rgb = mix(rgb, sketchMajor, covMajor);
         a   = max(a, covMajor);
     } else {
-        // WORLD / GROUND GRID: three tiers — minor (every 1), major (every 10),
+        // WORLD / GROUND GRID: three tiers - minor (every 1), major (every 10),
         // mega (every 100). The coarser 10- and 100-unit lines read on top;
         // zooming reveals finer tiers. Keeps the tiered look (the "10 mm /
         // 100 mm lines") the user wants on the ground grid.
@@ -176,7 +176,7 @@ void main() {
     if (axisU > 0.0) { rgb = mix(rgb, vec3(0.80, 0.20, 0.20), axisU); a = max(a, axisU); }
     if (axisV > 0.0) { rgb = mix(rgb, vec3(0.20, 0.20, 0.80), axisV); a = max(a, axisV); }
 
-    // Distance fade, then the global opacity slider — both linear multipliers so
+    // Distance fade, then the global opacity slider - both linear multipliers so
     // the whole grid dims uniformly instead of culling lines one by one.
     float alpha = a * fade * u_globalAlpha;
     if (alpha < 0.001) discard;
@@ -279,7 +279,7 @@ void Grid::render(const glm::mat4& view, const glm::mat4& projection,
     // hides it) but do NOT WRITE depth. Writing depth on the grid's line pixels
     // made the lines "win" the depth fight against any coplanar face (a body
     // sitting on the ground, or the very face being sketched on) and punch a
-    // hole through it to the background — a grey grid baked into the face that
+    // hole through it to the background - a grey grid baked into the face that
     // opacity couldn't dim. With writes off the grid simply blends over whatever
     // is behind it and fades cleanly. u_depthBias decides whether it sits on top
     // of (sketch) or behind (ground) a coplanar surface.

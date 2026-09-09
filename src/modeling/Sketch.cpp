@@ -132,10 +132,10 @@ bool Sketch::getWorldBounds(glm::vec3& outMin, glm::vec3& outMax) const {
         hi = glm::max(hi, v);
     };
     // An arc's centre is the centre of the (possibly enormous) circle the arc
-    // lies on — for a subtle, nearly-flat arc it sits far from the drawn
+    // lies on - for a subtle, nearly-flat arc it sits far from the drawn
     // geometry. Including it here made "frame sketch" and sketch-entry zoom
     // right out to nothing. Exclude arc centres from the framing bounds (the
-    // point itself stays visible and interactive — this only affects the
+    // point itself stays visible and interactive - this only affects the
     // camera box) and enclose the arc's actual swept rim instead. Circle
     // centres are kept: their rim expansion below brackets the centre exactly.
     std::unordered_set<int> arcCentres;
@@ -157,7 +157,7 @@ bool Sketch::getWorldBounds(glm::vec3& outMin, glm::vec3& outMax) const {
         addPt(sketchToWorld(ctr->pos + glm::vec2( 0,-r)));
     }
     // Arc rim: sample the swept span (start->end CCW, the buildWires
-    // convention) so the drawn arc — including any bulge past its endpoints —
+    // convention) so the drawn arc - including any bulge past its endpoints -
     // is enclosed without dragging in the far centre.
     for (const auto& a : m_arcs) {
         const SketchPoint* c = getPoint(a.centerPointId);
@@ -230,8 +230,8 @@ void Sketch::setArcRadius(int arcId, double r) {
     // left the curve fitted through three mutually inconsistent points. The
     // endpoints have to move with it.
     //
-    // resizeArc already does exactly that — slide both endpoints onto the new
-    // radius along their existing bearings, which preserves the swept angle —
+    // resizeArc already does exactly that - slide both endpoints onto the new
+    // radius along their existing bearings, which preserves the swept angle -
     // and it is what the Properties panel has always called. Delegating keeps
     // the dimension path and the panel path on one behaviour instead of two
     // that disagree in the degenerate case.
@@ -252,7 +252,7 @@ double ccwSweep(glm::vec2 c, glm::vec2 s, glm::vec2 e) {
 } // namespace
 
 void Sketch::moveEndpointPreservingArcs(int pointId, glm::vec2 newPos) {
-    // Capture the arcs hinging on this point BEFORE moving it — the swept angle
+    // Capture the arcs hinging on this point BEFORE moving it - the swept angle
     // has to be read from the current geometry. We also remember the opposite
     // (unmoved) endpoint's position, which stays put.
     struct Cap { int arcId; double sweep; glm::vec2 fixedPt; bool movedIsStart; };
@@ -350,7 +350,7 @@ void Sketch::setArcChord(int arcId, double chordLen) {
     // Keep the SAME arc shape (sweep angle), just scaled so the endpoints are
     // `chordLen` apart: chord = 2 R sin(sweep/2)  ->  R = chord / (2 sin(sweep/2)).
     // Then resize, which holds the centre and both endpoint angles and slides
-    // the ends radially — so the arc grows/shrinks symmetrically and the sweep
+    // the ends radially - so the arc grows/shrinks symmetrically and the sweep
     // is unchanged.
     double sweep = ccwSweep(c->pos, s->pos, e->pos);
     double sinHalf = std::sin(sweep * 0.5);
@@ -501,7 +501,7 @@ int Sketch::addPolygon(int centerPtId, double radius, int sides, double rotation
 
     const SketchPoint* center = getPoint(centerPtId);
     if (!center) return -1;
-    // COPY the centre position — `center` points INTO m_points, and the
+    // COPY the centre position - `center` points INTO m_points, and the
     // addPoint calls below reallocate that vector. The dangling pointer
     // produced vertices missing the centre offset or at ±1e26 ("many
     // meters long"), and only on the FIRST polygon per session: the first
@@ -511,7 +511,7 @@ int Sketch::addPolygon(int centerPtId, double radius, int sides, double rotation
 
     // Create N vertex points evenly spaced around center. The first vertex
     // lands at angle `rotationRad` so the caller can align it with the cursor
-    // direction — used by SketchTool to snap a corner of the polygon to the
+    // direction - used by SketchTool to snap a corner of the polygon to the
     // grid (the first vertex is exactly under the snapped cursor).
     for (int i = 0; i < sides; ++i) {
         double angle = rotationRad + 2.0 * M_PI * i / sides;
@@ -653,7 +653,7 @@ std::vector<glm::vec2> Sketch::sampleSpline2D(const SketchSpline& sp,
         // SKIP a dangling control-point id instead of truncating: returning
         // the partial RAW control polygon (old behaviour) collapsed a whole
         // spline to a tiny un-interpolated stub whenever one referenced point
-        // was gone — every classification against it then missed by miles.
+        // was gone - every classification against it then missed by miles.
         if (!p) continue;
         ctrl.push_back(p->pos);
     }
@@ -723,7 +723,7 @@ int Sketch::pruneOrphanPoints() {
     int pruned = static_cast<int>(before - m_points.size());
 
     // Drop constraints whose referenced entity (a point or an element) no longer
-    // exists — deleting geometry would otherwise leave the solver chasing ghosts.
+    // exists - deleting geometry would otherwise leave the solver chasing ghosts.
     std::unordered_set<int> valid;
     for (const auto& p : m_points)   valid.insert(p.id);
     for (const auto& l : m_lines)    valid.insert(l.id);
@@ -784,7 +784,7 @@ void Sketch::removeConstraint(int id) {
 // circle that *does* have points on it gets split into arc segments at those
 // points so the DFS can find closed loops mixing straight and curved edges.
 
-// The longest OPEN chain in the sketch — see the header note. Each element
+// The longest OPEN chain in the sketch - see the header note. Each element
 // becomes a run of 2D sample points; chains are walked from degree-1 nodes so
 // closed loops (which buildWires owns) never qualify.
 TopoDS_Wire Sketch::buildOpenWire() const {
@@ -920,7 +920,7 @@ std::vector<TopoDS_Wire> Sketch::buildWires() const {
     // Register a synthetic point at each proper line-line crossing (an
     // intersection strictly interior to BOTH segments). This lets closed shapes
     // formed by *crossing* lines be detected even when the user never placed a
-    // vertex at the crossing — matching what the trim tool produces, but without
+    // vertex at the crossing - matching what the trim tool produces, but without
     // requiring a trim first. Crossings at shared endpoints are excluded (the
     // interior-parameter test rejects them), so already-working profiles like a
     // plain rectangle are untouched.
@@ -1022,11 +1022,11 @@ std::vector<TopoDS_Wire> Sketch::buildWires() const {
         if (onPerim.size() < 2) {
             // A circle needs at least TWO perimeter junctions to be split into
             // arcs that route through them. With zero (a standalone circle) or
-            // ONE (a stray point sitting on the rim — e.g. a line's endpoint,
+            // ONE (a stray point sitting on the rim - e.g. a line's endpoint,
             // or the circle's own drag-release point), splitting would emit a
             // degenerate point->itself 360° arc that never closes into a wire,
-            // so the loop — and any region it bounds, like a concentric
-            // annulus — silently vanished. Emit the clean full-circle wire.
+            // so the loop - and any region it bounds, like a concentric
+            // annulus - silently vanished. Emit the clean full-circle wire.
             gp_Pnt center3d = sketchToWorld(center->pos);
             gp_Dir normal = m_plane.Position().Direction();
             gp_Circ gpCircle(gp_Ax2(center3d, normal), circle.radius);
@@ -1051,7 +1051,7 @@ std::vector<TopoDS_Wire> Sketch::buildWires() const {
     }
 
     // Existing arcs: include them in adjacency too. Same intermediate-point
-    // split as for lines — any sketch point lying on the arc's perimeter
+    // split as for lines - any sketch point lying on the arc's perimeter
     // inside the arc's angle range becomes a virtual split, so adjacency can
     // route through it.
     for (const auto& arc : m_arcs) {
@@ -1102,13 +1102,13 @@ std::vector<TopoDS_Wire> Sketch::buildWires() const {
                               sp.controlPointIds.front() == sp.controlPointIds.back();
         // Sample the curve (density MUST match emitOcctEdge's sampleSpline2D) and
         // find any adjacency node lying ON it other than the spline's own control
-        // points — a line endpoint landed there, and the spline must split so the
+        // points - a line endpoint landed there, and the spline must split so the
         // loop-walker (and a dividing line) can route through that point.
         std::vector<glm::vec2> samp = sampleSpline2D(sp, 24);
         const int ns = static_cast<int>(samp.size());
         std::unordered_set<int> ownCtrl(sp.controlPointIds.begin(), sp.controlPointIds.end());
         // A landed point sits ANYWHERE on the curve (between samples), so project
-        // each candidate onto the sample SEGMENTS, not just the vertices — a
+        // each candidate onto the sample SEGMENTS, not just the vertices - a
         // vertex-only test misses a point on a chord and the loop never closes.
         struct SplineSplit { int seg; float t; int ptId; };   // on segment [seg, seg+1]
         std::vector<SplineSplit> splits;
@@ -1160,8 +1160,8 @@ std::vector<TopoDS_Wire> Sketch::buildWires() const {
 
     if (edges.empty()) return wires;
 
-    // Prune dangling edges. An edge hanging off a free end — a vertex touched by
-    // only one edge — can never be part of a closed loop, so iteratively drop
+    // Prune dangling edges. An edge hanging off a free end - a vertex touched by
+    // only one edge - can never be part of a closed loop, so iteratively drop
     // such edges until only the cycle core remains. This keeps the greedy walker
     // below from wandering down a tail, marking its edges used, failing to
     // close, and rolling back: e.g. a triangle drawn with three *crossing* lines
@@ -1201,7 +1201,7 @@ std::vector<TopoDS_Wire> Sketch::buildWires() const {
 
         if (es.splineIdx >= 0) {
             // The SAME centripetal Catmull-Rom curve the renderer draws, densely
-            // sampled and fitted with a B-spline — what you see is what extrudes.
+            // sampled and fitted with a B-spline - what you see is what extrudes.
             // A sub-edge (splineSampStart/End set, from a point landing on the
             // spline and splitting it) emits only that slice, with its ends pinned
             // to the shared points so the pieces + the landing line meet exactly.
@@ -1295,14 +1295,14 @@ std::vector<TopoDS_Wire> Sketch::buildWires() const {
     // Trace every minimal face of the planar graph via half-edges: each
     // undirected edge becomes two directed half-edges, and at each vertex the
     // face turns to the next edge in angular order. Every DIRECTED half-edge is
-    // used once, so two faces can share an edge — a bump attached to a loop, or
-    // a region split by a chord — which the old one-use-per-edge greedy walker
+    // used once, so two faces can share an edge - a bump attached to a loop, or
+    // a region split by a chord - which the old one-use-per-edge greedy walker
     // could not (it consumed the shared edge for one face and starved the other,
     // merging the bump or breaking the main loop). The unbounded outer face
     // comes out clockwise and is dropped by its signed area.
 
     // A self-loop edge (a closed spline with no split points) is already a
-    // complete closed wire — emit it directly and keep it out of the graph.
+    // complete closed wire - emit it directly and keep it out of the graph.
     std::vector<bool> edgeDead(edges.size(), false);
     for (size_t i = 0; i < edges.size(); ++i) {
         if (!alive[i]) { edgeDead[i] = true; continue; }
@@ -1315,14 +1315,14 @@ std::vector<TopoDS_Wire> Sketch::buildWires() const {
     }
 
     // COINCIDENT STRAIGHT EDGES collapse to one. Drawing a rectangle whose side
-    // lands on an existing line — inevitable on a busy face, and what the 0.3mm
-    // point snap encourages — produces two edges between the SAME pair of nodes.
+    // lands on an existing line - inevitable on a busy face, and what the 0.3mm
+    // point snap encourages - produces two edges between the SAME pair of nodes.
     // The half-edge walker then sees two outgoing half-edges at an identical
     // angle, so nextHE's "clockwise of the twin" can pick the duplicate instead
     // of turning the corner: the walk escapes along the twin, the enclosed area
     // never closes as its own face, and its half-edges are absorbed into the
     // surrounding one. The visible result is a rectangle with NO selectable
-    // region, so clicking inside it picks the whole surrounding face — and a
+    // region, so clicking inside it picks the whole surrounding face - and a
     // push/pull there cut an entire box wall away (Steve's antenna tracker).
     //
     // Curves are excluded: two arcs (or an arc and a line) between the same two
@@ -1340,7 +1340,7 @@ std::vector<TopoDS_Wire> Sketch::buildWires() const {
     }
 
     // 2D polyline of an edge from its `from` endpoint to its `to` endpoint,
-    // curves sampled — used both for the outgoing tangent (so a spline's two
+    // curves sampled - used both for the outgoing tangent (so a spline's two
     // sub-arcs leaving a shared point are ordered right) and for the face's TRUE
     // signed area (a corners-only polygon has ~zero area for a 2-spline loop).
     auto edgePolyline = [&](const EdgeSpec& es, int fromPt) -> std::vector<glm::vec2> {
@@ -1520,7 +1520,7 @@ void densifyWire2D(const TopoDS_Wire& wire, const gp_Pln& plane,
         // Sample in the WIRE's traversal direction, not the curve's natural
         // f->l one. BRepTools_WireExplorer walks edges head-to-tail, but a
         // TopAbs_REVERSED edge (which the BOP region-builder routinely emits
-        // for multi-loop sketches) runs opposite to its curve parameter — so
+        // for multi-loop sketches) runs opposite to its curve parameter - so
         // sampling f->l appends its points backwards, producing a self-
         // intersecting polygon that makes the even-odd point-in-polygon test
         // miscount. Honouring the orientation keeps the polygon simple so
@@ -1567,7 +1567,7 @@ bool Sketch::regionsCached() const {
 }
 
 // FNV-1a over everything region construction depends on. ~10 µs on a text
-// sketch — noise next to the general fuse this guards (tens of ms).
+// sketch - noise next to the general fuse this guards (tens of ms).
 uint64_t Sketch::geometryHash() const {
     uint64_t h = 1469598103934665603ull;
     auto mix = [&h](const void* data, size_t n) {
@@ -1650,7 +1650,7 @@ TopoDS_Shape Sketch::buildProfileShape() const {
             if (i == j || polys[j].size() < 3) continue;
             // i ⊂ j  iff MOST of i's boundary points lie inside j. The old test
             // used a single vertex (polys[i][0]), which flips on float luck when
-            // a counter grazes its glyph's edge — that's why A/R counters were
+            // a counter grazes its glyph's edge - that's why A/R counters were
             // detected inconsistently. Sampling many points is robust, and keeps
             // concentric rings right (an outer ring's points sit OUTSIDE its
             // own counter, so it's never nested in its own hole).
@@ -1675,7 +1675,7 @@ TopoDS_Shape Sketch::buildProfileShape() const {
     }
 
     // One face per island; holes removed by boolean cut (no wire-winding
-    // coordination — the lesson from the projection op's aperture bug).
+    // coordination - the lesson from the projection op's aperture bug).
     auto wireFace = [&](TopoDS_Wire w) -> TopoDS_Face {
         for (int attempt = 0; attempt < 2; ++attempt) {
             BRepBuilderAPI_MakeFace mf(m_plane, w);
@@ -1701,11 +1701,11 @@ TopoDS_Shape Sketch::buildProfileShape() const {
     for (size_t i = 0; i < n; ++i) {
         if (depth[i] % 2 != 0) continue; // hole, consumed by its parent
         // #60: an even-depth island nested >=2 levels deep floats inside
-        // another island's hole — a "plug" (e.g. the inner circle of a
+        // another island's hole - a "plug" (e.g. the inner circle of a
         // stepped/counterbore hole, which sits inside both the part outline
         // AND the counterbore circle). Even-odd parity fills it solid, but a
         // single extruded profile must be connected material: sweeping a
-        // floating plug drops a disconnected lump into the body. Skip it — the
+        // floating plug drops a disconnected lump into the body. Skip it - the
         // hole stays open, matching the intent of a stepped hole.
         if (depth[i] >= 2) continue;
         TopoDS_Face outer = wireFace(wires[i]);
@@ -1743,7 +1743,7 @@ std::vector<Sketch::Region> Sketch::buildRegionsUncached() const {
 
     // Build a planar face from every closed wire the sketch forms. Each
     // sketch face is then augmented with any holes from the source face
-    // that fall fully inside it — BOPAlgo_Builder doesn't split coplanar
+    // that fall fully inside it - BOPAlgo_Builder doesn't split coplanar
     // faces when their edges don't intersect, so a sketch drawn AROUND an
     // existing hole would otherwise come out as a solid disk and a
     // push/pull would yield a solid bar instead of a tube.
@@ -1808,9 +1808,9 @@ std::vector<Sketch::Region> Sketch::buildRegionsUncached() const {
     if (faces.empty()) return regions;
 
     // Partition the union of all faces into atomic, non-overlapping regions.
-    // General-fusing the faces splits every overlap into its own face — the lens
+    // General-fusing the faces splits every overlap into its own face - the lens
     // where two shapes cross, the surrounding crescents, an annulus where one
-    // shape sits inside another — so each piece can be selected and push/pulled
+    // shape sits inside another - so each piece can be selected and push/pulled
     // independently. (This is what makes intersecting shapes selectable.) A lone
     // face has nothing to fuse, and a one-argument general fuse is invalid, so
     // use it directly in that case.
@@ -1834,7 +1834,7 @@ std::vector<Sketch::Region> Sketch::buildRegionsUncached() const {
     // divides a region (e.g. a wall splitting a room) yields separate selectable
     // cells. Curves that merely trace a face boundary are no-ops here; only those
     // crossing a face's interior actually subdivide it. (GF above handles closed
-    // overlaps/holes; this handles open dividing lines, ARCS and splines — the
+    // overlaps/holes; this handles open dividing lines, ARCS and splines - the
     // greedy wire-walker in buildWires can miss interior bands bounded by two
     // arcs, so feeding the arcs to the splitter recovers those cells.)
     {
@@ -1844,7 +1844,7 @@ std::vector<Sketch::Region> Sketch::buildRegionsUncached() const {
         // that for straight edges, but a boundary ARC gets imprinted and carves a
         // thin sliver off each rounded corner (newly visible once SVG import
         // recovers real arcs). So only feed a curve whose midpoint has face
-        // interior on BOTH sides — true for an interior divider, false for a
+        // interior on BOTH sides - true for an interior divider, false for a
         // boundary edge.
         std::vector<std::vector<glm::vec2>> atomicPolys;
         for (const auto& f : atomic) {
@@ -1885,7 +1885,7 @@ std::vector<Sketch::Region> Sketch::buildRegionsUncached() const {
             BRepBuilderAPI_MakeEdge mk(p1, p2);
             if (mk.IsDone()) toolEdges.Append(mk.Edge());
         }
-        // Arcs as dividing tools — same three-point construction as emitOcctEdge.
+        // Arcs as dividing tools - same three-point construction as emitOcctEdge.
         for (const auto& arc : m_arcs) {
             const SketchPoint* c = getPoint(arc.centerPointId);
             const SketchPoint* s = getPoint(arc.startPointId);
@@ -1910,7 +1910,7 @@ std::vector<Sketch::Region> Sketch::buildRegionsUncached() const {
                 if (mk.IsDone()) toolEdges.Append(mk.Edge());
             } catch (...) {}
         }
-        // Splines as dividing tools — same B-spline fit as emitOcctEdge.
+        // Splines as dividing tools - same B-spline fit as emitOcctEdge.
         for (const auto& sp : m_splines) {
             if (sp.isConstruction || sp.controlPointIds.size() < 2) continue;
             std::vector<glm::vec2> samp = sampleSpline2D(sp, 24);
@@ -2033,7 +2033,7 @@ bool Sketch::getSourceFaceCentroid(glm::vec2& out) const {
 
     // Let OCCT compute the true area centroid (centre of mass for a uniform
     // density surface). Doing this ourselves from densified polygon vertices is
-    // fragile for faces whose outer wire has any reversed edges — the resulting
+    // fragile for faces whose outer wire has any reversed edges - the resulting
     // vertex sequence is scrambled and the polygon-area formula returns garbage.
     //
     // NOTE this is the centroid of the TRIMMED face, so holes count: an
@@ -2051,7 +2051,7 @@ bool Sketch::getSourceFaceCentroid(glm::vec2& out) const {
 
     // Project to sketch-plane 2D on every call rather than caching the 2D
     // result. The centroid belongs to the face, so its world position holds
-    // until the face is replaced (setSourceFace clears the cache) — but its
+    // until the face is replaced (setSourceFace clears the cache) - but its
     // 2D coordinates are relative to the PLANE, and the plane moves whenever
     // the sketch is moved. Caching the 2D value left the centre marker (and
     // the snap that follows it) behind by exactly the distance moved, since

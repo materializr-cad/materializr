@@ -1,4 +1,4 @@
-# Sketch Offset Tool — Design
+# Sketch Offset Tool - Design
 
 **Status:** implemented 2026-08-31. Deviations from the original design are marked **[revised]** below.
 **Plan:** `docs/superpowers/plans/2026-08-31-sketch-offset-tool.md`.
@@ -19,14 +19,14 @@ produces ordinary sketch lines/arcs/circles.
 - **No new operation type, no serialization, no topo naming.** The output is
   plain sketch elements, so save/load, full replay and `test_full_replay` are
   untouched.
-- ~~**No splines.**~~ **[revised — splines ARE supported, added 2026-08-31]**
-  See "Splines" below. The original reasoning still holds — there is no exact
-  offset of a B-spline — so the implementation is explicitly an approximation
+- ~~**No splines.**~~ **[revised - splines ARE supported, added 2026-08-31]**
+  See "Splines" below. The original reasoning still holds - there is no exact
+  offset of a B-spline - so the implementation is explicitly an approximation
   with a stated error budget, rather than a refusal.
 - **No construction-geometry toggle.** **[revised]** The design called for a
   "make it construction geometry" checkbox on the panel. Dropped: `isConstruction`
   is honoured by `buildWires()` and round-trips through save/load, but nothing in
-  the app can set or clear it — there is no construction UI anywhere. Shipping the
+  the app can set or clear it - there is no construction UI anywhere. Shipping the
   checkbox only here would create geometry the user can never un-mark. The first
   construction-geometry UI is its own feature.
 - **No text glyphs.** `fromText` elements are excluded. "Embolden this word"
@@ -45,13 +45,13 @@ Rejected for v1 because:
 - `MakeOffset` on **open** wires is historically unreliable; open chains are
   half the use cases.
 - It is far too heavy to run per-frame for the live preview, so we would need
-  a second, native implementation for the ghost anyway — and then the ghost and
+  a second, native implementation for the ghost anyway - and then the ghost and
   the commit could disagree, which is exactly the class of bug
   `planTrim`/`applyTrim` was structured to avoid.
 
 Native 2D offset instead. `SketchTool.cpp` already carries
 `intersectLineLine`, `intersectLineCircle`, `intersectLineArc` and
-`intersectCircleCircle` (lines 2728–2790) — the corner fix-up kit — but they
+`intersectCircleCircle` (lines 2728–2790) - the corner fix-up kit - but they
 are `static` in that TU, so `SketchOffset.cpp` gets its own small, tested
 copies rather than a risky extraction (there is no `test_sketch_trim`, so
 refactoring Trim's helpers is unprotected).
@@ -64,13 +64,13 @@ adjacent iff they share an endpoint id.
 - Walk both directions from the picked element while the shared endpoint has
   degree exactly 2 among offsettable elements.
 - Stop at degree != 2 (branch or free end), or when the walk returns to the
-  start element — that is a **closed** chain.
+  start element - that is a **closed** chain.
 - A circle is a closed chain of one element; no walk.
 - **[revised]** Polygons need no special case at all: `Sketch::addPolygon`
   emits its edges as real `SketchLine` elements, so the ordinary line walk
   picks one up as an ordinary closed loop.
 - Splines, `fromText` elements and construction/non-construction mixing all
-  terminate the walk (mixing is allowed to terminate rather than error — the
+  terminate the walk (mixing is allowed to terminate rather than error - the
   user gets the sub-chain they pointed at).
 
 The walk produces an **ordered, consistently oriented** list of source
@@ -96,7 +96,7 @@ At each shared source vertex, between the two offset segments, classify by
 
 - **Tangent join** (|cross| ~ 0, e.g. line → tangent arc): no corner work, the
   offset endpoints already coincide.
-- **Opening corner** (the offsets pull apart) — two styles:
+- **Opening corner** (the offsets pull apart) - two styles:
   - **Round** (default): an arc centred on the *source* vertex, radius |d|,
     from the offset-in end to the offset-out start. Always valid, always
     exactly |d| from the source. This is the geometrically correct offset.
@@ -107,7 +107,7 @@ At each shared source vertex, between the two offset segments, classify by
     segments would miter to infinity).
 - **Closing corner** (the offsets overlap): intersect and trim both back to the
   intersection nearest the corner. If they do not intersect within their
-  extents, leave them — the prune pass below handles it.
+  extents, leave them - the prune pass below handles it.
 
 ## Validity invariant and pruning
 
@@ -150,7 +150,7 @@ declared budget rather than a claim of exactness:
    `sampleSpline2D` sampling `buildWires()` uses, so the offset is measured
    against the curve the user actually sees and extrudes).
 2. **Offset pointwise.** Each sample moves along its normal, where the normal
-   comes from the *averaged* adjacent segment directions — averaging is what
+   comes from the *averaged* adjacent segment directions - averaging is what
    keeps a smooth curve smooth instead of faceting it.
 3. **Refit at commit.** Control points are chosen along the offset curve and
    interpolated the way `Sketch` does; the count doubles until the interpolated
@@ -159,7 +159,7 @@ declared budget rather than a claim of exactness:
 Three things fell out of testing that the design did not anticipate:
 
 - **The control-point cap matters more than the tolerance.** Chasing a 0.01 mm
-  fit produced ~40 control points for a 5-point source — a solid mass of vertex
+  fit produced ~40 control points for a 5-point source - a solid mass of vertex
   markers that hides the curve and is horrible to edit. An offset of a 5-point
   spline should be about a 5-point spline, so the count is capped at **twice
   the source's** (min 8, max 48) and the resulting sub-0.1 mm deviation is
@@ -171,11 +171,11 @@ Three things fell out of testing that the design did not anticipate:
   `eps = max(0.02 mm, 1% of |d|)`.
 - **Sharp corners cannot miter against a curve.** A sampled curve has no
   analytic intersection, so `joinPoint` reports failure for any spline pair and
-  the corner rounds instead — which is exact.
+  the corner rounds instead - which is exact.
 
 Still excluded: **text glyphs**. Text and SVG *lettering* come in as hundreds of
 short `fromText` LINES, not splines, so they are untouched by this. Offsetting
-them would be "embolden the letters" — a reasonable want, but a separate
+them would be "embolden the letters" - a reasonable want, but a separate
 feature with its own performance question.
 
 ## Output mapping
@@ -184,7 +184,7 @@ feature with its own performance question.
 - Offset arc → `addArc(centre, start, end, r)`. **Trap:** `addArc` sweeps CCW
   from start to end (see the comment in `commitMirror`). Emit arcs with
   start/end ordered so the sweep is CCW; for a clockwise-travelled arc, swap
-  the endpoints — geometrically identical, and sketch arcs are undirected for
+  the endpoints - geometrically identical, and sketch arcs are undirected for
   region building.
 - **[revised]** The original claim that a hairpin yields a corner arc of
   "nearly 360 degrees" was wrong. A round corner spans the angle between the
@@ -207,8 +207,8 @@ feature with its own performance question.
 Two phases, matching the two-step Escape convention documented on
 `SketchTool::isPlacing()`:
 
-- **Pick** — hover highlights the resolved chain; click captures it.
-- **Distance** — cursor drives distance and side, ghost previews live; click or
+- **Pick** - hover highlights the resolved chain; click captures it.
+- **Distance** - cursor drives distance and side, ghost previews live; click or
   Enter commits, a typed number commits at that value (`applyDimension`), Esc
   returns to Pick, a second Esc leaves the tool.
 
@@ -216,7 +216,7 @@ After a commit the tool **stays in Offset** and returns to Pick (repeat offsets
 are common, and Trim likewise stays active). Unlike Mirror it does not hand
 back to Select or rewrite the selection.
 
-Undo: the commit is wrapped in `recordSketchMutation` — one step. **[revised]**
+Undo: the commit is wrapped in `recordSketchMutation` - one step. **[revised]**
 A click or a typed value only *requests* the commit, via `offsetReadyToCommit()`;
 the app drains that flag and performs the commit, so the click path and the
 typed-value path funnel through one wrapped call rather than mutating from
@@ -236,25 +236,25 @@ Headless, no GL, no OCCT beyond what `Sketch` already pulls in. A shared helper
 asserts the invariant (every sampled output point at |d| from the source) in
 every case.
 
-1. Square loop, offset out, Round — 4 lines + 4 quarter-circle corners; area
+1. Square loop, offset out, Round - 4 lines + 4 quarter-circle corners; area
    `(a+2d)^2 - (4-pi)d^2`.
-2. Square loop, offset out, Sharp — 4 lines; area exactly `(a+2d)^2`.
-3. Square loop, offset in, `d < a/2` — area `(a-2d)^2`.
-4. Square loop, offset in, `d > a/2` — plan invalid, nothing emitted.
-5. Open L chain — convex side gains one corner element, concave side trims.
-6. Circle — `r+d` and `r-d`; `r-d <= 0` refuses.
-7. Line + tangent arc — no spurious corner inserted at the tangent join.
-8. Slot (2 lines + 2 semicircular arcs, closed) — offset out is a concentric
+2. Square loop, offset out, Sharp - 4 lines; area exactly `(a+2d)^2`.
+3. Square loop, offset in, `d < a/2` - area `(a-2d)^2`.
+4. Square loop, offset in, `d > a/2` - plan invalid, nothing emitted.
+5. Open L chain - convex side gains one corner element, concave side trims.
+6. Circle - `r+d` and `r-d`; `r-d <= 0` refuses.
+7. Line + tangent arc - no spurious corner inserted at the tangent join.
+8. Slot (2 lines + 2 semicircular arcs, closed) - offset out is a concentric
    slot; offset in past the arc radius refuses.
-9. Chain walk — T-junction stops at the branch; closed loop detected; a lone
+9. Chain walk - T-junction stops at the branch; closed loop detected; a lone
    line with two free ends offsets as a single line.
-10. Hairpin — round corner arc with sweep > 180 degrees round-trips through
+10. Hairpin - round corner arc with sweep > 180 degrees round-trips through
     `addArc` and back out at radius |d|.
-11. Sign — cursor on either side of an open chain flips the result across the
+11. Sign - cursor on either side of an open chain flips the result across the
     source.
 
 All 39 tests pass on the build VM. **[revised]** Cases 1, 2 and 8 originally
 failed on fixtures, not on the code: an arc bulging the wrong way turns a
 tangent join into a cusp and a slot into a bowtie. Sketch arcs always sweep CCW
-from start to end, so the stored point order decides which way an arc bulges —
+from start to end, so the stored point order decides which way an arc bulges -
 worth remembering when writing any arc fixture.

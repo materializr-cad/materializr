@@ -19,6 +19,7 @@
 #include <GeomAbs_SurfaceType.hxx>
 #include <GeomAbs_CurveType.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
+#include "core/MeshParams.h"
 #include <BRepBuilderAPI_Copy.hxx>
 #include <Poly_Triangulation.hxx>
 #include <Poly_Triangle.hxx>
@@ -123,7 +124,7 @@ bool pointInPoly(const glm::dvec2& p, const std::vector<glm::dvec2>& poly) {
     }
     return in;
 }
-// True AREA centroid (not the vertex average — a curved edge is densely
+// True AREA centroid (not the vertex average - a curved edge is densely
 // tessellated and would drag a vertex-average toward it, landing the "centroid"
 // outside the shape or inside a neighbour).
 glm::dvec2 polyCentroid(const std::vector<glm::dvec2>& p) {
@@ -172,7 +173,7 @@ double coveredFraction(const std::vector<glm::dvec2>& poly,
 }
 
 // How badly a candidate face would BURY (or be buried by) the already-placed
-// faces — the max, over both directions, of the covered-area fraction. ~0 for a
+// faces - the max, over both directions, of the covered-area fraction. ~0 for a
 // clean hinge or a slight edge incursion (tolerated); large when a cap lands on
 // top of the fan. Cumulative across all placed faces, so a circle covering many
 // panels at once is caught.
@@ -358,7 +359,7 @@ FlatPattern unfoldPlanarFaces(const std::vector<TopoDS_Face>& faces) {
     if (out.piecesPlaced < planarCount)
         out.warning = "Some faces weren't connected to the main piece.";
     if (out.hasOverlap)
-        out.warning = "The flattened net overlaps itself — it may need to be cut into pieces.";
+        out.warning = "The flattened net overlaps itself - it may need to be cut into pieces.";
 
     out.ok = out.piecesPlaced > 0;
     return out;
@@ -440,7 +441,7 @@ FlatPattern unfoldFaces(const std::vector<TopoDS_Face>& faces,
         diag = std::sqrt((x1-x0)*(x1-x0) + (y1-y0)*(y1-y0) + (z1-z0)*(z1-z0));
     }
     // Linear deflection is deliberately LOOSE so the angular cap ("max bevel per
-    // score") is what actually controls facet density on curves — a tight linear
+    // score") is what actually controls facet density on curves - a tight linear
     // tolerance would force fine facets regardless of the slider.
     const double linDefl = std::max(1e-3, diag * 0.02);
     const double angRad = std::max(0.5, maxBevelDeg) * M_PI / 180.0;
@@ -466,11 +467,10 @@ FlatPattern unfoldFaces(const std::vector<TopoDS_Face>& faces,
     std::vector<Tri> tris;
     for (const TopoDS_Face& srcFace : faces) {
         // Mesh a COPY: the original face caches a (fine) triangulation from the
-        // viewport, which BRepMesh would keep instead of re-meshing coarser — so
+        // viewport, which BRepMesh would keep instead of re-meshing coarser - so
         // the bevel slider would have no effect. A copy starts with none.
         TopoDS_Face face = TopoDS::Face(BRepBuilderAPI_Copy(srcFace).Shape());
-        BRepMesh_IncrementalMesh mesher(face, linDefl, Standard_False, angRad, Standard_True);
-        mesher.Perform();
+        BRepMesh_IncrementalMesh mesher(face, materializr::meshParams(linDefl, angRad, true));
         TopLoc_Location loc;
         Handle(Poly_Triangulation) tri = BRep_Tool::Triangulation(face, loc);
         if (tri.IsNull()) continue;
@@ -554,7 +554,7 @@ FlatPattern unfoldFaces(const std::vector<TopoDS_Face>& faces,
 
     // Greedy papercraft unfold: grow a flat piece one triangle at a time; if a
     // triangle would OVERLAP one already in its piece (which a doubly-curved
-    // surface forces), leave it for another piece — the shared edge becomes a
+    // surface forces), leave it for another piece - the shared edge becomes a
     // cut/glue edge. A developable surface yields ONE piece; a compound-curved
     // one splits into several flat pieces. pieceOf[t] = which piece.
     std::vector<int> pieceOf(nt, -1);
@@ -724,7 +724,7 @@ FlatPattern unfoldFaces(const std::vector<TopoDS_Face>& faces,
     out.ok = !out.faces.empty();
     if (nPieces > 1)
         out.warning = "Split into " + std::to_string(nPieces) +
-                      " flat pieces — cut each and join along matching edges.";
+                      " flat pieces - cut each and join along matching edges.";
     return out;
 }
 
@@ -774,8 +774,7 @@ FaceNet unrollOneFace(const TopoDS_Face& srcFace, int faceIndex,
     const double angRad = std::max(0.5, maxBevelDeg) * M_PI / 180.0;
 
     TopoDS_Face face = TopoDS::Face(BRepBuilderAPI_Copy(srcFace).Shape());
-    BRepMesh_IncrementalMesh mesher(face, linDefl, Standard_False, angRad, Standard_True);
-    mesher.Perform();
+    BRepMesh_IncrementalMesh mesher(face, materializr::meshParams(linDefl, angRad, true));
     TopLoc_Location loc;
     Handle(Poly_Triangulation) tri = BRep_Tool::Triangulation(face, loc);
     if (tri.IsNull()) return fn;
@@ -794,7 +793,7 @@ FaceNet unrollOneFace(const TopoDS_Face& srcFace, int faceIndex,
     // Collapse degenerate poles/apexes: a true apex is a CLUSTER of many nodes at
     // one 3D point (the whole top of the UV grid collapses there), whereas a seam
     // is just TWO coincident nodes (one per side). Welding only clusters of ≥3
-    // folds the apex to a single point — no spurious tip hole — while leaving the
+    // folds the apex to a single point - no spurious tip hole - while leaving the
     // 2-node seam open so the surface still fans into a sector instead of a tube.
     std::vector<int> rep(nn + 1);
     for (int i = 0; i <= nn; ++i) rep[i] = i;
@@ -864,7 +863,7 @@ FaceNet unrollOneFace(const TopoDS_Face& srcFace, int faceIndex,
         return true;
     };
 
-    // Spanning-tree hinge over the face's (connected) triangles — place EVERY
+    // Spanning-tree hinge over the face's (connected) triangles - place EVERY
     // triangle, no overlap rejection. A developable face lays out flat and
     // watertight; orphaning a triangle here would only punch a hole. Splitting
     // into pieces happens at the FACE level (the net BFS), never inside a face.
@@ -1038,7 +1037,7 @@ FlatPattern unfoldDevelopableNet(const std::vector<TopoDS_Face>& faces,
         std::vector<Place> pl;
         std::vector<std::vector<int>> pieceFaces;
         std::vector<PFold> folds;
-        double cost = 1e300;   // Σ per-piece bounding-box area — a material proxy.
+        double cost = 1e300;   // Σ per-piece bounding-box area - a material proxy.
     };
 
     // Per-face flat area, used to seed big faces first and (later) score nothing.
@@ -1098,11 +1097,11 @@ FlatPattern unfoldDevelopableNet(const std::vector<TopoDS_Face>& faces,
                     // Evaluate both fold directions; pick the one that buries the
                     // least (ties → fold away from the parent). A slight overlap is
                     // tolerated so the doubly-curved panels stay ONE connected net;
-                    // only a substantial burial — a cap landing on top of the fan —
+                    // only a substantial burial - a cap landing on top of the fan -
                     // splits off to a new piece.
                     // A curved shared edge (a round cap's arc against a panel) can't
                     // fold flat without a curve mismatch, so it tolerates far less
-                    // burial than a clean straight-edge fold — a cap that only meets
+                    // burial than a clean straight-edge fold - a cap that only meets
                     // the net along arcs thus splits off as its own piece instead of
                     // overlapping, while straight-edge panel folds stay connected.
                     const bool straightHinge =
@@ -1131,7 +1130,7 @@ FlatPattern unfoldDevelopableNet(const std::vector<TopoDS_Face>& faces,
                     // A flat cap can't fold flush to a CURVED rim, so it always dips
                     // slightly into the panel. Rather than tolerate that sliver, slide
                     // the cap straight out (perpendicular to the hinge, away from the
-                    // parent) until it sits just clear of the edge — touching, not
+                    // parent) until it sits just clear of the edge - touching, not
                     // overlapping. Straight-edge folds are real folds and stay put.
                     if (!straightHinge && bestBury > 0.005) {
                         glm::dvec2 e = A1 - A0; const double el = glm::length(e);
@@ -1251,9 +1250,9 @@ FlatPattern unfoldDevelopableNet(const std::vector<TopoDS_Face>& faces,
     out.ok = !out.faces.empty();
     if (nPieces > 1)
         out.warning = "Split into " + std::to_string(nPieces) +
-                      " pieces — cut each and join along matching edges.";
+                      " pieces - cut each and join along matching edges.";
     else if (nonDev > 0)
-        out.warning = "Some faces are doubly-curved — score/fold lines approximate the curvature.";
+        out.warning = "Some faces are doubly-curved - score/fold lines approximate the curvature.";
     return out;
 }
 
@@ -1287,8 +1286,7 @@ void buildTriMesh(const std::vector<TopoDS_Face>& faces, double maxBevelDeg,
     };
     for (const TopoDS_Face& srcFace : faces) {
         TopoDS_Face face = TopoDS::Face(BRepBuilderAPI_Copy(srcFace).Shape());
-        BRepMesh_IncrementalMesh mesher(face, linDefl, Standard_False, angRad, Standard_True);
-        mesher.Perform();
+        BRepMesh_IncrementalMesh mesher(face, materializr::meshParams(linDefl, angRad, true));
         TopLoc_Location loc;
         Handle(Poly_Triangulation) tri = BRep_Tool::Triangulation(face, loc);
         if (tri.IsNull()) continue;
@@ -1316,7 +1314,7 @@ void buildTriMesh(const std::vector<TopoDS_Face>& faces, double maxBevelDeg,
 }
 
 // Cut a welded triangle mesh along seam paths until every connected component is
-// a DISK (exactly one boundary loop) — the topology LSCM needs. A closed
+// a DISK (exactly one boundary loop) - the topology LSCM needs. A closed
 // component (a sphere → 0 boundary loops) gets one slit between its two
 // farthest-apart vertices; a component with extra boundary loops (a tube/funnel
 // → 2 loops) gets each extra loop joined to the first by a shortest cut. Cutting
@@ -1372,7 +1370,7 @@ void cutMeshToDisks(std::vector<gp_Pnt>& verts, std::vector<Tri>& tris) {
     for (int v = 0; v < nv; ++v) if (compOfV[v] >= 0) vertsByComp[compOfV[v]].push_back(v);
 
     // Geodesic (edge-length-weighted) pathfinding so seams run straight across the
-    // mesh — a jagged hop-shortest slit would become a lumpy flattened outline.
+    // mesh - a jagged hop-shortest slit would become a lumpy flattened outline.
     // With no targets it instead returns the farthest-reached vertex; either way
     // it fills `par` with the shortest-path tree for backtracking.
     auto dijkstra = [&](const std::vector<int>& sources, const std::set<int>* targets,
@@ -1382,7 +1380,7 @@ void cutMeshToDisks(std::vector<gp_Pnt>& verts, std::vector<Tri>& tris) {
                             std::greater<std::pair<double,int>>> pq;
         for (int s : sources) { dist[s] = 0.0; par[s] = -1; pq.push({0.0, s}); }
         // NB: `far` (and `near`) are legacy macros defined by <windows.h>, which
-        // OCCT 7.9.3's Windows headers leak into this TU (8.0 doesn't) — using
+        // OCCT 7.9.3's Windows headers leak into this TU (8.0 doesn't) - using
         // them as identifiers breaks the MSVC parse. Hence `farthest`.
         int farthest = sources.empty() ? -1 : sources[0]; double farD = -1.0;
         while (!pq.empty()) {
@@ -1429,7 +1427,7 @@ void cutMeshToDisks(std::vector<gp_Pnt>& verts, std::vector<Tri>& tris) {
         if (nB == 1) {
             // A topological disk can still need a slit: a large interior angle
             // defect (a cone apex / sharp tip) makes LSCM wrap the surface all the
-            // way around it — a cone otherwise unwraps to a full disk instead of a
+            // way around it - a cone otherwise unwraps to a full disk instead of a
             // sector. Release it with a slit from the apex to the nearest boundary.
             int apex = -1; double worst = 1.0;          // ≈57° defect floor
             for (int v : cv.second)
@@ -1517,7 +1515,7 @@ FlatPattern unfoldConformal(const std::vector<TopoDS_Face>& faces,
     std::vector<Tri> tris;
     buildTriMesh(faces, maxBevelDeg, verts, tris);
     // Open seams so closed / multiply-connected surfaces (a sphere, a wrapped
-    // funnel tube) become disks LSCM can flatten — otherwise they collapse.
+    // funnel tube) become disks LSCM can flatten - otherwise they collapse.
     cutMeshToDisks(verts, tris);
     const int nv = int(verts.size()), nt = int(tris.size());
     if (nt == 0) { out.warning = "Nothing to tessellate."; return out; }
@@ -1549,7 +1547,7 @@ FlatPattern unfoldConformal(const std::vector<TopoDS_Face>& faces,
         for (int k = 0; k < 3; ++k)
             edgeTris[vkey(tris[t].v[k], tris[t].v[(k+1)%3])].push_back(t);
 
-    // Connected components (union-find over shared edges) — LSCM needs each
+    // Connected components (union-find over shared edges) - LSCM needs each
     // disconnected piece pinned independently, or the unpinned ones collapse.
     std::vector<int> uf(nt); for (int i = 0; i < nt; ++i) uf[i] = i;
     std::function<int(int)> findRoot = [&](int x){ while (uf[x]!=x){ uf[x]=uf[uf[x]]; x=uf[x]; } return x; };
@@ -1565,7 +1563,7 @@ FlatPattern unfoldConformal(const std::vector<TopoDS_Face>& faces,
         if (kv.second.size() == 1) { isBoundaryV[int(kv.first>>32)]=1; isBoundaryV[int(kv.first&0xffffffff)]=1; }
 
     // HARD-pin two far-apart vertices PER COMPONENT, preferring BOUNDARY vertices
-    // so we never pin a singular interior point (a cone apex / sphere pole) — that
+    // so we never pin a singular interior point (a cone apex / sphere pole) - that
     // was the fractal. Hard pinning (fixing the DOFs, not soft weights) keeps the
     // gauge exact and the system well-conditioned. Pin distance only sets scale
     // (corrected by the area rescale), so it can't distort the conformal shape.
@@ -1735,7 +1733,7 @@ FlatPattern unfoldConformal(const std::vector<TopoDS_Face>& faces,
     out.piecesPlaced = 1;
     out.ok = !out.faces.empty();
     if (out.ok)
-        out.warning = "Conformal flatten — one stretchy piece, up to " +
+        out.warning = "Conformal flatten - one stretchy piece, up to " +
                       std::to_string(int(out.distortionPct + 0.5)) + "% area stretch.";
     return out;
 }

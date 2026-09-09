@@ -18,7 +18,7 @@
 //   - the document-event subscriptions that mark the renderer dirty
 //   - the render pass that flushes the renderer each frame
 //
-// Application drives the popup (m_axisOpActive et al. — TODO scaffolding)
+// Application drives the popup (m_axisOpActive et al. - TODO scaffolding)
 // because the popup pushes a real ConstructionAxisOp onto history with
 // live preview; that needs deep document access. The visuals + plumbing
 // live here.
@@ -29,14 +29,14 @@ struct AxisRenderState {
     bool dirty = true;
 };
 
-// Plugin-local singleton — needed so the render-pass lambda and the event
+// Plugin-local singleton - needed so the render-pass lambda and the event
 // subscriber lambdas share the same renderer instance across init.
 static std::unique_ptr<AxisRenderState> g_state;
 
 } // namespace
 
 REGISTER_PLUGIN(ConstructionAxis, [](materializr::PluginContext& ctx) {
-    // Toolbar button + Command Palette entry — both hand the workflow over
+    // Toolbar button + Command Palette entry - both hand the workflow over
     // to Application's interactive-op popup (same routing the plane plugin
     // uses, with a different op name so the host can dispatch).
     auto action = [](materializr::PluginContext& c) {
@@ -70,7 +70,7 @@ REGISTER_PLUGIN(ConstructionAxis, [](materializr::PluginContext& ctx) {
             if (g_state) g_state->dirty = true;
         });
 
-    // Render pass — Application iterates registered passes once per frame.
+    // Render pass - Application iterates registered passes once per frame.
     materializr::RenderPassContribution pass;
     pass.name = "ConstructionAxes";
     pass.priority = 502; // just after planes (501) so axes draw on top
@@ -81,7 +81,7 @@ REGISTER_PLUGIN(ConstructionAxis, [](materializr::PluginContext& ctx) {
     pass.render = [](materializr::PluginContext& c,
                      const glm::mat4& view, const glm::mat4& proj) {
         if (!g_state) return;
-        // Same hide-during-ortho-sketch rule as planes — clean canvas for
+        // Same hide-during-ortho-sketch rule as planes - clean canvas for
         // drawing. Axes are decorative anchors, not sketch geometry.
         if (c.isInSketchMode() && c.camera().isOrthographic()) return;
 

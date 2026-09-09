@@ -9,14 +9,14 @@
 #include <vector>
 #include <string>
 
-// Slide a THROUGH-HOLE laterally across the face it pierces — round, square,
+// Slide a THROUGH-HOLE laterally across the face it pierces - round, square,
 // polygon, any straight prismatic section. Reuses the Move button + gizmo, but
 // under the hood it's a boolean re-cut, NOT a face loft: it fills the hole back
 // to solid where it was and cuts an identical hole at the new position
 //   result = (body ∪ void) − translate(void, move)
 // where `void` is the exact hole solid (the opening profile extruded through the
 // body). No opposite-cap heuristic, so it never fills cavities the way a face
-// loft can. Pockets (blind holes) are detected and REFUSED for now — moving a
+// loft can. Pockets (blind holes) are detected and REFUSED for now - moving a
 // pocket is a separate feature (the cap/depth need their own handling).
 class MoveHoleOp : public Operation {
 public:
@@ -25,20 +25,20 @@ public:
 
     void setBody(int bodyId) { m_bodyId = bodyId; }
     // A wall face of the hole the user clicked (one cylindrical face for a round
-    // hole, one of the flats for a square/polygon hole — the rest are gathered).
+    // hole, one of the flats for a square/polygon hole - the rest are gathered).
     void setSeedWall(const TopoDS_Face& wall) { m_seedWall = wall; }
     void setMoveVector(const gp_Vec& v) { m_move = v; }
 
     // Slide moves the whole hole: both rims travel together and the bore stays
     // parallel to where it was. Tilt pins the FAR rim and moves only the near
-    // one, so the bore goes oblique — "move the top edge and leave the bottom
+    // one, so the bore goes oblique - "move the top edge and leave the bottom
     // where it is". Same re-cut either way; only the replacement void differs,
     // which is why they share an op.
     // EdgeMove reshapes ONE straight side of the near rim: the grabbed edge
     // slides and its two neighbours extend or shrink to meet it, exactly like
     // dragging a line in a sketch. The far rim keeps its shape, so the bore
     // becomes a loft between two different profiles. Refused unless every side
-    // of the rim is straight — see editRimWire.
+    // of the rim is straight - see editRimWire.
     enum class Mode { Slide, Tilt, EdgeMove };
     void setMode(Mode m) { m_mode = m; }
     // Which rim edge EdgeMove drags. Ignored by the other modes.
@@ -46,7 +46,7 @@ public:
     Mode mode() const { return m_mode; }
     // Which mouth the user actually grabbed. buildVoid names the two rims
     // "entry" and "exit" by its OWN walk order, which has nothing to do with
-    // which one was clicked — so Tilt and EdgeMove must be told, or they move
+    // which one was clicked - so Tilt and EdgeMove must be told, or they move
     // the far rim and pin the near one (looks plausible, leans the wrong way).
     void setNearIsEntry(bool nearIsEntry) { m_nearIsEntry = nearIsEntry; }
     bool nearIsEntry() const { return m_nearIsEntry; }
@@ -66,7 +66,7 @@ public:
     std::vector<int> plannedBodyIds() const override { return {m_bodyId}; }
     OperationDiff captureDiff() const override;
     // Reload support: the seed wall persists as an ordinal index into the input
-    // shape's canonical face map (SubShapeIndex.h), the move as plain numbers —
+    // shape's canonical face map (SubShapeIndex.h), the move as plain numbers -
     // so a move-hole reloads as a real, editable op instead of baked geometry.
     std::string serializeParams() const override;
     bool deserializeParams(const std::string& blob) override;
@@ -77,8 +77,8 @@ public:
     // returns false) when it's a blind pocket. `entryNormal` is the outward
     // normal of the face the hole opens through (the plane the move slides in).
     // Static so the interactive layer can validate/preview a selection cheaply.
-    // `entryOpening` (optional) receives the entry mouth's loop — the hole's top
-    // rim — for the interactive move highlight. `exitOpening` (optional) receives
+    // `entryOpening` (optional) receives the entry mouth's loop - the hole's top
+    // rim - for the interactive move highlight. `exitOpening` (optional) receives
     // the far mouth's loop, which Tilt pins while the entry rim moves. Both were
     // always collected; only the entry one used to be handed back.
     static bool buildVoid(const TopoDS_Shape& body, const TopoDS_Face& seedWall,
@@ -89,7 +89,7 @@ public:
     // The oblique replacement void: a ruled loft from the pinned far rim to the
     // moved near rim, overshooting both faces. Null when it can't be built.
     // Slide one straight side of `rim` by `move`, re-meeting its neighbours at
-    // their new intersections. Returns false — and changes nothing — when the
+    // their new intersections. Returns false - and changes nothing - when the
     // edit isn't safe to make:
     //   * any side of the rim is an arc (a slot, a rounded pocket). Extending a
     //     line to meet an arc is a different, two-solution problem, and the far
@@ -106,8 +106,8 @@ public:
     //   whole rim (a circle is one edge)  -> Tilt   (pin the far rim)
     //   one straight side of a rim        -> EdgeMove
     //   edges on both rims                -> Slide  (the whole bore)
-    // Anything else — an edge that isn't a hole rim, or edges from more than
-    // one hole — resolves to None, and the caller offers nothing at all rather
+    // Anything else - an edge that isn't a hole rim, or edges from more than
+    // one hole - resolves to None, and the caller offers nothing at all rather
     // than falling back to a body move (Steve's call, 2026-08-03).
     struct EdgePick {
         bool ok = false;

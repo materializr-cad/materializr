@@ -118,7 +118,7 @@ TEST(MoveHole, RoundThroughHoleRelocatesAndConservesVolume) {
         << "no ghost face/edge left where the hole was (unified)";
 }
 
-// The face the hole pierces must keep its OUTWARD orientation after the move —
+// The face the hole pierces must keep its OUTWARD orientation after the move -
 // otherwise push/pull on that face reads inverted (BRepGProp_Face::Normal honors
 // the face's orientation flag). Regression guard for "push/pull goes the wrong
 // way on the top face after a hole move".

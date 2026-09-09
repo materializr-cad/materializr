@@ -269,6 +269,6 @@ REGISTER_PLUGIN(Sketch, [](PluginContext& /*ctx*/) {
     // The plugin SketchModeTool below is intentionally NOT wired to any command
     // or button: Application never calls InteractiveTool::handleInput(), so the
     // tool can't receive viewport input, and once activated its renderOverlay()
-    // runs outside any ImGui window — which spawned a stray "Debug" window. The
+    // runs outside any ImGui window - which spawned a stray "Debug" window. The
     // class is kept only as a reference for a future input-routing migration.
 })

@@ -14,6 +14,7 @@
 #include <Geom_Curve.hxx>
 #include <BRepTools_WireExplorer.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
+#include "core/MeshParams.h"
 #include <Poly_Triangulation.hxx>
 #include <TopLoc_Location.hxx>
 #include <TopoDS.hxx>
@@ -77,7 +78,7 @@ void SketchRenderer::buildPointLut(const Sketch* sketch) {
 }
 
 const SketchPoint* SketchRenderer::lutPoint(const Sketch* sketch, int id) const {
-    // Only trust the LUT for the sketch it was built from — the highlight /
+    // Only trust the LUT for the sketch it was built from - the highlight /
     // region entry points can arrive with a DIFFERENT sketch while the LUT
     // still holds the last render()'s table, and sketch point ids are small
     // ints that would false-hit across sketches. Everything else falls back
@@ -86,10 +87,10 @@ const SketchPoint* SketchRenderer::lutPoint(const Sketch* sketch, int id) const 
         auto it = m_pointLut.find(id);
         return it != m_pointLut.end() ? it->second : nullptr;
     }
-    // LUT belongs to another sketch — authoritative linear lookup. (This was
+    // LUT belongs to another sketch - authoritative linear lookup. (This was
     // `return lutPoint(sketch, id);`: infinite self-recursion, tail-call
     // compiled into a 100% CPU spin. Reached whenever a highlight draws a
-    // sketch the LUT wasn't built from — selecting a sketch from the im-touch
+    // sketch the LUT wasn't built from - selecting a sketch from the im-touch
     // lite tree, or the first frame of a brand-new sketch.)
     for (const auto& p : sketch->getPoints())
         if (p.id == id) return &p;
@@ -99,8 +100,8 @@ const SketchPoint* SketchRenderer::lutPoint(const Sketch* sketch, int id) const 
 std::uint64_t SketchRenderer::contentSignature(const Sketch* sketch) const {
     // FNV-1a over everything the standard passes read: plane basis, points,
     // element tables, spline control ids, the source-face centroid (midpoint
-    // dots) and the line-width setting (pass widths). Any change — from ops,
-    // the solver, or a whole-object snapshot restore — changes the hash.
+    // dots) and the line-width setting (pass widths). Any change - from ops,
+    // the solver, or a whole-object snapshot restore - changes the hash.
     std::uint64_t h = 1469598103934665603ull;
     auto mix = [&h](const void* data, size_t n) {
         const unsigned char* b = static_cast<const unsigned char*>(data);
@@ -179,7 +180,7 @@ void SketchRenderer::renderCachedStatic(const Sketch* sketch, const glm::mat4& v
     auto it = m_sketchCache.find(key);
     if (it == m_sketchCache.end() || it->second.sig != sig) {
         if (it == m_sketchCache.end() && m_sketchCache.size() >= kSketchCacheCap)
-            clearCache(); // flush; visible sketches rebuild lazily — cheap
+            clearCache(); // flush; visible sketches rebuild lazily - cheap
         SketchCacheEntry& e = m_sketchCache[key];
         freeEntry(e);
 
@@ -270,7 +271,7 @@ void SketchRenderer::uploadAndDraw(const std::vector<float>& verts, GLenum mode,
     if (verts.empty()) return;
 
     // Static-sketch cache rebuild in progress: capture the pass instead of
-    // drawing — renderCachedStatic uploads it into a persistent buffer once.
+    // drawing - renderCachedStatic uploads it into a persistent buffer once.
     if (m_capture) {
         m_capture->push_back({verts, mode, color, lineWidth});
         return;
@@ -318,7 +319,7 @@ void SketchRenderer::render(const Sketch* sketch, const SketchTool* tool,
     // A sketch rendered with no tool/solver is STATIC (not being edited):
     // draw it from cached GPU buffers instead of regenerating + re-uploading
     // its whole vertex stream every frame. The active sketch (tool/solver
-    // present) keeps the live path below — it changes every frame anyway,
+    // present) keeps the live path below - it changes every frame anyway,
     // and its overlays depend on transient tool state.
     if (!tool && !solver) {
         renderCachedStatic(sketch, vp);
@@ -447,7 +448,7 @@ void SketchRenderer::render(const Sketch* sketch, const SketchTool* tool,
         drawAirfoilGhost(sketch, tool, vp);
     }
 
-    // The LUT holds pointers into the sketch's point vector — valid only for
+    // The LUT holds pointers into the sketch's point vector - valid only for
     // this call. Clear AND un-own it so a later entry point can never
     // dereference pointers a between-frames mutation invalidated.
     m_pointLut.clear();
@@ -484,7 +485,7 @@ void SketchRenderer::drawLines(const Sketch* sketch, const glm::mat4& vp) {
         verts.push_back(w2.x); verts.push_back(w2.y); verts.push_back(w2.z);
     }
 
-    // Deep cobalt — saturated enough to pop against the light-blue sketch face
+    // Deep cobalt - saturated enough to pop against the light-blue sketch face
     // tint, while keeping the "blue = sketch" convention.
     glm::vec3 color = glm::vec3(0.10f, 0.35f, 0.95f);
     uploadAndDraw(verts, GL_LINES, color, vp, m_lineWidth);
@@ -556,7 +557,7 @@ void SketchRenderer::drawSplines(const Sketch* sketch, const glm::mat4& vp) {
 
     for (const auto& spline : sketch->getSplines()) {
         // Draw the SAME smooth interpolated curve the profile builder
-        // emits — what you see is what extrudes. (This used to draw the
+        // emits - what you see is what extrudes. (This used to draw the
         // raw control polyline, back when splines were display-only.)
         std::vector<glm::vec2> pts = sketch->sampleSpline2D(spline, 12);
         for (size_t i = 0; i + 1 < pts.size(); ++i) {
@@ -567,7 +568,7 @@ void SketchRenderer::drawSplines(const Sketch* sketch, const glm::mat4& vp) {
         }
     }
 
-    glm::vec3 color = glm::vec3(0.10f, 0.35f, 0.95f); // deep cobalt — match all sketch geometry
+    glm::vec3 color = glm::vec3(0.10f, 0.35f, 0.95f); // deep cobalt - match all sketch geometry
     uploadAndDraw(verts, GL_LINES, color, vp, m_lineWidth);
 }
 
@@ -598,7 +599,7 @@ void SketchRenderer::drawPolygons(const Sketch* sketch, const glm::mat4& vp) {
 void SketchRenderer::drawPoints(const Sketch* sketch, const glm::mat4& vp) {
     std::vector<float> verts;
     for (const auto& pt : sketch->getPoints()) {
-        // Glyph vertices stay invisible — hundreds per word, pure noise.
+        // Glyph vertices stay invisible - hundreds per word, pure noise.
         if (pt.fromText) continue;
         glm::vec3 w = toWorld(sketch, pt.pos);
         verts.push_back(w.x);
@@ -649,7 +650,7 @@ void SketchRenderer::drawOffsetPreview(const Sketch* sketch, const SketchTool* t
         if (!verts.empty()) uploadAndDraw(verts, GL_LINES, colour, vp, width);
     };
 
-    // Pick phase: cyan over the chain the click would capture — the whole
+    // Pick phase: cyan over the chain the click would capture - the whole
     // connected run, so it is obvious the tool takes more than one edge.
     stream(tool->getOffsetChainHover(), glm::vec3(0.35f, 0.85f, 1.0f), 4.0f);
     // Distance phase: the result ghost, in the same orange the Mirror ghost
@@ -665,7 +666,7 @@ void SketchRenderer::drawMidpointDots(const Sketch* sketch, const glm::mat4& vp)
         verts.push_back(w.x); verts.push_back(w.y); verts.push_back(w.z);
     };
 
-    // Midpoint of each line. Glyph edges excluded — no dot confetti on text.
+    // Midpoint of each line. Glyph edges excluded - no dot confetti on text.
     for (const auto& line : sketch->getLines()) {
         if (line.fromText) continue;
         const SketchPoint* p1 = lutPoint(sketch, line.startPointId);
@@ -691,7 +692,7 @@ void SketchRenderer::drawMidpointDots(const Sketch* sketch, const glm::mat4& vp)
         pushWorld(toWorld(sketch, mid));
     }
 
-    // Centre dot: the host body's TRUE centre when known (thread axis —
+    // Centre dot: the host body's TRUE centre when known (thread axis -
     // mirrors the snap, which suppresses the centroid then), else the face
     // centroid (skipped for freestanding-plane sketches). Drawing BOTH put
     // two green dots 0.3mm apart on a threaded cap and the wrong one was
@@ -708,7 +709,7 @@ void SketchRenderer::drawMidpointDots(const Sketch* sketch, const glm::mat4& vp)
     uploadAndDraw(verts, GL_POINTS, green, vp, 4.0f);
 }
 
-// Live ghost of the SVG artwork at the cursor — the actual paths, scaled /
+// Live ghost of the SVG artwork at the cursor - the actual paths, scaled /
 // rotated / Y-flipped exactly as SvgImport::place will stamp them, so the
 // user sees the real thing before clicking (the dashed box alone made
 // placement a guess for detailed art).
@@ -800,7 +801,7 @@ void SketchRenderer::drawPreview(const Sketch* sketch, const SketchTool* tool,
     };
 
     std::vector<float> verts;
-    // Bright yellow — distinct from both committed sketch lines (cobalt) and
+    // Bright yellow - distinct from both committed sketch lines (cobalt) and
     // the dimension overlay (light grey-white). Matches the existing "yellow =
     // active / being placed" convention used elsewhere (point markers).
     glm::vec3 color(1.0f, 0.85f, 0.2f);
@@ -890,7 +891,7 @@ void SketchRenderer::drawPreview(const Sketch* sketch, const SketchTool* tool,
             pushPt(verts, pw(start));
             pushPt(verts, pw(end));
             uploadAndDraw(verts, GL_LINES, color, vp, 1.5f);
-            // Curved cyan hint bulging off the chord — signals "this is an arc,
+            // Curved cyan hint bulging off the chord - signals "this is an arc,
             // not a line." It's only a placeholder default; the next tap sets the
             // real bulge. Sagitta = 28% of the chord, perpendicular to it.
             glm::vec2 chord = end - start;
@@ -1198,8 +1199,8 @@ void SketchRenderer::drawConstraints(const Sketch* sketch, const SketchSolver* s
     // (Removed: a solver-state indicator used to be drawn here as a small
     // square at the fixed sketch coordinate (-5, +5), coloured green / cobalt /
     // red for Fully / Under / Over-constrained. Cobalt is also the sketch LINE
-    // colour, so on an under-constrained sketch — i.e. most of the time while
-    // drawing — it read as a stray blue dot sitting in the model near the
+    // colour, so on an under-constrained sketch - i.e. most of the time while
+    // drawing - it read as a stray blue dot sitting in the model near the
     // origin, with nothing to explain it. Steve hit it as "a random little blue
     // dot" and it had been mis-filed in my notes as orphan vertices for two
     // months. The same three states are already reported in words by the sketch
@@ -1272,7 +1273,7 @@ void SketchRenderer::renderRegionFill(const Sketch* sketch, int regionIndex,
     Handle(Poly_Triangulation) tri = BRep_Tool::Triangulation(face, loc);
     if (tri.IsNull()) {
         try {
-            BRepMesh_IncrementalMesh mesher(face, 0.2);
+            BRepMesh_IncrementalMesh mesher(face, materializr::meshParams(0.2, 0.5, false));
             tri = BRep_Tool::Triangulation(face, loc);
         } catch (...) {}
         if (tri.IsNull()) return;
@@ -1320,7 +1321,7 @@ void SketchRenderer::renderSketchHighlight(const Sketch* sketch,
     glm::mat4 vp = projection * view;
 
     // Stuff every primitive into one buffer so a single GL draw covers the
-    // whole sketch — line endpoints, sampled circles / arcs, spline control
+    // whole sketch - line endpoints, sampled circles / arcs, spline control
     // polylines, polygon edges. Polygons share their underlying SketchLines
     // with getLines(), so we don't iterate getPolygons() separately.
     std::vector<float> verts;
@@ -1469,7 +1470,7 @@ void SketchRenderer::renderFaceGrid(const Sketch* sketch, float faceExtent, floa
     // the snap lattice: snap-to-grid rounds sketch coordinates to multiples
     // of the step from the PLANE ORIGIN, so the drawn lines must sit on that
     // same lattice. Anchoring at the raw centroid drew a grid offset by
-    // (centroid mod step) from where clicks actually land — glaring on a
+    // (centroid mod step) from where clicks actually land - glaring on a
     // threaded rod's cap, whose centroid shifts off-axis (the groove-runout
     // bite makes the face asymmetric).
     glm::vec2 c{0.0f};

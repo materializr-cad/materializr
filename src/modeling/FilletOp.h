@@ -18,10 +18,15 @@ public:
     void setBody(int bodyId);
     void setEdges(const std::vector<TopoDS_Edge>& edges);
     void setRadius(double radius);
+    std::vector<TopoDS_Shape*> shapeParams() override {
+        std::vector<TopoDS_Shape*> out;
+        for (TopoDS_Shape& s : m_edges) out.push_back(&s);
+        return out;
+    }
 
     // Generative edge tracking (experiment/generative-edges): remember which
     // SKETCH generated this body so a filleted CORNER edge can be re-found by
-    // the sketch VERTEX it sits over — surviving a dimension edit that
+    // the sketch VERTEX it sits over - surviving a dimension edit that
     // relocates the corner, where ordinal/carrier matching fails. -1 = unknown
     // (falls back to today's behaviour).
     void setSourceSketch(int sketchId) { m_sourceSketchId = sketchId; }
@@ -31,10 +36,10 @@ public:
     int getBodyId() const { return m_bodyId; }
     double getRadius() const { return m_radius; }
     const std::vector<TopoDS_Edge>& getEdges() const { return m_edges; }
-    // The blend faces this fillet produced on the live body — what ownsFace
+    // The blend faces this fillet produced on the live body - what ownsFace
     // matches and what the history-step preview highlights.
     const std::vector<TopoDS_Shape>& getGeneratedFaces() const { return m_generatedFaces; }
-    // Body shape from the last execute()'s pre-state — needed by the
+    // Body shape from the last execute()'s pre-state - needed by the
     // interactive edit-by-clicking-face flow so it can preview an updated
     // radius against the body as it stood BEFORE this fillet was applied.
     const TopoDS_Shape& getPreviousShape() const { return m_previousShape; }
@@ -82,16 +87,16 @@ private:
     // (corner vertex / rim line) each edge came from (see EdgeAnchor.h).
     int m_sourceSketchId = -1;
     std::vector<EdgeAnchor::Anchor> m_edgeAnchors;
-    // Topological names of the filleted edges — the LAST-RESORT resolution
+    // Topological names of the filleted edges - the LAST-RESORT resolution
     // after rebindEdges and resolveAnchors both fail. That is exactly the
     // boolean-SEAM case (a seam edge sits over no sketch feature, so anchors
-    // can't name it; its "gen" lineage name — via the producing boolean's
-    // ledger published on the Document — can). Minted on the first valid
+    // can't name it; its "gen" lineage name - via the producing boolean's
+    // ledger published on the Document - can). Minted on the first valid
     // execute with the body's producing ledger in context.
     std::vector<materializr::topo::Ref> m_edgeRefs;
 
     // Lineage-FIRST edge naming (parity with ChamferOp, #52): each filleted
-    // edge as its two adjacent faces' ancestry ids — resolvable from the
+    // edge as its two adjacent faces' ancestry ids - resolvable from the
     // FaceIdMap alone, i.e. it survives a partial replay where the ledger
     // (runtime-only) is gone but the map was carried/restored.
     std::vector<std::pair<int,int>> m_edgeFaceIdPairs;
@@ -100,7 +105,7 @@ private:
     materializr::topo::FaceIdMap m_prevFaceIds;
 
     // Known-good builds: (input body, radius) → result (see ChamferOp's
-    // StoredResult for the full story — the "put the value back" adoption).
+    // StoredResult for the full story - the "put the value back" adoption).
     // Entry 0 = the loaded original, never evicted.
     struct StoredResult {
         TopoDS_Shape base, result;
@@ -134,7 +139,7 @@ private:
 
     // Generation map of the last execute(): the input EDGE -> the blend FACE(S)
     // it produced. Lets the "gen" naming strategy name a blend face by the edge
-    // that generated it (itself sketch-anchored, so edit-stable) — the general
+    // that generated it (itself sketch-anchored, so edit-stable) - the general
     // kernel path for op-GENERATED faces no geometric scheme can name.
     materializr::topo::GenerationLedger m_ledger;
 
@@ -143,7 +148,7 @@ public:
         return m_ledger;
     }
 
-    // Capture anchors NOW if they're missing — used to retrofit fillets loaded
+    // Capture anchors NOW if they're missing - used to retrofit fillets loaded
     // from a project made before anchoring existed, while their edges are
     // still valid (before any edit breaks the rebind). Anchoring consults
     // every sketch in the document, so no source-sketch setup is needed.

@@ -3,8 +3,8 @@
 // SDL_main.h renames the function below to SDL_main. The body mirrors
 // android_main.cpp minus the Android-only fdsan workaround.
 //
-// Guarded by MZ_IOS (not a build-system exclusion) so the Android build — which
-// globs the whole src/ tree — compiles this file to nothing, the same pattern
+// Guarded by MZ_IOS (not a build-system exclusion) so the Android build - which
+// globs the whole src/ tree - compiles this file to nothing, the same pattern
 // as android_files.cpp on other platforms. The desktop build's explicit source
 // list never includes it.
 #include "platform_defs.h"

@@ -1,4 +1,4 @@
-// StoreKit tip jar — see ios_storekit.h for the flow. Uses the classic
+// StoreKit tip jar - see ios_storekit.h for the flow. Uses the classic
 // StoreKit 1 API (SKPaymentQueue / SKProductsRequest): the modern StoreKit 2
 // surface is Swift-only and this target is pure C++/Objective-C++. SK1 is
 // deprecated but fully functional, and the whole integration is one product.
@@ -69,7 +69,7 @@ bool userCancelled(NSError* e) {
         return;
     }
     [[SKPaymentQueue defaultQueue] addPayment:[SKPayment paymentWithProduct:product]];
-    // Still Working — the payment sheet takes over; a transaction callback ends it.
+    // Still Working - the payment sheet takes over; a transaction callback ends it.
 }
 
 - (void)request:(SKRequest*)request didFailWithError:(NSError*)error {
@@ -89,7 +89,7 @@ bool userCancelled(NSError* e) {
         case SKPaymentTransactionStatePurchasing:
             break; // sheet up; stay Working
         case SKPaymentTransactionStateDeferred:
-            // Ask to Buy: approval may take days — unblock the UI now.
+            // Ask to Buy: approval may take days - unblock the UI now.
             setMessage(@"Purchase is awaiting approval.");
             setPhase(materializr::TipPhase::Idle);
             break;
@@ -105,7 +105,7 @@ bool userCancelled(NSError* e) {
             break;
         case SKPaymentTransactionStateFailed:
             if (userCancelled(t.error)) {
-                setMessage(nil); // user backed out — not an error
+                setMessage(nil); // user backed out - not an error
                 setPhase(materializr::TipPhase::Idle);
             } else {
                 setMessage(t.error.localizedDescription.length

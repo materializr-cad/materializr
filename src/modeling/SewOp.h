@@ -5,15 +5,15 @@
 #include <string>
 #include <vector>
 
-// Sew — stitch loose surfaces back into one body, and into a SOLID when they
+// Sew - stitch loose surfaces back into one body, and into a SOLID when they
 // enclose something.
 //
 // This is the rung that was missing under Patch. A patch fills one opening; a
 // space bounded by several openings needs several, and until now there was no
 // way to put them together: BRepBuilderAPI_Sewing runs inside five different
 // operations and was reachable from the UI in none of them. So "bound a space
-// with surfaces, then make it solid" — which is how surface modelling works
-// everywhere else — dead-ended at a pile of separate faces.
+// with surfaces, then make it solid" - which is how surface modelling works
+// everywhere else - dead-ended at a pile of separate faces.
 //
 // Takes any mix of bodies. Every face of every one of them goes into one sew,
 // and what comes back depends only on whether the faces actually close:
@@ -29,7 +29,7 @@
 // TOLERANCE is a ladder, not a setting. Sewing wants the tightest value that
 // closes: too loose and distinct edges within that distance are merged into one,
 // which welds geometry the user did not ask to be welded. So try tight, and only
-// reach for a looser one when the tight pass leaves the shell open — and report
+// reach for a looser one when the tight pass leaves the shell open - and report
 // which rung it took, since a millimetre-scale sew is worth knowing about.
 class SewOp : public Operation {
 public:

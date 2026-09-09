@@ -11,7 +11,7 @@ enum class ViewCubeAction {
     None, Front, Back, Left, Right, Top, Bottom,
     FrontTopRight, FrontTopLeft, BackTopRight, BackTopLeft,
     FrontBottomRight, FrontBottomLeft, BackBottomRight, BackBottomLeft,
-    // Edge (two-face) views — clicking the seam between two faces looks down
+    // Edge (two-face) views - clicking the seam between two faces looks down
     // that edge so both faces are seen at once. One zero component each.
     TopFront, TopBack, TopLeft, TopRight,
     BottomFront, BottomBack, BottomLeft, BottomRight,
@@ -35,13 +35,13 @@ public:
     // the blue/grey cube faces and the yellow hover are unchanged.
     // `releaseIsGesture`: the current left-release was synthesized by a
     // two-finger gesture takeover (Window::lastLeftReleaseWasGesture), not a
-    // deliberate lift — treat it as a CANCEL of any armed click instead of a
+    // deliberate lift - treat it as a CANCEL of any armed click instead of a
     // commit, so a pinch whose first finger lands on the cube can't snap the
     // view (issue #38).
     ViewCubeAction render(Camera& camera, bool invertDrag = false,
                           bool lightMode = false, bool releaseIsGesture = false);
 
-    // True while the mouse is over the cube/ring widget — the viewport uses
+    // True while the mouse is over the cube/ring widget - the viewport uses
     // this to suppress its own selection logic so cube clicks don't pass through.
     bool wasHovered() const { return m_lastHovered; }
 

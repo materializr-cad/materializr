@@ -10,10 +10,10 @@
 #include <vector>
 #include <string>
 
-// Slide a face WITHIN ITS OWN PLANE (lateral move, never along the normal —
+// Slide a face WITHIN ITS OWN PLANE (lateral move, never along the normal -
 // that's PushPull). The whole body shears to follow: the selected face's plane
 // shifts by the in-plane move vector, the opposite end stays pinned, linear in
-// between — so a box's top slid sideways becomes a parallelepiped with slanted
+// between - so a box's top slid sideways becomes a parallelepiped with slanted
 // walls, and any other features lean proportionally. Implemented as one affine
 // gp_GTrsf shear (BRepBuilderAPI_GTransform): no booleans, topology always
 // valid by construction. The move vector is projected onto the face plane.
@@ -22,7 +22,7 @@ public:
     MoveFaceOp() = default;
     ~MoveFaceOp() override = default;
 
-    // The face transform this op applies — same loft engine, different motion:
+    // The face transform this op applies - same loft engine, different motion:
     //   Translate: slide the face in its plane (Move).
     //   Rotate:    tilt the face about an in-plane axis through its centre (Taper).
     //   Scale:     grow/shrink the face about its centre (Scale Face).
@@ -44,7 +44,7 @@ public:
     void setRotation(const gp_Dir& axisDir, double angleRad) {
         m_rotAxis = axisDir; m_rotAngle = angleRad; m_rotUseExplicit = false;
     }
-    // Rotate: an explicit composed rotation (already about the pivot) — lets the
+    // Rotate: an explicit composed rotation (already about the pivot) - lets the
     // UI stack tilts about both axes (5° right then 10° forward) into one op.
     void setRotationExplicit(const gp_Trsf& t) {
         m_rotExplicit = t; m_rotUseExplicit = true;
@@ -54,14 +54,14 @@ public:
     void setTwist(double angleRad) { m_twistAngle = angleRad; }
     // Scale: uniform factor about the face centre.
     void setScaleFactor(double f) { m_scaleFactor = f; m_scaleNonUniform = false; }
-    // Scale: NON-uniform — separate factors along two in-plane axes (about the
+    // Scale: NON-uniform - separate factors along two in-plane axes (about the
     // centre). Built as a gp_GTrsf applied to the moving loops.
     void setScaleNonUniform(const gp_Dir& axisA, const gp_Dir& axisB,
                             double sA, double sB) {
         m_scaleNonUniform = true;
         m_scaleAxisA = axisA; m_scaleAxisB = axisB; m_scaleA = sA; m_scaleB = sB;
     }
-    // Sketches lying ON the moved face — they slide with it (translated by the
+    // Sketches lying ON the moved face - they slide with it (translated by the
     // in-plane move vector) as part of the same atomic op.
     void setSketchIds(std::vector<int> ids) { m_sketchIds = std::move(ids); }
     // Per-loop motion (three hole states, set by how much of the hole is
@@ -118,7 +118,7 @@ private:
     // Ordinal index of m_face within the pre-op body shape, for reload
     // (SubShapeIndex.h). Empty/unresolved → the step replays as a ReplayOp.
     std::vector<int> m_faceIndices;
-    // Topological name of the target face — minted on the first execute, then
+    // Topological name of the target face - minted on the first execute, then
     // re-resolved whenever m_face has gone stale (an upstream edit rebuilt the
     // body and MOVED the face). Sketch-anchored, so it follows the move.
     // Serialized additively as `faceref=`; absent in old files.

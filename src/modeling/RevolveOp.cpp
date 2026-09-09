@@ -16,6 +16,7 @@
 #include "../i18n.h"
 #include "../i18n.h"
 #include "../i18n.h"
+#include "BoolArgs.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -102,7 +103,8 @@ bool RevolveOp::execute(Document& doc) {
                     return false;
                 }
                 m_previousTargetShape = doc.getBody(m_targetBodyId);
-                BRepAlgoAPI_Fuse fuse(m_previousTargetShape, revolvedShape);
+                BRepAlgoAPI_Fuse fuse;
+                materializr::setBooleanShapes(fuse, m_previousTargetShape, revolvedShape);
                 fuse.Build();
                 if (!fuse.IsDone()) {
                     return false;
@@ -116,7 +118,8 @@ bool RevolveOp::execute(Document& doc) {
                     return false;
                 }
                 m_previousTargetShape = doc.getBody(m_targetBodyId);
-                BRepAlgoAPI_Cut cut(m_previousTargetShape, revolvedShape);
+                BRepAlgoAPI_Cut cut;
+                materializr::setBooleanShapes(cut, m_previousTargetShape, revolvedShape);
                 cut.Build();
                 if (!cut.IsDone()) {
                     return false;
@@ -130,7 +133,8 @@ bool RevolveOp::execute(Document& doc) {
                     return false;
                 }
                 m_previousTargetShape = doc.getBody(m_targetBodyId);
-                BRepAlgoAPI_Common common(m_previousTargetShape, revolvedShape);
+                BRepAlgoAPI_Common common;
+                materializr::setBooleanShapes(common, m_previousTargetShape, revolvedShape);
                 common.Build();
                 if (!common.IsDone()) {
                     return false;
@@ -171,7 +175,7 @@ bool RevolveOp::rebuildProfileFromSketch(Document& doc) {
     auto sk = doc.getSketch(m_sketchId);
     if (!sk) return false;
     auto regions = sk->buildRegions();
-    // Outermost region (largest outer bbox) — mirrors the Revolve popup's
+    // Outermost region (largest outer bbox) - mirrors the Revolve popup's
     // creation pick, so a reload re-derives the same profile (its face
     // carries any inner boundaries as holes).
     int bestIdx = -1;

@@ -1,6 +1,6 @@
 // Single-shot shell probe: ONE (thickness, join) attempt against a project's
 // body, printed with timing, then exit. Run under `timeout` in a shell loop so
-// a hang in one combo can't poison the rest — this maps the failure band and
+// a hang in one combo can't poison the rest - this maps the failure band and
 // tells us whether the intersection (sharp-corner) join is viable near the
 // fillet radius or hangs there.
 //
@@ -64,7 +64,7 @@ int main(int argc, char** argv) {
     int id = doc.getAllBodyIds().front();
     TopoDS_Shape body = doc.getBody(id);
 
-    // radii mode: histogram of rounded-face radii — a doubled count of the same
+    // radii mode: histogram of rounded-face radii - a doubled count of the same
     // radius exposes a fillet stacked on itself by a bad re-derivation.
     if (std::strcmp(argv[2], "radii") == 0) {
         int total = 0, plane = 0, cyl = 0, tor = 0;

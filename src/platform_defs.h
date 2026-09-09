@@ -4,17 +4,17 @@
 // OS. The Android port keyed everything on __ANDROID__; iOS needs the same GL
 // and touch behaviour but different OS services, so the guards are split:
 //
-//   MZ_GLES   — rendering on OpenGL ES 3.0 (Android + iOS). Covers every GL
+//   MZ_GLES   - rendering on OpenGL ES 3.0 (Android + iOS). Covers every GL
 //               API delta: '#version 300 es' shaders, no glGetTexImage /
 //               GL_MULTISAMPLE / GL_POLYGON_OFFSET_LINE / geometry shaders /
 //               glPointSize.
-//   MZ_MOBILE — touch-first platform (Android + iOS): touch-mode defaults,
+//   MZ_MOBILE - touch-first platform (Android + iOS): touch-mode defaults,
 //               finger gestures, system document pickers (mobile_files.h),
 //               mobile app lifecycle.
-//   MZ_IOS    — iOS/iPadOS specifically (UIKit services live in src/ios_*).
+//   MZ_IOS    - iOS/iPadOS specifically (UIKit services live in src/ios_*).
 //
 // __ANDROID__ remains in use only for genuinely Android-only code (JNI, SAF,
-// logcat, fdsan). NOTE: on iOS __APPLE__ is also defined — any __APPLE__ guard
+// logcat, fdsan). NOTE: on iOS __APPLE__ is also defined - any __APPLE__ guard
 // means "macOS desktop" ONLY if the MZ_IOS/MZ_GLES case is handled first
 // (see gl_common.h).
 //

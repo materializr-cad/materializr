@@ -64,7 +64,7 @@ bool buildGlyphShape(const std::string& text, const std::string& fontPath,
                      double& emOut) {
     if (text.empty() || heightMm <= 0.01f || fontPath.empty()) return false;
 
-    // Render at a fixed em size and scale the sampled points afterwards —
+    // Render at a fixed em size and scale the sampled points afterwards -
     // cap height isn't the em size (DejaVu's 'H' is ~71% of it), and the
     // user asked for a letter height, not a typographic unit.
     const double em = 64.0;
@@ -128,7 +128,7 @@ int TextSketch::generate(Sketch* sketch, const std::string& text,
         return pos + glm::vec2(p.x * ca - p.y * sa, p.x * sa + p.y * ca);
     };
 
-    // 0.2%% of the em — ~0.02 mm chord error on 10 mm letters.
+    // 0.2%% of the em - ~0.02 mm chord error on 10 mm letters.
     const double deflection = em * 0.002;
 
     int loops = 0;
@@ -139,7 +139,7 @@ int TextSketch::generate(Sketch* sketch, const std::string& text,
                 sampleWire(TopoDS::Wire(wx.Current()), deflection);
             if (pts.size() < 3) continue;
 
-            // NOTE: ids only — SketchPoint* would dangle across addPoint
+            // NOTE: ids only - SketchPoint* would dangle across addPoint
             // reallocations (the polygon-tool lesson).
             std::vector<int> ids;
             ids.reserve(pts.size());

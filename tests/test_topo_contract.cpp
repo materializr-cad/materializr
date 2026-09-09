@@ -1,10 +1,10 @@
 // THE TOPOLOGICAL-NAMING CONTRACT. One named case per (reference kind ×
-// upstream-edit kind). "Topo naming works" MEANS this suite is green — a
+// upstream-edit kind). "Topo naming works" MEANS this suite is green - a
 // verbal "it's done" doesn't count. When a new breakage is found in the wild,
 // it becomes a new case here FIRST, then gets fixed.
 //
 // Every case drives the REAL replay path (History::editStep / the sketch-edit
-// cascade with the override pinned), not op internals — the gaps that bit us
+// cascade with the override pinned), not op internals - the gaps that bit us
 // repeatedly lived between the ops and the replay machinery, not inside
 // either.
 #include <gtest/gtest.h>
@@ -69,7 +69,7 @@ TopoDS_Edge lineEdgeWhere(const TopoDS_Shape& body, Pred pred) {
 }
 
 // Planar faces whose normal is diagonal in the Y-Z plane (|ny|,|nz| both
-// significant, |nx| tiny) — chamfer bevels of a Y-edge. Sorted large→small.
+// significant, |nx| tiny) - chamfer bevels of a Y-edge. Sorted large→small.
 std::vector<TopoDS_Face> yzBevels(const TopoDS_Shape& body) {
     std::vector<std::pair<double, TopoDS_Face>> got;
     for (TopExp_Explorer ex(body, TopAbs_FACE); ex.More(); ex.Next()) {
@@ -110,7 +110,7 @@ int pushExtrude(Document& doc, History& hist, int sid, double dist,
 } // namespace
 
 // ───────────────────────────────────────────────────────────────────────────
-// CASE 1 — edge ref held by a downstream chamfer, where the edge is OWNED BY
+// CASE 1 - edge ref held by a downstream chamfer, where the edge is OWNED BY
 // an upstream chamfer's bevel (op-generated geometry, no sketch feature under
 // it). Resizing the upstream chamfer moves the edge; the downstream chamfer
 // must follow it (gen scheme against the republished ledger).
@@ -133,7 +133,7 @@ TEST(TopoContract, BevelEdgeChamfer_FollowsUpstreamChamferResize) {
     ASSERT_TRUE(chA->execute(doc));
     hist.pushExecuted(std::move(chA));
 
-    // Chamfer B on the bevel's LOWER boundary edge (y=0, z=8) — an edge that
+    // Chamfer B on the bevel's LOWER boundary edge (y=0, z=8) - an edge that
     // exists only because A does.
     TopoDS_Edge lower = lineEdgeWhere(doc.getBody(body), [](const gp_Pnt& p) {
         return std::abs(p.Y()) < 1e-7 && std::abs(p.Z() - 8.0) < 1e-6;
@@ -154,7 +154,7 @@ TEST(TopoContract, BevelEdgeChamfer_FollowsUpstreamChamferResize) {
     const TopoDS_Shape& out = doc.getBody(body);
     EXPECT_TRUE(BRepCheck_Analyzer(out).IsValid());
     // B's small bevel must sit on the MOVED lower boundary (z≈6), not the old
-    // z≈8 (stale) — and must exist at all (not silently dropped).
+    // z≈8 (stale) - and must exist at all (not silently dropped).
     auto bevels = yzBevels(out);
     ASSERT_GE(bevels.size(), 2u) << "both bevels must exist after the edit";
     gp_Pnt cB = centroid(bevels.back());   // smallest = B's
@@ -163,9 +163,9 @@ TEST(TopoContract, BevelEdgeChamfer_FollowsUpstreamChamferResize) {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// CASE 2 — the light-cover scenario (#56): a hole punched THROUGH a bevel,
+// CASE 2 - the light-cover scenario (#56): a hole punched THROUGH a bevel,
 // then the hole's top rim chamfered. Resizing the big bevel shortens the rim
-// fragments. The rim chamfer must re-resolve onto the shorter fragments — or
+// fragments. The rim chamfer must re-resolve onto the shorter fragments - or
 // at minimum degrade gracefully (model intact, tail suspended) rather than
 // corrupt.
 TEST(TopoContract, HoleRimChamfer_FollowsBevelResize) {
@@ -189,7 +189,7 @@ TEST(TopoContract, HoleRimChamfer_FollowsBevelResize) {
 
     // SQUARE hole crossing the bevel's top boundary (y=6): rect x[8,14],
     // y[3,9], cut all the way through (symmetric so plane placement is
-    // irrelevant). Straight rim edges — the light cover's actual geometry.
+    // irrelevant). Straight rim edges - the light cover's actual geometry.
     int hpid[4];
     auto skHole = makeRect(8, 3, 14, 9, hpid);
     int hsid = doc.addSketch(skHole);
@@ -203,7 +203,7 @@ TEST(TopoContract, HoleRimChamfer_FollowsBevelResize) {
     ASSERT_TRUE(cut->execute(doc));
     hist.pushExecuted(std::move(cut));
 
-    // Rim chamfer: the hole's TOP-FACE rim fragments — the straight edges at
+    // Rim chamfer: the hole's TOP-FACE rim fragments - the straight edges at
     // z=10 shared with the flat top (two partial side edges y in [6,9] and
     // the back edge y=9). These are exactly the edges the bevel resize will
     // shorten.
@@ -223,7 +223,7 @@ TEST(TopoContract, HoleRimChamfer_FollowsBevelResize) {
         const bool back = std::abs(m.Y() - 9.0) < 1e-6 && m.X() > 8.0 &&
                           m.X() < 14.0;
         if (!side && !back) continue;
-        // TopExp_Explorer re-visits an edge once per owning face — dedup.
+        // TopExp_Explorer re-visits an edge once per owning face - dedup.
         bool dup = false;
         for (const auto& e : rim)
             if (e.IsSame(ex.Current())) { dup = true; break; }
@@ -243,7 +243,7 @@ TEST(TopoContract, HoleRimChamfer_FollowsBevelResize) {
     const bool ok = hist.editStep(1, doc, /*transactional=*/true);
 
     // HARD (graceful-degradation floor, must always hold): the body is valid
-    // and the bevel resize itself landed — no corruption, no half-replay.
+    // and the bevel resize itself landed - no corruption, no half-replay.
     const TopoDS_Shape& out = doc.getBody(body);
     EXPECT_TRUE(BRepCheck_Analyzer(out).IsValid());
     ASSERT_FALSE(yzBevels(out).empty());
@@ -257,7 +257,7 @@ TEST(TopoContract, HoleRimChamfer_FollowsBevelResize) {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// CASE 3 — face refs held by TaperOp (draft angle). Today TaperOp feeds its
+// CASE 3 - face refs held by TaperOp (draft angle). Today TaperOp feeds its
 // STORED face handles straight to BRepOffsetAPI_DraftAngle, so any upstream
 // rebuild strands it. Contract: the tapered wall follows a sketch resize
 // through the real cascade replay.
@@ -322,7 +322,7 @@ TEST(TopoContract, TaperFace_FollowsSketchResizeThroughReplay) {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// CASE 4 — ProjectSketchOp's TARGET FACE (its sketch side already re-derives;
+// CASE 4 - ProjectSketchOp's TARGET FACE (its sketch side already re-derives;
 // the face it stamps into is a raw stored handle today). Contract: the
 // engraving follows the top face across a sketch resize.
 TEST(TopoContract, ProjectSketchTargetFace_FollowsSketchResize) {
@@ -369,7 +369,7 @@ TEST(TopoContract, ProjectSketchTargetFace_FollowsSketchResize) {
 
     // Sketch edit widens the base 20 → 30 AND the extrude grows 10 → 15, so
     // the top face MOVES to z=15. A stale target-face handle would stamp at
-    // the old z=10 plane (buried inside the solid) — only a true re-resolve
+    // the old z=10 plane (buried inside the solid) - only a true re-resolve
     // puts the pocket floor at z=14.
     auto before = std::make_shared<Sketch>(*sk);
     sk->movePoint(pid[1], {30.0f, 0.0f});
@@ -397,12 +397,12 @@ TEST(TopoContract, ProjectSketchTargetFace_FollowsSketchResize) {
         break;
     }
     EXPECT_TRUE(floorAt14)
-        << "pocket floor must sit 1mm under the MOVED top (z=14) — a stale "
+        << "pocket floor must sit 1mm under the MOVED top (z=14) - a stale "
            "target handle stamps at the old z=10 plane instead";
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// CASE 5 — face-lineage COVERAGE after a fillet. ChamferOp complete()s the
+// CASE 5 - face-lineage COVERAGE after a fillet. ChamferOp complete()s the
 // FaceIdMap so every downstream face has an ancestry id; FilletOp historically
 // didn't, leaving holes that only bite two ops later. Contract: after any
 // fillet, EVERY face of the result carries at least one lineage id.
@@ -438,11 +438,11 @@ TEST(TopoContract, FilletFaceIdCoverage_Complete) {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// CASE 6 — editing a step BETWEEN the lineage producer and the consumer. The
+// CASE 6 - editing a step BETWEEN the lineage producer and the consumer. The
 // boolean's ledger is wiped by the transform's updateBody and the boolean is
-// NOT replayed (edit starts after it) — the consumer must still re-resolve.
+// NOT replayed (edit starts after it) - the consumer must still re-resolve.
 // Chamfer has a FaceIdMap lineage tier (and Transform carries the map), so it
-// should survive; Fillet lacks that tier — this is the parity gap.
+// should survive; Fillet lacks that tier - this is the parity gap.
 TEST(TopoContract, ChamferOnSeam_SurvivesEditOfInterveningTransform) {
     Document doc;
     History hist;
@@ -472,7 +472,7 @@ TEST(TopoContract, ChamferOnSeam_SurvivesEditOfInterveningTransform) {
     ASSERT_TRUE(tr->execute(doc));
     hist.pushExecuted(std::move(tr));
 
-    // Chamfer the seam's vertical corner edge — now at (25, 10). This edge
+    // Chamfer the seam's vertical corner edge - now at (25, 10). This edge
     // exists only because of the union (no sketch vertex under it).
     TopoDS_Edge seam = lineEdgeWhere(doc.getBody(body), [](const gp_Pnt& p) {
         return std::abs(p.X() - 25.0) < 1e-6 && std::abs(p.Y() - 10.0) < 1e-6;
@@ -486,13 +486,13 @@ TEST(TopoContract, ChamferOnSeam_SurvivesEditOfInterveningTransform) {
     hist.pushExecuted(std::move(ch));
 
     // THE EDIT: change the transform (5 → 10). Replay covers only the
-    // transform and the chamfer — the union (lineage producer) does NOT
+    // transform and the chamfer - the union (lineage producer) does NOT
     // re-execute, so no ledger exists when the chamfer re-resolves.
     trP->setTranslation(10.0, 0.0, 0.0);
     ASSERT_TRUE(hist.editStep(2, doc, /*transactional=*/true))
         << "seam chamfer must re-resolve across the moved body (lineage tier)";
 
-    // The bevel must sit at the MOVED seam (30, 10) — a vertical planar face
+    // The bevel must sit at the MOVED seam (30, 10) - a vertical planar face
     // with a diagonal X-Y normal whose centroid is near that corner.
     bool found = false;
     for (TopExp_Explorer ex(doc.getBody(body), TopAbs_FACE); ex.More();
@@ -510,10 +510,10 @@ TEST(TopoContract, ChamferOnSeam_SurvivesEditOfInterveningTransform) {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// CASE 7 — DISTINCT-CLAIM in the lineage edge tier. Fragment edges of one
+// CASE 7 - DISTINCT-CLAIM in the lineage edge tier. Fragment edges of one
 // span share the SAME adjacent-face-id pair; without per-edge claiming the
 // resolver handed every pair the first matching edge, collapsing a
-// 3-fragment selection to 1 and starving the rebuild — which made edits
+// 3-fragment selection to 1 and starving the rebuild - which made edits
 // ORDER-DEPENDENT ("17 works fresh, fails after any successful edit").
 // Contract: two consecutive successful edits on a fragmented-edge chamfer.
 TEST(TopoContract, FragmentedEdgeChamfer_SurvivesConsecutiveEdits) {
@@ -524,7 +524,7 @@ TEST(TopoContract, FragmentedEdgeChamfer_SurvivesConsecutiveEdits) {
     int sid = doc.addSketch(sk);
     int body = pushExtrude(doc, hist, sid, 10.0);
 
-    // Two notches crossing the top-front edge (y=0, z=10) — fragments it
+    // Two notches crossing the top-front edge (y=0, z=10) - fragments it
     // into three pieces.
     for (double x0 : {10.0, 26.0}) {
         int npid[4];
@@ -568,7 +568,7 @@ TEST(TopoContract, FragmentedEdgeChamfer_SurvivesConsecutiveEdits) {
     const double vol2 = volumeOf(doc.getBody(body));
 
     // Two consecutive edits. The FIRST recaptures the (identical) face-id
-    // pairs; the SECOND resolves through them — pre-fix it collapsed to one
+    // pairs; the SECOND resolves through them - pre-fix it collapsed to one
     // fragment and failed / built a partial bevel.
     chP->setDistance(3.0);
     ASSERT_TRUE(hist.editStep(chIdx, doc, /*transactional=*/true))
@@ -578,13 +578,13 @@ TEST(TopoContract, FragmentedEdgeChamfer_SurvivesConsecutiveEdits) {
         << "second re-edit must succeed (order-independence)";
     const TopoDS_Shape& out = doc.getBody(body);
     EXPECT_TRUE(BRepCheck_Analyzer(out).IsValid());
-    // d=4 removes strictly more than d=2 did — all three fragments beveled,
+    // d=4 removes strictly more than d=2 did - all three fragments beveled,
     // not a collapsed single-fragment partial.
     EXPECT_LT(volumeOf(out), vol2 - 1.0)
         << "full-width bevel must be present at d=4";
 }
 
-// Same chain, consumer is a FILLET (no lineage tier today) — parity contract.
+// Same chain, consumer is a FILLET (no lineage tier today) - parity contract.
 TEST(TopoContract, FilletOnSeam_SurvivesEditOfInterveningTransform) {
     Document doc;
     History hist;
@@ -638,7 +638,7 @@ TEST(TopoContract, FilletOnSeam_SurvivesEditOfInterveningTransform) {
         seen += " (" + std::to_string(loc.X()) + "," +
                 std::to_string(loc.Y()) + ")";
         // Concave corner: the blend axis sits r on the OPEN side of the seam
-        // in both X and Y — just require it near the corner (r*sqrt2 ~ 2.1),
+        // in both X and Y - just require it near the corner (r*sqrt2 ~ 2.1),
         // orientation-agnostic.
         if (std::hypot(loc.X() - 30.0, loc.Y() - 10.0) < 3.0) {
             found = true;

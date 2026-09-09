@@ -1,6 +1,6 @@
 // The arc tool takes typed dimensions like the line, circle and rectangle do.
 //
-// Arc placement is three clicks — chord start, chord end, apex — so no single
+// Arc placement is three clicks - chord start, chord end, apex - so no single
 // number ever specified it and applyDimension() simply refused for Arc. It now
 // works in two stages:
 //
@@ -8,7 +8,7 @@
 //   click 3 : ONE number for the bow, read as either the swept ANGLE or the
 //             RADIUS depending on SketchTool::ArcDimMode.
 //
-// Which way the arc bows stays with the cursor — that is a direction, not a
+// Which way the arc bows stays with the cursor - that is a direction, not a
 // dimension, and no number expresses it.
 //
 // Both readings describe the same family of arcs, so the tests below check them
@@ -72,7 +72,7 @@ struct Rig {
     }
     // Swept angle start -> end, in degrees. handleArcTool deliberately stores
     // the endpoints in the order whose CCW sweep passes through the apex, so
-    // the plain CCW sweep IS the arc's real swept angle — no complement.
+    // the plain CCW sweep IS the arc's real swept angle - no complement.
     float measuredSweepDeg() const {
         const SketchArc* a = lastArc();
         if (!a) return -1.0f;
@@ -155,7 +155,7 @@ TEST(ArcTypedDimension, RadiusBelowHalfTheChordIsRefused) {
     EXPECT_NEAR(r.tool.arcMinRadius(), kL * 0.5f, 1e-3f);
     EXPECT_FALSE(r.tool.applyDimension(kL * 0.5f - 1.0f));
     EXPECT_EQ(r.lastArc(), nullptr) << "refused input must not place an arc";
-    // Exactly half the chord IS valid — that is the semicircle.
+    // Exactly half the chord IS valid - that is the semicircle.
     EXPECT_TRUE(r.tool.applyDimension(kL * 0.5f));
     ASSERT_NE(r.lastArc(), nullptr);
     EXPECT_NEAR(r.measuredRadius(), kL * 0.5f, 1e-2f);

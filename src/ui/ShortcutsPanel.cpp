@@ -19,7 +19,7 @@ bool ShortcutsPanel::isVisible() const {
 
 namespace {
 // One "Key | what it does" table. Every section is the same shape, and the
-// old hand-rolled version drifted out of sync with the real handler — six
+// old hand-rolled version drifted out of sync with the real handler - six
 // bindings it advertised did not exist (Ctrl+C/Ctrl+V for a clipboard that
 // was never written, and S/L/C/R for sketch tools that are toolbar-only,
 // while R actually switches the gizmo to Scale). Keep this list checked
@@ -43,7 +43,7 @@ void section(const char* title, const char* tableId,
         ImGui::TableNextRow();
         ImGui::TableNextColumn(); ImGui::TextUnformatted(rows[i].keys);
         // WRAPPED, not plain text: the window size is remembered per user in
-        // imgui.ini, so a default width can't be relied on — anyone who
+        // imgui.ini, so a default width can't be relied on - anyone who
         // opened the old panel keeps its width and would just see the
         // descriptions clipped.
         ImGui::TableNextColumn(); ImGui::TextWrapped("%s", rows[i].action);

@@ -12,7 +12,7 @@ class Operation;
 // deserializeParams() then rehydrateFromReload() to fully restore it. Returns
 // nullptr for a typeId this factory doesn't know how to build (sketch edits,
 // sub-shape-referencing ops without persistent naming, or legacy/unknown
-// ids) — the loader then falls back to ReplayOp.
+// ids) - the loader then falls back to ReplayOp.
 namespace OperationFactory {
 std::unique_ptr<Operation> create(const std::string& typeId);
 }

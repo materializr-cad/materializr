@@ -12,7 +12,7 @@ set(MZ_SRC "${MZ_ROOT}/src")
 if(NOT DEFINED MATERIALIZR_OCCT_PREFIX)
     message(FATAL_ERROR "MATERIALIZR_OCCT_PREFIX not set (path to cross-built OCCT)")
 endif()
-# Accept EITHER a single-ABI prefix (…/prefix/arm64-v8a — the per-APK build) or
+# Accept EITHER a single-ABI prefix (…/prefix/arm64-v8a - the per-APK build) or
 # a BASE prefix (…/prefix) that needs the ABI appended. The base form lets one
 # build compile every ABI in an app bundle (AAB), where CMake runs once per ABI
 # with ANDROID_ABI set, each linking its own OCCT.
@@ -31,7 +31,7 @@ set(OCCT_LIB "${OCCT_ROOT}/lib")
 # ── ImGui (docking) + GLM, same versions as the desktop build ────────────────
 include(FetchContent)
 # Pinned to a release TAG, not the `docking` branch head and not a commit on it
-# — see the rationale in the top-level CMakeLists.txt (docking is rebased, which
+# - see the rationale in the top-level CMakeLists.txt (docking is rebased, which
 # orphans branch commits and breaks clean builds). Keep this in step with that
 # one so desktop and Android build the same ImGui.
 FetchContent_Declare(imgui GIT_REPOSITORY https://github.com/ocornut/imgui.git
@@ -91,7 +91,7 @@ find_library(Z_LIB z)
 target_link_libraries(main PRIVATE ${GLES3_LIB} ${EGL_LIB} ${LOG_LIB} ${ANDROID_LIB} ${Z_LIB})
 
 # Version is passed in from build.gradle (-DMATERIALIZR_VERSION_NAME=<versionName>)
-# so the splash/about version can't drift from the APK version — it silently did
+# so the splash/about version can't drift from the APK version - it silently did
 # (0.9.7.1 through 1.0.x, then 1.2.0 while the app shipped 1.2.2). The fallback
 # only applies to a direct CMake build outside gradle.
 if(NOT DEFINED MATERIALIZR_VERSION_NAME OR MATERIALIZR_VERSION_NAME STREQUAL "")

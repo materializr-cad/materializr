@@ -1,21 +1,21 @@
-// Two related sketch-inference behaviours at a CORNER — a vertex where two
+// Two related sketch-inference behaviours at a CORNER - a vertex where two
 // straight segments meet.
 //
 // 1. Corner guides (Full / Max). Tangency has no single answer at a corner:
 //    the chain has two tangent directions there, one per incident segment,
 //    and OnLineExtension already publishes both. The directions the corner
-//    itself defines are the ones that were missing —
+//    itself defines are the ones that were missing -
 //      • CornerBisector, norm(a + b) for unit rays a, b to the neighbours:
 //        the angle directly between the two lines (the miter direction);
 //      • CornerTangent, norm(b − a): the average of the two TRAVEL directions,
 //        the tangent a smooth curve through the three points would carry
-//        through the vertex — exactly perpendicular to the bisector.
+//        through the vertex - exactly perpendicular to the bisector.
 //
 // 2. The displacement budget. Every capture cap in the resolver is absolute
 //    (1.5 mm, or grid-relative), but the damage a pull does is relative to the
 //    segment being drawn: 1.5 mm off a 100 mm line is nothing, 1.5 mm off a
 //    2 mm line is the whole line. Steve, 2026-09-03: with geometry near the
-//    anchor a 2 mm line placed fine but 1 mm and 3 mm were unreachable — the
+//    anchor a 2 mm line placed fine but 1 mm and 3 mm were unreachable - the
 //    alternatives being no line at all (an intersection landing ON the anchor,
 //    collapsing the segment) or a 19 mm jump to a farther intersection still
 //    inside the 5x pair-intersection cap. An inference may now move the
@@ -120,7 +120,7 @@ TEST(CornerInference, BisectorFiresOnTheExteriorRayToo) {
     EXPECT_TRUE(hasKind(r.tool, InferenceGuide::CornerBisector));
 }
 
-// The corner tangent is perpendicular to the bisector — 135 deg here — and is
+// The corner tangent is perpendicular to the bisector - 135 deg here - and is
 // the direction a smooth curve through the three points would take.
 TEST(CornerInference, CornerTangentIsPerpendicularToTheBisector) {
     Rig r;
@@ -182,7 +182,7 @@ TEST(CornerInference, SilentAtReducedAndOff) {
 }
 
 // A straight-through vertex (two collinear segments) has no bisector to offer,
-// and its corner tangent is just the line itself — OnLineExtension's job.
+// and its corner tangent is just the line itself - OnLineExtension's job.
 TEST(CornerInference, DegenerateStraightVertexPublishesNoCornerGuide) {
     Rig r;
     const int v = r.sketch.addPoint(glm::vec2(0.0f, 0.0f));
@@ -203,7 +203,7 @@ TEST(CornerInference, DegenerateStraightVertexPublishesNoCornerGuide) {
 //
 // The mechanism behind Steve's report. Two candidate guides that each fired
 // well within their own (small) tolerance can still INTERSECT far away when
-// they are nearly parallel — a hair-off-vertical edge crossing the anchor's
+// they are nearly parallel - a hair-off-vertical edge crossing the anchor's
 // own vertical axis guide meets it wherever the two converge, which may be
 // centimetres up the line. The pair-intersection branch then wins outright,
 // with only an absolute 5x cap between the cursor and that crossing, so every
@@ -276,7 +276,7 @@ TEST(DisplacementBudget, LeavesNormalSizedGeometryAlone) {
 // ─── 3. a highlighted guide means an EXACT angle ─────────────────────────────
 //
 // With snap-to-grid on, the resolver used to round a directional guide's
-// result onto the lattice. For an axis-aligned guide that is free — the ray
+// result onto the lattice. For an axis-aligned guide that is free - the ray
 // passes through lattice points. For a DIAGONAL one it is not: rounding both
 // coordinates moves the point up to half a diagonal cell off the ray, which
 // near the anchor is degrees of angular error, while the guide still
@@ -284,7 +284,7 @@ TEST(DisplacementBudget, LeavesNormalSizedGeometryAlone) {
 // there is about a 5 degree window for error when those should be pretty
 // exact angles they highlight at." Measured before the fix, on a 1 mm grid:
 // 8.4 deg on a 3 mm leg off a 70 deg corner, 3.4 deg at 5 mm. A 90 deg corner
-// hid it completely — its 45 deg bisector is lattice-commensurate.
+// hid it completely - its 45 deg bisector is lattice-commensurate.
 TEST(CornerInference, BisectorIsExactWithGridSnapOn) {
     for (float cornerDeg : {90.0f, 70.0f, 60.0f, 50.0f}) {
         for (float len : {3.0f, 5.0f, 10.0f, 40.0f}) {

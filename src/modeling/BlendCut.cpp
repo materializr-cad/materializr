@@ -59,7 +59,7 @@ namespace blendcut {
 namespace {
 
 // Permanent, env-gated diagnostics: MZR_BLENDCUT_DEBUG=1 traces which stage
-// refuses a fallback build — this saga kept needing it re-added.
+// refuses a fallback build - this saga kept needing it re-added.
 bool bcDebug() {
     static const bool on = std::getenv("MZR_BLENDCUT_DEBUG") != nullptr;
     return on;
@@ -81,12 +81,12 @@ struct EdgeInfo {
 // over the union of their spans, which is what carries the blend across the
 // gap a hole or pocket bit out of the edge.
 struct Group {
-    EdgeInfo rep;      // representative — dirs/normals valid for all members
+    EdgeInfo rep;      // representative - dirs/normals valid for all members
     double tmin, tmax; // span along rep.line covered by every member
 };
 
 // A cutting solid plus the face of it that IS the blend surface (chamfer
-// plane / fillet cylinder) — the caller finds the bevel on the cut result
+// plane / fillet cylinder) - the caller finds the bevel on the cut result
 // through it.
 struct Tool {
     TopoDS_Shape solid;
@@ -157,7 +157,7 @@ bool analyzeEdge(const TopoDS_Shape& body, const TopoDS_Edge& e,
     gp_Dir t = out.line.Direction();
     // TRUE in-face directions, robust against nearby features (#57): of the
     // two candidates ±(n × t), pick the one whose probe points land ON the
-    // face — by MAJORITY across samples along the edge (a hole under one
+    // face - by MAJORITY across samples along the edge (a hole under one
     // sample can't flip the answer, unlike the old single-midpoint probe) at
     // a small offset (0.2mm, retry 0.05 for very narrow faces).
     auto pickDir = [&](const TopoDS_Face& f, const gp_Dir& n,
@@ -188,10 +188,10 @@ bool analyzeEdge(const TopoDS_Shape& body, const TopoDS_Edge& e,
 
     // Classify the corner from the directions: CONVEX = each face runs to the
     // material side of the other's plane (d·n(other) < 0); CONCAVE (interior
-    // corner, 270° of material — a chamfer FILLS it) = both run to the open
+    // corner, 270° of material - a chamfer FILLS it) = both run to the open
     // side. Mixed / near-tangent → refuse; the tool degenerates there. (Note
     // a solid-classifier probe on the outward bisector can NOT tell these
-    // apart — it reads OUT for both 90° and 270° corners.)
+    // apart - it reads OUT for both 90° and 270° corners.)
     const double s1 = out.dRefDir.Dot(out.nOther);
     const double s2 = out.dOtherDir.Dot(out.nRef);
     if (s1 < -0.05 && s2 < -0.05) out.concave = false;
@@ -290,11 +290,11 @@ TopoDS_Shape sweepProfile(const TopoDS_Wire& w, const TopoDS_Edge& blendEdge,
 // for: a bevel that legitimately sweeps ACROSS a hole in the adjacent face
 // (the sample lands in the void). One sample on the face proves the blend
 // runs along real face material somewhere; only when EVERY sample misses is
-// the blend genuinely bigger than the face it runs along — refuse then.
+// the blend genuinely bigger than the face it runs along - refuse then.
 // Sample support slightly INSIDE the setback (0.05mm short): a setback that
 // equals the face's exact extent (B = the wall's full height) otherwise
 // probes precisely ON the face's boundary edge, where both the face and the
-// solid classifier are numerically coin-flip — B=3.0 on a 3.0 wall refused
+// solid classifier are numerically coin-flip - B=3.0 on a 3.0 wall refused
 // everything while 2.9 worked. The blend only needs support arbitrarily
 // close to the setback, not exactly at it.
 gp_Vec insetSetback(const gp_Vec& off) {
@@ -318,7 +318,7 @@ bool setbackTouchesFace(const Group& g, const TopoDS_Face& f,
     return false;
 }
 
-// The chamfer tool: a triangular wedge — apex just outside the corner, the
+// The chamfer tool: a triangular wedge - apex just outside the corner, the
 // two setback points A/B exactly where the chamfer plane meets the faces.
 bool makeChamferTool(const Group& g, double dRef, double dOther, Tool& out) {
     const EdgeInfo& e = g.rep;
@@ -365,7 +365,7 @@ bool makeChamferTool(const Group& g, double dRef, double dOther, Tool& out) {
 }
 
 // The fillet tool: same wedge region but bounded by the arc of radius r
-// tangent to both faces — apex outside the corner, straight sides to the
+// tangent to both faces - apex outside the corner, straight sides to the
 // tangency points A/B, arc A→B bulging toward the corner. Cutting it leaves
 // exactly the convex fillet cylinder.
 bool makeFilletTool(const Group& g, double r, Tool& out) {
@@ -374,7 +374,7 @@ bool makeFilletTool(const Group& g, double r, Tool& out) {
     gp_Vec sweep;
     if (!groupSpan(g, P0, sweep)) return false;
     const double c = gp_Vec(e.nRef).Dot(gp_Vec(e.nOther));
-    if (c <= -1.0 + 1e-9) return false; // knife edge — no wedge to round
+    if (c <= -1.0 + 1e-9) return false; // knife edge - no wedge to round
     // Fillet centre: at distance r from BOTH planes, on the material side.
     gp_Vec w = gp_Vec(e.nRef) + gp_Vec(e.nOther);
     if (w.Magnitude() < 1e-9) return false;
@@ -391,7 +391,7 @@ bool makeFilletTool(const Group& g, double r, Tool& out) {
         !setbackTouchesFace(g, e.fOther, gp_Vec(P0, B)))
         return false;
     // Arc through the point of the circle nearest the corner (it bulges
-    // toward the edge — the removed region lies between arc and corner).
+    // toward the edge - the removed region lies between arc and corner).
     gp_Vec toCorner(O, P0);
     if (toCorner.Magnitude() < 1e-12) return false;
     toCorner.Normalize();
@@ -407,7 +407,7 @@ bool makeFilletTool(const Group& g, double r, Tool& out) {
     BRepBuilderAPI_MakeWire mw(ca.Edge(), ab.Edge(), bc.Edge());
     if (!mw.IsDone()) return false;
     // MakeWire may rework the edges it was fed (shared vertices, orientation)
-    // so Generated() must be asked about the wire's OWN arc edge — the only
+    // so Generated() must be asked about the wire's OWN arc edge - the only
     // circular one of the three.
     TopoDS_Edge arcEdge;
     for (TopExp_Explorer ex(mw.Wire(), TopAbs_EDGE); ex.More(); ex.Next()) {
@@ -485,7 +485,7 @@ bool applyCut(const TopoDS_Shape& body, const std::vector<Tool>& tools,
                 }
             }
         }
-        if (!found) return false; // a tool left no blend — over-cut or miss
+        if (!found) return false; // a tool left no blend - over-cut or miss
     }
 
     ledger.capture(cut, body, TopAbs_EDGE);
@@ -499,7 +499,7 @@ bool applyCut(const TopoDS_Shape& body, const std::vector<Tool>& tools,
 // ramp, not cutting. Native OCCT does this fine on clean geometry but gives
 // up when the ramp's footprint crosses a feature (a hole in the floor). The
 // additive twin of the wedge cut: fuse a ramp prism swept over the full span
-// — straight across any feature — then RE-PIERCE it with each crossed void's
+// - straight across any feature - then RE-PIERCE it with each crossed void's
 // own outline so a hole stays a hole, exactly as if the chamfer had preceded
 // the feature in history.
 
@@ -513,7 +513,7 @@ bool makeFillTool(const Group& g, double dRef, double dOther, Tool& out) {
     if (!groupSpan(g, P0, sweep)) return false;
     gp_Pnt A = P0.Translated(gp_Vec(e.dRefDir) * dRef);
     gp_Pnt B = P0.Translated(gp_Vec(e.dOtherDir) * dOther);
-    // The ramp must rest on real face material somewhere along the span —
+    // The ramp must rest on real face material somewhere along the span -
     // same hole-tolerant overshoot guard as the cut.
     if (!setbackTouchesFace(g, e.fRef, gp_Vec(e.dRefDir) * dRef)) {
         BC_DBG("[bc] fillTool: dRef=%.2f off fRef\n", dRef);
@@ -558,23 +558,23 @@ bool makeFillTool(const Group& g, double dRef, double dOther, Tool& out) {
 // plane-clip wrong here: (1) a previously-applied neighbour chamfer has
 // already TRIMMED this edge back to its bevel toe, so the prism starts shy
 // of the true corner and its flat cap lands right on the neighbour's
-// diagonal — the "weird angle" wall; (2) the neighbour's slope plane
+// diagonal - the "weird angle" wall; (2) the neighbour's slope plane
 // extended to infinity dives far below a long prism, so a half-space clip
 // picks the wrong side. Instead: EXTEND the span into the corner (bounded
 // by the neighbour's footprint), then SUBTRACT the column standing above
-// the neighbour's actual bevel face. Bounded solids only — no half-spaces.
+// the neighbour's actual bevel face. Bounded solids only - no half-spaces.
 
 // Trim group spans to where the corner can actually SUPPORT the blend: a
 // previously fused ramp's cap base merges (coplanar) with the wall base into
 // one longer edge, so a span built from the edge runs past the real wall end
-// and the ramp stands on open floor — the "wall sticking up" artifact. Walk
+// and the ramp stands on open floor - the "wall sticking up" artifact. Walk
 // each end inward until BOTH setback samples land on their faces (bounded,
 // so a feature at mid-span is untouched). Ends are then true corner points
 // for the fan/extension logic.
 void trimGroupEnds(const TopoDS_Shape& body, std::vector<Group>& groups,
                    double dRef, double dOther) {
     for (auto& g : groups) {
-        // A setback point is supported if it lands ON its parent face — or
+        // A setback point is supported if it lands ON its parent face - or
         // ON/INSIDE the body: a neighbouring fused ramp COVERS the floor
         // face there, but leaning into it is exactly what the fuse handles
         // (trimming there yanked the ramp back from the corner and left the
@@ -594,7 +594,7 @@ void trimGroupEnds(const TopoDS_Shape& body, std::vector<Group>& groups,
             return held(g.rep.fRef, P.Translated(offRef)) &&
                    held(g.rep.fOther, P.Translated(offOther));
         };
-        // Walk each end to wherever support actually BEGINS — a fixed cap
+        // Walk each end to wherever support actually BEGINS - a fixed cap
         // left the ends hovering unsupported when the true wall started
         // deeper in (and hovering ends are exactly the artifact this exists
         // to prevent). Bounded at 45% of the span per end so a degenerate
@@ -635,7 +635,7 @@ double faceExtentBeyond(const TopoDS_Face& f, const gp_Pnt& endPt,
     return std::min(std::max(best, 0.0), cap);
 }
 
-// Existing inclined (bevel) faces of the body near a point — the neighbour
+// Existing inclined (bevel) faces of the body near a point - the neighbour
 // chamfers this ramp must miter into. Inclined to at least ONE parent: a
 // corner-mate's bevel is perpendicular to our wall, parents themselves and
 // plain walls score 0/1 on both and never qualify.
@@ -651,7 +651,7 @@ std::vector<TopoDS_Face> bevelFacesNear(const TopoDS_Shape& body,
         // Inclined = not (near-)coplanar with a parent and not a plain wall.
         // The ceiling must be TIGHT (≈1.8°): a shallow 11.4×3 ramp's normal
         // is 0.97 aligned with the floor, and the old 0.95 cap silently
-        // classified real bevels as floor-like — no fan, no clip, ever.
+        // classified real bevels as floor-like - no fan, no clip, ever.
         const double dr = std::abs(n.Dot(g.rep.nRef));
         const double doth = std::abs(n.Dot(g.rep.nOther));
         if (dr > 0.9995 || doth > 0.9995) continue;   // parent-parallel
@@ -701,7 +701,7 @@ std::vector<HipPlan> planHips(const TopoDS_Shape& body,
             }
             // Extend ONLY when the end vertex sits ON the bevel (a native
             // neighbour chamfer trimmed this edge back to its toe). At an
-            // OUTSIDE block corner the bevel is a full setback away — no
+            // OUTSIDE block corner the bevel is a full setback away - no
             // extension there; the corner fan handles that join instead.
             for (const TopoDS_Face& f : bevelFacesNear(body, g, endPt, 0.3)) {
                 ext = std::max(
@@ -720,7 +720,7 @@ std::vector<HipPlan> planHips(const TopoDS_Shape& body,
 }
 
 // Phase 3: subtract from each tool the column standing above every clip
-// face — the face extruded along this corner's outward bisector. Bounded by
+// face - the face extruded along this corner's outward bisector. Bounded by
 // the face's real footprint, so it only bites in the hip overlap.
 void applyHipClips(const TopoDS_Shape& body, std::vector<Tool>& tools,
                    const std::vector<const Group*>& groups,
@@ -734,7 +734,7 @@ void applyHipClips(const TopoDS_Shape& body, std::vector<Tool>& tools,
         for (size_t j : plans[i].siblingClips)
             if (j < tools.size()) clipFaces.push_back(tools[j].blendTemplate);
         // OVERLAP detection: any inclined face of the body whose extent
-        // intersects this ramp is a hip candidate — end-proximity alone
+        // intersects this ramp is a hip candidate - end-proximity alone
         // missed a neighbour that was itself FILL-built (a fused ramp does
         // not trim this edge back, so the span end sits at floor level, a
         // full setback away from the neighbour's slope). The bounded column
@@ -792,7 +792,7 @@ void applyHipClips(const TopoDS_Shape& body, std::vector<Tool>& tools,
 }
 
 // Corner FAN (#57): two interior-corner ramps wrapping an OUTSIDE plan
-// corner of a raised block never overlap — each ends in a flat cap at the
+// corner of a raised block never overlap - each ends in a flat cap at the
 // corner, side by side, which reads as two abrupt walls. Native chamfers
 // join them with a triangular corner facet spreading from the wall-corner
 // top W down to the two toes. With matching wall setbacks that facet bounds
@@ -812,7 +812,7 @@ TopoDS_Shape tetraSolid(const gp_Pnt& a, const gp_Pnt& b, const gp_Pnt& c,
         sew.Add(tri(a, b, c));
         sew.Add(tri(a, c, d));
         sew.Add(tri(a, d, b));
-        TopoDS_Face fan = tri(b, c, d); // W-T1-T2 facet — the visible fan
+        TopoDS_Face fan = tri(b, c, d); // W-T1-T2 facet - the visible fan
         sew.Add(fan);
         sew.Perform();
         TopoDS_Shape shell = sew.SewedShape();
@@ -844,7 +844,7 @@ void addCornerFans(const TopoDS_Shape& body,
     for (size_t i = 0; i < nOrig; ++i) {
         const Group& g = *groups[i];
         for (int e = 0; e < 2; ++e) {
-            // ORIGINAL span end — planHips may have extended the span for an
+            // ORIGINAL span end - planHips may have extended the span for an
             // inside corner; the fan belongs at the true edge end.
             const gp_Pnt V = originalEnds[i][e];
             const gp_Vec outward =
@@ -856,7 +856,7 @@ void addCornerFans(const TopoDS_Shape& body,
                    i, e, V.X(), V.Y(), V.Z(), nearFaces.size());
             for (const TopoDS_Face& f : nearFaces) {
                 // W = the face vertex that IS our wall-top point (equal
-                // heights — the tight gate); T1 = our own toe at this end;
+                // heights - the tight gate); T1 = our own toe at this end;
                 // T2 = the face's floor-level vertex nearest the corner
                 // (the neighbour's toe where its ramp meets our end plane).
                 gp_Pnt W, T1;
@@ -876,7 +876,7 @@ void addCornerFans(const TopoDS_Shape& body,
                 gp_Vec wallDir(V, W);
                 if (wallDir.Magnitude() < 1e-9) continue;
                 wallDir.Normalize();
-                // "Floor level" must be measured along the FLOOR's normal —
+                // "Floor level" must be measured along the FLOOR's normal -
                 // projecting onto the (slightly tilted, trim-offset) V→W
                 // axis amplifies with distance and rejected an 11mm-away toe
                 // over a 0.1mm corner offset. The floor parent is whichever
@@ -895,7 +895,7 @@ void addCornerFans(const TopoDS_Shape& body,
                     const double d = p.Distance(V);
                     if (d < best) { best = d; T2 = p; }
                 }
-                // T2's reach is bounded by the NEIGHBOUR's own bevel size —
+                // T2's reach is bounded by the NEIGHBOUR's own bevel size -
                 // not ours: an 11.4-deep side ramp's toe is legitimately
                 // 11.4mm out, and bounding by our setback silently rejected
                 // the fan at exactly the corners Steve was building.
@@ -915,7 +915,7 @@ void addCornerFans(const TopoDS_Shape& body,
                 // OUTSIDE corner only: the neighbour's toe continues past our
                 // end ALONG our edge direction (the ramps wrap a block corner
                 // in disjoint quadrants). An INSIDE corner's neighbour toe
-                // sits out in our own floor quadrant — that join is handled
+                // sits out in our own floor quadrant - that join is handled
                 // by extension + column clip, and a fan there is wrong.
                 gp_Vec toT2(V, T2);
                 const double along = toT2.Dot(outward);
@@ -929,7 +929,7 @@ void addCornerFans(const TopoDS_Shape& body,
                 // corner (to the neighbour's toe) and clip it by the
                 // neighbour's actual slope PLANE. The clipped face lies IN
                 // that plane, so after the fuse (+ coplanar merge) the two
-                // slopes read as one continuous miter — a flat tetra here
+                // slopes read as one continuous miter - a flat tetra here
                 // showed up as a visible third facet ("almost acceptable").
                 Tool piece;
                 try {
@@ -940,7 +940,7 @@ void addCornerFans(const TopoDS_Shape& body,
                     // fills the neighbour's trim slot at the cap base (so
                     // the clip face lands edge-to-edge on the neighbour
                     // bevel and the coplanar merge takes), while putting
-                    // nothing below the floor — a downward apex dip swept
+                    // nothing below the floor - a downward apex dip swept
                     // to a toe on the plate edge imprinted the outer wall
                     // as a coplanar strip + razor faces, the visible
                     // "bottom sliver" no merge could remove.
@@ -1014,7 +1014,7 @@ void addCornerFans(const TopoDS_Shape& body,
 
 // Fuse the ramp(s) onto the body, then re-pierce every void whose outline
 // (an inner wire of one of the corner's faces) the ramp roofed over. Boss
-// outlines — inner wires with material ABOVE the face — are left alone.
+// outlines - inner wires with material ABOVE the face - are left alone.
 bool applyFill(const TopoDS_Shape& body, const std::vector<Tool>& tools,
                const std::vector<const Group*>& groups, double maxSetback,
                topo::GenerationLedger& ledger, TopoDS_Shape& outShape,
@@ -1042,11 +1042,11 @@ bool applyFill(const TopoDS_Shape& body, const std::vector<Tool>& tools,
 
     // Re-pierce: for each inner wire of each corner face, if it outlines a
     // VOID the ramp actually roofed over, extrude the outline through the
-    // ramp height and subtract — the hole punches through the new ramp just
+    // ramp height and subtract - the hole punches through the new ramp just
     // as a feature cut after the chamfer would have. Two guards keep this
     // surgical: the outline's bbox must intersect a ramp's bbox (a wire on
     // the far side of the part is none of our business), and the region just
-    // inside the outline must be EMPTY above the face all around its rim —
+    // inside the outline must be EMPTY above the face all around its rim -
     // a centroid-only probe misread a screw boss's ring footprint (probe
     // fell down the boss's own bore) as a void and decapitated the boss.
     Bnd_Box toolBox;
@@ -1074,7 +1074,7 @@ bool applyFill(const TopoDS_Shape& body, const std::vector<Tool>& tools,
                 if (gw.Mass() < 1e-9) continue;
                 const gp_Pnt centroid = gw.CentreOfMass();
                 // Void all around? Probe just above the face at points a
-                // little inside the rim (plus the centroid) — ANY material
+                // little inside the rim (plus the centroid) - ANY material
                 // hit means a boss lives inside this outline; keep it.
                 bool boss = false;
                 {
@@ -1119,10 +1119,10 @@ bool applyFill(const TopoDS_Shape& body, const std::vector<Tool>& tools,
     }
 
     // Merge coplanar face fragments (the fuse leaves seam edges wherever the
-    // ramp lands exactly flush against an existing bevel or wall — visible as
+    // ramp lands exactly flush against an existing bevel or wall - visible as
     // hairline steps at the joint). UnifySameDomain is cosmetic-but-correct
     // here; fall back to the un-merged shape if it misbehaves.
-    // Merge coplanar face fragments the fuse/booleans left behind — they read
+    // Merge coplanar face fragments the fuse/booleans left behind - they read
     // in the viewport as a fan of seams across the ramp even though the
     // surface is geometrically flat. TWO merge strategies are needed and
     // NEITHER alone suffices:
@@ -1286,7 +1286,7 @@ bool fillChamfer(const TopoDS_Shape& body,
         // neighbour's chamfer trimmed this edge back to its toe, so the
         // prism must reach the true corner), build the tools on the
         // extended spans, then clip each by the column above every
-        // neighbouring bevel face — the hip emerges by construction.
+        // neighbouring bevel face - the hip emerges by construction.
         const double maxSetback = std::max(dRef, dOther);
         trimGroupEnds(body, groups, dRef, dOther);
         std::vector<std::array<gp_Pnt, 2>> originalEnds;

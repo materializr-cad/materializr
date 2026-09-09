@@ -48,7 +48,7 @@ TEST(ResizeCylindrical, ShrinkEndKeepsLargerNeighbourSolid) {
     // The 11mm end IS shrunk to r5.4: solid just inside, void just outside.
     EXPECT_TRUE(solidAt(res, 5.35, 0, 26)) << "end core removed";
     EXPECT_FALSE(solidAt(res, 5.45, 0, 26)) << "end not shrunk";
-    // The 13mm neighbour stays a SOLID rod — no internal void ring.
+    // The 13mm neighbour stays a SOLID rod - no internal void ring.
     EXPECT_TRUE(solidAt(res, 5.45, 0, 10))
         << "neighbour hollowed into a tube (the bug)";
     EXPECT_TRUE(solidAt(res, 0.0, 0, 10)) << "neighbour core gone";
@@ -56,7 +56,7 @@ TEST(ResizeCylindrical, ShrinkEndKeepsLargerNeighbourSolid) {
 }
 
 TEST(ResizeCylindrical, ShrinkStandaloneRodStillWorks) {
-    // A plain rod (both ends free flat caps) must still shrink cleanly — the
+    // A plain rod (both ends free flat caps) must still shrink cleanly - the
     // free-end padding path.
     TopoDS_Shape rod = BRepPrimAPI_MakeCylinder(5.5, 20.0).Shape();
     Document doc;

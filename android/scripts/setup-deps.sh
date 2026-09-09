@@ -24,13 +24,13 @@ FT_VER="2.13.3"
 OCCT_TAG="V7_9_3"
 
 ANDROID_HOME="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}}"
-# NDK location — accept the various env vars different setups use (F-Droid sets
+# NDK location - accept the various env vars different setups use (F-Droid sets
 # ANDROID_NDK_HOME / ANDROID_NDK_ROOT; CI may set ANDROID_NDK), else the newest
 # NDK under the SDK. Any NDK with the r26 CMake toolchain works.
 NDK="${ANDROID_NDK:-${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-$(ls -d "$ANDROID_HOME"/ndk/* 2>/dev/null | sort -V | tail -1)}}}"
 TOOLCHAIN="$NDK/build/cmake/android.toolchain.cmake"
 # Prefer whatever cmake is on PATH (F-Droid's buildserver / a distro package);
-# fall back to the SDK's bundled cmake. Version isn't pinned — 3.22+ is fine.
+# fall back to the SDK's bundled cmake. Version isn't pinned - 3.22+ is fine.
 CMAKE_BIN="$(command -v cmake || ls "$ANDROID_HOME"/cmake/*/bin/cmake 2>/dev/null | sort -V | tail -1)"
 [ -n "$CMAKE_BIN" ] || CMAKE_BIN="$ANDROID_HOME/cmake/3.22.1/bin/cmake"
 
@@ -45,7 +45,7 @@ echo "PREFIX: $PREFIX"
 echo "REPO:   $REPO"
 [ -f "$TOOLCHAIN" ] || { echo "NDK toolchain not found: $TOOLCHAIN"; exit 1; }
 
-# Expected SHA-256 of each pinned source tarball — verified after download so a
+# Expected SHA-256 of each pinned source tarball - verified after download so a
 # corrupted mirror or tampered upstream can't slip in (supply-chain integrity;
 # also what F-Droid wants for a reproducible build from source).
 SDL2_SHA256="24b574f71c87a763f50704bbb630cbe38298d544a1f890f099a4696b1d6beba4"
@@ -56,7 +56,7 @@ fetch() { # url dest sha256
     [ -f "$2" ] || curl -L --fail --retry 3 -o "$2" "$1"
     if [ -n "$3" ]; then
         echo "$3  $2" | sha256sum -c - || {
-            echo "ERROR: checksum mismatch for $2 — refusing to build." >&2
+            echo "ERROR: checksum mismatch for $2 - refusing to build." >&2
             rm -f "$2"; exit 1
         }
     fi
@@ -95,7 +95,7 @@ OCCT_DIR="$SRC/OCCT-${OCCT_TAG#V}"
 # TCollection_AsciiString / TopLoc_Location / NCollection_* members). On Windows
 # `Standard_EXPORT` = __declspec(dllexport) forces those inlines to be emitted +
 # exported, but on Android `Standard_EXPORT` is empty, so at -O2 every TU inlines
-# them away and NO .so emits them — yet OCCT's own toolkits (e.g. libTKDEGLTF)
+# them away and NO .so emits them - yet OCCT's own toolkits (e.g. libTKDEGLTF)
 # still reference them out-of-line, so the app dies at load with an SDL
 # "dlopen failed: cannot locate symbol _ZNK16Standard_Failure16GetMessageStringEv"
 # error. Windows (vcpkg) stays on 8.0; Android/desktop stay on 7.9.x.

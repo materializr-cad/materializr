@@ -48,7 +48,7 @@ void redirectStdioToLogcat() {
 }
 
 // Copy a file bundled in the APK's assets/ (read via SDL's asset-aware RWops)
-// to an absolute path in writable storage. Idempotent — skips if dest exists.
+// to an absolute path in writable storage. Idempotent - skips if dest exists.
 bool extractAsset(const std::string& assetPath, const std::string& destPath) {
     std::error_code ec;
     if (fs::exists(destPath, ec)) return true;
@@ -83,7 +83,7 @@ void androidInitRuntime() {
     //     cwd-relative "assets/fonts/<name>" candidate resolves.
     if (chdir(internal.c_str()) != 0) logi("chdir to internal storage failed");
     // MUST list every font the Text-tool picker offers (kFontFiles in
-    // Application_Dialogs.cpp) — SDL's asset RWops can't enumerate a directory,
+    // Application_Dialogs.cpp) - SDL's asset RWops can't enumerate a directory,
     // so any font missing here is bundled in the APK but never extracted and
     // shows "font file not found".
     const char* fonts[] = {

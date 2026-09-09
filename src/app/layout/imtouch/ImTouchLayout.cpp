@@ -1,17 +1,17 @@
-// im-touch layout (UiLayout::ImTouch — the name is an homage to ImGui):
+// im-touch layout (UiLayout::ImTouch - the name is an homage to ImGui):
 // near-zero chrome. The viewport fills the whole work rect; everything else
-// floats over it — project/selection chip (top-left), undo + keyboard + menu
+// floats over it - project/selection chip (top-left), undo + keyboard + menu
 // (top-right), the contextual tool catalogue on the left edge, the
 // Fusion-style history timeline (bottom-center), a "+" create FAB
 // (bottom-right), and an fps readout.
 //
 // Everything fundamental (menus, tool catalogue, history editing) is shared
-// code — see layout/LayoutCommon.h for the keep-in-lockstep contract.
+// code - see layout/LayoutCommon.h for the keep-in-lockstep contract.
 
 #include "core/Units.h"
 #include "app/Application.h"
 #include "app/layout/LayoutCommon.h"
-#include <algorithm>   // std::min — viewport-capped popup height
+#include <algorithm>   // std::min - viewport-capped popup height
 #include "core/Document.h"
 #include "core/History.h"
 #include "core/Operation.h"
@@ -114,7 +114,7 @@ void Application::renderImTouchLayout() {
 
     // These overlays float ON TOP of the full-screen viewport window, which is
     // NoBringToFrontOnFocus (pinned to the back). They must NOT share that flag:
-    // if they do, z-order falls to ImGui's persistent creation order — which is
+    // if they do, z-order falls to ImGui's persistent creation order - which is
     // fine when the app LAUNCHES straight into im-touch (overlays created
     // early), but when the user TOGGLES to it at runtime the viewport was
     // created first and stays in front, burying every overlay (the "invisible
@@ -125,12 +125,12 @@ void Application::renderImTouchLayout() {
         (layoutui::kShellWindowFlags & ~ImGuiWindowFlags_NoBringToFrontOnFocus) |
         ImGuiWindowFlags_AlwaysAutoResize;
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, touchui::radius(14.0f * s));
-    // No window borders on any of the floating overlays — the 1px frame reads
+    // No window borders on any of the floating overlays - the 1px frame reads
     // as a faint "ghost" rectangle around transparent windows (the +, the
     // chip, the buttons). Their rounded fill is the only chrome we want.
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
 
-    // ── Top-left: [Logo] [Menu] [Project name] — three INDIVIDUAL boxes of
+    // ── Top-left: [Logo] [Menu] [Project name] - three INDIVIDUAL boxes of
     //    equal height (matching the top-right cluster's button boxes), on a
     //    fully transparent host window so each box carries its own fill.
     ImGui::SetNextWindowPos(ImVec2(wp.x + m, wp.y + m));
@@ -182,7 +182,7 @@ void Application::renderImTouchLayout() {
             }
             // Tab affordance (Steve's popout): more than one open project adds
             // a chevron and the chip becomes the button that opens the tabs
-            // sheet — no extra chrome when only one project is open (the chip
+            // sheet - no extra chrome when only one project is open (the chip
             // still opens the sheet then too, for "+ New Project").
             std::string chev = "  " ICON_IC_NAV_ARROW_DOWN;
             if (sessionDirty(m_activeSession)) pn += " \xe2\x80\xa2";
@@ -228,13 +228,13 @@ void Application::renderImTouchLayout() {
             tip(materializr::tr("Multi-select: add taps to the current selection\n(the touch equivalent of holding Ctrl)"));
             ImGui::SameLine(0.0f, 8.0f * s);
         }
-        // Inference level, in sketch mode — the same live cycle the modern
+        // Inference level, in sketch mode - the same live cycle the modern
         // layout puts in its top bar and the classic toolbar puts in its rail.
         // It IS in this layout's tool catalogue, but only inside the "More"
         // flyout at the BOTTOM of a dock that scrolls once the sketch tools
         // outgrow the screen, so on a tablet it sits below the fold and reads
         // as missing (Steve: "i cannot seem to find it"). Beside the snap pill
-        // is where it belongs — the two are the same kind of drawing aid, and
+        // is where it belongs - the two are the same kind of drawing aid, and
         // this cluster never scrolls. Honours the same "show the toggle"
         // setting the other layouts gate on.
         if (m_inSketchMode && m_showInferenceToolbarToggle && m_sketchTool) {
@@ -250,7 +250,7 @@ void Application::renderImTouchLayout() {
             tip(materializr::tr("Sketch inference level (snapping / guides)\nTap to cycle: Full \xE2\x86\x92 Reduced \xE2\x86\x92 Off \xE2\x86\x92 Max\nMax widens the catch ranges for fingertips."));
             ImGui::SameLine(0.0f, 8.0f * s);
         }
-        // Snap-to-grid — the corner square's im-touch home (renderSnapWidget
+        // Snap-to-grid - the corner square's im-touch home (renderSnapWidget
         // skips itself in this layout). Label shows the current step; accent
         // fill while snap is on; tap opens the shared settings popup.
         {
@@ -262,12 +262,12 @@ void Application::renderImTouchLayout() {
             if (touchui::pillButton("snap", MZ_ICON_GUIDES, snapLbl,
                                     m_snapToGrid))
                 ImGui::OpenPopup("SnapSettings");
-            tip(m_snapToGrid ? "Snap ON — tap for step / toggle"
-                             : "Snap off — tap for step / toggle");
+            tip(m_snapToGrid ? "Snap ON - tap for step / toggle"
+                             : "Snap off - tap for step / toggle");
             renderSnapSettingsPopup();
             ImGui::SameLine(0.0f, 8.0f * s);
         }
-        // Items (model tree) reveal/hide — moved up from the right-edge rail
+        // Items (model tree) reveal/hide - moved up from the right-edge rail
         // button so the whole toggle row lives in one place.
         if (touchui::pillButton("items", MZ_ICON_ITEMS, nullptr,
                                 m_imTouchTree)) {
@@ -297,7 +297,7 @@ void Application::renderImTouchLayout() {
     // History toggle's size at the bottom.)
     const float railBtnW = 60.0f * s;
 
-    // ── Transparent model tree (right edge) — the structure the modern
+    // ── Transparent model tree (right edge) - the structure the modern
     //    layout's Items panel shows: visibility eye + name + tap-to-select,
     //    plus press-and-hold context menus (rename / delete / move-to-folder)
     //    and folder grouping, mirroring ItemsPanel but touch-native.
@@ -318,7 +318,7 @@ void Application::renderImTouchLayout() {
             m_imTouchTreeHovered = ImGui::IsWindowHovered(
                 ImGuiHoveredFlags_RootAndChildWindows |
                 ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
-            // (Project name intentionally omitted here — the top-left chip
+            // (Project name intentionally omitted here - the top-left chip
             // already shows it; dropping the browser's root row reclaims space.)
 
             // Selected ids per kind, collected once.
@@ -387,10 +387,12 @@ void Application::renderImTouchLayout() {
                 if (act.eyeToggled) {
                     m_document->setBodyVisible(id, visible);
                     // The viewport only filters hidden bodies when it rebuilds
-                    // its meshes — without this the flag flips but the stale
+                    // their meshes - without this the flag flips but the stale
                     // mesh keeps drawing (#37; desktop's ItemsPanel returns
-                    // colorChanged for the same reason).
-                    m_meshesDirty = true;
+                    // colorChanged for the same reason). Just this body: the
+                    // partial pass drops it or meshes it, whichever way the
+                    // eye went.
+                    markBodyDirty(id);
                     markDirty();
                 }
                 if (act.swatchClicked) ImGui::OpenPopup("bodyColor");
@@ -405,7 +407,7 @@ void Application::renderImTouchLayout() {
                     SelectionEntry e;
                     e.type = SelectionType::Body;
                     e.bodyId = id;
-                    // Parity with ItemsPanel::makeEntry — downstream code
+                    // Parity with ItemsPanel::makeEntry - downstream code
                     // (highlight outline, ops) expects the shape on the entry.
                     try { e.shape = m_document->getBody(id); } catch (...) {}
                     pick(e, /*multiOk=*/true);
@@ -427,7 +429,7 @@ void Application::renderImTouchLayout() {
                     }
                     if (!gone && ImGui::BeginMenu(materializr::tr("Move to folder"))) {
                         if (m_document->getBodyFolder(id) >= 0 &&
-                            ImGui::MenuItem(materializr::tr("(root — no folder)"))) {
+                            ImGui::MenuItem(materializr::tr("(root - no folder)"))) {
                             m_document->setBodyFolder(id, -1);
                             markDirty();
                         }
@@ -455,7 +457,7 @@ void Application::renderImTouchLayout() {
             const auto folderIds = m_document->getAllFolderIds();
             if (!bodyIds.empty() || !folderIds.empty()) {
                 any = true;
-                // Visible "+ Folder" pill on the header (its own hit area) —
+                // Visible "+ Folder" pill on the header (its own hit area) -
                 // the obvious way to make an empty folder; bodies join via a
                 // row's Move-to-folder menu.
                 bool addFolderClick = false;
@@ -648,7 +650,7 @@ void Application::renderImTouchLayout() {
         }
         ImGui::End();
 
-        // ── Rename modal (native keyboard) — raised from any context "Rename".
+        // ── Rename modal (native keyboard) - raised from any context "Rename".
         //    Decodes the namespaced key to route the committed name back.
         if (m_imTouchRenameOpen) {
             ImGui::OpenPopup("Rename##imtouch");
@@ -690,7 +692,7 @@ void Application::renderImTouchLayout() {
             ImGui::EndPopup();
         }
 
-        // ── New-folder modal — raised from a body's Move-to-folder menu or the
+        // ── New-folder modal - raised from a body's Move-to-folder menu or the
         //    Bodies header. Creates the folder and drops the pending bodies in.
         if (m_imTouchNewFolderOpen) {
             ImGui::OpenPopup("New Folder##imtouch");
@@ -729,7 +731,7 @@ void Application::renderImTouchLayout() {
         }
     }
 
-    // ── Contextual tool bar — the same catalogue the modern layout's rail
+    // ── Contextual tool bar - the same catalogue the modern layout's rail
     //    uses, floating on the LEFT edge, vertically centered. Sketch mode
     //    appends Finish/Exit pills below the tools. Tall catalogues (sketch
     //    mode on a landscape tablet) can exceed the work rect, so cap the
@@ -738,7 +740,7 @@ void Application::renderImTouchLayout() {
                             ImGuiCond_Always, ImVec2(0.0f, 0.5f));
     // The dock is vertically CENTRED, so it grows symmetrically from the
     // middle. Reserve the top-left (menu chip) and bottom-left (History
-    // button) zones so a tall catalogue can't expand over them — cap the max
+    // button) zones so a tall catalogue can't expand over them - cap the max
     // height to twice the smaller half-gap. Beyond that it scrolls.
     const float leftReserve = 96.0f * s; // History / chip button + margin
     const float dockMaxH = std::max(120.0f * s,
@@ -817,11 +819,11 @@ void Application::renderImTouchLayout() {
                 // (matching modern's rail):
                 //   Transform = Move + Rotate + Scale
                 //   Multiply  = Duplicate + Mirror + patterns + splits
-                // Everything else — including unrecognised future plugins —
+                // Everything else - including unrecognised future plugins -
                 // renders in catalogue order so nothing silently vanishes.
                 //   Repair    = Patch + Sew + Merge Faces + Remove Feature
                 // Its members come from four different selection contexts, so
-                // the flyout holds whichever are usable right now — and the
+                // the flyout holds whichever are usable right now - and the
                 // group button doesn't appear at all when none are.
                 std::vector<const Toolbar::RailTool*> multiply, transform, repair;
                 int railIdx = 0;
@@ -861,11 +863,11 @@ void Application::renderImTouchLayout() {
                       "feature back off",
                       repair);
             } else {
-                // Sketch mode: the flat catalogue is ~19 buttons — a screen
+                // Sketch mode: the flat catalogue is ~19 buttons - a screen
                 // and a half of scrolling. The DRAWING tools stay flat (they're
                 // the constantly-switched core of sketching, and Steve wants
                 // them one tap away); the occasional tools collapse into two
-                // Fusion-style groups — Modify (trim/copy/mirror/patterns +
+                // Fusion-style groups - Modify (trim/copy/mirror/patterns +
                 // sketch plugins) and More (guides/measure/look-at). Select,
                 // the draw tools and the active tool's origin toggle render
                 // in catalogue order, so anything unrecognised (future tools)
@@ -913,11 +915,11 @@ void Application::renderImTouchLayout() {
     ImGui::End();
     ImGui::PopStyleColor();
 
-    // ── Bottom-right corner: in a sketch, the commit actions — an accent
+    // ── Bottom-right corner: in a sketch, the commit actions - an accent
     //    ✓ Finish FAB with a smaller ✗ Discard beside it (gap so a Finish tap
     //    can't stray onto Discard). During a live ACTION (push/pull, extrude,
     //    fillet, shell, pattern, …) the same pair reads Apply/Cancel and
-    //    drives the action — the op panels hide their own Confirm/Cancel
+    //    drives the action - the op panels hide their own Confirm/Cancel
     //    rows while this corner hosts them (imTouchActionCorner()).
     //    Everywhere else, the "+" create FAB. Commit actions used to live at
     //    the bottom of the left tool bar, which coupled "done sketching" to
@@ -939,7 +941,7 @@ void Application::renderImTouchLayout() {
                 if (toolRunning)
                     m_sketchTool->onCancel();
                 else
-                    ImGui::OpenPopup("Discard sketch?"); // confirm — destructive
+                    ImGui::OpenPopup("Discard sketch?"); // confirm - destructive
             }
             tip(toolRunning
                     ? "Cancel the in-progress shape"
@@ -983,7 +985,7 @@ void Application::renderImTouchLayout() {
         if (ImGui::Begin("##LiteFab", nullptr, kFloat)) {
             const float fabD = 56.0f * s;
             const float side = 44.0f * s;
-            // ✗ first (left), vertically centred on the ✓ FAB — mirrors the
+            // ✗ first (left), vertically centred on the ✓ FAB - mirrors the
             // sketch pair so the corner always means confirm/discard.
             const float topY = ImGui::GetCursorPosY();
             ImGui::SetCursorPosY(topY + (fabD - side) * 0.5f);
@@ -1007,7 +1009,7 @@ void Application::renderImTouchLayout() {
                 // option flat: sketch is contextual (on a picked face/plane if there
                 // is one, else a "New Sketch" submenu of world planes), the five
                 // primitives live under ONE "Primitive" submenu, and construction
-                // geometry derives from the selection — so only the relevant, grouped
+                // geometry derives from the selection - so only the relevant, grouped
                 // create tools show, matching the classic + modern layouts.
                 const bool faceOrPlaneSel = m_selection &&
                     (m_selection->hasSelectedFaces() ||
@@ -1050,8 +1052,8 @@ void Application::renderImTouchLayout() {
 
     // ── History: a bottom toggle whose REOPEN button sits exactly where its
     //    minimize chevron is (not up on the Items rail). The toggle is a fixed
-    //    left-anchored button — a chevron to hide while the strip is open, the
-    //    History clock to reopen while collapsed — and the Fusion-360-style
+    //    left-anchored button - a chevron to hide while the strip is open, the
+    //    History clock to reopen while collapsed - and the Fusion-360-style
     //    step strip (tap a box for its properties popup: edit params, roll
     //    to it, toggle/delete) is a separate scrolling window to its right.
     //    Hidden in sketch mode: rolling the host body back under a live sketch
@@ -1061,7 +1063,7 @@ void Application::renderImTouchLayout() {
     const float histX   = wp.x + m;   // bottom-left corner (fps moved to top)
     const float histGap = 8.0f * s;
     // Last frame's measured strip height, so the toggle can be centred on the
-    // strip's vertical middle — the strip window carries padding the
+    // strip's vertical middle - the strip window carries padding the
     // borderless button doesn't, so plain bottom-alignment left it sitting low.
     // The height persists once the strip has rendered, so the button holds that
     // same centred position when collapsed instead of snapping back down.
@@ -1077,7 +1079,7 @@ void Application::renderImTouchLayout() {
         ImGui::SetNextWindowBgAlpha(0.0f);   // the button draws its own solid fill
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
         if (ImGui::Begin("##LiteHistoryToggle", nullptr, kFloat)) {
-            // Clock icon + "History" label — mirrors the Items button, and
+            // Clock icon + "History" label - mirrors the Items button, and
             // accent-fills while the timeline is open. The button is the same
             // open or closed, so the reopen state sits exactly where the
             // collapse state was.
@@ -1097,10 +1099,10 @@ void Application::renderImTouchLayout() {
         ImGui::SetNextWindowPos(ImVec2(stripX, wp.y + ws.y - m),
                                 ImGuiCond_Always, ImVec2(0.0f, 1.0f));
         // Always reserve room for the WIDEST thing the bottom-right corner can
-        // host — the ✗+gap+✓ Cancel/Apply pair (44+18+56 = 118dp) — not just
+        // host - the ✗+gap+✓ Cancel/Apply pair (44+18+56 = 118dp) - not just
         // the single "+" create FAB (56dp). Sizing to the FAB let the expanded
         // strip run under the Cancel ✗ during a live action (drawn OVER it on
-        // Android, UNDER on Linux, purely by z-order — #20). Reserving the pair
+        // Android, UNDER on Linux, purely by z-order - #20). Reserving the pair
         // width unconditionally keeps the strip's right edge fixed instead of
         // popping in/out as the corner button changes. +20 = the FAB window's
         // own padding plus a small visual gap.
@@ -1124,7 +1126,7 @@ void Application::renderImTouchLayout() {
             const ImU32 red   = ImGui::GetColorU32(ImVec4(1.0f, 0.45f, 0.35f, 1.0f));
 
             // Auto-scroll the current step into view whenever history mutates
-            // (new op, undo/redo, edit) — not on user scrolls.
+            // (new op, undo/redo, edit) - not on user scrolls.
             static unsigned s_seenRev = ~0u;
             const bool historyMoved = (s_seenRev != m_history->revision());
 
@@ -1184,7 +1186,7 @@ void Application::renderImTouchLayout() {
                     if (!op->isEnabled())
                         ImGui::TextColored(touchui::textDim(), "%s", materializr::tr("Disabled"));
                     if (i > curr)
-                        ImGui::TextColored(touchui::textDim(), "%s", materializr::tr("Undone \xE2\x80\x94 Go Here replays it."));
+                        ImGui::TextColored(touchui::textDim(), "%s", materializr::tr("Undone - Go Here replays it."));
                     if (i == failedAt) {
                         ImGui::PushTextWrapPos(0.0f);
                         ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.35f, 1.0f), "%s", materializr::tr("Couldn't recompute after an upstream change. Edit its parameters, fix the step before it, or delete it."));
@@ -1194,10 +1196,10 @@ void Application::renderImTouchLayout() {
 
                     if (op->isReloaded()) {
                         ImGui::PushTextWrapPos(0.0f);
-                        ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.3f, 1.0f), "%s", materializr::tr("Restored from an older save \xE2\x80\x94 no editable parameters. Undo/redo still work."));
+                        ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.3f, 1.0f), "%s", materializr::tr("Restored from an older save - no editable parameters. Undo/redo still work."));
                         ImGui::PopTextWrapPos();
                     } else {
-                        // The op's own parameter editor — identical widgets to
+                        // The op's own parameter editor - identical widgets to
                         // the desktop History panel's Properties section.
                         // An EXPLICIT height, derived from the popup's own cap.
                         // A fill height (-footerH) reads better but is circular
@@ -1271,7 +1273,7 @@ void Application::renderImTouchLayout() {
                     ImGui::BeginDisabled(histLocked);
                     if (ImGui::Button(op->isEnabled() ? "Disable" : "Enable",
                                       ImVec2(bw, 44.0f * s))) {
-                        // In-place toggle — preserves base bodies the op
+                        // In-place toggle - preserves base bodies the op
                         // modifies (replayAll's doc.clear() would drop them).
                         m_history->setStepEnabled(i, !op->isEnabled(),
                                                   *m_document);
@@ -1294,7 +1296,7 @@ void Application::renderImTouchLayout() {
                 }
                 ImGui::EndPopup();
             } else if (m_imTouchHistoryEdit >= 0) {
-                // Popup dismissed by tapping elsewhere — drop the edit state
+                // Popup dismissed by tapping elsewhere - drop the edit state
                 // (and the viewport highlight) with it.
                 m_imTouchHistoryEdit = -1;
                 if (m_historyPanel) m_historyPanel->setEditingStep(-1);
@@ -1304,7 +1306,7 @@ void Application::renderImTouchLayout() {
         ImGui::PopStyleColor();
     }
 
-    // ── fps readout — a small solid chip at the top-centre. Hidden entirely
+    // ── fps readout - a small solid chip at the top-centre. Hidden entirely
     //    via Settings → Appearance → "Show FPS counter".
     if (m_showFps) {
         ImGui::SetNextWindowPos(ImVec2(wp.x + ws.x * 0.5f, wp.y + m),

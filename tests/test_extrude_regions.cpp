@@ -1,5 +1,5 @@
-// #53: an extrude remembers WHICH regions it used. The normal workflow —
-// draw, extrude, draw MORE in the same sketch, extrude again — must replay
+// #53: an extrude remembers WHICH regions it used. The normal workflow -
+// draw, extrude, draw MORE in the same sketch, extrude again - must replay
 // each extrude from its own regions, not the sketch's final everything-
 // compound (which made four different extrudes replay identically).
 #include <gtest/gtest.h>
@@ -44,7 +44,7 @@ TEST(ExtrudeRegions, DrawExtrudeDrawMoreReplaysEachFromItsOwnRegions) {
     e2->setSketchSource(sid);
     ASSERT_TRUE(e2->rebuildProfileFromSketch(doc));
     // rebuild takes ALL regions at creation time; the app hands the op the
-    // PICKED region — simulate by re-deriving then keeping only B via the
+    // PICKED region - simulate by re-deriving then keeping only B via the
     // recorded points mechanism: point capture happens at execute from the
     // profile, so give it B's face only.
     {

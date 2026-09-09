@@ -26,7 +26,7 @@ namespace materializr {
 // OCCT/world space is Y-up; the UI presents the user's Z-up axes
 // (user X = world X, user Y = world Z, user Z = world Y). The Measure panel
 // reports in the user's axes, so every world coordinate/extent it displays
-// goes through this swap — mirrors the Scale panel's userToWorld[]={0,2,1}
+// goes through this swap - mirrors the Scale panel's userToWorld[]={0,2,1}
 // (Application_Dialogs.cpp). Without it a body's height (user Z) was reported
 // under Y (issue #2). A pure axis swap, so it works for points and deltas
 // alike and never flips a box's min/max.
@@ -79,7 +79,7 @@ void MeasureTool::update() {
 void MeasureTool::measureObjects() {
     if (!m_document || !m_selection) return;
     // Combined bbox of every body referenced by the selection. A single click
-    // on a body in the viewport selects its FACE — for the user this still
+    // on a body in the viewport selects its FACE - for the user this still
     // intuitively means "I picked that body", so we deduplicate body ids
     // across any selection type (Body / Face / Edge / Vertex) and bbox each.
     std::set<int> uniqueBodyIds;
@@ -92,7 +92,7 @@ void MeasureTool::measureObjects() {
         try {
             const TopoDS_Shape& shape = m_document->getBody(bodyId);
             if (shape.IsNull()) continue;
-            // Analytic bounds, no tolerance padding — same reasoning as the
+            // Analytic bounds, no tolerance padding - same reasoning as the
             // Properties panel dim readout (avoids ~5–10 µm of slop on
             // cylinders/cones and STEP-imported faces).
             BRepBndLib::AddOptimal(shape, bb, Standard_False, Standard_False);
@@ -164,7 +164,7 @@ void MeasureTool::renderPanel() {
     ImGui::SetNextWindowSize(uiSz(320, 0), ImGuiCond_FirstUseEver);
     if (!ImGui::Begin("Measure", &open)) { ImGui::End(); return; }
 
-    // Mode selector — three buttons at the top, current mode highlighted.
+    // Mode selector - three buttons at the top, current mode highlighted.
     auto modeButton = [&](const char* label, MeasureMode m) {
         bool isCurrent = (m_mode == m);
         if (isCurrent)
@@ -198,7 +198,7 @@ void MeasureTool::renderPanel() {
             ImGui::TextWrapped("%s", materializr::tr("Pick a measurement mode above."));
             break;
         case MeasureMode::Object:
-            ImGui::TextWrapped("%s", materializr::tr("Click a body in the viewport — clicking a face counts. Ctrl+click to add more bodies, or use box-select."));
+            ImGui::TextWrapped("%s", materializr::tr("Click a body in the viewport - clicking a face counts. Ctrl+click to add more bodies, or use box-select."));
             ImGui::Spacing();
             ImGui::TextColored(materializr::accentText(),
                                materializr::tr("Selected: %d %s"), bodyIds, bodyIds == 1 ? "body" : "bodies");

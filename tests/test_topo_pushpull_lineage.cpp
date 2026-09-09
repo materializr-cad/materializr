@@ -1,4 +1,4 @@
-// Face-lineage propagation THROUGH a push/pull — the class behind Steve's
+// Face-lineage propagation THROUGH a push/pull - the class behind Steve's
 // body-412 gift-box drift. PushPull rebuilds a body via a boolean against a
 // transient prism and doc.updateBody CLEARS the FaceIdMap, so before the fix
 // every downstream fillet/chamfer lost its edge lineage and drifted onto the
@@ -74,8 +74,8 @@ int idOf(const Document& doc, int body, const TopoDS_Face& f) {
 } // namespace
 
 // A push/pull must re-publish a face lineage map (updateBody clears it) and
-// give every face an id. (A fresh extrude publishes no map — the input has no
-// ancestry — so the push MINTS ids; the contract is that the map exists and is
+// give every face an id. (A fresh extrude publishes no map - the input has no
+// ancestry - so the push MINTS ids; the contract is that the map exists and is
 // complete afterwards, which is what downstream fillets key on.)
 TEST(TopoPushPullLineage, PushRepublishesCompleteMap) {
     Document doc;
@@ -106,7 +106,7 @@ TEST(TopoPushPullLineage, PushRepublishesCompleteMap) {
 
 // The bystander CARRY contract: once a body carries lineage (established by a
 // first push), a SECOND push on the top face must leave the untouched bottom
-// cap's id unchanged — carried through, not re-minted to something new.
+// cap's id unchanged - carried through, not re-minted to something new.
 TEST(TopoPushPullLineage, BystanderIdCarriesThroughSecondPush) {
     Document doc;
     int pid[4];

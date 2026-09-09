@@ -6,7 +6,7 @@ namespace materializr {
 
 // The two in-plane directions a gizmo offers for a plane with normal `n`.
 //
-// The obvious construction — pick any reference, project it, then B = N × A —
+// The obvious construction - pick any reference, project it, then B = N × A -
 // is HANDED: flipping the normal flips B. That matters because a surface
 // normal's sign is often incidental (OCCT's buildVoid names a hole's two
 // mouths by its own walk order, so the "entry" normal of an identical hole can
@@ -15,7 +15,7 @@ namespace materializr {
 //
 // So: drop the world axis the plane is most normal to, and keep the other two
 // in X→Y→Z order, projected into the plane and left POSITIVELY oriented. The
-// arrows then always point along +X/+Y/+Z — stable under a normal flip, and
+// arrows then always point along +X/+Y/+Z - stable under a normal flip, and
 // matching the X=red / Y=green / Z=blue colouring the gizmo applies. The pair
 // is orthonormal but not necessarily right-handed about n; only use it where
 // handedness doesn't matter (translation, not a rotation sweep).
@@ -42,7 +42,7 @@ inline void inPlaneAxes(const glm::vec3& n, glm::vec3& axisA, glm::vec3& axisB) 
     // Projecting the second world axis independently leaves the pair SKEWED on
     // an oblique plane (two world axes aren't perpendicular once flattened into
     // it). Grid snapping decomposes the drag onto these and rebuilds it as
-    // a*A + b*B, which is only the same vector if they're orthonormal — so
+    // a*A + b*B, which is only the same vector if they're orthonormal - so
     // orthogonalise against A. A no-op on axis-aligned planes, where the two
     // are already square, which is what keeps the arrows on +X/+Y/+Z there.
     glm::vec3 b = project(inPlane[1]);

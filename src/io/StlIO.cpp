@@ -55,7 +55,7 @@
 namespace materializr {
 namespace {
 
-// Stage timing to stderr when MZR_STL_TIMING is set — used by bench_stl_import
+// Stage timing to stderr when MZR_STL_TIMING is set - used by bench_stl_import
 // to choose the accuracy→triangle mapping and verify import never hangs.
 struct StageTimer {
     bool on;
@@ -144,7 +144,7 @@ ImportResult StlIO::import(const std::string& filePath, Document& doc, double ac
 
     // OCCT can throw Standard_Failure (or raise a kernel signal) on malformed
     // meshes or while sewing degenerate facets. Catch it so a bad import fails
-    // gracefully instead of aborting the process — on Android an uncaught fault
+    // gracefully instead of aborting the process - on Android an uncaught fault
     // shows up as an instant crash.
     try {
     OCC_CATCH_SIGNALS
@@ -157,7 +157,7 @@ ImportResult StlIO::import(const std::string& filePath, Document& doc, double ac
     timer.mark("read");
 
     // Pull the triangulation into a bare indexed mesh (RWStl already shares
-    // vertices, so adjacent facets reference the same node — what the decimator
+    // vertices, so adjacent facets reference the same node - what the decimator
     // and the sewing step both need to weld cleanly).
     SimpleMesh smesh;
     smesh.nodes.reserve(mesh->NbNodes());
@@ -184,7 +184,7 @@ ImportResult StlIO::import(const std::string& filePath, Document& doc, double ac
     timer.mark("decimate");
 
     // Reconcile winding (STLs are often inconsistently wound) and learn whether
-    // the mesh is closed — the precondition for a valid solid below.
+    // the mesh is closed - the precondition for a valid solid below.
     const bool watertight = orientMeshConsistently(smesh);
     timer.mark("orient");
 
@@ -202,7 +202,7 @@ ImportResult StlIO::import(const std::string& filePath, Document& doc, double ac
     // Build the shell DIRECTLY from the indexed mesh: one shared TopoDS_Vertex
     // per node, one shared TopoDS_Edge per mesh edge, faces referencing them.
     // We already know the connectivity from the indices, so there is nothing to
-    // match geometrically — this is O(n). BRepBuilderAPI_Sewing, by contrast,
+    // match geometrically - this is O(n). BRepBuilderAPI_Sewing, by contrast,
     // re-discovers connectivity by proximity search and is pathologically slow
     // on a tessellated mesh (it was the import "hang").
     BRep_Builder builder;
@@ -258,8 +258,8 @@ ImportResult StlIO::import(const std::string& filePath, Document& doc, double ac
     timer.mark("build-shell");
 
     // Promote to a solid ONLY when the mesh is a closed 2-manifold (every edge
-    // shared by exactly two facets). An open/holey mesh stays a shell — still
-    // selectable and sketchable, just without volume/boolean semantics — rather
+    // shared by exactly two facets). An open/holey mesh stays a shell - still
+    // selectable and sketchable, just without volume/boolean semantics - rather
     // than being wrapped as an invalid "solid" that misbehaves downstream.
     TopoDS_Shape solidified = sewn;
     if (watertight) {
@@ -285,7 +285,7 @@ ImportResult StlIO::import(const std::string& filePath, Document& doc, double ac
     // makes "fairly flat" regions one pickable, sketchable face: a larger angular
     // tolerance merges adjacent facets whose normals differ slightly. Every input
     // face is planar, so merged faces stay planar. Accuracy → angle: 0 → 6°,
-    // 1 → 0.5°. This is deliberately conservative — a wide tolerance (the old
+    // 1 → 0.5°. This is deliberately conservative - a wide tolerance (the old
     // 20°) lumps gently-curved/angled facets into one bogus "flat" face whose
     // plane is then unreliable to sketch on, which is exactly the low-accuracy
     // "can't tell what's flat" problem. Keep merging to genuinely near-coplanar
@@ -298,13 +298,13 @@ ImportResult StlIO::import(const std::string& filePath, Document& doc, double ac
         ShapeUpgrade_UnifySameDomain unify(solidified, /*unifyEdges=*/Standard_True,
                                            /*unifyFaces=*/Standard_True,
                                            /*concatBSplines=*/Standard_False);
-        unify.SetSafeInputMode(Standard_False); // throwaway input — no need to copy
+        unify.SetSafeInputMode(Standard_False); // throwaway input - no need to copy
         unify.SetAngularTolerance(angTol);
         unify.SetLinearTolerance(linTol);
         unify.Build();
         if (!unify.Shape().IsNull()) finalShape = unify.Shape();
     } catch (...) {
-        // Keep the un-unified shape on any failure — it's still valid geometry.
+        // Keep the un-unified shape on any failure - it's still valid geometry.
     }
     timer.mark("unify");
 

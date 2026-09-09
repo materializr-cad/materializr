@@ -50,7 +50,7 @@ REGISTER_PLUGIN(RefImage, [](materializr::PluginContext& ctx) {
     // list rather than hitting nothing.
     ctx.registerCommand({"Import Reference Image", "", action});
 
-    // Same three plane events as the plane renderer — pose moves, renames,
+    // Same three plane events as the plane renderer - pose moves, renames,
     // visibility, AND every image-side change (opacity/size/add/remove) ride
     // PlaneChangedEvent, so one dirty flag covers everything.
     ctx.events().subscribe<materializr::PlaneAddedEvent>(
@@ -76,7 +76,7 @@ REGISTER_PLUGIN(RefImage, [](materializr::PluginContext& ctx) {
     pass.name = "ReferenceImages";
     // 500 = Application::kBodyPassPriority, the threshold that decides whether
     // a pass runs BEFORE the bodies or after. At 490 the photo ran before them
-    // and every body painted straight over it — the renderer uses
+    // and every body painted straight over it - the renderer uses
     // glDepthMask(GL_FALSE), correct for a translucent overlay but it leaves no
     // depth behind, so a body drawn afterwards passes the depth test and wins.
     // Construction planes had exactly this bug and were moved across the line;
@@ -95,7 +95,7 @@ REGISTER_PLUGIN(RefImage, [](materializr::PluginContext& ctx) {
                      const glm::mat4& view, const glm::mat4& proj) {
         if (!g_state) return;
         // Unlike construction planes, the image STAYS visible while sketching
-        // in ortho — tracing over the photo is the whole point of the feature.
+        // in ortho - tracing over the photo is the whole point of the feature.
         int selectedPlaneId = -1;
         for (const auto& sel : c.selection().getSelection()) {
             if (sel.type == SelectionType::Plane && sel.planeId >= 0) {

@@ -1,16 +1,16 @@
-// A point placed on a circle or arc STAYS on it — stickily, not rigidly.
+// A point placed on a circle or arc STAYS on it - stickily, not rigidly.
 //
 // Rim snapping itself has always worked (SketchTool's curve-perimeter snap,
 // which even lands the point where the rim crosses a grid line). What was
 // missing was memory: nothing recorded that a point had been placed on a rim,
-// so the first drag threw the relationship away — and with grid snap on, the
+// so the first drag threw the relationship away - and with grid snap on, the
 // old multi-point drag rounded EVERY point to the lattice, which moved a line's
 // ends 0.6mm off their circles and rotated the line 30 -> 33.7 degrees on a
 // drag of essentially zero length.
 //
 // So SketchPoint carries onCurveId, and dragging consults it. Deliberately NOT
 // a solver Constraint: constraints here are opt-in and binding, and Steve asked
-// for something you can walk away from — "we can break it and it will be fine
+// for something you can walk away from - "we can break it and it will be fine
 // if we simply take the point off the circle with a move, but moving the line
 // about the circle keeps it constrained on the circle". Hence two break bands:
 // generous when the whole selection moves, tight when the point is dragged on
@@ -122,7 +122,7 @@ TEST(StickyRim, DraggingItClearLetsGo) {
 
 TEST(StickyRim, ATwitchMovesNothing) {
     // The delta is quantised, not each point. Before, a sub-grid drag rounded
-    // every point to the lattice — so pressing on a line and twitching moved it,
+    // every point to the lattice - so pressing on a line and twitching moved it,
     // rotated it, and threw away both rim attachments.
     Rig r;
     const glm::vec2 before = r.end()->pos;
@@ -133,7 +133,7 @@ TEST(StickyRim, ATwitchMovesNothing) {
 
 TEST(StickyRim, ARimLandingPublishesAGuide) {
     // Rim snapping predates the guide overlay and drew NOTHING, so landing on a
-    // circle looked the same as landing nowhere — no marker, no label, no way to
+    // circle looked the same as landing nowhere - no marker, no label, no way to
     // tell it had happened. It now publishes an OnCircle guide, which the
     // viewport draws with the same diamond marker as On Line.
     Sketch sketch; SketchSolver solver; SketchTool tool;
@@ -194,7 +194,7 @@ TEST(StickyRim, TheAttachmentSurvivesSaveAndLoad) {
 }
 
 TEST(StickyRim, AFreePointStaysFreeThroughSaveAndLoad) {
-    // The default must round-trip too — an old file has no such token at all,
+    // The default must round-trip too - an old file has no such token at all,
     // and a point that was never on a rim must not come back attached to id 0.
     Sketch sketch;
     const int a = sketch.addPoint(glm::vec2(5.0f, 5.0f));

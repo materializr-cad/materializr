@@ -30,7 +30,7 @@ TEST(DimDragThreshold, SmallJitterStaysAClick) {
     EXPECT_FALSE(materializr::dimDragExceedsThreshold(1.0f, 0.0f));
     EXPECT_FALSE(materializr::dimDragExceedsThreshold(0.0f, -2.0f));
     EXPECT_FALSE(materializr::dimDragExceedsThreshold(-2.0f, 2.0f));
-    // Exactly on the boundary is still a click — the test is strictly greater.
+    // Exactly on the boundary is still a click - the test is strictly greater.
     EXPECT_FALSE(materializr::dimDragExceedsThreshold(
         materializr::kDimDragThresholdPx, 0.0f));
 }
@@ -59,7 +59,7 @@ TEST(DimLabelOffset, NegativeOffsetsSurvive) {
     EXPECT_DOUBLE_EQ(-4.0, y);
 }
 
-// Dropping a label exactly on its anchor produces (0,0) — the "never placed"
+// Dropping a label exactly on its anchor produces (0,0) - the "never placed"
 // sentinel. Storing that verbatim would make the label jump to its automatic
 // position, reading as "the drag was ignored".
 TEST(DimLabelOffset, ExactAnchorDropDoesNotBecomeTheUnplacedSentinel) {
@@ -68,7 +68,7 @@ TEST(DimLabelOffset, ExactAnchorDropDoesNotBecomeTheUnplacedSentinel) {
     EXPECT_FALSE(x == 0.0 && y == 0.0)
         << "offset collapsed to the unplaced sentinel; the label would revert "
            "to automatic placement";
-    // The nudge must be far below anything visible — a tenth of a micron.
+    // The nudge must be far below anything visible - a tenth of a micron.
     EXPECT_LT(std::abs(x), 1e-3);
     EXPECT_LT(std::abs(y), 1e-3);
 }

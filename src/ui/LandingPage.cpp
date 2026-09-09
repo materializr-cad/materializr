@@ -53,7 +53,7 @@ void LandingPage::setEntryTexture(const std::string& ref, unsigned int tex) {
         e.tex = tex;
         return;
     }
-    // The tile list changed under a peek that was already in flight — its
+    // The tile list changed under a peek that was already in flight - its
     // texture has no home, so don't leak it.
     GLuint orphan = tex;
     glDeleteTextures(1, &orphan);
@@ -77,7 +77,7 @@ enum class TileAct { None, Click, CtxOpen, CtxStep, CtxStl, CtxParts };
 
 // One tile: label centred above a square preview area. `tex` = 0 draws the
 // placeholder glyph instead of an image. `withContext` adds the right-click
-// menu (recent-project tiles only — not New Project).
+// menu (recent-project tiles only - not New Project).
 TileAct tile(const char* id, const std::string& label, unsigned int tex,
              const char* placeholderGlyph, float tileW, float previewH,
              const char* tooltip, bool withContext) {
@@ -97,7 +97,7 @@ TileAct tile(const char* id, const std::string& label, unsigned int tex,
         if (ImGui::MenuItem(materializr::tr("Open"))) act = TileAct::CtxOpen;
         ImGui::Separator();
         // Cross-project parts: pick bodies/sketches out of this project into
-        // a fresh workspace. Baked copies — no cross-file parametrics.
+        // a fresh workspace. Baked copies - no cross-file parametrics.
         if (ImGui::MenuItem(materializr::tr("Import Parts..."))) act = TileAct::CtxParts;
         ImGui::Separator();
         // The cheap, deliberate export model: the file's baked final bodies,
@@ -159,7 +159,7 @@ LandingPage::Action LandingPage::render() {
     ImGui::SetNextWindowSize(vp->WorkSize, ImGuiCond_Always);
     if (m_takeFocus) {
         // One-shot: lift the page above the docked panels it covers. Not
-        // every frame — that would fight the menu-bar popups and the modal
+        // every frame - that would fight the menu-bar popups and the modal
         // dialogs that must sit on top.
         ImGui::SetNextWindowFocus();
         m_takeFocus = false;

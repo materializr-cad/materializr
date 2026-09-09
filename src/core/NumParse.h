@@ -9,7 +9,7 @@ namespace materializr {
 // NON-FINITE result: "1e999" parses to +inf under plain atof/strtod and
 // used to flow straight into OCCT (infinite extrude distances, inf
 // constraint values wedging the sketch solver). Callers keep their previous
-// value on false — the input box simply doesn't take effect.
+// value on false - the input box simply doesn't take effect.
 inline bool parseFinite(const char* buf, double& out) {
     if (!buf || !*buf) return false;
     char* end = nullptr;

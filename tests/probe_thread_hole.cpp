@@ -1,5 +1,5 @@
 // PROBE: current boolean-path cost for an INTERNAL (hole) thread at realistic
-// nut-ish sizes — decides whether holes need a swept-path variant at all.
+// nut-ish sizes - decides whether holes need a swept-path variant at all.
 #include "modeling/ThreadOp.h"
 #include "core/Document.h"
 #include <BRepPrimAPI_MakeBox.hxx>

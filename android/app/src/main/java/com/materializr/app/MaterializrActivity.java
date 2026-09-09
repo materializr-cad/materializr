@@ -86,7 +86,7 @@ public class MaterializrActivity extends SDLActivity {
 
     // Overwrite an ALREADY-PICKED document in place (quick-save): we hold a
     // persistable write grant on the URI from the original picker, so no new
-    // picker — and no "name (1)" dedup copies — is involved. "wt" truncates.
+    // picker - and no "name (1)" dedup copies - is involved. "wt" truncates.
     public static boolean nativeCommitSaveToUri(String uriStr, String tempPath) {
         MaterializrActivity a = sInstance;
         if (a == null || uriStr == null || uriStr.isEmpty()) return false;
@@ -99,7 +99,7 @@ public class MaterializrActivity extends SDLActivity {
             // Only AFTER the stream closed cleanly. Cloud providers do the
             // actual upload at close(), so a fallback written inside the
             // try-with-resources would record content the document never
-            // received — leaving the backup copy newer than the real file
+            // received - leaving the backup copy newer than the real file
             // after a save the user was told had failed.
             try {
                 File dir = new File(a.getCacheDir(), "import");
@@ -174,7 +174,7 @@ public class MaterializrActivity extends SDLActivity {
 
     // Raise the soft keyboard directly. SDL_StartTextInput only shows the IME
     // when SDL_GetFocusWindow() is non-null, which it isn't in our immersive
-    // surface — so SDL never calls this. Driving showTextInput (inherited from
+    // surface - so SDL never calls this. Driving showTextInput (inherited from
     // SDLActivity) ourselves sets up SDL's text-routing DummyEdit and the
     // SHOW_FORCED patch raises the keyboard. Typed text still flows to SDL/ImGui.
     public static void nativeShowKeyboard() {
@@ -201,7 +201,7 @@ public class MaterializrActivity extends SDLActivity {
     public static String nativeLastDocName() { return sLastDocName; }
 
     // Re-open a previously persisted document URI without a picker: copy it into
-    // a cache temp and return that path ("" on failure — access revoked or the
+    // a cache temp and return that path ("" on failure - access revoked or the
     // file was deleted). Runs synchronously on the caller (native) thread.
     public static String nativeOpenUri(String uriString) {
         MaterializrActivity a = sInstance;
@@ -219,7 +219,7 @@ public class MaterializrActivity extends SDLActivity {
         } catch (Exception e) {
             // Persisted SAF grants are NOT durable in practice: they're wiped
             // by uninstall / clear-data, and the Downloads provider's numeric
-            // document ids churn on re-index — either way openInputStream
+            // document ids churn on re-index - either way openInputStream
             // throws and every recent silently died here (the long-standing
             // "access may have been revoked" bug, diagnosed 2026-07-28).
             // Serve the app-private fallback copy from the last successful
@@ -231,12 +231,12 @@ public class MaterializrActivity extends SDLActivity {
             // restarting), and the write grant is very much alive. Opening a
             // stale copy there and letting quick-save commit it is how you
             // silently overwrite newer work with older work. Fail visibly
-            // instead — the user retries when they're back online.
+            // instead - the user retries when they're back online.
             android.util.Log.w("Materializr",
                 "nativeOpenUri: resolver failed for " + uriString, e);
             if (a.documentStillExists(uriString)) {
                 android.util.Log.w("Materializr",
-                    "nativeOpenUri: document exists but is unreachable — "
+                    "nativeOpenUri: document exists but is unreachable - "
                     + "refusing the stale fallback");
                 return "";
             }
@@ -267,8 +267,8 @@ public class MaterializrActivity extends SDLActivity {
     // right now" (row present -> the read failure was transient) from "gone or
     // disowned" (no row, or the query itself is refused -> the grant/doc-id
     // died, which is exactly what the fallback copies exist for). Note a
-    // deleted file and a churned Downloads document id look identical here —
-    // both come back as no row — so both take the fallback path, and the
+    // deleted file and a churned Downloads document id look identical here -
+    // both come back as no row - so both take the fallback path, and the
     // unlink above is what keeps the deleted-file case from writing back.
     private boolean documentStillExists(String uriString) {
         try {
@@ -279,14 +279,14 @@ public class MaterializrActivity extends SDLActivity {
                 return c != null && c.moveToFirst();
             }
         } catch (Exception e) {
-            return false;   // refused or unqueryable — treat as gone
+            return false;   // refused or unqueryable - treat as gone
         }
     }
 
     // ---- App-private fallback copies for Open Recent -------------------------
     // files/docfallback/<sha1(uri)>_<displayName>. Written on every successful
     // open and save-commit; read when the content resolver can no longer serve
-    // the URI (see nativeOpenUri). Pruned to the newest 15 — same order of
+    // the URI (see nativeOpenUri). Pruned to the newest 15 - same order of
     // magnitude as the recents list itself.
     private File docFallbackDir() {
         File d = new File(getFilesDir(), "docfallback");

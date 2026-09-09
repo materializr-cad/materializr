@@ -8,7 +8,7 @@ namespace materializr {
 
 // Lightweight transform op for a single sketch's plane. Used when the user
 // drags the Move/Rotate gizmo on a selected standalone sketch (one with no
-// source body — the body-attached case still routes through TransformOp's
+// source body - the body-attached case still routes through TransformOp's
 // sketch-propagation path). Stores the before-plane explicitly for undo so
 // it works even if m_transform itself isn't perfectly invertible numerically.
 class SketchTransformOp : public Operation {

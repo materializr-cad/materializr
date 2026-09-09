@@ -4,7 +4,7 @@
 // in BrepIO::import was added. The guard rejects any section count larger than
 // the file's own byte size (physically impossible for a real file) up front.
 //
-// If the guard regresses, ImpossibleCountIsRejectedFast doesn't just fail — it
+// If the guard regresses, ImpossibleCountIsRejectedFast doesn't just fail - it
 // hangs, and CTest's per-test timeout turns that into a red build, which is the
 // intended signal.
 
@@ -38,7 +38,7 @@ void writeFile(const std::string& path, const std::string& text) {
 
 TEST(BrepIoDos, ImpossibleCountIsRejectedFast) {
     const std::string path = tempPath("mz_test_brep_hugecount.brep");
-    // ~90 bytes, but the header claims ~1e9 curves — no real file can.
+    // ~90 bytes, but the header claims ~1e9 curves - no real file can.
     writeFile(path,
               "DBRep_DrawableShape\n\n"
               "CASCADE Topology V3, (c) Open Cascade\n"
@@ -73,7 +73,7 @@ TEST(BrepIoDos, ValidFileStillRoundTrips) {
 
 TEST(BrepIoDos, TruncatedFileFailsCleanly) {
     // A believable-but-truncated file (counts within the byte size) sails past
-    // the guard and is rejected by the reader itself — still no crash/hang.
+    // the guard and is rejected by the reader itself - still no crash/hang.
     const std::string path = tempPath("mz_test_brep_truncated.brep");
     writeFile(path,
               "DBRep_DrawableShape\n\n"
@@ -107,7 +107,7 @@ const char* kHdr =
 
 TEST(BrepIoDos, TruncatedSectionsAreRefused) {
     // `preScan` marks the files whose declared counts outrun the data behind
-    // them — those MUST be refused before the kernel reader opens them, because
+    // them - those MUST be refused before the kernel reader opens them, because
     // that is the path that faults. The others are merely malformed: the reader
     // rejects them cleanly on both platforms, which is a fine outcome and not
     // something the guard needs to duplicate.
@@ -117,7 +117,7 @@ TEST(BrepIoDos, TruncatedSectionsAreRefused) {
         {"curves2_one_partial", "Locations 0\nCurve2ds 0\nCurves 2\n1 0 0 0 0 -1 0\n", true},
         // Declares 1 curve with nothing after it.
         {"curves1_none",        "Locations 0\nCurve2ds 0\nCurves 1\n", true},
-        // Declares 1 curve and has 1 (partial) line for it — the count is
+        // Declares 1 curve and has 1 (partial) line for it - the count is
         // satisfiable, so the guard lets it through and the reader says no.
         {"curves1_half_record", "Locations 0\nCurve2ds 0\nCurves 1\n1 0 0 0 0 ", false},
         // Declares 3 shapes with an empty table. THIS is the one that killed
@@ -138,7 +138,7 @@ TEST(BrepIoDos, TruncatedSectionsAreRefused) {
         EXPECT_FALSE(r.success) << c.name << " was accepted";
         EXPECT_TRUE(doc.getAllBodyIds().empty()) << c.name << " added bodies";
         if (c.preScan) {
-            // Refused by the pre-scan, not merely survived by the reader — on
+            // Refused by the pre-scan, not merely survived by the reader - on
             // Windows "survived" is a coin flip.
             EXPECT_NE(r.errorMessage.find("truncated"), std::string::npos)
                 << c.name << " reached the kernel reader: " << r.errorMessage;
@@ -147,7 +147,7 @@ TEST(BrepIoDos, TruncatedSectionsAreRefused) {
 }
 
 // The guard must not cost a legitimate file. A real export, with every section
-// count matching real records, still round-trips — this is the check that
+// count matching real records, still round-trips - this is the check that
 // would catch an over-eager line bound.
 TEST(BrepIoDos, RealExportSurvivesTheTruncationGuard) {
     const std::string path = tempPath("mz_test_brep_guard_roundtrip.brep");

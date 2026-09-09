@@ -4,10 +4,10 @@
 //
 // Root cause: Application::renderSketchRecoveryPrompt() / renderProjectRecoveryPrompt()
 // call ImGui::OpenPopup() UNCONDITIONALLY every frame (src/app/Application.cpp,
-// renderSketchRecoveryPrompt ~5344, renderProjectRecoveryPrompt ~5470) — a
+// renderSketchRecoveryPrompt ~5344, renderProjectRecoveryPrompt ~5470) - a
 // pattern the codebase's own comment there already recognized as dangerous:
 // "opening a second popup at the same stack level ... makes the two close
-// each other every frame ... neither ever draws" — and gates against it
+// each other every frame ... neither ever draws" - and gates against it
 // w.r.t. the Welcome screen and each other. Application_Dialogs.cpp's
 // renderUpdatePopup() (~line 662) ALSO calls OpenPopup() unconditionally
 // every frame while m_showUpdatePopup is true, but had NO gate against the
@@ -15,22 +15,22 @@
 // update check runs on a background thread and can resolve at any frame,
 // including while a recovery prompt is up), so the two raw-every-frame
 // OpenPopup calls contend for the same popup-stack level (0) and steal it
-// from each other every single frame — via dear imgui's
+// from each other every single frame - via dear imgui's
 // "OpenPopupEx / re-open" path (imgui.cpp), which treats every such steal as
 // a fresh popup activation, resetting Size/ContentSize to 0 and hiding the
 // window for exactly one frame (HiddenFramesCannotSkipItems=1) EVERY frame,
 // forever. The window is never NOT hidden long enough to compute a real
 // size, so it's permanently drawn nowhere at a degenerate floor size, while
-// still occupying the modal popup stack (blocking all other input) — exactly
+// still occupying the modal popup stack (blocking all other input) - exactly
 // the reported symptom.
 //
 // This test exercises the real dear imgui popup-stack mechanics headlessly
 // (CreateContext / NewFrame / Begin / End, no window/GL backend) against two
 // harness functions written to mirror the production call sites: `popupA()`
 // (renderUpdatePopup) and `popupB()` (renderSketchRecoveryPrompt). It proves
-// (1) the anti-pattern — no gate — deadlocks both popups permanently hidden
-// at a degenerate size, and (2) the fix — popupA gates on popupB's pending
-// state, exactly like Application_Dialogs.cpp now does — lets popupB render
+// (1) the anti-pattern - no gate - deadlocks both popups permanently hidden
+// at a degenerate size, and (2) the fix - popupA gates on popupB's pending
+// state, exactly like Application_Dialogs.cpp now does - lets popupB render
 // and stabilize at a real size, and popupA opens cleanly once popupB clears.
 
 #define IMGUI_DEFINE_MATH_OPERATORS
@@ -114,14 +114,14 @@ bool popupB_sketchRecovery(bool* pending) {
 // activates mid-flight (simulating the async update check resolving while
 // the sketch-recovery prompt is up), the two raw-every-frame OpenPopup calls
 // steal the popup-stack level from each other every frame. Assert this
-// really does deadlock — both windows permanently Hidden at a degenerate
-// size — so the mechanism behind the reported bug is pinned, not assumed.
+// really does deadlock - both windows permanently Hidden at a degenerate
+// size - so the mechanism behind the reported bug is pinned, not assumed.
 // ---------------------------------------------------------------------------
 TEST_F(ImGuiHeadlessTest, UngatedCompetingPopupsDeadlockHiddenForever) {
     bool sketchPending = true;
     bool updateActive = false;
 
-    // Frames 1-2: only popupB is active — it opens and stabilizes normally.
+    // Frames 1-2: only popupB is active - it opens and stabilizes normally.
     for (int frame = 1; frame <= 2; ++frame) {
         NewFrame();
         popupA_updatePopup(updateActive, /*gateOnB=*/false, sketchPending);
@@ -135,7 +135,7 @@ TEST_F(ImGuiHeadlessTest, UngatedCompetingPopupsDeadlockHiddenForever) {
         EXPECT_GT(b->Size.x, 100.0f) << "sketch prompt should have a real, laid-out width";
     }
 
-    // Frame 3: the async update check resolves — popupA activates. From here
+    // Frame 3: the async update check resolves - popupA activates. From here
     // on both call OpenPopup() every frame with no turn-taking.
     updateActive = true;
     for (int frame = 3; frame <= 15; ++frame) {
@@ -152,10 +152,10 @@ TEST_F(ImGuiHeadlessTest, UngatedCompetingPopupsDeadlockHiddenForever) {
 
     // This is the reported bug, reproduced: both windows are permanently
     // Hidden (never actually drawn/rendered) and pinned at the degenerate
-    // "just reset, nothing measured yet" floor size — not the real ~478x92
-    // content size — even though m_pendingSketchRecovery is STILL true (the
+    // "just reset, nothing measured yet" floor size - not the real ~478x92
+    // content size - even though m_pendingSketchRecovery is STILL true (the
     // user can never see or click the buttons that would clear it).
-    EXPECT_TRUE(sketchPending) << "prompt can never be dismissed — its buttons never render";
+    EXPECT_TRUE(sketchPending) << "prompt can never be dismissed - its buttons never render";
     EXPECT_TRUE(a->Hidden);
     EXPECT_TRUE(b->Hidden);
     EXPECT_LT(b->Size.x, 50.0f) << "stuck at the degenerate floor size, never the real content size";
@@ -193,11 +193,11 @@ TEST_F(ImGuiHeadlessTest, GatedUpdatePopupLetsSketchRecoveryRenderAndStabilize) 
         if (frame == 4) stableWidth = b->Size.x; // one settle frame after the trigger
     }
     ASSERT_GT(stableWidth, 100.0f);
-    // "Check for Updates" must not exist yet — it's still gated off.
+    // "Check for Updates" must not exist yet - it's still gated off.
     EXPECT_EQ(ImGui::FindWindowByName("Check for Updates"), nullptr);
 
     // User dismisses the sketch prompt (mirrors clicking "Discard", which
-    // this harness can't do via a synthetic mouse click — set the flag the
+    // this harness can't do via a synthetic mouse click - set the flag the
     // button's handler would have set instead).
     sketchPending = false;
 

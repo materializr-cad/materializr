@@ -1,5 +1,5 @@
 // Generated from Silbad/iconoir-font dist/fonts/iconoir.json (Iconoir icons,
-// MIT — see assets/fonts/licenses/Iconoir-LICENSE.txt). Regenerate with the
+// MIT - see assets/fonts/licenses/Iconoir-LICENSE.txt). Regenerate with the
 // python snippet in docs/im-touch-ui-plan.md if the font is updated.
 #pragma once
 

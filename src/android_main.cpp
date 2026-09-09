@@ -1,7 +1,7 @@
 // Android entry point. SDL2 owns the real platform main on Android (it runs an
 // activity that loads this shared library and calls SDL_main); including
 // SDL_main.h renames the function below to SDL_main. The body mirrors the
-// desktop main() minus the CLI parsing — a phone passes no arguments.
+// desktop main() minus the CLI parsing - a phone passes no arguments.
 #include "app/Application.h"
 #include "core/Verbose.h"
 #include "android_platform.h"
@@ -17,7 +17,7 @@ int main(int /*argc*/, char* /*argv*/[]) {
     // OpenCASCADE's OSD_File / Resource_Manager closes a resource-file descriptor
     // in a way Android's fd-sanitizer flags as illegal (double-close / wrong
     // ownership tag), which aborts the whole process with SIGABRT. It's hit when
-    // a STEP import (and other OCCT readers) load a shape-healing resource — so
+    // a STEP import (and other OCCT readers) load a shape-healing resource - so
     // importing a complex STEP killed the app instantly. OCCT's fd use is
     // otherwise functional, so downgrade fdsan from FATAL to warn-only. The
     // sanitizer is only fatal on API 29+ and android_fdsan_set_error_level is

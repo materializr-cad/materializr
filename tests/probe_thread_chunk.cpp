@@ -1,4 +1,4 @@
-// PROBE: >40-turn rods as CHUNKED sweeps — MakePipeShell is exact through ~40
+// PROBE: >40-turn rods as CHUNKED sweeps - MakePipeShell is exact through ~40
 // turns and degrades beyond, so build N phase-aligned <=40-turn segments and
 // fuse them at their planar interfaces (cheap boolean: two solids touching on
 // a disc). Usage: probe_thread_chunk [R len pitch depth]
@@ -90,7 +90,7 @@ int main(int argc, char** argv) {
             f.SetArguments(args); f.SetTools(tools);
             f.SetFuzzyValue(1e-5);
             // The segments touch ONLY on coincident planar discs (identical
-            // notched profiles at whole-pitch boundaries) — glue mode skips
+            // notched profiles at whole-pitch boundaries) - glue mode skips
             // the face-face intersection machinery entirely.
             f.SetGlue(BOPAlgo_GlueFull);
             auto f0 = std::chrono::steady_clock::now();

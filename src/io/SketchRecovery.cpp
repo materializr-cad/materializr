@@ -78,7 +78,7 @@ bool writeSketchDraft(const Sketch& sk, int sourceBodyId,
 bool hasSketchDraft() {
     // Only a DEAD instance's draft may be offered. Our own slot is claimed
     // before the scan (orphanedRecoverySlots does that), so our live draft can
-    // never be a candidate — which is what stopped two instances from being
+    // never be a candidate - which is what stopped two instances from being
     // handed each other's unfinished sketch.
     s_candidatePath.clear();
     std::error_code ec;

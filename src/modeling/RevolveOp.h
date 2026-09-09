@@ -24,7 +24,7 @@ public:
     // reload (and by a future cascade-on-sketch-edit). -1 = not from a sketch.
     void setSketchSource(int sketchId) { m_sketchId = sketchId; }
 
-    // Re-derive m_profile from the source sketch's first closed region —
+    // Re-derive m_profile from the source sketch's first closed region -
     // exactly what the Revolve popup used at creation time. Returns false if
     // there's no source sketch, it's gone, or it has no closed region.
     bool rebuildProfileFromSketch(Document& doc);

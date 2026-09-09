@@ -48,7 +48,7 @@ bool BooleanOp::execute(Document& doc) {
         // Run the boolean at a given fuzzy tolerance, returning a VALID result
         // shape or null. Null/degenerate are rejected here so the caller can
         // escalate the fuzzy value instead of committing junk. (IsDone() is
-        // necessary but not sufficient — OCCT can report success yet hand back a
+        // necessary but not sufficient - OCCT can report success yet hand back a
         // null or zero-volume compound.)
         // A boolean on pathological contact geometry (a solid sitting
         // skin-tight on another, tangent B-spline walls) can grind for tens of
@@ -188,7 +188,7 @@ bool BooleanOp::execute(Document& doc) {
                 }
             }
             // Reject topologically INVALID results (self-intersections, bad
-            // faces) — a fuzzy boolean can return a non-null, non-zero-volume
+            // faces) - a fuzzy boolean can return a non-null, non-zero-volume
             // shape that's still garbage. Only a valid solid is worth committing;
             // otherwise the caller escalates the fuzzy value or fails cleanly.
             if (!BRepCheck_Analyzer(s).IsValid()) return TopoDS_Shape();
@@ -216,7 +216,7 @@ bool BooleanOp::execute(Document& doc) {
         }
         if (resultShape.IsNull()) {
             std::fprintf(stderr, "[Boolean] %s failed (target=%d tool=%d) even "
-                         "with fuzzy — bodies may not overlap, or the geometry is "
+                         "with fuzzy - bodies may not overlap, or the geometry is "
                          "too degenerate.\n",
                          m_mode == BooleanMode::Subtract ? "Cut" :
                          m_mode == BooleanMode::Union ? "Fuse" : "Common",
@@ -225,13 +225,13 @@ bool BooleanOp::execute(Document& doc) {
         }
 
         // Snapshot both inputs' face lineage BEFORE updateBody/removeBody
-        // clear them, then propagate through the boolean's FACE ledger — a
+        // clear them, then propagate through the boolean's FACE ledger - a
         // split face's pieces all inherit its ancestry ids, which is what
         // keeps a chamfer's bevel traceable after a cut crosses it (#51).
         materializr::topo::FaceIdMap inTarget, inTool;
         if (const auto* im = doc.bodyFaceIds(m_targetBodyId)) inTarget = *im;
         if (const auto* im = doc.bodyFaceIds(m_toolBodyId))   inTool   = *im;
-        m_prevTargetFaceIds = inTarget;   // undo restores these — a partial
+        m_prevTargetFaceIds = inTarget;   // undo restores these - a partial
         m_prevToolFaceIds   = inTool;     // replay never re-runs the minters
 
         // Update target body with the result
@@ -243,7 +243,7 @@ bool BooleanOp::execute(Document& doc) {
                  {&inTool, m_previousToolShape}},
                 m_ledger, resultShape);
             // COMPLETE the published map, with STABLE ids: faces with no
-            // inherited ancestry (inputs carried no lineage — the common
+            // inherited ancestry (inputs carried no lineage - the common
             // fresh-extrude case) get ids reused across re-executes while
             // the uncovered count is unchanged. Without this, a downstream
             // chamfer/fillet captures pairs against ids this op re-mints
@@ -263,7 +263,7 @@ bool BooleanOp::execute(Document& doc) {
             doc.setBodyFaceIds(m_targetBodyId, std::move(next));
         }
 
-        // Remove the tool body — unless we're keeping it (the "keep cutters"
+        // Remove the tool body - unless we're keeping it (the "keep cutters"
         // option, or a cutter still needed by another target).
         if (m_keepTool) {
             m_removedToolId = -1;
@@ -287,7 +287,7 @@ bool BooleanOp::undo(Document& doc) {
                 doc.setBodyFaceIds(m_targetBodyId, m_prevTargetFaceIds);
         }
 
-        // Re-add the tool body that was removed — restore it under its ORIGINAL
+        // Re-add the tool body that was removed - restore it under its ORIGINAL
         // id (not a fresh addBody id). editStep rolls a boolean back then
         // re-executes the steps above it; an upstream op that targets the tool
         // body (e.g. a fillet on it) must still find it by its old id, and the
@@ -388,7 +388,7 @@ bool BooleanOp::rehydrateFromReload(const ReloadState& state, Document& /*doc*/)
     if (m_previousTargetShape.IsNull()) return false;
 
     if (m_keepTool) {
-        // The tool wasn't consumed, so it isn't in the step's deleted set — it's
+        // The tool wasn't consumed, so it isn't in the step's deleted set - it's
         // still a live body. execute() re-fetches it; nothing to restore on undo.
         m_removedToolId = -1;
     } else {

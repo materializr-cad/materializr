@@ -1,12 +1,12 @@
 // Imported meshes are REFERENCE bodies: modelling operations decline them.
 //
 // Steve, 2026-08-03: a union on two imported STLs appeared to hang the app.
-// It wasn't hung — measured on his own file, the fuse of two 4,881-face mesh
+// It wasn't hung - measured on his own file, the fuse of two 4,881-face mesh
 // solids completed in 101 seconds and produced an 8,745-face result, on the
 // main thread, with no progress and no cancel. The output would have been
 // another mesh: no analytic faces to fillet, sketch on, or edit afterwards.
 //
-// So the rule is a boundary, not a performance fix — an import is there to
+// So the rule is a boundary, not a performance fix - an import is there to
 // measure and trace against. These tests pin the two halves of it: which bodies
 // count as references, and that a mixed selection is caught (the case where the
 // refusal is easiest to get wrong, because most of the selection is fine).
@@ -54,7 +54,7 @@ TEST(MeshGuard, MixedSelectionIsFlagged) {
 }
 
 // The message has to name the operation and tell the user what the import IS
-// good for — a bare refusal reads as a missing feature.
+// good for - a bare refusal reads as a missing feature.
 TEST(MeshGuard, RefusalMessageNamesTheOpAndTheAlternative) {
     const std::string all = materializr::meshRefusalMessage("Fillet", 2, 2);
     EXPECT_NE(all.find("Fillet"), std::string::npos);

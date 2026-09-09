@@ -1,8 +1,8 @@
 // Rung 1: the working EdgeAnchor, migrated behind the topo registry as the
-// "sketchedge" scheme. These prove the migration preserves what already works —
+// "sketchedge" scheme. These prove the migration preserves what already works -
 // edges mint through the registry, resolveSet claims DISTINCT edges, and the
 // set survives a sketch dimension edit (best-first picks the generative
-// scheme over the now-stale ordinal fallback) — with no change to EdgeAnchor
+// scheme over the now-stale ordinal fallback) - with no change to EdgeAnchor
 // or FilletOp.
 
 #include "modeling/TopoName.h"
@@ -118,7 +118,7 @@ TEST(TopoEdge, ResolveSetDistinctOnSameBody) {
 // THE migration proof: mint refs on the ORIGINAL body, WIDEN the sketch,
 // re-extrude, then resolveSet the SAME refs against the NEW body. The ordinal
 // fallback is now stale (edges renumbered), so best-first must pick the
-// sketchedge scheme, which re-finds the moved corners — exactly EdgeAnchor's
+// sketchedge scheme, which re-finds the moved corners - exactly EdgeAnchor's
 // survives-resize behaviour, now flowing through the registry.
 TEST(TopoEdge, ResolveSetFollowsSketchResize) {
     Document doc;

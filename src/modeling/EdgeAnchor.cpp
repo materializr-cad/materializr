@@ -78,7 +78,7 @@ bool rimEnds(const TopoDS_Edge& e, const Frame& f,
 
 // Does the (u1,v1)-(u2,v2) edge lie ON segment A-B (within tol)? Features that
 // intersect each other clip rim edges into FRAGMENTS of the sketch line, so
-// endpoint-pair equality is too strict — containment is the real relation.
+// endpoint-pair equality is too strict - containment is the real relation.
 // Sets t = the edge midpoint's fraction along A-B (for fragment disambiguation).
 bool onSegment(double u1, double v1, double u2, double v2,
                double ax, double ay, double bx, double by,
@@ -101,7 +101,7 @@ bool onSegment(double u1, double v1, double u2, double v2,
 
 // Arc/Circle = circular OR elliptical edge cut from the cylinder swept by a
 // sketch arc/circle: center on the extrusion axis over (cu,cv), radius (minor
-// radius for oblique = elliptical sections — a plane section of a cylinder is
+// radius for oblique = elliptical sections - a plane section of a cylinder is
 // an ellipse whose minor radius IS the cylinder radius) equal to the sketch
 // radius. Sets h = center height along the normal.
 bool cylUVRH(const TopoDS_Edge& e, const Frame& f,
@@ -286,7 +286,7 @@ bool parse(const std::string& blob, std::vector<Anchor>& anchors) {
     anchors.clear();
     if (blob.empty()) return false;
 
-    // Legacy v1: "<sketchId>~C,<pid>~R,<lid>,<h>~N" — header sketch id applies
+    // Legacy v1: "<sketchId>~C,<pid>~R,<lid>,<h>~N" - header sketch id applies
     // to every token. v2 leads with the literal "v2".
     const bool v2 = blob.rfind("v2", 0) == 0 &&
                     (blob.size() == 2 || blob[2] == '~');

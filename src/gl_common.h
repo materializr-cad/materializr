@@ -6,15 +6,15 @@
 // uses OpenGL ES 3.0, which provides the same subset Materializr relies on
 // (VAOs, instancing, in/out shader stages, transpose/inverse). Shader sources
 // written for GLSL 330 core are adapted to GLSL ES 3.00 transparently at
-// upload time — see below.
+// upload time - see below.
 //
 // Branch order matters: iOS defines __APPLE__ too, so the GLES branch must be
 // tested BEFORE the __APPLE__ (= macOS desktop GL) branch.
 
 // The window's default framebuffer object. 0 on every platform except iOS,
 // where the screen is an SDL-created renderbuffer FBO and binding 0 renders
-// into the void (black screen). Set once in Window::create(); bind THIS —
-// never literal 0 — to target the window. Defined in Window.cpp.
+// into the void (black screen). Set once in Window::create(); bind THIS -
+// never literal 0 - to target the window. Defined in Window.cpp.
 namespace materializr {
 extern unsigned int g_windowFramebuffer;
 }
@@ -52,13 +52,13 @@ void glShaderSourceAdapt(GLuint shader, GLsizei count,
 #elif defined(_WIN32)
 // Windows: opengl32.dll only exports GL 1.1, so load the GL 3.3 core entry
 // points with GLEW (provided by vcpkg). glewInit() runs once after the context
-// is current — see Window.cpp. GLEW must precede any other GL header.
+// is current - see Window.cpp. GLEW must precede any other GL header.
 #include <GL/glew.h>
 #elif defined(__APPLE__)
 // macOS: OpenGL.framework exports the 3.2+ core-profile entry points directly
-// via <OpenGL/gl3.h> (up to GL 4.1 — the platform ceiling, which still covers
+// via <OpenGL/gl3.h> (up to GL 4.1 - the platform ceiling, which still covers
 // every GLSL 330 shader here), so no GLEW-style loader is needed. The context
-// must be created with the forward-compatible core profile — see Window.cpp.
+// must be created with the forward-compatible core profile - see Window.cpp.
 // GL was deprecated on macOS 10.14; silence those headers (Apple still ships
 // and supports the framework, and there's no Metal/MoltenVK port yet). The
 // CMake build also defines this for ImGui's GL backend, so guard against the

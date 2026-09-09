@@ -60,8 +60,8 @@ bool ConstructionAxisOp::execute(Document& doc) {
         gp_Pnt o; gp_Dir d;
         if (m_hasLiteralAxis) { o = m_literalOrigin; d = m_literalDir; }
         else computeAxis(o, d);
-        // Prior id (kept across undo) is passed as reuseId so a redo — in
-        // session or of a reloaded step — restores the axis under the same id,
+        // Prior id (kept across undo) is passed as reuseId so a redo - in
+        // session or of a reloaded step - restores the axis under the same id,
         // keeping Revolve / pattern steps that reference it valid.
         m_createdAxisId = doc.addAxis(o, d, m_axisName, m_createdAxisId);
         return m_createdAxisId >= 0;
@@ -134,7 +134,7 @@ bool ConstructionAxisOp::deserializeParams(const std::string& blob) {
 
 bool ConstructionAxisOp::rehydrateFromReload(const ReloadState& /*state*/,
                                              Document& doc) {
-    // The axis is persisted as a document entity and already loaded — verify
+    // The axis is persisted as a document entity and already loaded - verify
     // the recorded id resolves so undo() removes the right one.
     if (!m_hasLiteralAxis || m_createdAxisId < 0) return false;
     return doc.getAxis(m_createdAxisId) != nullptr;

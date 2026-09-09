@@ -3,6 +3,8 @@
 #include "../viewport/ShapeRenderer.h"
 
 #include <BRepMesh_IncrementalMesh.hxx>
+#include "core/MeshParams.h"
+#include <BRepBuilderAPI_Copy.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Face.hxx>
@@ -31,10 +33,9 @@ struct MeshBufferData {
 };
 
 static void tessellateMesh(const TopoDS_Shape& shape, MeshBufferData& out, float deflection) {
-    // Pass an angular deflection too — the single-arg ctor defaults it to 0.5rad
+    // Pass an angular deflection too - the single-arg ctor defaults it to 0.5rad
     // (~28°), which left small fillets visibly faceted/rippled.
-    BRepMesh_IncrementalMesh meshGen(shape, deflection, false, 0.2);
-    meshGen.Perform();
+    BRepMesh_IncrementalMesh meshGen(shape, materializr::meshParams(deflection, 0.2, false));
 
     for (TopExp_Explorer explorer(shape, TopAbs_FACE); explorer.More(); explorer.Next()) {
         const TopoDS_Face& face = TopoDS::Face(explorer.Current());
@@ -156,7 +157,10 @@ GltfExportResult GltfExport::exportFile(const std::string& filePath, const Docum
         MeshBufferData md;
         md.name = doc.getBodyName(id);
         md.color = ShapeRenderer::bodyColor(colorIndex);
-        tessellateMesh(shape, md, 0.02f);
+        // Mesh a COPY: meshing the live body in place would leave it carrying
+        // an export-quality triangulation the viewport's mesh cache
+        // (ShapeRenderer::m_meshedAt) still believes is viewport quality.
+        tessellateMesh(BRepBuilderAPI_Copy(shape).Shape(), md, 0.02f);
 
         if (!md.positions.empty()) {
             meshes.push_back(std::move(md));

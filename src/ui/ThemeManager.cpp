@@ -145,7 +145,7 @@ void ThemeManager::applyLight() {
     colors[ImGuiCol_Tab]              = ImVec4(0.82f, 0.82f, 0.86f, 1.0f);
     colors[ImGuiCol_TabHovered]       = ImVec4(0.62f, 0.70f, 0.82f, 1.0f);
     colors[ImGuiCol_TabSelected]      = ImVec4(0.72f, 0.78f, 0.88f, 1.0f);
-    // Unfocused (dimmed) dock tabs — without these, docked panel tab labels
+    // Unfocused (dimmed) dock tabs - without these, docked panel tab labels
     // (Properties/History/Tools) kept the dark default and went unreadable
     // against the black light-theme text until hovered.
     colors[ImGuiCol_TabDimmed]         = ImVec4(0.84f, 0.84f, 0.88f, 1.0f);

@@ -20,13 +20,13 @@ exact configuration.
 ## Bundled fonts
 
 The sketch Text tool ships 10 TrueType fonts (in `assets/fonts/`, also mirrored
-under `android/app/src/main/assets/`). All are free/redistributable — SIL Open
+under `android/app/src/main/assets/`). All are free/redistributable - SIL Open
 Font License 1.1, the Ubuntu Font Licence 1.0, or the Bitstream Vera/Arev
 permissive license. Per-font copyright notices, the picker mapping, and the full
 license texts are in `assets/fonts/FONT-CREDITS.md` and `assets/fonts/licenses/`.
 
 Note: "Times (Liberation)" and "Arial (Liberation)" are the OFL Liberation fonts,
-which are *metric-compatible* stand-ins for the proprietary Microsoft fonts — the
+which are *metric-compatible* stand-ins for the proprietary Microsoft fonts - the
 real Times New Roman / Arial are NOT bundled.
 
 Materializr's own source is under the license in the repository root `LICENSE`.

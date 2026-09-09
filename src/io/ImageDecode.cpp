@@ -3,7 +3,7 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_NO_STDIO            // we only ever decode from memory
-#define STBI_NO_HDR              // no float/HDR path — photos only
+#define STBI_NO_HDR              // no float/HDR path - photos only
 #define STBI_NO_LINEAR
 // Defence in depth only. NOT the memory bound: 16384x16384 RGBA is still ~1 GB,
 // so kMaxImagePixels below is what actually caps the allocation.
@@ -18,7 +18,7 @@ namespace materializr {
 namespace {
 
 // A reference image is a photo underlay. These bound what a *file* may ask us to
-// allocate — the blob arrives inside a .materializr (the REFIMG section), so the
+// allocate - the blob arrives inside a .materializr (the REFIMG section), so the
 // dimensions are untrusted even though the picker path looks interactive.
 constexpr int    kMaxImageDim    = 16384;        // per axis; GL texture ceiling
 constexpr size_t kMaxImagePixels = 64000000;     // 64 MP decoded
@@ -48,7 +48,7 @@ bool decodeImage(const uint8_t* bytes, size_t len, DecodedImage& out) {
     if (!inputLengthOk(bytes, len)) return false;
 
     // PROBE FIRST. Validating after stbi_load_from_memory would validate after
-    // the oversized allocation has already happened — a ~1 KB PNG can declare
+    // the oversized allocation has already happened - a ~1 KB PNG can declare
     // 30000x30000 and ask for ~3.6 GB.
     int w = 0, h = 0, comp = 0;
     if (!stbi_info_from_memory(bytes, static_cast<int>(len), &w, &h, &comp))
@@ -71,7 +71,7 @@ bool decodeImage(const uint8_t* bytes, size_t len, DecodedImage& out) {
     out.height = dh;
     // One copy, into vector-owned storage. stb returns malloc'd memory that a
     // std::vector cannot adopt, so this copy is inherent to the interface
-    // (accepted; removing it needs a custom allocator, not a reordering — and
+    // (accepted; removing it needs a custom allocator, not a reordering - and
     // freeing px before the copy would be a use-after-free).
     out.rgba.assign(px, px + static_cast<size_t>(dw) * dh * 4);
     stbi_image_free(px);
@@ -87,7 +87,7 @@ bool probeImageSize(const uint8_t* bytes, size_t len, int& wOut, int& hOut) {
     // whether to accept a file at all, so it must apply the same ceiling the
     // decoder will.
     if (!dimensionsOk(w, h)) return false;
-    // Outputs are written only on success — callers keep their prior values.
+    // Outputs are written only on success - callers keep their prior values.
     wOut = w;
     hOut = h;
     return true;

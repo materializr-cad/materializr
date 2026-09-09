@@ -58,7 +58,7 @@
 namespace materializr {
 
 namespace {
-// Same test as Application::faceIsPlanar — a plane, or close enough that OCCT's
+// Same test as Application::faceIsPlanar - a plane, or close enough that OCCT's
 // planarity check accepts it (a face can be planar without a Geom_Plane).
 bool faceIsPlanar(const TopoDS_Face& face) {
     Handle(Geom_Surface) s = BRep_Tool::Surface(face);
@@ -70,7 +70,7 @@ bool faceIsPlanar(const TopoDS_Face& face) {
 
 // True if `face` shares an edge with a rounded (cylinder/torus = fillet) face of
 // `body`. That's the exact condition OCCT's offset can't open, so it's what the
-// Shell warning should key on — NOT merely "the body has fillets somewhere"
+// Shell warning should key on - NOT merely "the body has fillets somewhere"
 // (which mis-blamed fillets on a plain side face that failed for another reason).
 bool faceBordersRounded(const TopoDS_Shape& body, const TopoDS_Face& face) {
     if (body.IsNull() || face.IsNull()) return false;
@@ -106,6 +106,10 @@ int ShellController::onBegin(const IopContext& ctx) {
     return -1;
 }
 
+bool ShellController::wantsDeferredCommit(const IopContext& ctx) const {
+    return previewIsOffThread() && !ctx.history.isBodyThreaded(bodyId());
+}
+
 std::unique_ptr<Operation> ShellController::buildOp(const IopContext&) {
     if (m_thickness <= 0.0f) return nullptr;
     auto op = std::make_unique<ShellOp>();
@@ -119,7 +123,7 @@ void ShellController::panelBody(const IopContext& ctx, bool& changed) {
     ImGui::TextDisabled("%s", materializr::tr("Hollows the body, opening a face."));
 
     if (ctx.cornerCommitUi) {
-        // im-touch: number-pad amount field — no InputText, no native
+        // im-touch: number-pad amount field - no InputText, no native
         // keyboard (which froze the app on iOS).
         if (materializr::amountLengthField("shellAmt", nullptr, &m_thickness, /*allowSign=*/false, 0.1f, 20.0f)) {
             materializr::formatLengthDigits(m_inputBuf, sizeof(m_inputBuf), m_thickness);
@@ -141,7 +145,7 @@ void ShellController::panelBody(const IopContext& ctx, bool& changed) {
         requestCommit();
     } else if (materializr::lengthBufferIsActive("##shellThickness")) {
         // Only while the user is typing. Parsing an IDLE buffer wrote the
-        // buffer's rounded text back over a more precise member — a value was
+        // buffer's rounded text back over a more precise member - a value was
         // truncated to the display decimals just by opening the tool.
         float parsed = m_thickness;
         if (materializr::parseLength(m_inputBuf, parsed) &&
@@ -156,16 +160,20 @@ void ShellController::panelBody(const IopContext& ctx, bool& changed) {
 
     if (materializr::lengthStepperRow("shellStep", &m_thickness,
                                 /*allowNegative=*/false, 0.1f, 20.0f)) {
-        // Snap to 0.1 mm — wall thicknesses are almost always in tenths, and a
+        // Snap to 0.1 mm - wall thicknesses are almost always in tenths, and a
         // free-floating 3.47 mm slider value is just noise.
         m_thickness = std::round(m_thickness * 10.0f) / 10.0f;
         materializr::formatLengthDigits(m_inputBuf, sizeof(m_inputBuf), m_thickness);
         changed = true;
     }
 
-    if (!previewOk()) {
+    // Not while a worker job is in flight: previewOk() then describes the
+    // last LANDED thickness, and on a heavy body the slider runs ahead of it,
+    // so the failure of a value the user has already moved past would flash
+    // over a thickness that is still being computed.
+    if (!previewOk() && !previewPending()) {
         const ImVec4 warn(1.0f, 0.6f, 0.3f, 1.0f);
-        // Only blame fillets when THIS face actually borders one — OCCT can't
+        // Only blame fillets when THIS face actually borders one - OCCT can't
         // open a fillet-bordered face (it seals the cavity), and no thickness
         // fixes it; the answer is order-of-operations: shell first, fillet after.
         // A plain side face that failed for another reason gets the generic hint.
@@ -185,7 +193,7 @@ void ShellController::onCleanup() {
 // ─── Taper ───────────────────────────────────────────────────────────────────
 
 int TaperController::onBegin(const IopContext& ctx) {
-    // Collect every selected face on ONE body — multi-select all four
+    // Collect every selected face on ONE body - multi-select all four
     // sides of a box to pyramid it in one go.
     m_faces.clear();
     int body = -1;
@@ -253,11 +261,19 @@ bool TaperController::resolveFrame(const IopContext& ctx, glm::vec3& dirOut,
     dir = glm::normalize(dir);
 
     // Neutral plane: perpendicular to the pull direction, through the
-    // body's extreme along it — the BASE stays fixed and the far end
+    // body's extreme along it - the BASE stays fixed and the far end
     // tilts. Flip moves the fixed plane to the other extreme.
+    //
+    // Measured on the SNAPSHOT, not the live body: in an async gesture the
+    // live body shows the previous preview (the engine no longer restores the
+    // snapshot per frame), whose bounds already carry that tilt. Reading them
+    // would move the neutral plane from frame to frame and change the
+    // dispatch key without the slider moving, so every landed job would look
+    // stale and relaunch, and the commit (which runs on the restored
+    // snapshot) would build different geometry than the preview showed.
     try {
         Bnd_Box bb;
-        BRepBndLib::Add(ctx.doc.getBody(bodyId()), bb);
+        BRepBndLib::Add(snapshot().IsNull() ? ctx.doc.getBody(bodyId()) : snapshot(), bb);
         if (bb.IsVoid()) return false;
         double x0, y0, z0, x1, y1, z1;
         bb.Get(x0, y0, z0, x1, y1, z1);
@@ -298,7 +314,7 @@ void TaperController::panelBody(const IopContext& ctx, bool& changed) {
     ImGui::TextDisabled(materializr::tr("%zu face(s) tilt about the body's base."),
                         m_faces.size());
     ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 240.0f);
-    ImGui::TextDisabled("%s", materializr::tr("Tip: pick SIDE walls — a cylinder wall becomes a cone, box sides become a pyramid."));
+    ImGui::TextDisabled("%s", materializr::tr("Tip: pick SIDE walls - a cylinder wall becomes a cone, box sides become a pyramid."));
     ImGui::PopTextWrapPos();
     ImGui::Separator();
 
@@ -306,7 +322,7 @@ void TaperController::panelBody(const IopContext& ctx, bool& changed) {
         ImGui::TextColored(ImVec4(0.4f, 0.9f, 0.5f, 1.0f),
                            materializr::tr("Previewing %.1f deg"), m_angle);
     } else if (std::abs(m_angle) < 0.1f) {
-        // buildOp() short-circuits at ~0° so no preview is computed —
+        // buildOp() short-circuits at ~0° so no preview is computed -
         // but the face is fine. Don't flash the "can't taper" warning
         // when the user is just sitting on the slider's zero stop.
         ImGui::TextDisabled("%s", materializr::tr("Move the angle slider to preview."));
@@ -345,7 +361,7 @@ void TaperController::onCleanup() { m_faces.clear(); }
 // ─── Remove Face (defeature) ─────────────────────────────────────────────────
 
 int DefeatureController::onBegin(const IopContext& ctx) {
-    // Gather every selected face on ONE body — multi-select a few faces to
+    // Gather every selected face on ONE body - multi-select a few faces to
     // remove them together.
     m_faces.clear();
     int body = -1;
@@ -370,7 +386,7 @@ std::unique_ptr<Operation> DefeatureController::buildOp(const IopContext&) {
 
 void DefeatureController::panelBody(const IopContext&, bool&) {
     ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 240.0f);
-    ImGui::TextDisabled("%s", materializr::tr("Removes the selected face(s) and heals the surrounding faces back together — e.g. take a baked fillet back to a sharp edge so you can re-fillet it."));
+    ImGui::TextDisabled("%s", materializr::tr("Removes the selected face(s) and heals the surrounding faces back together - e.g. take a baked fillet back to a sharp edge so you can re-fillet it."));
     ImGui::PopTextWrapPos();
     ImGui::Separator();
     ImGui::Text(materializr::tr("%zu face(s) selected"), m_faces.size());
@@ -379,7 +395,7 @@ void DefeatureController::panelBody(const IopContext&, bool&) {
         ImGui::TextColored(ImVec4(0.4f, 0.9f, 0.5f, 1.0f), "%s", materializr::tr("Previewing removal"));
     } else {
         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 240.0f);
-        ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f), "%s", materializr::tr("Can't remove: the neighbouring faces can't be extended to close the gap. Try a different face — a single fillet / round usually works."));
+        ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.4f, 1.0f), "%s", materializr::tr("Can't remove: the neighbouring faces can't be extended to close the gap. Try a different face - a single fillet / round usually works."));
         ImGui::PopTextWrapPos();
     }
 }
@@ -446,10 +462,10 @@ std::unique_ptr<Operation> ProjectSketchController::buildOp(
 void ProjectSketchController::panelBody(const IopContext& ctx,
                                         bool& changed) {
     ImGui::TextDisabled("%s", materializr::tr("Projects the sketch onto this face along the\nsketch's normal, then cuts in or raises out."));
-    ImGui::TextWrapped("%s", materializr::tr("Click the sketch elements you want projected — click each to add or remove. Use Select all / Clear below."));
+    ImGui::TextWrapped("%s", materializr::tr("Click the sketch elements you want projected - click each to add or remove. Use Select all / Clear below."));
 
     // Live region scoping: clicking sketch regions in the viewport while this
-    // panel is open narrows the projection to just those (each click toggles —
+    // panel is open narrows the projection to just those (each click toggles -
     // no modifier needed while this step is active); clicking empty space goes
     // back to the whole sketch. A clicked region also drives the sketch choice,
     // so picking "the relevant sketch" is literally clicking it.
@@ -667,7 +683,7 @@ int ScaleFaceController::onBegin(const IopContext& ctx) {
             }
         }
         // Gizmo frame: the face plane's own axes + the face's half-extents
-        // along them. COPY the plane — Pln() returns a temporary, and a
+        // along them. COPY the plane - Pln() returns a temporary, and a
         // reference into it dangles (the red-line-to-infinity bug).
         Handle(Geom_Plane) gpl =
             Handle(Geom_Plane)::DownCast(BRep_Tool::Surface(m_face));
@@ -714,7 +730,7 @@ std::unique_ptr<Operation> ScaleFaceController::buildOp(const IopContext&) {
     op->setFace(m_face);
     op->setScaleUV(static_cast<double>(m_pctU), static_cast<double>(m_pctV));
     op->setLength(static_cast<double>(m_len));
-    // Always Pinch — it re-slopes the EXISTING walls and, since the >100%
+    // Always Pinch - it re-slopes the EXISTING walls and, since the >100%
     // union landed, does it in both directions. The old Extend/Pinch radio
     // asked the user to pick a boolean before they knew what either did, and
     // Extend answered a different question anyway (bolt a new tapered section
@@ -881,8 +897,8 @@ void ScaleFaceController::onCleanup() {
 // ─── Resize Cylindrical (Edit Diameter) ──────────────────────────────────────
 // Was ~17 members on Application plus begin/update/commit/cancel and a
 // hand-rolled panel in Application_Dialogs. The base already models all of it:
-// the snapshot, the live preview, Confirm/Cancel/Enter/Esc, and — via
-// wantsLivePreview — the threaded-body case that has to skip the preview.
+// the snapshot, the live preview, Confirm/Cancel/Enter/Esc, and - via
+// wantsLivePreview - the threaded-body case that has to skip the preview.
 
 int ResizeCylindricalController::onBegin(const IopContext& ctx) {
     // Resolve our own target rather than being handed one. detectCylindricalPick
@@ -928,22 +944,22 @@ std::unique_ptr<Operation> ResizeCylindricalController::buildOp(
 void ResizeCylindricalController::panelBody(const IopContext& ctx,
                                             bool& changed) {
     // The base already titles the panel "Edit Diameter"; this line carries the
-    // part that varies — which end, and whether it's a hole or an outer face.
+    // part that varies - which end, and whether it's a hole or an outer face.
     const bool bothEnds = both();
     const char* what = bothEnds       ? "Both ends"
                      : m_pick.editBottom ? "Bottom end"
                                          : "Top end";
-    ImGui::TextDisabled("%s \xE2\x80\x94 %s", what,
+    ImGui::TextDisabled("%s - %s", what,
                         m_pick.isHole ? "hole" : "outer face");
 
     if (bothEnds) {
         ImGui::TextUnformatted(materializr::trFormat("Original: %s", materializr::fmtLength(m_pick.topR * 2.0)).c_str());
     } else if (m_pick.editBottom) {
         ImGui::TextUnformatted(materializr::trFormat("Original: %s", materializr::fmtLength(m_pick.bottomR * 2.0)).c_str());
-        ImGui::TextDisabled("%s", materializr::trFormat("Top stays at %s — drag this end to make a cone.", materializr::fmtLength(m_pick.topR * 2.0)).c_str());
+        ImGui::TextDisabled("%s", materializr::trFormat("Top stays at %s - drag this end to make a cone.", materializr::fmtLength(m_pick.topR * 2.0)).c_str());
     } else {
         ImGui::TextUnformatted(materializr::trFormat("Original: %s", materializr::fmtLength(m_pick.topR * 2.0)).c_str());
-        ImGui::TextDisabled("%s", materializr::trFormat("Bottom stays at %s — drag this end to make a cone.", materializr::fmtLength(m_pick.bottomR * 2.0)).c_str());
+        ImGui::TextDisabled("%s", materializr::trFormat("Bottom stays at %s - drag this end to make a cone.", materializr::fmtLength(m_pick.bottomR * 2.0)).c_str());
     }
 
     if (m_inputFocus) {
@@ -958,7 +974,7 @@ void ResizeCylindricalController::panelBody(const IopContext& ctx,
     double parsed = *val;
     bool edited = false;
     if (ctx.cornerCommitUi) {
-        // im-touch: number-pad amount field — no InputText, no native keyboard
+        // im-touch: number-pad amount field - no InputText, no native keyboard
         // (which froze the app on iOS).
         double v = *val;
         if (materializr::amountLengthField("rcylAmt", nullptr, &v, /*allowSign=*/false)) {
@@ -998,13 +1014,13 @@ void ResizeCylindricalController::panelBody(const IopContext& ctx,
 
     // Only complain once the user has actually asked for a different size.
     // buildOp returns nullptr for "unchanged", which the base reports as a
-    // failed preview — so at the untouched original this warned about an
+    // failed preview - so at the untouched original this warned about an
     // invalid diameter before anything had been typed.
     if (!previewOk() && !m_deferred && changedFromOriginal()) {
-        ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.35f, 1.0f), "%s", materializr::tr("Invalid diameter for this feature —\na hole can't exceed the surrounding wall."));
+        ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.35f, 1.0f), "%s", materializr::tr("Invalid diameter for this feature -\na hole can't exceed the surrounding wall."));
     }
     if (m_deferred) {
-        ImGui::TextDisabled("%s", materializr::tr("Threaded body — applies on OK,\nthen the thread re-cuts in background."));
+        ImGui::TextDisabled("%s", materializr::tr("Threaded body - applies on OK,\nthen the thread re-cuts in background."));
     }
 }
 
@@ -1015,7 +1031,7 @@ void ResizeCylindricalController::onCleanup() {
 }
 
 // ─── Move Face ───────────────────────────────────────────────────────────────
-// Slice 2: the gesture maths moves first — these four read nothing but the
+// Slice 2: the gesture maths moves first - these four read nothing but the
 // state, so they port with a rename and no behaviour change. The lifecycle
 // (begin/update/commit) still runs on Application and calls back through
 // the accessors until slice 3.
@@ -1041,7 +1057,7 @@ glm::mat3 MoveFaceController::faceRotTotal() const {
 }
 
 void MoveFaceController::bakeFaceRotationDrag() {
-    // Twist isn't a tilt-matrix accumulation — nothing to bake for it.
+    // Twist isn't a tilt-matrix accumulation - nothing to bake for it.
     if (m_st.moveFaceIsTwist) return;
     if (m_st.faceXformKind != FaceXform::Rotate || std::abs(m_st.moveFaceAngle) < 1e-5f)
         return;
@@ -1061,7 +1077,7 @@ bool MoveFaceController::localTweakApplies() const {
 }
 
 gp_Trsf MoveFaceController::faceTweakTrsf() const {
-    // The same composed rotation configureFaceOp hands MoveFaceOp — live drag
+    // The same composed rotation configureFaceOp hands MoveFaceOp - live drag
     // stacked on the tilts already banked this session, about the face centre.
     const glm::mat3 R = faceRotTotal();
     const glm::vec3 t = m_st.moveFacePivot - R * m_st.moveFacePivot;
@@ -1127,8 +1143,8 @@ void MoveFaceController::configureFaceOp(MoveFaceOp& op) const {
 
 // ─── Move Face: lifecycle (slice 2b) ────────────────────────────────────────
 // Moved wholesale from Application_InteractiveOps. Everything these needed
-// from the app — document, selection, history, toast, mesh refusal, grid
-// snap — now arrives through IopContext, so the tool no longer reaches into
+// from the app - document, selection, history, toast, mesh refusal, grid
+// snap - now arrives through IopContext, so the tool no longer reaches into
 // a 28k-line class. They are still plain methods rather than base overrides:
 // Move Face slides on-face sketches during the preview and RE-SELECTS the
 // moved face on commit instead of clearing, and the base offers no hook for
@@ -1138,7 +1154,7 @@ void MoveFaceController::beginMoveFace(const IopContext& ctx, FaceXform kind) {
     if (ctx.refuseMesh("Move Face")) return;
     
     m_st.moveFaceActive = false;
-    setActive(false); // keep the base flag — what the generic loops gate on — in step
+    setActive(false); // keep the base flag - what the generic loops gate on - in step
     m_st.moveFaceBodyId = -1;
     m_st.moveFaceFace.Nullify();
     m_st.faceXformKind = kind;
@@ -1185,7 +1201,7 @@ void MoveFaceController::beginMoveFace(const IopContext& ctx, FaceXform kind) {
                 } catch (...) { m_st.moveFaceP0 = m_st.moveFacePivot = glm::vec3(0.0f); }
                 // Same canonical basis as the rim-edge path (PlaneAxes.h). The
                 // old cross(N, A) construction flips with the ENTRY NORMAL'S
-                // SIGN, and buildVoid's walk order decides that sign — a
+                // SIGN, and buildVoid's walk order decides that sign - a
                 // top-facing hole (N = world +Y) got its blue arrow along -Z,
                 // i.e. pointing the opposite way to the main gizmo's blue.
                 // Which of the two hole paths ran depended on whether the
@@ -1225,8 +1241,8 @@ void MoveFaceController::beginMoveFace(const IopContext& ctx, FaceXform kind) {
                 return;
             }
             // Refuse ONLY when the pick is plausibly a bore wall. buildVoid
-            // reports "one mouth" for plenty of ordinary faces — a solid
-            // cylinder's flat top cap among them — and this used to toast and
+            // reports "one mouth" for plenty of ordinary faces - a solid
+            // cylinder's flat top cap among them - and this used to toast and
             // RETURN on all of them, so selecting a cylinder's top face and
             // pressing Move refused with a message about holes instead of
             // moving the face (Steve, 2026-08-04). A bore wall is curved; a
@@ -1235,7 +1251,7 @@ void MoveFaceController::beginMoveFace(const IopContext& ctx, FaceXform kind) {
             // whole-hole slide above, because for them buildVoid SUCCEEDS.
             if (pocket && !faceIsPlanar(wall)) {
                 ctx.toast("Only simple through-holes can be moved for now "
-                          "\xE2\x80\x94 not pockets, countersunk, or stepped holes.");
+                          "- not pockets, countersunk, or stepped holes.");
                 return;
             }
         }
@@ -1244,7 +1260,7 @@ void MoveFaceController::beginMoveFace(const IopContext& ctx, FaceXform kind) {
     // Sort the selection: the first PLANAR face slides (the moving face); every
     // OTHER selected face is a candidate hole WALL (move that hole as a straight
     // tube); selected EDGES are hole top rings (slant). Walls are matched to
-    // hole loops by shared edges below — NOT by surface type, because after any
+    // hole loops by shared edges below - NOT by surface type, because after any
     // face op the wall is a ruled loft surface, not an analytic cylinder.
     std::vector<TopoDS_Face> selectedFaces;
     std::vector<TopoDS_Edge> selectedEdges;
@@ -1288,7 +1304,7 @@ void MoveFaceController::beginMoveFace(const IopContext& ctx, FaceXform kind) {
     // (The loft rebuild now lofts the outer loop AND subtracts a loft of each
     // hole loop, so holed faces are allowed. Freeform / boolean bodies that
     // crashed the old shear are handled safely too: the op only lofts local
-    // wires and refuses gracefully on release if the body isn't a clean prism —
+    // wires and refuses gracefully on release if the body isn't a clean prism -
     // no crash.)
 
     // Face plane (orientation-corrected outward normal + a point on it).
@@ -1314,7 +1330,7 @@ void MoveFaceController::beginMoveFace(const IopContext& ctx, FaceXform kind) {
         const glm::vec3 N = m_st.moveFaceN;
         if (kind == FaceXform::Translate) {
             // Slide: canonical basis (core/PlaneAxes.h). B = N x A is HANDED,
-            // so it flips with the face normal's sign — and a normal's sign is
+            // so it flips with the face normal's sign - and a normal's sign is
             // incidental. That put one arrow along a NEGATIVE world axis on
             // half the orientations, which is what "the arrow does nothing / is
             // reversed" kept meaning. Same fix the hole path got in 64a0c7f.
@@ -1425,7 +1441,7 @@ void MoveFaceController::beginMoveFace(const IopContext& ctx, FaceXform kind) {
     }
 
     // Face half-extent (max distance pivot→outline) so a drag of ~that length
-    // maps to ≈1 rad of tilt / a unit of scale — a size-independent feel.
+    // maps to ≈1 rad of tilt / a unit of scale - a size-independent feel.
     m_st.moveFaceHalfExtent = 1.0f;
     if (!m_st.moveFaceSilhouetteLoops.empty()) {
         float mx = 0.0f;
@@ -1435,11 +1451,11 @@ void MoveFaceController::beginMoveFace(const IopContext& ctx, FaceXform kind) {
     }
 
     // Hollow (shelled) body: the per-frame preview refuses (the loft engine
-    // can't shear a cavity), so the body won't follow the drag — but the
+    // can't shear a cavity), so the body won't follow the drag - but the
     // commit reflows beneath the Shell and lands correctly. Say so up front
     // instead of looking broken.
     if (ctx.history.isBodyShelled(m_st.moveFaceBodyId))
-        ctx.toast("Hollow body: the preview stays put \xE2\x80\x94 the change "
+        ctx.toast("Hollow body: the preview stays put - the change "
                   "applies when you release (re-shelled automatically).");
 
     m_st.moveFaceActive = true;
@@ -1498,7 +1514,7 @@ bool MoveFaceController::beginMoveHoleFromEdges(const IopContext& ctx) {
             sampleEdge(we.Current(), out);
     };
 
-    // Slide the rim IN ITS OWN PLANE — the entry normal from buildVoid is the
+    // Slide the rim IN ITS OWN PLANE - the entry normal from buildVoid is the
     // plane the drag lives in, exactly as the face-driven path uses it.
     TopoDS_Shape v; gp_Vec n; bool pocket = false;
     TopoDS_Wire entryRim, exitRim;
@@ -1508,7 +1524,7 @@ bool MoveFaceController::beginMoveHoleFromEdges(const IopContext& ctx) {
 
     // Anchor the gizmo on what is actually being dragged. Without this the
     // whole block below never ran and the gizmo drew at the world origin, far
-    // from the hole — P0/pivot/axes kept their defaults.
+    // from the hole - P0/pivot/axes kept their defaults.
     const TopoDS_Wire& nearRim = pick.nearIsEntry ? entryRim : exitRim;
     std::vector<glm::vec3> handle;   // the thing the user grabbed
     if (pick.mode == MoveHoleOp::Mode::EdgeMove && !pick.rimEdge.IsNull())
@@ -1534,7 +1550,7 @@ bool MoveFaceController::beginMoveHoleFromEdges(const IopContext& ctx) {
     }
 
     // In-plane axes, CANONICAL. The face path derives axis B as cross(N, A),
-    // which flips sign with N — and buildVoid's entry normal points whichever
+    // which flips sign with N - and buildVoid's entry normal points whichever
     // way its walk happened to go, so an identical hole gave a green arrow
     // along +Y or -Y depending on which mouth it called the entry. That reads
     // as reversed controls (it bit x/y holes, where the entry resolved to the
@@ -1575,7 +1591,7 @@ void MoveFaceController::updateMoveFace(const IopContext& ctx) {
             op.setSeedWall(m_st.moveHoleWall);
             // The PREVIEW has to run the same verb as the commit. It used to
             // build a bare op, which defaults to Slide, so every drag showed the
-            // whole hole moving no matter what the selection picked — and then
+            // whole hole moving no matter what the selection picked - and then
             // the result jumped to a tilt/reshape on release.
             op.setMode(m_st.moveHoleOpMode);
             op.setNearIsEntry(m_st.moveHoleNearIsEntry);
@@ -1594,7 +1610,7 @@ void MoveFaceController::updateMoveFace(const IopContext& ctx) {
     // Snap an in-plane face SLIDE to the grid step (issue #24): decompose the
     // translation onto the face's in-plane axes and round each to the step, so
     // the face moves in grid increments (like Extrude/Push-Pull). Only for a
-    // Translate — Rotate has its own degree snap and Scale is a percentage.
+    // Translate - Rotate has its own degree snap and Scale is a percentage.
     // m_st.moveFaceVec is recomputed absolutely from the drag each frame, so this
     // never compounds.
     if (m_st.faceXformKind == FaceXform::Translate && ctx.snapToGrid &&
@@ -1609,7 +1625,7 @@ void MoveFaceController::updateMoveFace(const IopContext& ctx) {
     ctx.doc.updateBody(m_st.moveFaceBodyId, m_st.moveFacePreviousShape);
     ctx.markMeshesDirty();
     if (!faceXformNontrivial()) { moveFaceSlideSketches(ctx, glm::vec3(0.0f)); return; }
-    // Local tilt previews through the FaceTweak engine directly (no op needed —
+    // Local tilt previews through the FaceTweak engine directly (no op needed -
     // the preview only has to put a shape on the document). A refusal leaves the
     // body on its snapshot and the reason on the state for the panel; it is not
     // quietly retried as a shear, because the two produce different bodies and
@@ -1786,7 +1802,7 @@ void MoveFaceController::moveFaceSlideSketches(const IopContext& ctx, const glm:
 // The drag. Intersect the cursor ray with the face's plane, latch the
 // nearest handle at drag start (ring-aware for Rotate), then track the
 // gesture: slide along the latched axis, sweep a ring, twist, or scale.
-// The body does NOT rebuild mid-drag — only the ghost silhouette moves
+// The body does NOT rebuild mid-drag - only the ghost silhouette moves
 // (drawOverlay below); the rebuild runs once on release.
 void MoveFaceController::onViewportInput(const IopViewport& vp,
                                          const IopContext& ctx) {
@@ -1862,7 +1878,7 @@ void MoveFaceController::onViewportInput(const IopViewport& vp,
                     float dB = std::min(sd(m_st.moveFaceAxisB), sd(-m_st.moveFaceAxisB));
                     m_st.moveFaceGrab = (dA <= dB) ? 0 : 1;
                     // Once per gesture: which arrow latched and the
-                    // frame it moves in. Left in on purpose — arrow
+                    // frame it moves in. Left in on purpose - arrow
                     // no-ops are order-dependent and impossible to
                     // reconstruct after the fact without this.
                     std::fprintf(stdout,
@@ -1951,7 +1967,7 @@ void MoveFaceController::onViewportInput(const IopViewport& vp,
                         m_st.moveFaceScaleBBase + along / ext);
                 }
             }
-            // Deferred: don't rebuild the body mid-drag — only the ghost
+            // Deferred: don't rebuild the body mid-drag - only the ghost
             // silhouette moves (drawOverlay). Flag a rebuild for release.
             m_st.moveFacePendingRebuild = true;
         }
@@ -1966,7 +1982,7 @@ void MoveFaceController::onViewportInput(const IopViewport& vp,
         if (m_st.moveFaceDragging)
             std::fprintf(stdout, "Move drag release: vec=(%.2f,%.2f,%.2f)\n",
                          m_st.moveFaceVec.x, m_st.moveFaceVec.y, m_st.moveFaceVec.z);
-        m_st.moveFaceDragging = false; // released — next drag re-latches
+        m_st.moveFaceDragging = false; // released - next drag re-latches
         m_st.moveFaceGrab = -1;
         setDraggingHandle(false);
     }
@@ -1996,7 +2012,7 @@ void MoveFaceController::drawOverlay(const IopOverlay& ov) const {
         }
         if (m_st.moveFaceIsTwist) {
             // Twist: spin the top loop about the face normal through
-            // the pivot (Rodrigues) — shows the final top orientation.
+            // the pivot (Rodrigues) - shows the final top orientation.
             glm::vec3 d = p - m_st.moveFacePivot;
             float c = std::cos(m_st.moveFaceTwist), s = std::sin(m_st.moveFaceTwist);
             const glm::vec3& k = m_st.moveFaceN;
@@ -2104,7 +2120,7 @@ void MoveFaceController::renderMoveFacePanel(const IopContext& ctx,
         }
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.80f, 0.35f, 1.0f));
         ImGui::PushTextWrapPos(230.0f);
-        ImGui::TextWrapped("%s", materializr::tr("Tilt and Twist are separate ops — one gesture does either a tilt OR a twist, not both. For a tapered-and-twisted face, commit one then the other."));
+        ImGui::TextWrapped("%s", materializr::tr("Tilt and Twist are separate ops - one gesture does either a tilt OR a twist, not both. For a tapered-and-twisted face, commit one then the other."));
         ImGui::PopTextWrapPos();
         ImGui::PopStyleColor();
 
@@ -2221,9 +2237,9 @@ void MoveFaceController::drawGizmos3D(const IopGizmo3D& g) const {
         return 0xFF000000u | (b(c.b) << 16) | (b(c.g) << 8) | b(c.r);
     };
     // Translate arrows take the colour of the axis each in-plane direction
-    // most aligns with — coloured by the USER's axis, not the world's. The
+    // most aligns with - coloured by the USER's axis, not the world's. The
     // world is Y-up internally while everything the user reads is Z-up
-    // (user X = world X, user Y = world Z, user Z = world Y — see
+    // (user X = world X, user Y = world Z, user Z = world Y - see
     // UserAxes.h), and this used to colour straight off the world axis. So a
     // top face's in-plane directions came out red + BLUE, when in the user's
     // own axes they are X and Y and should read red + GREEN (Steve,
@@ -2239,7 +2255,7 @@ void MoveFaceController::drawGizmos3D(const IopGizmo3D& g) const {
     };
     if (m_st.faceXformKind == FaceXform::Rotate) {
         // grab 0 tilts about axis B (RED ring), grab 1 about axis A
-        // (GREEN ring) — matched to the colored controls in the panel.
+        // (GREEN ring) - matched to the colored controls in the panel.
         const unsigned red0 = pack(m_st.moveFaceGrab == 0
                                        ? glm::vec3(1.0f, 0.32f, 0.32f)
                                        : glm::vec3(0.72f, 0.22f, 0.22f));
@@ -2248,7 +2264,7 @@ void MoveFaceController::drawGizmos3D(const IopGizmo3D& g) const {
                                        : glm::vec3(0.24f, 0.66f, 0.28f));
         g.ring(m_st.moveFacePivot, m_st.moveFaceAxisB, red0);
         g.ring(m_st.moveFacePivot, m_st.moveFaceAxisA, grn1);
-        // Third ring: about the face NORMAL (lies IN the face plane) —
+        // Third ring: about the face NORMAL (lies IN the face plane) -
         // grabbing it TWISTS the face rather than tilting it. Blue, the
         // "third axis" colour; brightens when latched (grab 2).
         const unsigned blu2 = pack(m_st.moveFaceGrab == 2

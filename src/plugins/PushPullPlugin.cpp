@@ -44,7 +44,7 @@ public:
                 // Detached sketch, OR one whose host body is gone: both are
                 // free-floating. Without the second check the target kept a
                 // dead id, PushPullOp took the fuse-into-existing branch, and
-                // its doc.getBody() failure `continue`d — the op silently did
+                // its doc.getBody() failure `continue`d - the op silently did
                 // NOTHING rather than falling back to making a new body.
                 int host = sketch->isDetachedFromBody()
                                ? -1
@@ -80,7 +80,7 @@ public:
     bool update(materializr::PluginContext&) override { return !m_done; }
 
     void commit(materializr::PluginContext& ctx) override {
-        // The last preview push IS the committed result — clear the flag so a
+        // The last preview push IS the committed result - clear the flag so a
         // later cancel() can never undo it.
         m_previewPushed = false;
         m_done = true;
@@ -131,7 +131,7 @@ public:
         }
 
         // parseFinite: reject garbage / non-finite input ("1e999" -> inf
-        // used to flow straight into the extrude) — the previous value stays.
+        // used to flow straight into the extrude) - the previous value stays.
         // The member is the truth; the buffer follows unless being typed in.
         materializr::reseedLengthBufferIfIdle("##dist", m_inputBuf, sizeof(m_inputBuf), m_distance);
         if (ImGui::InputText("##dist", m_inputBuf, sizeof(m_inputBuf),

@@ -8,7 +8,7 @@ bool DuplicateSketchOp::execute(Document& doc) {
     // source's body (issue #21). The deep copy carried the source's
     // m_sourceBodyId AND its bound host face, which made the copy:
     //   - cascade edits back into the original body (it wasn't detached),
-    //   - re-bind that host face — pulling the body face's wires into the copy's
+    //   - re-bind that host face - pulling the body face's wires into the copy's
     //     region (the stray translucent fill over the body),
     //   - aim push/pull + extrude at the ORIGINAL body instead of a new one, so
     //     push/pull did nothing and extrude was degenerate (perimeter fused flat,

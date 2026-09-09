@@ -1,6 +1,6 @@
 // Multi-body export: several separate solids must land in ONE file with their
-// relative positions intact. That is the print-in-place case — a hinge, or one
-// of those articulated toys — where the parts are deliberately disjoint and
+// relative positions intact. That is the print-in-place case - a hinge, or one
+// of those articulated toys - where the parts are deliberately disjoint and
 // the SPACING between them is the whole design. Exercises the document-level
 // exporter that Application::exportBodiesAs drives with a scratch document.
 #include <gtest/gtest.h>
@@ -21,7 +21,7 @@ using namespace materializr;
 namespace fs = std::filesystem;
 
 namespace {
-// Three separate 10mm cubes spread 25mm apart along X — disjoint solids
+// Three separate 10mm cubes spread 25mm apart along X - disjoint solids
 // standing in for the links of a print-in-place assembly.
 Document threeSpacedCubes() {
     Document d;
@@ -45,7 +45,7 @@ TEST(MultiBodyExport, EverySolidLandsInOneFile) {
 
     auto res = StlExport::exportFile(path, doc);
     ASSERT_TRUE(res.success) << res.errorMessage;
-    // 3 cubes x 12 triangles — one body's worth would be 12.
+    // 3 cubes x 12 triangles - one body's worth would be 12.
     EXPECT_GE(res.triangleCount, 36);
     EXPECT_TRUE(fs::exists(path));
     fs::remove(path);
@@ -66,7 +66,7 @@ TEST(MultiBodyExport, RelativePositionsSurvive) {
         << "the spread between parts was lost";
 }
 
-// Visibility is the subset control — hiding a body leaves it out of the
+// Visibility is the subset control - hiding a body leaves it out of the
 // export without deleting it, which is how you export part of an assembly.
 TEST(MultiBodyExport, HiddenBodiesAreExcluded) {
     Document full = threeSpacedCubes();

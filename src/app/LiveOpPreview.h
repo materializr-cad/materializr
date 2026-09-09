@@ -12,8 +12,8 @@ namespace materializr {
 //
 // This is the engine InteractiveOpController calls PreviewModel::LiveOp, in a
 // form an op that is NOT a controller can use. It exists because five
-// interactive ops — Pattern, Loft, Boundary Fill, Construction Plane,
-// Construction Axis — all previewed the other way:
+// interactive ops - Pattern, Loft, Boundary Fill, Construction Plane,
+// Construction Axis - all previewed the other way:
 //
 //     if (m_fooPreviewPushed && m_history->canUndo()) m_history->undo(doc);
 //     ...
@@ -23,18 +23,18 @@ namespace materializr {
 // things are wrong with that, all of which this class removes:
 //
 //   1. `canUndo()` is not "my preview is on top". It undoes whatever the top
-//      step happens to be. Anything that touches history mid-gesture — a
-//      cascade re-execute, a thread recut landing, another preview — and the
+//      step happens to be. Anything that touches history mid-gesture - a
+//      cascade re-execute, a thread recut landing, another preview - and the
 //      next parameter change silently undoes the USER's work instead.
 //      Extrude used to carry an explicit "preview op no longer on top of
-//      history — resyncing without undo" bail-out for exactly this; these
+//      history - resyncing without undo" bail-out for exactly this; these
 //      five never had one.
 //   2. A fresh op instance per frame throws away the id-reuse pool that
 //      PatternOp/LoftOp keep across undo (m_reuseBodyIds / m_createdBodyId),
 //      so every created body changes id on every frame. Downstream references
 //      and the renderer's per-body slots both churn.
 //   3. The preview is a real, visible, undoable history step while the popup
-//      is still open — Ctrl+Z lands in the middle of the gesture, and the
+//      is still open - Ctrl+Z lands in the middle of the gesture, and the
 //      History panel shows a step the user has not committed to.
 //
 // Keeping one instance and calling undo()/execute() on it directly fixes all
@@ -62,7 +62,7 @@ public:
     // leaves nothing applied, so the document keeps its un-previewed state.
     bool apply(Document& doc);
 
-    // Undo and drop — the cancel path.
+    // Undo and drop - the cancel path.
     void clear(Document& doc);
 
     // Record the applied instance WITHOUT re-running it (pushExecuted), and

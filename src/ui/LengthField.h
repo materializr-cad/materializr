@@ -2,7 +2,7 @@
 // Length widgets. Every one of these takes and returns MILLIMETRES; the
 // display unit is applied on the way in and stripped on the way out, inside
 // this header, and nowhere else. A panel that shows or edits a length uses one
-// of these — never a bare ImGui::InputFloat / SliderFloat / Text with "mm" in
+// of these - never a bare ImGui::InputFloat / SliderFloat / Text with "mm" in
 // the format string. That rule is what makes "only presentation converts" a
 // property of the code rather than a hope.
 //
@@ -26,7 +26,7 @@
 #include "TouchWidgets.h"
 
 #include <imgui.h>
-#include <imgui_internal.h>   // GetActiveID — same include the viewport already uses
+#include <imgui_internal.h>   // GetActiveID - same include the viewport already uses
 
 #include <cstdio>
 #include <string>
@@ -49,8 +49,8 @@ inline unsigned long      fmtArg(unsigned long v)      { return v; }   // size_t
 inline unsigned long long fmtArg(unsigned long long v) { return v; }
 inline double             fmtArg(double v)             { return v; }
 // A float here is a NON-length numeric printed by its own spec (a %.0f%%
-// percentage, a count of turns). Lengths never arrive as raw numbers — they
-// come pre-formatted as std::string — so promoting to double is correct.
+// percentage, a count of turns). Lengths never arrive as raw numbers - they
+// come pre-formatted as std::string - so promoting to double is correct.
 inline double             fmtArg(float v)              { return v; }
 template <class T> void fmtArg(const T&) {
     static_assert(sizeof(T) == 0, "trFormat: pass counts as int, quantities pre-formatted as std::string");
@@ -60,7 +60,7 @@ template <class T> void fmtArg(const T&) {
 // tr(fmt) then printf with exact sizing: a counting pass, then a buffer of that
 // size. Long translated sentences are never cut. Quantities arrive already
 // formatted (fmtLength / fmtArea / fmtVec3) so catalogue keys carry only %s and
-// %d — never a unit.
+// %d - never a unit.
 template <class... A>
 inline std::string trFormat(const char* fmt, const A&... a) {
     const char* f = tr(fmt);
@@ -74,7 +74,7 @@ inline std::string trFormat(const char* fmt, const A&... a) {
 
 // Reseed a controller's own text buffer from its millimetre member, unless
 // that field is being edited RIGHT NOW. Decided before the item is submitted,
-// using the field's own id, so an external change — or a unit switch — shows
+// using the field's own id, so an external change - or a unit switch - shows
 // this frame while a half-typed value is never clobbered.
 //
 // The hand-rolled controllers treated their buffer as the source of truth and
@@ -85,11 +85,11 @@ inline std::string trFormat(const char* fmt, const A&... a) {
 // opening the tool. The member is the truth; the buffer follows it.
 // A stepper row whose buttons mean what their labels say. stepperRow adds its
 // literal magnitudes (10 / 1 / 0.1) straight to a millimetre member, so beside
-// a field reading "in" the button labelled +1 moved the value by 1 mm — 0.039
-// in — and the mm min/max bounds shrank the usable range by the unit factor.
+// a field reading "in" the button labelled +1 moved the value by 1 mm - 0.039
+// in - and the mm min/max bounds shrank the usable range by the unit factor.
 //
 // Magnitudes come from the unit table as {10*step, step, 0.1*step}, which for
-// millimetres is exactly {10, 1, 0.1} — the behaviour that was already there.
+// millimetres is exactly {10, 1, 0.1} - the behaviour that was already there.
 // Bounds stay millimetres and keep stepperRow's clamp semantics (a bound only
 // stops motion TOWARDS it), so call sites pass what they always passed.
 inline bool lengthStepperRow(const char* id, float* mm, bool allowNegative,
@@ -140,14 +140,6 @@ inline void reseedLengthBufferIfIdle(const char* label, char* buf, size_t n, dou
     if (!lengthBufferIsActive(label)) formatLengthDigits(buf, n, mm);
 }
 
-inline std::string fmtVec3(double xMm, double yMm, double zMm) {
-    const UnitInfo& u = unitInfo(currentUnit());
-    char b[96];
-    std::snprintf(b, sizeof b, "(%.*f, %.*f, %.*f) %s",
-                  u.decimals, toDisplay(xMm), u.decimals, toDisplay(yMm),
-                  u.decimals, toDisplay(zMm), u.suffix);
-    return b;
-}
 
 // One-quantity readout: lengthText("Length: %s", mm).
 inline void lengthText(const char* fmt, double mm) {
@@ -163,7 +155,7 @@ struct LengthEdit {
 };
 
 // Numeric length input. The display value is recomputed from mm EVERY frame and
-// written back only when the widget reports a change — so an untouched value
+// written back only when the widget reports a change - so an untouched value
 // never drifts, and a unit switch shows correctly on the next frame. Step and
 // precision come from the unit table; there are deliberately no step/fmt
 // parameters to get wrong.

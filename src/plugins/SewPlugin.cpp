@@ -2,7 +2,7 @@
 #include "../plugin/PluginContext.h"
 #include "../core/SelectionManager.h"
 
-// Sew — the rung under Patch. See SewOp.h for why it has to exist: sewing runs
+// Sew - the rung under Patch. See SewOp.h for why it has to exist: sewing runs
 // inside five operations and was reachable from the UI in none of them, so a
 // space bounded by several patches could never be made solid.
 //

@@ -1,6 +1,6 @@
 // BooleanOp publishes a two-input GenerationLedger, so the "gen" strategy can
 // name a boolean SEAM EDGE by the two faces that made it (each face named by
-// sketchface against its own input body — edit-stable). THE deferred dream
+// sketchface against its own input body - edit-stable). THE deferred dream
 // case: seam sub-shapes were unnameable by every geometric scheme, which is
 // why fillets on seams bake to ReplayOps today. This proves the naming layer
 // now reaches them and survives an upstream sketch edit.
@@ -58,7 +58,7 @@ TopoDS_Edge edgeNear(const TopoDS_Shape& body, const gp_Pnt& p, double tol) {
 
 TEST(TopoBooleanGen, SeamEdgeNameSurvivesSketchEdit) {
     Document doc;
-    // Body A: 20x10 slab, z 0..10. Body B: 15..25 x 3..7 post, z 0..15 —
+    // Body A: 20x10 slab, z 0..10. Body B: 15..25 x 3..7 post, z 0..15 -
     // sticks out of A's top, so B's walls cut SEAM edges into A's top face.
     int pa[4], pb[4];
     auto skA = makeRect(0, 0, 20, 10, pa);
@@ -109,7 +109,7 @@ TEST(TopoBooleanGen, SeamEdgeNameSurvivesSketchEdit) {
     ASSERT_TRUE(extB.execute(doc));
     ASSERT_TRUE(fuse.execute(doc)) << "re-fuse on the moved post";
 
-    // Resolve the ORIGINAL gen payload against the NEW ledger — directly via
+    // Resolve the ORIGINAL gen payload against the NEW ledger - directly via
     // the gen strategy, so no other scheme can mask the result. It must land
     // the MOVED seam edge at (13, 5, 10).
     const topo::Strategy* gen = topo::Registry::instance().forScheme("gen");
@@ -132,8 +132,8 @@ TEST(TopoBooleanGen, SeamEdgeNameSurvivesSketchEdit) {
 #include <BRepAdaptor_Surface.hxx>
 
 // THE PAYOFF: a FILLET on a boolean seam edge survives an upstream sketch
-// edit. The vertical seam at (20,3) — where the post's y=3 wall crosses the
-// slab's x=20 wall — sits over NO sketch vertex (proven in-test: EdgeAnchor
+// edit. The vertical seam at (20,3) - where the post's y=3 wall crosses the
+// slab's x=20 wall - sits over NO sketch vertex (proven in-test: EdgeAnchor
 // classifies it None), so the proven anchor path fails by construction and
 // the new topo-ref last resort (gen lineage via the boolean's ledger,
 // republished on the Document by the replay) is what re-finds it.
@@ -299,7 +299,7 @@ TEST(TopoBooleanGen, SeamRefsRoundTripThroughParams) {
 
 // FULL FILE ROUND-TRIP: the seam fillet's params (incl. edgerefs) go through
 // a real .materializr save+load; the RELOADED op must still follow a sketch
-// edit — the exact flow of: work, save, quit, reopen, edit.
+// edit - the exact flow of: work, save, quit, reopen, edit.
 TEST(TopoBooleanGen, ReloadedSeamFilletFollowsEdit) {
     Document doc;
     int pa[4], pb[4];
@@ -345,7 +345,7 @@ TEST(TopoBooleanGen, ReloadedSeamFilletFollowsEdit) {
         << "edge refs must survive the FILE";
 
     // "Reopen": a fresh FilletOp from the FILE params, working in the live
-    // doc (sketch ids match — same project).
+    // doc (sketch ids match - same project).
     FilletOp reloaded;
     ASSERT_TRUE(reloaded.deserializeParams(loaded.steps[0].params));
     // The app rehydrates at load: ordinal indices -> edges of the LOADED
@@ -374,7 +374,7 @@ TEST(TopoBooleanGen, ReloadedSeamFilletFollowsEdit) {
 #include <TopExp.hxx>
 #include <TopTools_IndexedMapOfShape.hxx>
 
-// ownsFace (click-to-edit) must claim ONLY blend faces — a planar neighbour
+// ownsFace (click-to-edit) must claim ONLY blend faces - a planar neighbour
 // (the big slab top the blends were carved from) must never open the fillet
 // editor (Steve: "most faces of the base box showed the fillet properties").
 TEST(TopoBooleanGen, OwnsFaceClaimsOnlyBlends) {

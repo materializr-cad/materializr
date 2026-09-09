@@ -19,7 +19,7 @@ namespace materializr {
 // OCCT's default is Precision::Angular() = 1e-12, which is TIGHTER THAN ITS OWN
 // BOOLEAN OUTPUT. The coplanar faces a cut or fuse leaves behind have normals
 // agreeing to ~1e-9, not 1e-12, so unify silently declines to merge them and
-// the split shows to the user as a seam line across an otherwise flat face —
+// the split shows to the user as a seam line across an otherwise flat face -
 // issue #81, hit on an imported-and-edited STEP part.
 //
 // Measured on that part (left nacelle.mzr, 189 faces, 10 coplanar-adjacent
@@ -33,7 +33,7 @@ namespace materializr {
 // 1e-9 is deliberately the tightest value that still clears every seam: it
 // merges only the six faces that were genuinely one, where 1e-3 merges 29. Do
 // not loosen it to "fix" some other merge without measuring what else it
-// starts merging — this tolerance decides which faces cease to exist, and
+// starts merging - this tolerance decides which faces cease to exist, and
 // downstream fillet/chamfer references are resolved against those faces.
 constexpr double kUnifyAngularTol = 1.0e-9;
 
@@ -50,14 +50,14 @@ constexpr double kUnifyAngularTol = 1.0e-9;
 //     after unify        -> vol 161.075, INVALID, and still 9 faces
 //
 // It merged NOTHING (9 faces in, 9 out) and ate 29% of the volume on the way
-// through. Every flag combination did it — concatBSplines off, faces-only,
-// edges-only, OCCT's default angular tolerance — so it is not a tuning
+// through. Every flag combination did it - concatBSplines off, faces-only,
+// edges-only, OCCT's default angular tolerance - so it is not a tuning
 // question. BooleanOp then validity-checked the mangled shape, got false, and
 // reported "Fuse failed even with fuzzy" four times over a fuse that had
 // succeeded perfectly each time. From the user's chair the Union button was
 // simply dead.
 //
-// So: check the result is still the same solid before adopting it — a visible
+// So: check the result is still the same solid before adopting it - a visible
 // seam is a blemish, a silently reshaped part is data loss, and a refused
 // operation is neither. Callers go through unifySameDomain() below rather than
 // calling this directly, because the shape to fall back to has to be a copy
@@ -101,15 +101,15 @@ inline bool unifyIsSafe(const TopoDS_Shape& before, const TopoDS_Shape& after,
 // ShapeUpgrade_UnifySameDomain EDITS ITS INPUT IN PLACE. Measured on the same
 // union: the fuse result reads 227.049 and valid, unify runs, and the original
 // handle now reads 161.075 and invalid alongside the returned one. Checking the
-// result and "keeping the pre-unify shape" therefore fixes nothing on its own —
+// result and "keeping the pre-unify shape" therefore fixes nothing on its own -
 // by then there is no pre-unify shape left to keep. Only a deep copy taken
 // BEFORE the merge survives it. (The merge's inputs, if it is a boolean result,
-// are not touched — verified separately.)
+// are not touched - verified separately.)
 //
 // So: copy first, merge, and return the copy when the merge is not adoptable.
 // The merge still runs on the caller's shape, so a merge we DO adopt carries a
 // BRepTools_History whose keys are the caller's own sub-shapes and face lineage
-// is unaffected — that is the common path and it behaves exactly as before.
+// is unaffected - that is the common path and it behaves exactly as before.
 // On the rejected path the caller gets the spare copy, whose sub-shapes are new:
 // a ledger keyed on the corrupted original will not resolve against it, so that
 // one operation can lose its face lineage. A downstream reference re-resolves

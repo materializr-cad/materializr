@@ -1,11 +1,11 @@
-// Multi-instance recovery-slot tests — the "two running instances fight over
+// Multi-instance recovery-slot tests - the "two running instances fight over
 // one recovery autosave" SIGBUS fix. Each instance claims a per-slot OS file
 // lock (kernel-released on death) and writes only its own snapshot; the
 // startup scan offers only ORPHANED snapshots (owner provably dead), never a
 // live instance's file.
 //
 // NOTE: the slot claim is a process-lifetime static, so the ordering inside
-// this binary matters — the pre-seeded slot-0 orphan must exist BEFORE the
+// this binary matters - the pre-seeded slot-0 orphan must exist BEFORE the
 // first recovery API call, which is also exactly the scenario under test
 // ("previous session crashed, new session starts").
 
@@ -39,7 +39,7 @@ void writeFile(const std::string& path, const std::string& text) {
     os << text;
 }
 
-// Must match recoveryDir() in ProjectRecovery.cpp byte-for-byte — a prefix
+// Must match recoveryDir() in ProjectRecovery.cpp byte-for-byte - a prefix
 // assertion compares strings, and the Windows branch mixes separators.
 std::string recDir() {
 #ifdef _WIN32
@@ -50,7 +50,7 @@ std::string recDir() {
 }
 
 // Pre-main setup: sandbox the config dir and seed a "crashed previous
-// session" — a slot-0 snapshot (legacy filename) with no lock held.
+// session" - a slot-0 snapshot (legacy filename) with no lock held.
 struct Env {
     Env() {
 #ifdef _WIN32
@@ -73,7 +73,7 @@ struct Env {
         writeFile(recDir() + "/autosave.materializr.meta",
                   "MZRECOVERY 1\nSAVEDAT 1234\nBODIES 3\nSTEPS 7\n"
                   "PROJECT /tmp/original.materializr\n");
-        // Slot 1 holds ONLY a background TAB's snapshot — no session-0 file.
+        // Slot 1 holds ONLY a background TAB's snapshot - no session-0 file.
         // That is exactly what a clean quit leaves behind when a background
         // tab had unsaved work (the active tab's snapshot is cleared, the
         // dirty inactive one is deliberately kept), and it is the only copy
@@ -82,7 +82,7 @@ struct Env {
         writeFile(recDir() + "/autosave-1-t1.materializr.meta",
                   "MZRECOVERY 1\nSAVEDAT 1200\nBODIES 1\nSTEPS 2\n"
                   "PROJECT /tmp/background-tab.materializr\n");
-        // Age it so the slot-0 orphan stays the newest — the candidate the
+        // Age it so the slot-0 orphan stays the newest - the candidate the
         // tests above assert on.
         std::error_code ec;
         fs::last_write_time(recDir() + "/autosave-1-t1.materializr",
@@ -94,7 +94,7 @@ struct Env {
         // deliberately leaks the slot lock handle for the process lifetime;
         // there that is an exclusive CreateFileA handle, which BLOCKS deletion
         // of the file. The throwing overload then raises filesystem_error out
-        // of a static destructor — std::terminate, and a non-zero exit that
+        // of a static destructor - std::terminate, and a non-zero exit that
         // ctest reports as a failure even though every test passed. POSIX
         // unlinks open files happily, so this only ever surfaced on Windows.
         // A few leftover files in the temp directory are harmless.
@@ -106,7 +106,7 @@ struct Env {
 } // namespace
 
 // The new instance must NOT claim the crashed session's slot (it holds the
-// snapshot we want to offer) — it takes the next free one.
+// snapshot we want to offer) - it takes the next free one.
 TEST(Recovery, ClaimAvoidsOrphanedSnapshotSlot) {
     const std::string own = materializr::projectRecoveryPath();
     EXPECT_NE(own.find("autosave-"), std::string::npos)
@@ -131,7 +131,7 @@ TEST(Recovery, OrphanIsOfferedWithMeta) {
 // A slot holding ONLY a "-t<K>" tab snapshot is still OCCUPIED. Checking just
 // the session-0 filename made such a slot look free: the new instance claimed
 // it, the orphan scan then skipped the slot (it holds the lock, so the files
-// read as ours), and our own tabs overwrote the snapshot — silently destroying
+// read as ours), and our own tabs overwrote the snapshot - silently destroying
 // the only copy of a background tab's unsaved work.
 TEST(Recovery, ClaimSkipsSlotHoldingOnlyATabSnapshot) {
     const std::string own = materializr::projectRecoveryPath();
@@ -217,7 +217,7 @@ TEST(Recovery, LiveInstanceSnapshotIsSkippedUntilItDies) {
 
 // Discard/consume deletes only the candidate; the next scan surfaces the next
 // orphan, one per launch, until the queue empties. Counted rather than
-// hardcoded — how many orphans exist depends on which tests above ran (the
+// hardcoded - how many orphans exist depends on which tests above ran (the
 // fork test adds slot 5) and on the seeded tab-only snapshot.
 TEST(Recovery, ClearCandidateConsumesOneOrphanAtATime) {
     ASSERT_TRUE(materializr::hasProjectRecovery());

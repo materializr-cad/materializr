@@ -3,6 +3,7 @@
 
 #include <BRepBuilderAPI_Transform.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
+#include "core/MeshParams.h"
 #include <BRep_Tool.hxx>
 #include <Poly_Triangulation.hxx>
 #include <Standard_ErrorHandler.hxx>
@@ -13,7 +14,7 @@
 #include <TopoDS_Face.hxx>
 #include <gp_Trsf.hxx>
 
-#include <zlib.h> // crc32 — already a project dependency (gzip project files)
+#include <zlib.h> // crc32 - already a project dependency (gzip project files)
 
 #include <array>
 #include <cmath>
@@ -99,8 +100,7 @@ struct IndexedMesh {
 };
 
 bool harvest(const TopoDS_Shape& shape, IndexedMesh& out) {
-    BRepMesh_IncrementalMesh meshGen(shape, 0.01, false, 0.1);
-    meshGen.Perform();
+    BRepMesh_IncrementalMesh meshGen(shape, materializr::meshParams(0.01, 0.1, false));
     if (!meshGen.IsDone()) return false;
     std::map<std::tuple<double, double, double>, int> index;
     auto vid = [&](const gp_Pnt& p) {

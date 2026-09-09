@@ -1,4 +1,5 @@
 #include "ui/LengthField.h"
+#include "core/Units.h"
 #include "ShellOp.h"
 #include "SubShapeIndex.h"
 #include <cstdio>
@@ -27,6 +28,9 @@
 #include "../i18n.h"
 #include "../i18n.h"
 #include "ParamParse.h"
+#include "core/OpProgress.h"
+#include <Message_ProgressRange.hxx>
+#include <Message_ProgressScope.hxx>
 
 namespace {
 
@@ -152,7 +156,7 @@ bool ShellOp::resolveFacesTopo(const Document& doc, const TopoDS_Shape& shape) {
         return false;
     // SANITY GUARD: each resolved face must point the way the opened face
     // pointed when it was captured (m_faceAnchors, zip-aligned with the refs).
-    // A resolution that flips orientation is a MIS-resolve — reject the whole
+    // A resolution that flips orientation is a MIS-resolve - reject the whole
     // set and let the geometric rebind handle it, so a bad topo answer can
     // never preempt the fallback that used to work.
     if (m_faceAnchors.size() == out.size()) {
@@ -193,16 +197,16 @@ bool ShellOp::execute(Document& doc) {
         m_previousShape = doc.getBody(m_bodyId);
 
         // Re-bind the opened faces to the (possibly regenerated) body before
-        // offsetting — without this, an upstream sketch edit that rebuilds the
+        // offsetting - without this, an upstream sketch edit that rebuilds the
         // body leaves m_facesToRemove pointing at the OLD body's faces, so the
         // opening is silently lost and the whole shell vanishes on the next
         // edit. Mirrors FilletOp's edge rebind. Capture the anchors first (on
         // the initial run they're still valid against this body).
         captureFaceAnchors(m_previousShape);
         captureFaceRefs(doc, m_previousShape);
-        // Prefer the sketch-anchored topo resolution — it follows an opened
+        // Prefer the sketch-anchored topo resolution - it follows an opened
         // face that a dimension edit MOVED (which the geometric normal+point
-        // rebind can't) — then fall back to that rebind for unnameable faces.
+        // rebind can't) - then fall back to that rebind for unnameable faces.
         if (!resolveFacesTopo(doc, m_previousShape) &&
             !rebindFaces(m_previousShape)) {
             std::fprintf(stderr,
@@ -212,30 +216,30 @@ bool ShellOp::execute(Document& doc) {
         }
 
         // Two join strategies, tried in order:
-        //  • Arc (rolling-ball) — the default; rounds inner transitions. This
+        //  • Arc (rolling-ball) - the default; rounds inner transitions. This
         //    is the one that OCCT can drive to a hard fault when the wall is
         //    thicker than a concave fillet on the body can absorb (the inner
         //    offset of an R fillet collapses at thickness >= R).
-        //  • Intersection (sharp corners) — survives some lofted/BSpline side
+        //  • Intersection (sharp corners) - survives some lofted/BSpline side
         //    walls the arc join can't. BUT on a filleted body at an over-thick
-        //    wall it does NOT fail cleanly — it spins in an unbounded internal
+        //    wall it does NOT fail cleanly - it spins in an unbounded internal
         //    loop (OCCT "Cote PT2PT3 nul"), freezing the app.
         // So: if the Arc attempt THREW (thickness exceeds the geometry's
-        // capacity), do NOT fall through to Intersection — that's the hang.
+        // capacity), do NOT fall through to Intersection - that's the hang.
         // Only try Intersection when Arc failed *cleanly* (produced an invalid
         // or null result without throwing), i.e. the lofted-wall case.
         //
         // Accept ONLY a genuine OPEN hollow (issue #30). Two disguised failures
         // must be rejected, because OCCT marks both "valid" and both would be
         // committed as a silent do-nothing:
-        //   • NO-OP  — volume ≈ the solid: the offset declined the face and
+        //   • NO-OP  - volume ≈ the solid: the offset declined the face and
         //     handed the untouched solid straight back.
-        //   • SEALED — a closed thick shell (2 shells: outer + inner void). This
+        //   • SEALED - a closed thick shell (2 shells: outer + inner void). This
         //     is what OCCT produces when the removed face is ringed by fillets:
         //     it can't OPEN the face, so it seals the cavity. From the outside a
         //     sealed hollow is indistinguishable from the solid.
         // A real open cup is a single shell whose volume dropped. If neither
-        // join yields one, fail — the user should shell BEFORE filleting.
+        // join yields one, fail - the user should shell BEFORE filleting.
         const double solidVol = shapeVolume(m_previousShape);
         auto isOpenHollow = [&](const TopoDS_Shape& s) {
             if (s.IsNull() || shapeVolume(s) >= solidVol * 0.99) return false;
@@ -244,6 +248,22 @@ bool ShellOp::execute(Document& doc) {
             TopExp::MapShapes(s, TopAbs_SHELL, shells);
             return shells.Extent() == 1;   // 2 shells == sealed void
         };
+
+        // The commit runs between frames behind a progress window (see
+        // ShellController::wantsDeferredCommit). MakeThickSolid on the
+        // 300-hole plate calls Show 11275 times over three seconds, so the
+        // window stays live and Cancel aborts the offset within about 10 ms,
+        // leaving IsDone() false. Null when no reporter is set, which is every
+        // headless and preview-worker call.
+        Handle(materializr::OpProgressBridge) progress;
+        if (m_progress)
+            progress = new materializr::OpProgressBridge(
+                [this](float f, const char* l) { return reportProgress(f, l); },
+                materializr::tr("Shell"));
+        // Two steps: the arc attempt, and the intersection retry it may need.
+        Message_ProgressScope attempts(
+            progress.IsNull() ? Message_ProgressRange() : progress->Start(),
+            nullptr, 2);
 
         enum Outcome { Ok, CleanFail, Threw };
         auto tryShell = [&](Standard_Boolean inter, GeomAbs_JoinType join,
@@ -255,9 +275,15 @@ bool ShellOp::execute(Document& doc) {
                 // Standard_Failure the catch below absorbs.
                 OCC_CATCH_SIGNALS
                 BRepOffsetAPI_MakeThickSolid mk;
+                // The range goes on ByJoin, which is where the offset is
+                // actually computed. BRepOffsetAPI_MakeThickSolid::Build is
+                // commented "Does nothing." in OCCT's own header, and a range
+                // handed to it drove the window three times in three seconds
+                // instead of the expected fifty.
                 mk.MakeThickSolidByJoin(m_previousShape, m_facesToRemove,
                                         -m_thickness, 1.0e-3, BRepOffset_Skin,
-                                        inter, Standard_False, join);
+                                        inter, Standard_False, join,
+                                        Standard_False, attempts.Next());
                 mk.Build();
                 if (!mk.IsDone() || mk.Shape().IsNull()) return CleanFail;
                 TopoDS_Shape s = mk.Shape();
@@ -266,7 +292,7 @@ bool ShellOp::execute(Document& doc) {
                 // interior-curve body often opens the face correctly but trips
                 // BRepCheck on a face or two, which a single ShapeFix pass mends.
                 // A SEALED hollow stays 2-shell after ShapeFix, so isOpenHollow
-                // still rejects it — this only rescues genuine open cups.
+                // still rejects it - this only rescues genuine open cups.
                 ShapeFix_Shape fix(s);
                 fix.Perform();
                 if (isOpenHollow(fix.Shape())) { out = fix.Shape(); return Ok; }
@@ -278,14 +304,19 @@ bool ShellOp::execute(Document& doc) {
 
         TopoDS_Shape result;
         Outcome arc = tryShell(Standard_False, GeomAbs_Arc, result);
+        // A cancelled offset comes back not-done, which is indistinguishable
+        // from a wall that is too thick. Answer here rather than let the
+        // retry run, print the misleading advice and then fail anyway.
+        if (!progress.IsNull() && progress->cancelled()) return false;
         if (arc != Ok) {
             // Only the clean-fail (lofted-wall) case earns the intersection
             // retry; a throw means the wall is too thick for the geometry, and
             // the intersection join would hang instead of refusing.
             if (arc == Threw ||
                 tryShell(Standard_True, GeomAbs_Intersection, result) != Ok) {
+                if (!progress.IsNull() && progress->cancelled()) return false;
                 std::fprintf(stderr,
-                    "[Shell] failed at thickness %.3f mm — the wall is too thick, "
+                    "[Shell] failed at thickness %.3f mm - the wall is too thick, "
                     "or the opened face is ringed by fillets (shell BEFORE adding "
                     "fillets: OCCT can't open a fillet-bordered face).\n",
                     m_thickness);
@@ -293,6 +324,7 @@ bool ShellOp::execute(Document& doc) {
             }
         }
 
+        if (!progress.IsNull() && progress->cancelled()) return false;
         doc.updateBody(m_bodyId, result);
         return true;
     } catch (...) {
@@ -315,7 +347,7 @@ bool ShellOp::undo(Document& doc) {
 
 std::string ShellOp::description() const {
     int faceCount = m_facesToRemove.Size();
-    return "Shell thickness " + std::to_string(m_thickness) +
+    return "Shell thickness " + materializr::fmtLength(m_thickness) +
            " (" + std::to_string(faceCount) + " open face(s))";
 }
 
@@ -345,7 +377,7 @@ std::string ShellOp::serializeParams() const {
         if (!idx.empty()) blob += ";faces=" + idx;
     }
     // Topological face names (additive, robust to a moving edit). Only when
-    // EVERY opened face is nameable — otherwise the ordinal `faces=` above and
+    // EVERY opened face is nameable - otherwise the ordinal `faces=` above and
     // the geometric rebind carry it. Written last; a length-prefixed list so
     // each ref's opaque blob round-trips.
     if (!m_faceRefs.empty()) {
@@ -373,7 +405,7 @@ bool ShellOp::deserializeParams(const std::string& blob) {
         if (end == std::string::npos) end = blob.size();
         std::string key = blob.substr(pos, eq - pos);
         // facerefs holds a length-prefixed list of opaque ref blobs, written
-        // last — read it to end-of-string (not to the next ';').
+        // last - read it to end-of-string (not to the next ';').
         if (key == "facerefs") {
             std::string rest = blob.substr(eq + 1);
             m_faceRefs.clear();
@@ -400,7 +432,7 @@ bool ShellOp::rehydrateFromReload(const ReloadState& state, Document& /*doc*/) {
     if (m_previousShape.IsNull()) return false;
 
     // Re-resolve the opened faces. A closed shell (no faces removed) is
-    // legitimate — m_faceIndices empty just means MakeThickSolid hollows
+    // legitimate - m_faceIndices empty just means MakeThickSolid hollows
     // without an opening. But if indices WERE saved, all must resolve.
     m_facesToRemove.Clear();
     if (!m_faceIndices.empty()) {

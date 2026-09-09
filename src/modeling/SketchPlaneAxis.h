@@ -14,10 +14,10 @@
 // So: prefer a straight edge that agrees with the world frame, and fall back to
 // the longest edge when the face has no such edge (a part deliberately rotated
 // off-axis still follows its own geometry). A face with no straight edge at all
-// — a circular cap — has nothing to follow and takes a projected world axis.
+// - a circular cap - has nothing to follow and takes a projected world axis.
 //
 // Lives here, not in Application, so it can be tested: ctest cannot see
-// src/app. Header-only on purpose — a new .cpp would have to be added to TWO
+// src/app. Header-only on purpose - a new .cpp would have to be added to TWO
 // source lists (root CMakeLists.txt and tests/CMakeLists.txt) and one of them
 // always gets forgotten.
 
@@ -39,7 +39,7 @@ namespace materializr {
 // and length breaks the tie between them. This is a band around the winner, not
 // an absolute tolerance: an absolute one is what got this wrong the first time.
 // On the reporting part the diagonal ran 4.51 degrees off world Z, inside a 5
-// degree tolerance, so it qualified as "aligned" and then won on length — the
+// degree tolerance, so it qualified as "aligned" and then won on length - the
 // exact edge the rule existed to reject.
 inline constexpr double kSketchAxisBandDeg = 0.5;
 
@@ -50,7 +50,7 @@ inline constexpr double kSketchAxisBandDeg = 0.5;
 // Kept low on purpose: on a TALL taper the aligned ends are short against the
 // diagonals (the reporting part's were 81.6 against 130.4, and a narrower one
 // would be worse), so a high bar would quietly hand the grid back to the
-// diagonal — the bug this exists to prevent.
+// diagonal - the bug this exists to prevent.
 inline constexpr double kSketchAxisMinLenFrac = 0.15;
 
 // The X direction for a sketch plane on `face` whose normal is `n`.
@@ -106,7 +106,7 @@ inline gp_Dir sketchPlaneXDirection(const TopoDS_Face& face, const gp_Dir& n,
         if (len < 1e-6) continue;
         const gp_Vec dir = proj.Normalized();
 
-        // Direction, not sense — an edge and its reverse are the same axis.
+        // Direction, not sense - an edge and its reverse are the same axis.
         double best = 180.0;
         for (int i = 0; i < 3; ++i) {
             if (!haveWorld[i]) continue;

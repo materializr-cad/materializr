@@ -8,7 +8,7 @@ namespace materializr {
 
 // One Op that handles all five primitives so save/load and history bookkeeping
 // stays in a single place. Each Kind has its own parameter set; unused fields
-// are ignored. Defaults land an axis-aligned shape at the world origin —
+// are ignored. Defaults land an axis-aligned shape at the world origin -
 // users place / size it afterwards via the gizmo.
 class PrimitiveOp : public Operation {
 public:

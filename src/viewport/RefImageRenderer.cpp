@@ -10,7 +10,7 @@
 namespace materializr {
 
 // Textured quad. UVs flip V because stb_image decodes top-left-origin rows
-// while GL samples bottom-left — the flip happens in the corner/UV pairing
+// while GL samples bottom-left - the flip happens in the corner/UV pairing
 // (see render()), not in the shader.
 static const char* s_vertSource = R"(
 #version 330 core
@@ -36,7 +36,7 @@ void main() {
 }
 )";
 
-// Border line-loop (selection highlight) — plain color, same as PlaneRenderer.
+// Border line-loop (selection highlight) - plain color, same as PlaneRenderer.
 static const char* s_lineVertSource = R"(
 #version 330 core
 layout(location = 0) in vec3 a_position;
@@ -112,7 +112,7 @@ bool RefImageRenderer::initialize() {
     glGenBuffers(1, &m_vbo);
     glBindVertexArray(m_vao);
     glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
-    // Interleaved x,y,z,u,v — the border pass just strides past the UVs.
+    // Interleaved x,y,z,u,v - the border pass just strides past the UVs.
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), nullptr);
     glEnableVertexAttribArray(1);
@@ -127,7 +127,7 @@ void RefImageRenderer::sync(const std::vector<Item>& items) {
     m_items = items;
 
     // Upload textures for ids we haven't seen. Decode failures leave no cache
-    // entry, so the item simply doesn't draw (and we retry next sync — cheap,
+    // entry, so the item simply doesn't draw (and we retry next sync - cheap,
     // since a bad file keeps failing the same probe the panel already ran).
     for (const auto& it : m_items) {
         if (m_textures.count(it.planeId)) continue;
@@ -163,7 +163,7 @@ void RefImageRenderer::sync(const std::vector<Item>& items) {
     }
 
     // The byte pointers alias Document storage and are only valid during this
-    // call — null them so a stale dereference is impossible between syncs.
+    // call - null them so a stale dereference is impossible between syncs.
     for (auto& it : m_items) it.fileBytes = nullptr;
 
     // Evict textures whose planes left the document (image or plane deleted).
@@ -188,12 +188,12 @@ void RefImageRenderer::render(const glm::mat4& view, const glm::mat4& projection
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     // NO depth write: the world grid now renders BEFORE this pass (so the
-    // photo blends over it — real transparency), and the sketch grid renders
-    // AFTER it with a small bias that must never lose to the quad — writing
+    // photo blends over it - real transparency), and the sketch grid renders
+    // AFTER it with a small bias that must never lose to the quad - writing
     // depth here made the sketch grid vanish over the photo past a certain
     // zoom (bias shrinks with depth precision, the 0.05 mm lift doesn't).
     glDepthMask(GL_FALSE);
-    // Photos read from both sides (mirrored from behind — physically honest).
+    // Photos read from both sides (mirrored from behind - physically honest).
     glDisable(GL_CULL_FACE);
 
     glBindVertexArray(m_vao);
@@ -211,7 +211,7 @@ void RefImageRenderer::render(const glm::mat4& view, const glm::mat4& projection
         // Lift the quad 0.05 mm off its plane: the ground grid renders BEFORE
         // this pass with a depth bias, so an exactly-coplanar quad loses the
         // depth test and vanishes (the default import pose is the ground
-        // plane — the common case). 0.05 mm is invisible for tracing and the
+        // plane - the common case). 0.05 mm is invisible for tracing and the
         // SKETCH still lands on the true plane, not the lifted quad.
         glm::vec3 o(static_cast<float>(origin.X() + normal.X() * 0.05),
                     static_cast<float>(origin.Y() + normal.Y() * 0.05),

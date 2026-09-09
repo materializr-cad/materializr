@@ -11,9 +11,9 @@ below).
 
 Notwithstanding anything to the contrary in the GPLv3, you may convey
 Materializr, and covered works based on it, in object-code form through
-digital application distribution platforms operated by third parties —
+digital application distribution platforms operated by third parties -
 including but not limited to the Apple App Store, the Google Play Store,
-and comparable platforms — even where the terms of service, usage rules,
+and comparable platforms - even where the terms of service, usage rules,
 or technical measures of such a platform would otherwise conflict with
 the conditions of the GPLv3 (for example, restrictions on redistribution
 by users, cryptographic signing requirements, or the absence of
@@ -33,8 +33,8 @@ Installation Information as defined in GPLv3 section 6), provided that:
 
 If you modify Materializr, or any covered work based on it, by linking or
 combining it with platform frameworks or SDKs that are required to build
-or run it on a given operating system — including but not limited to the
-Apple iOS/macOS SDKs and the Android SDK and NDK — containing parts
+or run it on a given operating system - including but not limited to the
+Apple iOS/macOS SDKs and the Android SDK and NDK - containing parts
 covered by the terms of the platform vendor's license, the copyright
 holders of Materializr grant you additional permission to convey the
 resulting work.
@@ -48,7 +48,7 @@ not add further restrictions.
 
 Charging for copies, and accepting voluntary donations or tips through a
 platform's payment mechanism, is already permitted by the GPLv3 itself
-and requires no additional permission — provided the Corresponding
+and requires no additional permission - provided the Corresponding
 Source remains available as the license requires.
 
 ## Contributor consent

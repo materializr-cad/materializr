@@ -19,7 +19,7 @@ public:
     void setSelectionManager(SelectionManager* sel);
     void setHistory(History* hist);
     // The sketch currently being drawn, if any, can appear as a normal row
-    // here the moment a mid-edit save registers it with the Document — but
+    // here the moment a mid-edit save registers it with the Document - but
     // it's still live in Application::m_activeSketch, uncoordinated with this
     // panel. Delete/Edit Sketch on that row would desync the two (stale
     // m_activeSketchId, clobbered undo floor); gate them while it's active.
@@ -28,7 +28,7 @@ public:
         m_activeSketchId = activeSketchId;
     }
 
-    // True if the panel was hovered last frame — the touch input layer uses this
+    // True if the panel was hovered last frame - the touch input layer uses this
     // to arm long-press (right-click) over the panel's rows for their context
     // menus, the same way it does over the viewport.
     bool isHovered() const { return m_hovered; }
@@ -41,7 +41,7 @@ public:
     // route the click into its own per-body export flow.
     void setExportStlCallback(std::function<void(int)> cb) { m_exportStl = std::move(cb); }
     // The formats the "Export" submenu offers, in menu order, from the plugin
-    // registry — a new export plugin shows up here without touching this
+    // registry - a new export plugin shows up here without touching this
     // panel. The callback below gets the bodies to export (the whole
     // selection when the clicked body is part of one) and the chosen name.
     // A PROVIDER, not a fixed list: the panel is wired up before the plugins
@@ -55,7 +55,7 @@ public:
         std::function<void(const std::vector<int>&, const std::string&)> cb) {
         m_exportBodies = std::move(cb);
     }
-    // "Export to New Project" on a body's context menu — routes to
+    // "Export to New Project" on a body's context menu - routes to
     // Application::exportBodiesToNewProject, which opens the parts in a new
     // tab as an unsaved project. Takes the whole body selection, same rule
     // as the Export submenu.
@@ -65,19 +65,19 @@ public:
     }
     // Called when the user picks "Edit Sketch" from a sketch's right-click
     // menu. Routes to Application::editSketch which enters sketch mode on
-    // that sketch — the only way to re-enter a sketch that was created in
+    // that sketch - the only way to re-enter a sketch that was created in
     // a previous session.
     void setEditSketchCallback(std::function<void(int)> cb) { m_editSketch = std::move(cb); }
     // Called when the user picks "Export as SVG…" from a sketch's right-click
     // menu. Routes to Application::exportSketchAsSvg (1:1-mm polyline SVG for
-    // laser / 2.5D CNC). Sketch-only by design — a File-menu export would also
+    // laser / 2.5D CNC). Sketch-only by design - a File-menu export would also
     // catch non-planar geometry, which SVG can't represent.
     void setExportSketchSvgCallback(std::function<void(int)> cb) { m_exportSketchSvg = std::move(cb); }
     void setExportSketchDxfCallback(std::function<void(int)> cb) { m_exportSketchDxf = std::move(cb); }
-    // Called when the user picks "Duplicate Sketch" — makes an independent copy.
+    // Called when the user picks "Duplicate Sketch" - makes an independent copy.
     // Routes to Application::duplicateSketch.
     void setDuplicateSketchCallback(std::function<void(int)> cb) { m_duplicateSketch = std::move(cb); }
-    // Called when the user picks "Combine sketches" — merges the selected
+    // Called when the user picks "Combine sketches" - merges the selected
     // coplanar sketches into the first. Routes to Application::combineSketches.
     void setCombineSketchesCallback(std::function<void(const std::vector<int>&)> cb) {
         m_combineSketches = std::move(cb);
@@ -89,7 +89,7 @@ public:
 
     // Returns true if a body was deleted (caller must rebuild meshes)
     bool render();
-    // Panel body without the "Items" window wrapper — for hosting inside
+    // Panel body without the "Items" window wrapper - for hosting inside
     // another container (im-touch shell right panel). Same return contract.
     bool renderContent();
 
@@ -112,7 +112,7 @@ private:
     int m_activeSketchId = -1;
     int m_renamingId = -1;
     char m_renameBuffer[128] = {};
-    // Selected body ids, rebuilt once at the top of render() — renderBodyRow
+    // Selected body ids, rebuilt once at the top of render() - renderBodyRow
     // reads it per row instead of rescanning the whole selection.
     std::set<int> m_selectedBodyIdsFrame;
     bool m_showBodies = true;
@@ -127,11 +127,11 @@ private:
     // Anchor body for shift-click range selection in the Items panel. Set
     // whenever a plain click (no Ctrl, no Shift) selects a body.
     int m_anchorBodyId = -1;
-    // "New folder…" submenu prompts for a name — kept across frames until the
+    // "New folder…" submenu prompts for a name - kept across frames until the
     // user confirms / cancels via Enter / Esc. The body being moved is
     // remembered so we can assign it once the folder exists.
     bool m_newFolderPopupOpen = false;
-    bool m_newFolderFocusInput = false; // first-frame focus only — else the
+    bool m_newFolderFocusInput = false; // first-frame focus only - else the
                                         // input steals focus from Create/Cancel
                                         // every frame and the popup locks up.
     char m_newFolderName[128] = {};
@@ -144,7 +144,7 @@ private:
     // already selected. Body rows keep their own version because they also
     // support Shift range-select. Without this the non-body rows always
     // REPLACED the selection, so Ctrl+clicking a sketch silently dropped the
-    // bodies you had picked — while Ctrl+clicking a body afterwards did
+    // bodies you had picked - while Ctrl+clicking a body afterwards did
     // extend, which is what made the behaviour look arbitrary.
     void applyRowClick(const SelectionEntry& entry);
 

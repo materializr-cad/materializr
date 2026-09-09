@@ -4,7 +4,7 @@
 
 namespace materializr {
 
-// How rigid the sheet material is — this (plus thickness) is what defines how the
+// How rigid the sheet material is - this (plus thickness) is what defines how the
 // flattened geometry is processed, instead of naming specific materials. A few
 // materials map onto each: Pliable = thin vinyl / Monokote / film; SemiRigid =
 // foam board / corrugated (score & fold); Rigid = plywood / acrylic (mitred).
@@ -50,9 +50,9 @@ inline const char* rigidityName(Rigidity r) {
 
 inline const char* rigidityHint(Rigidity r) {
     switch (r) {
-        case Rigidity::Pliable:   return "vinyl, Monokote — boundary only";
-        case Rigidity::SemiRigid: return "foam board — score & bevel folds";
-        case Rigidity::Rigid:     return "plywood, acrylic — mitred edges";
+        case Rigidity::Pliable:   return "vinyl, Monokote - boundary only";
+        case Rigidity::SemiRigid: return "foam board - score & bevel folds";
+        case Rigidity::Rigid:     return "plywood, acrylic - mitred edges";
     }
     return "";
 }

@@ -1,7 +1,7 @@
 #pragma once
 
 // Safe URL opener. Hands the URL to the OS via SDL_OpenURL, which does NOT run a
-// shell — unlike the old `std::system("xdg-open \"" + url + "\" ...")` path, where
+// shell - unlike the old `std::system("xdg-open \"" + url + "\" ...")` path, where
 // a server-controlled release URL (the GitHub API's html_url) was an OS
 // command-injection vector ($(...), backticks, and quote-breakout all executed).
 //
@@ -16,7 +16,7 @@
 namespace materializr {
 
 inline bool openUrl(const std::string& url, const char* requiredPrefix = nullptr) {
-    // Scheme: https only — every link the app opens is an https resource.
+    // Scheme: https only - every link the app opens is an https resource.
     if (url.rfind("https://", 0) != 0) {
         std::fprintf(stderr, "openUrl: refusing non-https URL\n");
         return false;

@@ -35,7 +35,7 @@ constexpr double kAxisDot = 0.999; // |dir·axis| above this = parallel
 // leaves unattributed. Mirrors EdgeAnchor::kDriftTol.
 constexpr double kDriftTol = 1.0;
 
-// Sketch-plane frame — identical convention to EdgeAnchor (o + axis/xd/yd,
+// Sketch-plane frame - identical convention to EdgeAnchor (o + axis/xd/yd,
 // with u/v in-plane and h along the normal).
 struct Frame {
     gp_Pnt o; gp_Dir axis, xd, yd;
@@ -98,7 +98,7 @@ double distToPolyline(double px, double py, const std::vector<glm::vec2>& poly) 
 
 // Sample the (profile) basis curve of a surface-of-extrusion face. For a
 // trimmed face the underlying surface still carries the FULL profile curve, so
-// these points trace the whole sketch curve regardless of clipping — good for
+// these points trace the whole sketch curve regardless of clipping - good for
 // attribution; the centroid disambiguates fragments at resolve.
 std::vector<gp_Pnt> extrusionProfilePts(const TopoDS_Face& face) {
     std::vector<gp_Pnt> pts;
@@ -112,7 +112,7 @@ std::vector<gp_Pnt> extrusionProfilePts(const TopoDS_Face& face) {
     double a = ac.FirstParameter(), b = ac.LastParameter();
     // Sample over the FACE's trimmed U-range, not the basis curve's full
     // parameter span. After the region walker splits a spline wall at an
-    // intersection, the basis curve extends past the face — full-range
+    // intersection, the basis curve extends past the face - full-range
     // samples run off the sketch spline and the whole face was rejected
     // (corvus body 532: 15 extr walls unclassified).
     double u0, u1, v0, v1;
@@ -147,10 +147,10 @@ Anchor classify(const TopoDS_Face& face, int sketchId,
         const gp_Dir n = s.Plane().Axis().Direction();
         const double align = std::abs(n.Dot(f.axis));
         if (align > kAxisDot) {
-            // Cap — normal parallel to the extrude axis. Not element-tied.
+            // Cap - normal parallel to the extrude axis. Not element-tied.
             return { Anchor::Cap, sketchId, -1, ch, cu, cv };
         }
-        // Wall — normal perpendicular to the axis: swept from a sketch line the
+        // Wall - normal perpendicular to the axis: swept from a sketch line the
         // centroid sits over. Intersecting features clip walls into fragments,
         // so on-segment containment (not endpoint equality), like rim edges.
         for (const auto& L : sk.getLines()) {

@@ -17,7 +17,7 @@ void ReplayOp::applyDelta(Document& doc, const BodyState& from,
                           const BodyState& to) {
     // Apply ONLY what this step changed between `from` and `to`, leaving every
     // other body untouched. Reloaded steps carry full-document snapshots, but
-    // re-applying the whole snapshot resets bodies this step never touched —
+    // re-applying the whole snapshot resets bodies this step never touched -
     // which silently discarded edits made to an UPSTREAM step (e.g. editing a
     // fillet whose body is later consumed by a union: a baked transform on an
     // unrelated body would re-slam the entire stale scene over the rebuilt
@@ -78,6 +78,6 @@ void ReplayOp::renderProperties() {
         ImGui::TextWrapped("%s", materializr::tr("Loaded from a saved project. Undo/redo work, but the parameters of a reloaded step can't be edited."));
     } else {
         ImGui::Spacing();
-        ImGui::TextWrapped("%s", materializr::tr("Batched transform — undo/redo restores the whole set at once."));
+        ImGui::TextWrapped("%s", materializr::tr("Batched transform - undo/redo restores the whole set at once."));
     }
 }

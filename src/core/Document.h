@@ -26,16 +26,16 @@ struct BodyEntry {
     // An imported tessellated mesh (e.g. STL): the shape is a sewn solid built
     // from many small facets, not analytic CAD geometry. The viewport uses this
     // to take a mesh-aware path (cached picking, optional wireframe). Serialized
-    // to project files since it can't be re-derived from the shape — see ProjectIO.
+    // to project files since it can't be re-derived from the shape - see ProjectIO.
     bool isMesh = false;
     // Set once the user marks this body as a fabrication sheet part (foam board,
     // sheet metal, plywood, …). Drives the unfold/flatten engine. Serialized to
-    // project files (can't be re-derived from the shape) — see ProjectIO.
+    // project files (can't be re-derived from the shape) - see ProjectIO.
     materializr::SheetSpec sheet;
 };
 
 // Bodies can be grouped under a folder for organisation in the Items panel.
-// Folder visibility and colour CASCADE to its bodies — toggling the folder
+// Folder visibility and colour CASCADE to its bodies - toggling the folder
 // hides/shows every body inside; setting the colour overwrites every body's
 // colour (which can still be re-customised per body afterwards).
 struct FolderEntry {
@@ -43,7 +43,7 @@ struct FolderEntry {
     std::string name;
     bool visible = true;
     glm::vec3 color = glm::vec3(0.80f, 0.80f, 0.82f);
-    bool expanded = true; // UI-only — collapsed folders hide children in panel
+    bool expanded = true; // UI-only - collapsed folders hide children in panel
 };
 
 struct PlaneEntry {
@@ -57,7 +57,7 @@ struct PlaneEntry {
     double halfSize = 50.0;
 };
 
-// Reference image — a photo carried on a construction plane so a real object
+// Reference image - a photo carried on a construction plane so a real object
 // can be traced without a 3D scanner. 1:1 with a host PlaneEntry (keyed by
 // planeId): the plane contributes pose / selection / visibility / gizmo /
 // sketch-on-plane; this entry carries the raster payload plus physical size
@@ -72,7 +72,7 @@ struct RefImageEntry {
     float opacity = 0.6f;      // underlay strength for tracing
 };
 
-// Construction axis — a stored ray (origin + unit direction). Used as the
+// Construction axis - a stored ray (origin + unit direction). Used as the
 // rotation axis for Revolve (post-0.6) and any other "around a line"
 // operation. Same plumbing shape as PlaneEntry: id / name / visibility /
 // a render-extent (halfLength for the drawn segment in mm).
@@ -114,7 +114,7 @@ public:
     // The generation ledger of the op that PRODUCED a body's current shape
     // (published by ops after updateBody; the pointer is owned by the
     // history-held op). Lets a downstream op's topo::Ref resolve a sub-shape
-    // by lineage — e.g. a fillet re-finding a boolean SEAM edge, which no
+    // by lineage - e.g. a fillet re-finding a boolean SEAM edge, which no
     // geometric scheme can name. updateBody clears the entry (a stale ledger
     // is worse than none); the producing op re-publishes right after.
     // Stored BY VALUE (copied from the op): a non-owning pointer dangled the
@@ -131,7 +131,7 @@ public:
 
     // Face-lineage map of a body's CURRENT shape (see FaceLineage.h): face →
     // stable ancestry ids. Published by ops after updateBody, same lifecycle
-    // as the ledger — updateBody clears it (stale lineage is worse than none;
+    // as the ledger - updateBody clears it (stale lineage is worse than none;
     // an op that doesn't re-publish leaves consumers on their geometric
     // fallback, which is exactly the pre-lineage behaviour). Persisted in new
     // saves; absent in old ones.
@@ -167,7 +167,7 @@ public:
     void setBodyColor(int id, const glm::vec3& color);
     std::vector<int> getAllBodyIds() const;
 
-    // Folder management. Folders are pure UI grouping over bodies — they
+    // Folder management. Folders are pure UI grouping over bodies - they
     // don't own bodies (a body keeps its id and is only assigned a folderId).
     int addFolder(const std::string& name = "");
     void removeFolder(int folderId); // bodies in it return to root (folderId=-1)
@@ -190,8 +190,8 @@ public:
     // Sketch management
     int addSketch(std::shared_ptr<materializr::Sketch> sketch, const std::string& name = "");
     // Insert/replace a sketch under a SPECIFIC id (mirrors putBody). Used by
-    // project load to preserve saved sketch ids so SketchEditOps — and extrude/
-    // push-pull ops — that reference a sketch by id rebind correctly on reload.
+    // project load to preserve saved sketch ids so SketchEditOps - and extrude/
+    // push-pull ops - that reference a sketch by id rebind correctly on reload.
     void putSketch(int id, std::shared_ptr<materializr::Sketch> sketch,
                    const std::string& name = "");
     void removeSketch(int id);
@@ -208,7 +208,7 @@ public:
     // into the serialized snapshot.
     int findSketchId(const materializr::Sketch* sk) const;
 
-    // Cascade sketch override — the EDITED sketch's final state, pinned for
+    // Cascade sketch override - the EDITED sketch's final state, pinned for
     // the duration of a history replay. During History::editStep the replayed
     // SketchEditOp snapshots roll the LIVE sketch back through its history, so
     // an op that re-finds geometry from "the sketch the user just edited"
@@ -225,7 +225,7 @@ public:
         return it == m_cascadeSketchOverrides.end() ? nullptr : it->second;
     }
 
-    // Construction planes — first-class document objects parallel to sketches.
+    // Construction planes - first-class document objects parallel to sketches.
     // PlaneAddedEvent / PlaneRemovedEvent let the renderer + Items panel
     // react without polling each frame.
     // `reuseId` >= 0 re-adds the plane under that id (redo of a plane-creation
@@ -249,7 +249,7 @@ public:
     std::vector<int> getAllPlaneIds() const;
     int planeCount() const;
 
-    // Reference images — raster underlays hosted on construction planes
+    // Reference images - raster underlays hosted on construction planes
     // (see RefImageEntry). Keyed by the host plane's id; changes ride the
     // Plane*Event stream (the image renderer re-syncs off the same events the
     // plane renderer does). removePlane() drops the hosted image with it.
@@ -260,7 +260,7 @@ public:
     void setRefImageOpacity(int planeId, float opacity);
     std::vector<int> getAllRefImagePlaneIds() const;
 
-    // Construction axes — same shape as construction planes. Used by
+    // Construction axes - same shape as construction planes. Used by
     // Revolve and any other op that needs to rotate around a line.
     // Axis* events let the renderer + Items panel react without polling.
     // `reuseId` semantics match addPlane.
@@ -295,12 +295,12 @@ private:
     std::vector<RefImageEntry> m_refImages;
     std::vector<AxisEntry> m_axes;
     std::vector<SketchEntry> m_sketches;
-    // See setCascadeSketchOverride — pinned final sketch states during a
+    // See setCascadeSketchOverride - pinned final sketch states during a
     // cascade history replay. Empty outside cascadeFromSketchEdit.
     std::map<int, std::shared_ptr<materializr::Sketch>> m_cascadeSketchOverrides;
-    // See setBodyLedger — non-owning, cleared on updateBody.
+    // See setBodyLedger - non-owning, cleared on updateBody.
     std::map<int, materializr::topo::GenerationLedger> m_bodyLedgers;
-    // See setBodyFaceIds — owned here (unlike the non-owning ledgers).
+    // See setBodyFaceIds - owned here (unlike the non-owning ledgers).
     std::map<int, materializr::topo::FaceIdMap> m_bodyFaceIds;
     int m_nextFaceId = 1;
     std::vector<FolderEntry> m_folders;

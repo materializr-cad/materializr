@@ -160,7 +160,7 @@ TEST(TopoThread, AsyncHookDefersRecompute) {
     ASSERT_TRUE(thr.execute(doc)) << "deferred execute reports success";
     EXPECT_EQ(calls, 1);
     EXPECT_NEAR(volumeOf(doc.getBody(body)), plain, 1e-6)
-        << "body untouched — the hook owns the re-cut";
+        << "body untouched - the hook owns the re-cut";
     ThreadOp::setAsyncRecutHook(nullptr);   // restore sync for other tests
 }
 

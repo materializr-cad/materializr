@@ -10,8 +10,8 @@
 //   * carry a line on tangentially from the END of an arc.
 //
 // In both, D == R exactly (the on-rim snap puts the anchor on the curve), the
-// formula degenerates cleanly onto the single tangent there — asin(1) = 90°
-// off the radius, in both directions — and the guard rejected it one epsilon
+// formula degenerates cleanly onto the single tangent there - asin(1) = 90°
+// off the radius, in both directions - and the guard rejected it one epsilon
 // early. Nothing fired; 15° angle-snap silently took the placement instead.
 //
 // Two narrower faults fixed alongside, covered below:
@@ -106,7 +106,7 @@ TEST(TangentInference, FiresFromAnAnchorOutsideTheCircle) {
     EXPECT_TRUE(aim(r.tool, A, -tAng, 15.0f));  // the mirrored tangent
 }
 
-// The bug. Anchor sits ON the rim — where clicking a circle actually puts it —
+// The bug. Anchor sits ON the rim - where clicking a circle actually puts it -
 // and the tangent there is perpendicular to the radius, in both directions.
 TEST(TangentInference, FiresFromAnAnchorOnTheRim) {
     Rig r;
@@ -122,7 +122,7 @@ TEST(TangentInference, FiresFromAnAnchorOnTheRim) {
     EXPECT_FALSE(aim(r.tool, A, up - static_cast<float>(M_PI) / 9.0f, 15.0f));
 }
 
-// Same shape, from the end of an arc — carrying a profile on tangentially is
+// Same shape, from the end of an arc - carrying a profile on tangentially is
 // the common one (slot ends, fillet run-outs).
 TEST(TangentInference, FiresFromAnArcEndpoint) {
     Rig r;
@@ -183,7 +183,7 @@ TEST(TangentInference, PicksTheCurveBeingAimedAt) {
     EXPECT_EQ(tangentRef(r.tool), id1);
 }
 
-// An anchor strictly inside a circle has no tangent through it at all — the
+// An anchor strictly inside a circle has no tangent through it at all - the
 // guard that case needs must survive, and must not produce a NaN direction.
 TEST(TangentInference, NeverFiresFromInsideTheCircle) {
     Rig r;

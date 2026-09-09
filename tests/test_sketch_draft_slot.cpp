@@ -1,6 +1,6 @@
 // Multi-instance safety for the in-progress SKETCH draft.
 //
-// The draft sidecar used one fixed path — <config>/recovery/draft.mzsketch —
+// The draft sidecar used one fixed path - <config>/recovery/draft.mzsketch -
 // shared by every running copy of the app. Two instances each mid-sketch
 // overwrote each other's only copy, and on the next launch whichever file
 // survived was offered to whoever asked first, including the instance it did
@@ -57,7 +57,7 @@ struct Env {
 const Env g_env;
 
 // A draft file with just enough shape to be found by the scan. The content
-// only has to exist — readSketchDraft's parsing is covered elsewhere.
+// only has to exist - readSketchDraft's parsing is covered elsewhere.
 void seedDraft(const fs::path& p) {
     fs::create_directories(p.parent_path());
     std::ofstream os(p, std::ios::trunc);
@@ -78,7 +78,7 @@ TEST(SketchDraftSlot, OurOwnLiveDraftIsNeverOfferedBack) {
 }
 
 // A draft left in a slot nobody holds is an orphan, and is what a restore
-// loads — sketchDraftRestorePath, not our own path.
+// loads - sketchDraftRestorePath, not our own path.
 TEST(SketchDraftSlot, ADeadInstancesDraftIsOfferedAndConsumed) {
     // Pick a slot that is definitely not ours.
     const int ours = materializr::recoverySlot();
@@ -114,7 +114,7 @@ TEST(SketchDraftSlot, SlotsGiveDistinctPaths) {
 
 // A slot holding nothing but a draft is OCCUPIED. Claiming it would put our
 // own lock over that file, hiding it from the orphan scan and then
-// overwriting it on the first autosave — the only copy of that work.
+// overwriting it on the first autosave - the only copy of that work.
 TEST(SketchDraftSlot, ASlotHoldingOnlyADraftIsNotClaimedAsFree) {
     const int ours = materializr::recoverySlot();
     EXPECT_FALSE(fs::exists(materializr::sketchDraftPathForSlot(ours)))

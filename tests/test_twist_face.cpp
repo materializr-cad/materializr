@@ -1,7 +1,7 @@
 // MoveFaceOp Kind::Twist regression: twisting the top face of a prism about its
 // normal produces a valid, correctly-twisted solid, preserves volume (a rigid
 // per-section rotation adds/removes nothing), and undoes cleanly. Uses a
-// RECTANGULAR prism so a 90 twist is unambiguous — the top footprint swaps.
+// RECTANGULAR prism so a 90 twist is unambiguous - the top footprint swaps.
 
 #include "core/Document.h"
 #include "modeling/MoveFaceOp.h"
@@ -57,12 +57,12 @@ TEST(TwistFace, Rectangle90SwapsFootprintValidVolumePreserved) {
     const TopoDS_Shape& r = doc.getBody(body);
     EXPECT_TRUE(BRepCheck_Analyzer(r).IsValid()) << "twisted solid must be valid";
     // Near-preserving: a ruled (faceted) twist chords the helicoid so it shaves
-    // a sliver — within ~2% and never MORE than the prism.
+    // a sliver - within ~2% and never MORE than the prism.
     EXPECT_LT(vol(r), v0 + 1e-6) << "ruled twist can't add volume";
     EXPECT_GT(vol(r), v0 * 0.98) << "twist shouldn't lose much volume";
 
     // The overall bbox now needs room for the diagonal of the swept rectangle,
-    // so it grows in both X and Y vs the untwisted 10x6 — a plain (non-twisting)
+    // so it grows in both X and Y vs the untwisted 10x6 - a plain (non-twisting)
     // loft would keep 10x6. Confirms a genuine twist happened.
     Bnd_Box bb; BRepBndLib::Add(r, bb);
     double x0,y0,z0,x1,y1,z1; bb.Get(x0,y0,z0,x1,y1,z1);

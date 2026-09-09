@@ -108,8 +108,8 @@ gp_Pln ConstructionPlaneOp::computePlane() const {
 bool ConstructionPlaneOp::execute(Document& doc) {
     try {
         gp_Pln plane = m_hasLiteralPlane ? m_literalPlane : computePlane();
-        // Pass the prior id (kept across undo) as reuseId so a redo — in
-        // session or of a reloaded step — restores the plane under the same
+        // Pass the prior id (kept across undo) as reuseId so a redo - in
+        // session or of a reloaded step - restores the plane under the same
         // id, keeping sketches / transform steps that reference it valid.
         m_createdPlaneId = doc.addPlane(plane, m_planeName, m_createdPlaneId);
         return m_createdPlaneId >= 0;
@@ -121,7 +121,7 @@ bool ConstructionPlaneOp::execute(Document& doc) {
 bool ConstructionPlaneOp::undo(Document& doc) {
     // Actually remove the plane now that Document exposes the API. Without
     // this every preview cycle (radio-click XY/XZ/YZ, drag the offset
-    // slider) would stack a fresh plane on top of the previous one — the
+    // slider) would stack a fresh plane on top of the previous one - the
     // visible "every selection shows" + "offset has no effect" symptoms.
     // The id itself is KEPT so the next execute() re-adds under it.
     if (m_createdPlaneId >= 0) {
@@ -197,7 +197,7 @@ bool ConstructionPlaneOp::deserializeParams(const std::string& blob) {
 bool ConstructionPlaneOp::rehydrateFromReload(const ReloadState& /*state*/,
                                               Document& doc) {
     // The plane itself was persisted as a document entity and is already
-    // loaded — verify our recorded id points at it, so undo() removes the
+    // loaded - verify our recorded id points at it, so undo() removes the
     // right plane and a redo re-adds under the same id.
     if (!m_hasLiteralPlane || m_createdPlaneId < 0) return false;
     return doc.getPlane(m_createdPlaneId) != nullptr;

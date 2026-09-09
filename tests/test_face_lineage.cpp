@@ -1,6 +1,6 @@
 // Face lineage (#49/#51): a chamfer's bevel faces stay traceable to their op
-// after a downstream boolean SPLITS them — the case no geometric matcher can
-// handle — and the lineage survives save/load. Old saves (no lineage section)
+// after a downstream boolean SPLITS them - the case no geometric matcher can
+// handle - and the lineage survives save/load. Old saves (no lineage section)
 // keep today's geometric-fallback behaviour untouched.
 #include <gtest/gtest.h>
 
@@ -47,7 +47,7 @@ TopoDS_Edge topFrontEdge(const TopoDS_Shape& box, double h) {
 }
 
 // Box 60x10x10 at origin, chamfer its top-front edge (two distances), then
-// subtract a narrow box crossing the middle — the bevel splits in two.
+// subtract a narrow box crossing the middle - the bevel splits in two.
 struct Scenario {
     Document doc;
     int bodyId = -1;
@@ -120,7 +120,7 @@ TEST(FaceLineage, SurvivesSaveLoad) {
 }
 
 TEST(FaceLineage, OldSaveWithoutLineageFallsBackGracefully) {
-    // Unsplit chamfer, lineage map deliberately DROPPED before refresh — the
+    // Unsplit chamfer, lineage map deliberately DROPPED before refresh - the
     // old-save condition. The geometric fallback must still find the bevel.
     Document doc;
     int bid = doc.addBody(BRepPrimAPI_MakeBox(60.0, 10.0, 10.0).Shape(), "Bar");

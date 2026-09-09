@@ -1,8 +1,8 @@
 #pragma once
 // Cut-based blend fallback (#55): when OCCT's native blend (ChFi3d via
 // BRepFilletAPI_MakeChamfer) fails because a surface feature crosses the
-// target edge — a drilled hole or pocket fragments the edge and the blend
-// surface can't resolve against the feature walls — build the SAME material
+// target edge - a drilled hole or pocket fragments the edge and the blend
+// surface can't resolve against the feature walls - build the SAME material
 // removal as a boolean instead: sweep the chamfer's triangular cross-section
 // along the edge line and subtract it. Booleans are the robust half of the
 // kernel; a wedge swept ACROSS the feature gap gives exactly the geometry
@@ -28,7 +28,7 @@ namespace blendcut {
 
 // Chamfer as a swept-wedge cut. dRef is the setback measured along `refFace`
 // when non-null (the asymmetric reference), else along each edge's first
-// adjacent face — mirroring BRepFilletAPI_MakeChamfer::Add(dRef, dOther,
+// adjacent face - mirroring BRepFilletAPI_MakeChamfer::Add(dRef, dOther,
 // edge, face). On success fills `outShape` (the cut body, BRepCheck-valid,
 // strictly smaller in volume), `outBlendFaces` (the bevel faces ON the
 // result, for click-to-edit / highlighting), and captures the cut's
@@ -45,7 +45,7 @@ bool cutChamfer(const TopoDS_Shape& body,
 // by ADDING a ramp, which native OCCT refuses when the ramp's footprint
 // crosses a feature (a hole in the floor face). Fuse a ramp prism swept over
 // the full span, then re-pierce each crossed void with its own outline so a
-// hole stays open — exactly chamfer-first-then-feature. Same gating: only
+// hole stays open - exactly chamfer-first-then-feature. Same gating: only
 // called after native failed; straight edges between planar faces; refuses
 // convex edges (those belong to cutChamfer).
 bool fillChamfer(const TopoDS_Shape& body,
@@ -57,7 +57,7 @@ bool fillChamfer(const TopoDS_Shape& body,
                  std::vector<TopoDS_Shape>& outBlendFaces);
 
 // Convex fillet as a cut: the same swept wedge, but bounded by the arc of
-// radius `radius` tangent to both adjacent faces — subtracting it leaves
+// radius `radius` tangent to both adjacent faces - subtracting it leaves
 // exactly the fillet cylinder. Same scope and gating as cutChamfer.
 bool cutFillet(const TopoDS_Shape& body,
                const std::vector<TopoDS_Edge>& edges, double radius,

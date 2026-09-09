@@ -3,7 +3,7 @@ name: Prune old artifacts
 # Actions storage is metered account-wide (0.5 GB-month included on the free
 # plan), so we keep exactly ONE artifact per name: the latest main build.
 # After each build workflow finishes on main, delete the older artifacts that
-# share a name with what it just uploaded. PR artifacts are left alone — their
+# share a name with what it just uploaded. PR artifacts are left alone - their
 # 2-day retention (set at upload) cleans those up on its own.
 #
 # This keeps steady-state storage bounded (~140 MB across the five artifact
@@ -20,7 +20,7 @@ permissions:
 jobs:
   prune:
     # Only prune in the wake of a main/release run. A PR run must never
-    # trigger deletion — its artifacts share names with main's.
+    # trigger deletion - its artifacts share names with main's.
     if: github.event.workflow_run.event != 'pull_request'
     runs-on: ubuntu-latest
     steps:

@@ -26,6 +26,7 @@
 #include <BRepCheck_Analyzer.hxx>
 #include <ShapeUpgrade_UnifySameDomain.hxx>
 #include "UnifyTolerance.h"
+#include "BoolArgs.h"
 #include <TopTools_MapOfShape.hxx>
 #include <TopoDS_Shell.hxx>
 #include <TopoDS_Solid.hxx>
@@ -72,7 +73,7 @@ gp_Vec faceNormal(const TopoDS_Face& f) {
     return n;
 }
 
-// Centre of mass of a closed wire — the rim's centre, however shaped.
+// Centre of mass of a closed wire - the rim's centre, however shaped.
 gp_Pnt wireCentre(const TopoDS_Wire& w) {
     GProp_GProps g;
     BRepGProp::LinearProperties(w, g);
@@ -86,7 +87,7 @@ gp_Pnt wireCentre(const TopoDS_Wire& w) {
 // Which hole do these edges belong to, and what does the selection mean?
 //
 // The trap here is WHICH rim was grabbed. buildVoid reports entry/exit in its
-// own order, decided by how it walked the body — not by what the user clicked.
+// own order, decided by how it walked the body - not by what the user clicked.
 // Tilt has to pin the OTHER rim, so a Tilt that trusted buildVoid's order would
 // look like it worked and lean the wrong end of the bore. So match the picked
 // edges against both mouth wires and record which one they came from.
@@ -99,13 +100,13 @@ MoveHoleOp::EdgePick MoveHoleOp::classifyRimEdges(
     TopExp::MapShapesAndAncestors(body, TopAbs_EDGE, TopAbs_FACE, edgeFaces);
 
     // Every candidate wall the picked edges touch. More than one distinct hole
-    // means an ambiguous selection — decline.
+    // means an ambiguous selection - decline.
     TopoDS_Face wall;
     TopoDS_Shape voidSolid; gp_Vec entryN; bool pocket = false;
     TopoDS_Wire entryRim, exitRim;
     // Take the first wall any picked edge touches that buildVoid accepts. Do
     // NOT try to prove later edges belong to the same hole by comparing their
-    // voids — buildVoid constructs a fresh solid per call, so IsSame is never
+    // voids - buildVoid constructs a fresh solid per call, so IsSame is never
     // true even for the same hole, and a square hole (four separate wall faces)
     // declined every time. The rim-membership loop below is the real filter:
     // an edge from another hole simply isn't on THIS hole's rims.
@@ -160,7 +161,7 @@ MoveHoleOp::EdgePick MoveHoleOp::classifyRimEdges(
         grabbedEntry ? entryEdges : exitEdges;
     const size_t got = grabbedEntry ? onEntry : onExit;
 
-    // Can this rim be edge-moved at all? Only if every side is straight —
+    // Can this rim be edge-moved at all? Only if every side is straight -
     // EdgeMove refuses arcs, and it would be perverse to offer a verb that is
     // guaranteed to decline. A round rim is a single circular edge, so this
     // only ever bites on curved rims made of several arcs (a slot), where
@@ -187,7 +188,7 @@ MoveHoleOp::EdgePick MoveHoleOp::classifyRimEdges(
     return r;
 }
 
-// Slide one straight side of a rim, letting its neighbours follow — the 3D
+// Slide one straight side of a rim, letting its neighbours follow - the 3D
 // equivalent of dragging a line in a sketch.
 //
 // The geometry is only line-line intersection: translate the grabbed side's
@@ -216,7 +217,7 @@ bool MoveHoleOp::editRimWire(const TopoDS_Wire& rim, const TopoDS_Edge& edge,
         const TopoDS_Edge& e = wx.Current();
         BRepAdaptor_Curve c(e);
         if (c.GetType() != GeomAbs_Line)
-            return fail("this hole has a curved side — moving one edge of it "
+            return fail("this hole has a curved side - moving one edge of it "
                         "would have to move the curves too, which isn't "
                         "supported yet. Try the whole-hole move instead.");
         edges.push_back(e);
@@ -254,7 +255,7 @@ bool MoveHoleOp::editRimWire(const TopoDS_Wire& rim, const TopoDS_Edge& edge,
     gp_Pnt newA, newB;
     if (!intersect(pts[iPrev], pts[iA], mA, mB, newA) ||
         !intersect(pts[iNext], pts[iB], mB, mA, newB))
-        return fail("that side is parallel to the one next to it — there's no "
+        return fail("that side is parallel to the one next to it - there's no "
                     "corner for it to meet");
 
     // Refuse a move that turns the profile inside out or eats a whole side: each
@@ -283,7 +284,7 @@ bool MoveHoleOp::editRimWire(const TopoDS_Wire& rim, const TopoDS_Edge& edge,
 
 // The oblique void: a ruled loft from the PINNED far rim to the MOVED near rim.
 //
-// Ruled, not smoothed, because a hole's walls are straight — a smoothed loft
+// Ruled, not smoothed, because a hole's walls are straight - a smoothed loft
 // would bow them. Lofting rim-to-rim is also why this is shape-agnostic: it
 // never looks at what the profile is, so a square or slotted hole tilts by the
 // same code as a round one. (Polygons need the two wires to correspond vertex
@@ -343,7 +344,7 @@ bool MoveHoleOp::buildVoid(const TopoDS_Shape& body, const TopoDS_Face& seedWall
     TopTools_IndexedDataMapOfShapeListOfShape edgeFaces;
     TopExp::MapShapesAndAncestors(body, TopAbs_EDGE, TopAbs_FACE, edgeFaces);
 
-    // Gather the hole's ACTUAL interior faces (walls, cones, counterbore steps —
+    // Gather the hole's ACTUAL interior faces (walls, cones, counterbore steps -
     // any segment), and the two outer MOUTHS the bore opens through. This is
     // section-agnostic AND profile-agnostic: it reconstructs the exact void by
     // its real faces, so a countersink (cone+shank) or a counterbore (two
@@ -352,7 +353,7 @@ bool MoveHoleOp::buildVoid(const TopoDS_Shape& body, const TopoDS_Face& seedWall
     // BFS from the clicked wall. For each face's edge, the adjacent face is a
     // MOUTH if it's planar and the edge lies on one of its INNER wires (the bore
     // pierces it → that inner wire is the opening). Otherwise it's another
-    // interior face of the hole (another wall, a cone, or a step — whose own
+    // interior face of the hole (another wall, a cone, or a step - whose own
     // outer boundary the edge sits on) → keep walking. A pocket floor would also
     // be gathered as an interior face, leaving only ONE mouth, which we reject.
     std::vector<TopoDS_Face> walls;
@@ -423,7 +424,7 @@ bool MoveHoleOp::buildVoid(const TopoDS_Shape& body, const TopoDS_Face& seedWall
     if (exitOpening)  *exitOpening  = mouths[1].second; // the far rim (Tilt pins it)
 
     // Sew the interior faces + a cap over each mouth opening into a closed shell,
-    // then a solid — the exact hole void, whatever its axial profile. Caps reuse
+    // then a solid - the exact hole void, whatever its axial profile. Caps reuse
     // the mouths' real inner-wire edges, so they sew to the walls seamlessly.
     BRepBuilderAPI_Sewing sew(1e-6);
     for (const auto& w : walls) sew.Add(w);
@@ -467,7 +468,7 @@ bool MoveHoleOp::execute(Document& doc) {
         return false; // pocket or unrecognized → caller toasts
 
     // Project the requested move onto the entry plane (a hole slides ACROSS its
-    // face, never along the bore — that would just deepen/shorten it).
+    // face, never along the bore - that would just deepen/shorten it).
     gp_Vec move = m_move;
     double along = move.Dot(entryNormal);
     move -= entryNormal * along;
@@ -475,7 +476,8 @@ bool MoveHoleOp::execute(Document& doc) {
 
     try {
         // Fill the old hole back to solid, then cut the same void at the new spot.
-        BRepAlgoAPI_Fuse fuse(body, voidSolid);
+        BRepAlgoAPI_Fuse fuse;
+        materializr::setBooleanShapes(fuse, body, voidSolid);
         fuse.Build();
         if (!fuse.IsDone() || fuse.Shape().IsNull()) return false;
 
@@ -515,7 +517,8 @@ bool MoveHoleOp::execute(Document& doc) {
             movedVoid = BRepBuilderAPI_Transform(voidSolid, t, true).Shape();
         }
 
-        BRepAlgoAPI_Cut cut(fuse.Shape(), movedVoid);
+        BRepAlgoAPI_Cut cut;
+        materializr::setBooleanShapes(cut, fuse.Shape(), movedVoid);
         cut.Build();
         if (!cut.IsDone() || cut.Shape().IsNull()) return false;
 
@@ -556,7 +559,7 @@ std::string MoveHoleOp::serializeParams() const {
     // body + move vector as plain numbers; the seed wall as an ordinal index
     // into the INPUT shape's canonical face map (see SubShapeIndex.h).
     // The MODE travels too. Without it a tilted or reshaped hole reloads as a
-    // plain slide — the geometry silently changes on reopen, which is exactly
+    // plain slide - the geometry silently changes on reopen, which is exactly
     // what full replay exists to prevent. Old blobs have no mode= and default
     // to Slide, which is what they were.
     char buf[200];
@@ -625,7 +628,7 @@ bool MoveHoleOp::rehydrateFromReload(const ReloadState& state, Document& /*doc*/
     if (m_previousShape.IsNull()) return false;
 
     // The seed wall must resolve against the reloaded input shape, else the BFS
-    // in buildVoid can't find the hole — decline so it falls back to a baked op.
+    // in buildVoid can't find the hole - decline so it falls back to a baked op.
     if (m_seedWallIndices.empty()) return false;
     std::vector<TopoDS_Shape> resolved;
     if (!SubShapeIndex::resolveAll(m_previousShape, m_seedWallIndices,
@@ -637,7 +640,7 @@ bool MoveHoleOp::rehydrateFromReload(const ReloadState& state, Document& /*doc*/
 
     // EdgeMove additionally needs the dragged rim edge back. If it won't
     // resolve, replaying as a slide would move the whole hole somewhere the
-    // user never put it — decline instead and let it reload baked.
+    // user never put it - decline instead and let it reload baked.
     if (m_mode == Mode::EdgeMove) {
         std::vector<TopoDS_Shape> edges;
         if (m_rimEdgeIndices.empty() ||

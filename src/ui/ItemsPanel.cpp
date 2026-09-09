@@ -48,13 +48,13 @@ bool ItemsPanel::render() {
     return changed;
 }
 
-// Panel body without the window wrapper — the desktop render() hosts it in
+// Panel body without the window wrapper - the desktop render() hosts it in
 // the docked "Items" window, the im-touch shell hosts it inside its right
 // panel. Same return contract as render().
 bool ItemsPanel::renderContent() {
     m_bodyDeleted = false;
     // AllowWhenBlockedByActiveItem: a held body row is the "active item", which
-    // would otherwise make IsWindowHovered() report false — exactly during the
+    // would otherwise make IsWindowHovered() report false - exactly during the
     // long-press we need to detect to arm its context menu.
     m_hovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows |
                                        ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
@@ -66,7 +66,7 @@ bool ItemsPanel::renderContent() {
 
     bool colorChanged = false; // a body colour edit also needs a mesh rebuild
 
-    // Selected-body ids collected ONCE per frame — renderBodyRow used to
+    // Selected-body ids collected ONCE per frame - renderBodyRow used to
     // rescan the whole selection per row (O(bodies × selection) per frame).
     m_selectedBodyIdsFrame.clear();
     if (m_selection)
@@ -78,14 +78,14 @@ bool ItemsPanel::renderContent() {
     ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Filter"));
     ImGui::Separator();
 
-    // The toggles wrap to fit whatever width the host panel has — each one
+    // The toggles wrap to fit whatever width the host panel has - each one
     // stays on the current row only if it actually fits, so a narrow panel
     // (the touch shell's is user-resizable) stacks them instead of pushing
     // the panel wide. The width probe mirrors Button sizing (label +
     // 2×FramePadding.x); the [x] on/off states are same-width by design.
     {
         const ImGuiStyle& st = ImGui::GetStyle();
-        // Measure from the PREVIOUS item's right edge (screen space) — after an
+        // Measure from the PREVIOUS item's right edge (screen space) - after an
         // item the cursor is already at the next line's start, so CursorPosX
         // would always say "fits".
         auto fits = [&](const char* label) {
@@ -144,7 +144,7 @@ bool ItemsPanel::renderContent() {
 
             // Tree-node arrow + name. Use TreeNodeEx so we can pre-set the
             // expanded state from the Document (persisted across frames).
-            // Deliberately NO SpanAvailWidth — it makes the whole row a tree-
+            // Deliberately NO SpanAvailWidth - it makes the whole row a tree-
             // node hit target, which silently swallowed clicks on the colour
             // swatch (popup never appeared).
             ImGuiTreeNodeFlags fflags = ImGuiTreeNodeFlags_OpenOnArrow;
@@ -153,8 +153,8 @@ bool ItemsPanel::renderContent() {
 
             std::string fname = m_document->getFolderName(folderId);
             // Reserve room for the colour swatch on the right. The gap must be
-            // the style's ItemSpacing.x — that's what SameLine() actually
-            // advances by — or the swatch overhangs the panel edge under a
+            // the style's ItemSpacing.x - that's what SameLine() actually
+            // advances by - or the swatch overhangs the panel edge under a
             // theme with wider spacing (the im-touch shell clipped it).
             float swatchW = ImGui::GetFrameHeight();
             float nameW = ImGui::GetContentRegionAvail().x - swatchW -
@@ -242,7 +242,7 @@ bool ItemsPanel::renderContent() {
         end_bodies:;
 
         // "New folder…" name prompt (kept as a modal popup so it survives the
-        // frame the user clicked the menu item — ImGui menus auto-close).
+        // frame the user clicked the menu item - ImGui menus auto-close).
         if (m_newFolderPopupOpen) {
             ImGui::OpenPopup("New Folder##itemspanel");
             m_newFolderPopupOpen = false;
@@ -297,7 +297,7 @@ bool ItemsPanel::renderContent() {
             if (ImGui::Checkbox("##svis", &visible)) {
                 m_document->setSketchVisible(id, visible);
                 // NOT colorChanged: sketch visibility is read live by the
-                // viewport's sketch loop every frame — setting the flag here
+                // viewport's sketch loop every frame - setting the flag here
                 // forced a FULL re-tessellation of every visible body (a
                 // multi-second stall on a heavy project) for a toggle that
                 // doesn't touch body meshes at all.
@@ -374,7 +374,7 @@ bool ItemsPanel::renderContent() {
                     if (ImGui::MenuItem(materializr::tr("Export as DXF…"))) {
                         if (m_exportSketchDxf) m_exportSketchDxf(id);
                     }
-                    // Make an independent copy — edit it freely (e.g. resize
+                    // Make an independent copy - edit it freely (e.g. resize
                     // holes) to derive a same-layout variant without touching
                     // this sketch or any body built from it.
                     if (ImGui::MenuItem(materializr::tr("Duplicate Sketch"))) {
@@ -386,7 +386,7 @@ bool ItemsPanel::renderContent() {
                     //
                     // Pulls in EVERY other sketch id, so if the active sketch
                     // is registered at all it gets swept into the fold no
-                    // matter which row is clicked — gate on that, not just
+                    // matter which row is clicked - gate on that, not just
                     // whether this row IS the active sketch.
                     bool activeSketchInvolved = m_sketchModeActive && m_activeSketchId >= 0;
                     if (sketchIds.size() > 1 &&
@@ -628,7 +628,7 @@ bool ItemsPanel::renderContent() {
 
 // One body row. Pulled out of render() so it can run at the root level OR
 // inside a folder's expanded contents (indented by the caller). Returns false
-// if this body was deleted via its context menu — caller must stop iterating
+// if this body was deleted via its context menu - caller must stop iterating
 // because the body list is now stale.
 bool ItemsPanel::renderBodyRow(int id, bool& colorChanged) {
     ImGui::PushID(id);
@@ -660,19 +660,19 @@ bool ItemsPanel::renderBodyRow(int id, bool& colorChanged) {
         return true;
     }
 
-    // Gap = ItemSpacing.x (what SameLine() advances by), not a hardcoded 6 —
+    // Gap = ItemSpacing.x (what SameLine() advances by), not a hardcoded 6 -
     // else the swatch overhangs the right edge under wider-spacing themes.
     float swatchW = ImGui::GetFrameHeight();
     float nameW = ImGui::GetContentRegionAvail().x - swatchW -
                   ImGui::GetStyle().ItemSpacing.x;
     std::string name = m_document->getBodyName(id);
-    // Show the kernel body id alongside the display name — it's the id that
+    // Show the kernel body id alongside the display name - it's the id that
     // Boolean/Separate/etc. properties reference ("Target Body ID: 22"), so
     // this is the only way to tell which body in the list a step operated on.
     // The Selectable keeps a stable widget id via the enclosing PushID(id), so
     // decorating the visible label is safe.
     std::string label = name + "  \xC2\xB7 b" + std::to_string(id);
-    // Imported meshes are REFERENCE bodies — you sketch and snap against them,
+    // Imported meshes are REFERENCE bodies - you sketch and snap against them,
     // but every modelling op declines them (core/MeshGuard.h). Say so in the
     // list, so the boundary is visible BEFORE a refusal, not just after: the
     // row otherwise looks exactly like a modelled body.
@@ -692,7 +692,7 @@ bool ItemsPanel::renderBodyRow(int id, bool& colorChanged) {
                           ImVec2(nameW > 1.0f ? nameW : 0.0f, 0.0f));
     if (isMesh) ImGui::PopStyleColor();
     if (isMesh && ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("%s", materializr::tr("Imported mesh \xE2\x80\x94 a reference body.\nSketch on it and snap to it; modelling operations (booleans, fillets, push/pull) decline it."));
+        ImGui::SetTooltip("%s", materializr::tr("Imported mesh - a reference body.\nSketch on it and snap to it; modelling operations (booleans, fillets, push/pull) decline it."));
     }
     if (rowClicked) {
         if (m_selection) {
@@ -775,7 +775,7 @@ bool ItemsPanel::renderBodyRow(int id, bool& colorChanged) {
             colorChanged = true;
         }
         // The way back from Isolate in one click (mirrors the viewport
-        // context menu) — beats re-ticking every checkbox above.
+        // context menu) - beats re-ticking every checkbox above.
         if (!deleted && ImGui::MenuItem(materializr::tr("Show All Bodies"))) {
             for (int otherId : m_document->getAllBodyIds()) {
                 m_document->setBodyVisible(otherId, true);
@@ -784,13 +784,13 @@ bool ItemsPanel::renderBodyRow(int id, bool& colorChanged) {
         }
         // Separate: only when the body actually holds more than one
         // disconnected solid (air-gapped lumps fused into one body). Splits
-        // them into individual bodies — the largest keeps this one, the rest
+        // them into individual bodies - the largest keeps this one, the rest
         // become new bodies the user can inspect or delete.
         if (!deleted && m_history &&
             // Guarded: getBody throws when the row's body has just been
             // retired (a replay, a delete elsewhere) and the panel is drawing
             // one frame behind. Same class as the escape that silently exited
-            // the app on Android — see Application_InteractiveOps.cpp's note.
+            // the app on Android - see Application_InteractiveOps.cpp's note.
             [&] { try { return SeparateBodyOp::solidCount(
                                    m_document->getBody(id)) > 1; }
                   catch (...) { return false; } }()) {
@@ -803,7 +803,7 @@ bool ItemsPanel::renderBodyRow(int id, bool& colorChanged) {
         }
         // Export: every format the app can write, listed from the plugin
         // registry (Application supplies the names), acting on the whole
-        // BODY SELECTION when the clicked body is part of one — the
+        // BODY SELECTION when the clicked body is part of one - the
         // print-in-place case, where the parts must land in one file with
         // their relative positions intact. Same multi-selection rule as
         // "Move to folder" below.
@@ -835,13 +835,13 @@ bool ItemsPanel::renderBodyRow(int id, bool& colorChanged) {
             ImGui::MenuItem(materializr::tr("Export STL…"))) {
             m_exportStl(id);
         }
-        // Baked copy of this body into a fresh project file — the "use this
+        // Baked copy of this body into a fresh project file - the "use this
         // part elsewhere" flow (the new file lands in Open Recent / the
         // landing page, ready for Import Parts from another project).
         if (!deleted && m_exportToProject &&
             ImGui::MenuItem(materializr::tr("Export to New Project"))) {
             // Same selection rule as Export above: the whole selection when
-            // this body is part of one. No ellipsis — it opens a tab now
+            // this body is part of one. No ellipsis - it opens a tab now
             // rather than asking for a filename.
             std::vector<int> targets;
             if (m_selection) {
@@ -878,15 +878,15 @@ bool ItemsPanel::renderBodyRow(int id, bool& colorChanged) {
             for (int t : targets) {
                 if (m_document->getBodyFolder(t) >= 0) { anyInFolder = true; break; }
             }
-            const char* moveLabel = multi ? "(root — no folder) — all selected"
-                                          : "(root — no folder)";
+            const char* moveLabel = multi ? "(root - no folder) - all selected"
+                                          : "(root - no folder)";
             if (anyInFolder && ImGui::MenuItem(moveLabel)) {
                 for (int t : targets) m_document->setBodyFolder(t, -1);
                 if (m_markDirty) m_markDirty();
             }
             for (int fid : m_document->getAllFolderIds()) {
                 std::string label = m_document->getFolderName(fid);
-                if (multi) label += " — all selected";
+                if (multi) label += " - all selected";
                 if (ImGui::MenuItem(label.c_str())) {
                     for (int t : targets) m_document->setBodyFolder(t, fid);
                     if (m_markDirty) m_markDirty();

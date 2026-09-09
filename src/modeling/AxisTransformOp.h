@@ -9,7 +9,7 @@
 // the edit is applied live to the Document; this records before/after
 // (origin, direction) snapshots so undo/redo swap between them via
 // Document::setAxis. Owns no bodies (empty captureDiff), so it never touches
-// getBody(-1) — the crash that made axis/plane drags skip history in 0.6.0.
+// getBody(-1) - the crash that made axis/plane drags skip history in 0.6.0.
 // Pushed via History::pushExecuted. Holds a batch so a multi-axis drag is one
 // undo step.
 class AxisTransformOp : public Operation {
@@ -33,7 +33,7 @@ public:
     std::string description() const override;
     void renderProperties() override;
     std::string typeId() const override { return "axis_transform"; }
-    // Reload support — mirrors PlaneTransformOp.
+    // Reload support - mirrors PlaneTransformOp.
     std::string serializeParams() const override;
     bool deserializeParams(const std::string& blob) override;
     bool rehydrateFromReload(const ReloadState& state, Document& doc) override;

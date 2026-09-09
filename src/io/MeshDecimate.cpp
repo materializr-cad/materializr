@@ -191,7 +191,7 @@ int decimateMesh(SimpleMesh& mesh, int targetTriangles) {
     }
 
     // Would collapsing v→u (moving the merged vertex to `target`) flip any of the
-    // surrounding triangles? Reject the collapse if so — guards against folds.
+    // surrounding triangles? Reject the collapse if so - guards against folds.
     auto wouldFlip = [&](int u, int v, const Vec3& target) -> bool {
         for (int pass = 0; pass < 2; ++pass) {
             const int src = pass == 0 ? u : v;

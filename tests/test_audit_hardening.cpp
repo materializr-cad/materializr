@@ -7,7 +7,7 @@
 //    string values with embedded control characters cannot inject key=value
 //    lines into the .cfg on the save -> load round trip.
 //  - ProjectIO::load is transactional-on-failure: a corrupt file never leaves
-//    a partially-mutated (or stale) Document behind — failure means empty.
+//    a partially-mutated (or stale) Document behind - failure means empty.
 //  - SvgImport: a file whose paths flatten into more vertices than the global
 //    budget is refused instead of freezing buildWires/regions downstream.
 
@@ -80,7 +80,7 @@ TEST(SettingsHardening, OutOfRangeIntsAreClampedOnLoad) {
 TEST(SettingsHardening, EmbeddedNewlineCannotInjectKeys) {
     // A POSIX filename may legally contain '\n'. Before the fix, save() wrote
     // it verbatim and the next load() re-parsed the payload as its own
-    // key=value line — flipping arbitrary settings (here: orbitButton).
+    // key=value line - flipping arbitrary settings (here: orbitButton).
     const std::string path = tempPath("mz_test_settings_inject.cfg");
 
     AppSettings s;                      // defaults: orbitButton is 0 or 2

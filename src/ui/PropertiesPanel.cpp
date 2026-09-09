@@ -47,7 +47,7 @@
 #include "../i18n.h"
 #include "../i18n.h"
 
-// Measurement-style readouts for selected FACES / EDGES / VERTICES — area,
+// Measurement-style readouts for selected FACES / EDGES / VERTICES - area,
 // length, surface/curve kind and dimensions, with totals across a
 // multi-select (doubles as a measure tool). Coordinates are shown in the
 // app's user Z-up convention (user Y = world Z, user Z = world Y), matching
@@ -201,7 +201,7 @@ bool PropertiesPanel::render() {
 bool PropertiesPanel::renderContent() {
     bool modified = false;
 
-    // Case 0: In sketch mode — show the editable size of the selected element.
+    // Case 0: In sketch mode - show the editable size of the selected element.
     // Takes priority: while sketching, the panel is about the sketch, not the
     // history step or a 3D selection.
     if (m_inSketchMode && m_activeSketch && m_sketchTool) {
@@ -223,7 +223,7 @@ bool PropertiesPanel::renderContent() {
             // Render the operation's parameter controls. Size the input for
             // ~7 digits plus the -/+ step buttons so a labelled InputInt/Double
             // neither runs its right-hand label off the panel nor clips the
-            // value — see HistoryPanel.
+            // value - see HistoryPanel.
             ImGui::PushItemWidth(
                 ImGui::CalcTextSize("0000000").x +
                 2.0f * (ImGui::GetFrameHeight() +
@@ -231,7 +231,7 @@ bool PropertiesPanel::renderContent() {
             const_cast<Operation*>(op)->renderProperties();
             ImGui::PopItemWidth();
 
-            // Enter commits the edit directly — the Apply button stays as the
+            // Enter commits the edit directly - the Apply button stays as the
             // mouse-driven alternative.
             bool enterCommits =
                 ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) &&
@@ -260,7 +260,7 @@ bool PropertiesPanel::renderContent() {
             bool enabled = op->isEnabled();
             if (ImGui::Checkbox(materializr::tr("Enabled"), &enabled)) {
                 if (m_document) {
-                    // In-place toggle — preserves base bodies the op modifies
+                    // In-place toggle - preserves base bodies the op modifies
                     // (replayAll's doc.clear() would delete them).
                     m_history->setStepEnabled(m_editingStep, enabled, *m_document);
                     modified = true;
@@ -336,7 +336,7 @@ bool PropertiesPanel::renderContent() {
 
         // Bounding-box readout (display only). Editing dimensions used to
         // live here as an inline editor, but it was functionally a glorified
-        // Scale — same TransformOp, same anchor, same ellipse-from-cylinder
+        // Scale - same TransformOp, same anchor, same ellipse-from-cylinder
         // surprise. Editing now lives on the Scale gizmo popup, which has a
         // % / mm toggle and shows live dimensions in mm mode.
         ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Dimensions"));
@@ -482,7 +482,7 @@ bool PropertiesPanel::renderContent() {
             } else {
                 // Construction-plane CREATION actions (Midplane / Tangent /
                 // Normal-to-axis) live in the Tools panel, alongside the other
-                // create operations — see Toolbar's context renderers.
+                // create operations - see Toolbar's context renderers.
                 renderSubShapeProperties(*m_selection);
             }
         } else {
@@ -616,7 +616,7 @@ void PropertiesPanel::renderSketchElementPanel(bool& modified) {
 
     // Resolve what was clicked to an editable element. Clicking a circle near
     // its CENTRE grabs the centre point (so you can drag-move it), so a selected
-    // point that is a circle/arc centre still exposes that curve's size — you
+    // point that is a circle/arc centre still exposes that curve's size - you
     // can edit a circle by clicking anywhere on it, centre included.
     int circleId = -1, arcId = -1;
     if (!selC.empty()) circleId = *selC.begin();
@@ -687,7 +687,7 @@ void PropertiesPanel::renderSketchElementPanel(bool& modified) {
         for (const auto& ll : sk->getLines()) if (ll.id == lid) { l = &ll; break; }
         if (!l) return;
         // If this line is a side of an axis-aligned rectangle, edit the whole
-        // rectangle (Width × Height) instead of a single side — that's what the
+        // rectangle (Width × Height) instead of a single side - that's what the
         // user means by "make the rectangle editable".
         Sketch::RectInfo rect;
         if (sk->findAxisAlignedRect(lid, rect)) {
@@ -727,7 +727,7 @@ void PropertiesPanel::renderSketchElementPanel(bool& modified) {
 // Commit policy: text edits commit on Enter or focus-out (the
 // IsItemDeactivatedAfterEdit signal). On commit we snapshot the pre-edit
 // sketch, apply the value, run the solver, and push a SketchEditOp
-// covering both states — so the change is undoable AND shows up as a
+// covering both states - so the change is undoable AND shows up as a
 // proper step in history.
 void PropertiesPanel::renderSketchConstraintsPanel(int sketchId, bool& modified) {
     auto sk = m_document->getSketch(sketchId);
@@ -833,7 +833,7 @@ void PropertiesPanel::renderSketchConstraintsPanel(int sketchId, bool& modified)
 
         // Render dimensional ones (Distance, Radius/Diameter, Angle,
         // point-to-line Distance) inline. Non-dimensional ones get a single
-        // muted bullet — there's nothing to tune, but listing them confirms
+        // muted bullet - there's nothing to tune, but listing them confirms
         // what's actually applied.
         bool isDim = (c.type == ConstraintType::Distance ||
                       c.type == ConstraintType::Radius   ||
@@ -861,7 +861,7 @@ void PropertiesPanel::renderSketchConstraintsPanel(int sketchId, bool& modified)
               : c.type == ConstraintType::DistancePointLine ? "Dist \xE2\x8A\xA5"
               : c.type == ConstraintType::CircleGap ? "Gap"
                                                    : "Angle";
-            // Decimals from the unit table, not a hardcoded 3 — under metres
+            // Decimals from the unit table, not a hardcoded 3 - under metres
             // or feet the table asks for 4, and "%.3f" quantised the stored
             // value to a 1 mm grid on every commit. An Angle is degrees and
             // keeps its own fixed precision.
@@ -886,7 +886,7 @@ void PropertiesPanel::renderSketchConstraintsPanel(int sketchId, bool& modified)
                 materializr::inputNumber("##val", &padVal, 0.0, 0.0, shownFmt,
                                          ImGuiInputTextFlags_EnterReturnsTrue,
                                          &justActivated);
-            // Keep the buffer authoritative — the commit path below parses it.
+            // Keep the buffer authoritative - the commit path below parses it.
             if (justDeactivated)
                 std::snprintf(edit.buf, sizeof(edit.buf), "%.6g", padVal);
             ImGui::SameLine(); ImGui::Text("%s", unit);
@@ -925,7 +925,7 @@ void PropertiesPanel::renderSketchConstraintsPanel(int sketchId, bool& modified)
 
     if (!anyDim) {
         ImGui::Spacing();
-        ImGui::TextWrapped("%s", materializr::tr("This sketch has no dimensional constraints — only Horizontal / Parallel / etc., which have nothing to tune."));
+        ImGui::TextWrapped("%s", materializr::tr("This sketch has no dimensional constraints - only Horizontal / Parallel / etc., which have nothing to tune."));
     } else {
         ImGui::Spacing();
         ImGui::TextDisabled("%s", materializr::tr("Press Enter or click elsewhere to commit a value."));

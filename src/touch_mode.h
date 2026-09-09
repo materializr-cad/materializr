@@ -10,7 +10,7 @@
 //
 // It defaults to the platform (on for Android, off elsewhere) but is a saved
 // user setting, so a tablet with a mouse/keyboard/trackpad attached can run the
-// full desktop interaction model — the touch adaptations are a mode, not baked
+// full desktop interaction model - the touch adaptations are a mode, not baked
 // into the build.
 //
 // The value is fixed for a run: Application sets it from the saved setting at
@@ -18,7 +18,7 @@
 // touchMode(). Changing it in Settings persists the choice and takes full effect
 // on the next launch. Header-only (inline function-local static) so it's a
 // single shared instance across translation units with no extra .cpp / CMake
-// entry — same pattern as ui_scale.h.
+// entry - same pattern as ui_scale.h.
 namespace materializr {
 
 inline bool& touchModeRef() {
@@ -65,7 +65,7 @@ inline bool touchInputActive() {
 #endif
 }
 
-// Commit/cancel/create button labels. In touch mode drop the keyboard hint —
+// Commit/cancel/create button labels. In touch mode drop the keyboard hint -
 // there are no Enter/Esc keys, and "(Enter)" just eats space and confuses. So
 // "Confirm (Enter)" -> "Confirm", "Cancel (Esc)" -> "Cancel", etc.
 inline const char* btnConfirm() {

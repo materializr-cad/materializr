@@ -116,13 +116,13 @@ TEST(RectangleRigidity, AddRectangleCarriesHVConstraints) {
 
 TEST(RectangleRigidity, StaysSquareWhenACornerIsPulled) {
     // A rectangle whose corner is dragged (as a distance dim would) must stay
-    // rectangular — sides horizontal/vertical — not skew into a parallelogram.
+    // rectangular - sides horizontal/vertical - not skew into a parallelogram.
     Sketch sk;
     sk.addRectangle({0.0f, 0.0f}, {10.0f, 6.0f});
     // Pull the top-right corner off-axis, then solve: H/V constraints re-square.
     const auto& pts = sk.getPoints();
     ASSERT_GE(pts.size(), 4u);
-    // The 3rd point (corner2) — nudge it diagonally.
+    // The 3rd point (corner2) - nudge it diagonally.
     int cornerId = pts[2].id;
     sk.movePoint(cornerId, pts[2].pos + glm::vec2(3.0f, 2.5f));
     SketchSolver solver;
@@ -155,7 +155,7 @@ TEST(CircleGap, SolverDrivesRimGapToTarget) {
     EXPECT_TRUE(solver.solve(sk, 500, 1e-4));
     double centreDist = glm::length(sk.getPoint(cA)->pos - sk.getPoint(cB)->pos);
     EXPECT_NEAR(centreDist, 10.0, 1e-2); // 2 + 5 + 3
-    // Radii are left to their own constraints — unchanged here.
+    // Radii are left to their own constraints - unchanged here.
     double rA = 0, rB = 0;
     for (const auto& ci : sk.getCircles()) {
         if (ci.id == ciA) rA = ci.radius;
@@ -187,7 +187,7 @@ TEST(ReferenceDimension, DoesNotDriveGeometry) {
 
 TEST(ReferenceDimension, RemeasuresItselfAfterSolve) {
     // The stored value follows the geometry, so the label always reports what
-    // is actually there — value 999 is overwritten by the real radius.
+    // is actually there - value 999 is overwritten by the real radius.
     Sketch sk;
     int ctr = sk.addPoint({0.0f, 0.0f});
     int ci  = sk.addCircle(ctr, 5.0);
@@ -229,7 +229,7 @@ TEST(ReferenceDimension, CostsNoDegreeOfFreedom) {
 }
 
 TEST(ReferenceDimension, DrivingStillConsumesDegreeOfFreedom) {
-    // Control for the test above — the same constraint, driving, does count.
+    // Control for the test above - the same constraint, driving, does count.
     Sketch sk;
     int a = sk.addPoint({0.0f, 0.0f});
     int b = sk.addPoint({10.0f, 0.0f});
@@ -251,8 +251,8 @@ TEST(ReferenceDimension, DrivingStillConsumesDegreeOfFreedom) {
 }
 
 TEST(ReferenceDimension, DefaultsToDrivingForBackCompat) {
-    // Every constraint ever written before isDriving existed — and every
-    // geometric type — must keep driving. The struct default guarantees it.
+    // Every constraint ever written before isDriving existed - and every
+    // geometric type - must keep driving. The struct default guarantees it.
     Constraint c{};
     EXPECT_TRUE(c.isDriving);
     EXPECT_FALSE(materializr::constraintSupportsReference(ConstraintType::Horizontal));
@@ -286,7 +286,7 @@ TEST(RadiusConstraint, SolverDrivesArcRadius) {
     // yields error 0.0 → "already satisfied" → applyCorrection's arc branch is
     // never reached and the radius never moves, while solve() still returns
     // true and the label renders the TYPED value (Application_Viewport.cpp
-    // renders c.value * 2.0, not the measured radius) — a dimension that
+    // renders c.value * 2.0, not the measured radius) - a dimension that
     // disagrees with its own geometry.
     Sketch sk;
     int ctr   = sk.addPoint({0.0f, 0.0f});
@@ -306,7 +306,7 @@ TEST(RadiusConstraint, SolverDrivesArcRadius) {
     // The bug: converged == true while r is still 5.0.
     EXPECT_NEAR(r, 8.0, 1e-2) << "arc radius not driven (solve returned "
                               << (converged ? "true" : "false")
-                              << ") — label would read 16.00 mm on a 10.00 mm arc";
+                              << ") - label would read 16.00 mm on a 10.00 mm arc";
 }
 
 TEST(DistancePointLine, DegenerateLineDoesNotNaN) {
@@ -339,7 +339,7 @@ TEST(DistancePointLine, DegeneratePointOnOwnLineStaysBounded) {
     // entityA == the line's own start point is a degenerate constraint that
     // resolveDimension now refuses to produce (see the DimensionResolve
     // rejection tests below), but a constraint can still reach the solver
-    // another way — an older project file, or direct injection as here.
+    // another way - an older project file, or direct injection as here.
     // Before the applyCorrection identity guard, this residual-0 constraint
     // fed a non-zero ~value/2 correction into BOTH the point and the line's
     // endpoints every iteration, which cancelled out for the point (moved
@@ -442,7 +442,7 @@ TEST(DimensionPersistence, LegacySixFieldKLineDefaultsOffsetsToZero) {
         "SPLINE_COUNT 0\n"
         "POLYGON_COUNT 0\n"
         "CONSTRAINT_COUNT 1\n"
-        "K 4 3 1 2 4 0\n"          // 6 fields, no offsets — ConstraintType 3 = Distance
+        "K 4 3 1 2 4 0\n"          // 6 fields, no offsets - ConstraintType 3 = Distance
         "SKETCH_END\n";
     std::istringstream is(body);
     Sketch sk;
@@ -517,7 +517,7 @@ TEST(DimensionPersistence, IsDrivingRoundTrips) {
 }
 
 TEST(DimensionPersistence, OutOfRangeConstraintTypeIsDropped) {
-    // A garbage enum int must not be cast into ConstraintType — the solver's
+    // A garbage enum int must not be cast into ConstraintType - the solver's
     // switches have no default arm and the value would be UB.
     std::string body =
         "PLANE 0 0 0 0 0 1 1 0 0 0 1 0\n"
@@ -672,7 +672,7 @@ TEST(DimensionResolve, ParallelLinesGiveDistance_NonParallelGiveAngle) {
 }
 
 TEST(DimensionResolve, AntiParallelLinesGiveDistance) {
-    // 179.5° apart folds to 0.5° — inside the parallel threshold.
+    // 179.5° apart folds to 0.5° - inside the parallel threshold.
     DimFixture f(179.5f);
     auto r = SketchTool::resolveDimension(f.sk, pick(DimEntityKind::Line, f.lnAB),
                                           pick(DimEntityKind::Line, f.lnCD));
@@ -730,8 +730,8 @@ TEST(DimensionResolve, TwoCirclesGiveRimGap) {
 }
 
 // Degenerate pick: a point that IS an endpoint of the target line measures a
-// perpendicular distance of 0 by construction, which — if resolveDimension
-// let it through — would create a DistancePointLine constraint whose
+// perpendicular distance of 0 by construction, which - if resolveDimension
+// let it through - would create a DistancePointLine constraint whose
 // applyCorrection has nothing to correct along (see the solver-side
 // DegeneratePointOnOwnLineStaysBounded test above). Both reachable paths
 // (direct point+line pick, and the line-line parallel branch whose derived
@@ -742,7 +742,7 @@ TEST(DimensionResolve, RejectsPointOnOwnLineEndpoint) {
     auto r1 = SketchTool::resolveDimension(f.sk, pick(DimEntityKind::Point, f.pA),
                                            pick(DimEntityKind::Line, f.lnAB));
     EXPECT_FALSE(r1.valid);
-    // pB is the END point of lnAB — same rejection, opposite endpoint and
+    // pB is the END point of lnAB - same rejection, opposite endpoint and
     // opposite pick order (line first, point second).
     auto r2 = SketchTool::resolveDimension(f.sk, pick(DimEntityKind::Line, f.lnAB),
                                            pick(DimEntityKind::Point, f.pB));
@@ -761,7 +761,7 @@ TEST(DimensionResolve, RejectsChainedCollinearLineLineSharedVertex) {
     int lnAB = sk.addLine(pA, pB);
     // Second line starts exactly AT pB (a chained segment sharing the
     // vertex, e.g. drawn as a continuing line chain) and is nearly
-    // collinear with AB (~0.29 deg) — inside the parallel threshold. The
+    // collinear with AB (~0.29 deg) - inside the parallel threshold. The
     // parallel branch's derived point (second line's start == pB) is an
     // endpoint of the FIRST line, so this must reject just like the direct
     // point+line pick above.
@@ -777,7 +777,7 @@ TEST(DimensionResolve, RejectsChainedCollinearLineLineSharedVertex) {
 // kParallelTol == 1.0 degree in double precision. DimFixture builds its
 // rotated line through a FLOAT pi/180 conversion and float sin/cos, so the
 // angle it actually produces for deg=1.0 is not bit-identical to the double
-// 1-degree tolerance — empirically (see scratch probe) it lands a hair
+// 1-degree tolerance - empirically (see scratch probe) it lands a hair
 // UNDER the tolerance, so <= keeps 1.0 deg on the parallel
 // (DistancePointLine) side. 1.5 deg is unambiguously past the threshold.
 TEST(DimensionResolve, ParallelThresholdBoundary) {
@@ -825,13 +825,13 @@ TEST(DimensionResolve, LinesParallelWithinDimTol) {
 // lines sharing endpoint p2 but at a real (non-parallel) angle. Dimensioning
 // p1-to-L2 then, separately, p2-to-L1 satisfies the OLD mirrored-DPL
 // endpoint-membership check (each picked point is an endpoint of the OTHER
-// line) but is not the same physical gap — the fix's parallel gate must
+// line) but is not the same physical gap - the fix's parallel gate must
 // reject it so applyPendingDimension (untestable here) falls through to
 // adding a second, independent constraint instead of overwriting the first.
 TEST(DimensionResolve, TriangleAltitudeIsNotMirroredDPL) {
     Sketch sk;
     // A right-angle-ish triangle: L1 = p1-p2 (horizontal), L2 = p2-p3
-    // (vertical) — 90 deg apart, nowhere near the 1 deg parallel tolerance.
+    // (vertical) - 90 deg apart, nowhere near the 1 deg parallel tolerance.
     int p1 = sk.addPoint({0.0f, 0.0f});
     int p2 = sk.addPoint({10.0f, 0.0f});
     int l1 = sk.addLine(p1, p2);

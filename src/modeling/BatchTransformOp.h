@@ -13,11 +13,11 @@
 //
 // It USED to be recorded as a baked ReplayOp snapshot, so on reload it re-slammed
 // its stored geometry over any upstream edit whenever the model replayed through
-// it — the "batchtransform bakes" bug: a repair beneath a threaded body reverted
+// it - the "batchtransform bakes" bug: a repair beneath a threaded body reverted
 // the moment this step re-landed. Storing the affine transform + the body ids
 // instead makes it reload as a REAL op that re-applies to the LIVE bodies, so
 // upstream edits propagate through it (parity with single-body TransformOp,
-// generalised to gp_GTrsf — which covers non-uniform scale — and N bodies).
+// generalised to gp_GTrsf - which covers non-uniform scale - and N bodies).
 class BatchTransformOp : public Operation {
 public:
     BatchTransformOp() = default;

@@ -56,7 +56,7 @@ public:
     bool hasSelectedSketches() const;
     bool hasSelectedSketchRegions() const;
 
-    // "Navigation-only" — the current selection was made for highlighting /
+    // "Navigation-only" - the current selection was made for highlighting /
     // navigation purposes (e.g. clicking a body name in the Items panel) and
     // should not auto-activate the move/rotate/scale gizmo. Cleared by any
     // mutation through select / addToSelection / clear so a follow-up
@@ -68,7 +68,7 @@ public:
     void setNavigationOnly(bool b) { m_navigationOnly = b; }
 
     // Monotonic counter bumped by every mutation (select/add/remove/toggle/
-    // clear). Lets callers memoize per-selection work — e.g. the toolbar's
+    // clear). Lets callers memoize per-selection work - e.g. the toolbar's
     // "Edit Diameter" candidate detection, which was re-running OCCT surface
     // queries every rendered frame while a face was selected.
     unsigned revision() const { return m_revision; }

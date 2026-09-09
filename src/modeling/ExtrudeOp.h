@@ -23,7 +23,7 @@ public:
     void setDraftAngle(double degrees);
     // Remember the source sketch so we can rebuild the profile if the sketch
     // is later edited (constraint value change → cascade). -1 means "not from
-    // a sketch" (e.g., a face-driven extrude) — those won't cascade.
+    // a sketch" (e.g., a face-driven extrude) - those won't cascade.
     void setSketchSource(int sketchId) { m_sketchId = sketchId; }
 
     // Getters
@@ -58,7 +58,7 @@ public:
     bool rehydrateFromReload(const ReloadState& state, Document& doc) override;
 
     // The body this op minted (NewBody mode), or -1. Survives undo so a redo
-    // — and the interactive preview's undo/re-execute cycle — reuses the same
+    // - and the interactive preview's undo/re-execute cycle - reuses the same
     // id instead of minting a new one every frame.
     int createdBodyId() const { return m_createdBodyId; }
 
@@ -87,7 +87,7 @@ private:
     int m_sketchId = -1;
     // WHICH regions of that sketch this extrude used (#53): one point INSIDE
     // each picked region, in sketch-2D. rebuildProfileFromSketch selects only
-    // regions containing these — without them it takes EVERY region of the
+    // regions containing these - without them it takes EVERY region of the
     // sketch's current state, which breaks replay for the normal
     // draw/extrude/draw-more-in-the-same-sketch workflow (four extrudes all
     // re-deriving the same final compound). Captured at execute; persisted
@@ -96,7 +96,7 @@ private:
     // Transient (rebuilt on every load): the saved body's footprint faces,
     // translated onto the sketch plane. Used as the profile when the
     // recorded regions no longer exist in the sketch's current state (the
-    // user later deleted/moved that geometry) — historically correct, and
+    // user later deleted/moved that geometry) - historically correct, and
     // never the catastrophic every-region fallback (#53).
     TopoDS_Shape m_recoveredProfile;
 };

@@ -10,7 +10,7 @@ class SelectionManager;
 
 namespace materializr {
 
-// One open project — everything that must swap when the user switches tabs.
+// One open project - everything that must swap when the user switches tabs.
 // Application does NOT own the document/history/selection directly any more:
 // it holds raw-pointer mirrors into the ACTIVE session (repointed by
 // Application::adoptSession), so the ~900 existing `m_document->` call sites
@@ -26,7 +26,7 @@ struct ProjectSession {
     std::unique_ptr<SelectionManager> selection;
 
     // Project identity + dirty tracking. These mirror Application's working
-    // copies (m_currentProjectPath etc.) — synced both ways by adoptSession,
+    // copies (m_currentProjectPath etc.) - synced both ways by adoptSession,
     // because the working copies are read/written all over Application.
     std::string projectPath;               // "" until first save/load
     std::string projectName;

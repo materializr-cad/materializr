@@ -3,7 +3,7 @@
 #include "../io/BrepIO.h"
 #include "../io/FileDialogs.h"
 
-// OCCT-native BREP exchange — the lossless path to/from FreeCAD and other
+// OCCT-native BREP exchange - the lossless path to/from FreeCAD and other
 // OCCT-based tools (exact geometry, no tessellation, no STEP translation).
 REGISTER_PLUGIN(BrepIO, [](materializr::PluginContext& ctx) {
     ctx.registerIOFormat({"BREP", {"brep"}, true, true,

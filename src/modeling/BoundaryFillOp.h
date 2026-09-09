@@ -9,13 +9,13 @@
 // Boundary Fill: N closed profiles on (typically non-parallel) planes, each
 // treated as a SILHOUETTE of the solid viewed along its plane normal. Every
 // profile is extruded symmetrically through the others' combined extent and
-// the prisms are boolean-INTERSECTED — the classic visual-hull construction.
+// the prisms are boolean-INTERSECTED - the classic visual-hull construction.
 // Three orthogonal sketches (top + front + side) carve exactly the solid that
 // matches all three outlines: Steve's "pyramid with two rounded sides" from a
 // ground square and two curved wall profiles, the traced-photos → object
 // workflow, etc.
 //
-// Deliberately built from extrude + Common only — no surface fitting, no
+// Deliberately built from extrude + Common only - no surface fitting, no
 // ordering sensitivity, no seam matching. Profiles that don't mutually
 // overlap simply produce an empty intersection and the op fails cleanly.
 // Holes in a profile become channels: the hole's prism is subtracted from

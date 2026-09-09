@@ -3,7 +3,7 @@
 // Checked parsing for the length-prefixed fields in operation parameter blobs.
 //
 // WHY THIS EXISTS: every deserializeParams() that carries an opaque payload wrote
-// the same shape by hand —
+// the same shape by hand -
 //
 //     size_t n = static_cast<size_t>(std::atoll(text.c_str()));
 //     if (colon + 1 + n > blob.size()) break;      // <-- WRONG
@@ -12,7 +12,7 @@
 // and the bound is defeated by its own arithmetic. `std::atoll("-1")` yields -1,
 // which converts to SIZE_MAX; `colon + 1 + SIZE_MAX` then WRAPS to `colon`, so
 // `colon > blob.size()` is false and the check passes. substr() clamps, so this
-// is not an overread — it is a bypassed validation that hands an arbitrary tail
+// is not an overread - it is a bypassed validation that hands an arbitrary tail
 // of the blob to an OCCT reader.
 //
 // Worse, the sites that walk a list with `p = c + 1 + n` can wrap the cursor
@@ -22,7 +22,7 @@
 //
 // So: parse the length as UNSIGNED with full-consumption checking (no sign, no
 // trailing junk), and bound it by SUBTRACTION against the bytes that actually
-// remain — never by addition, which is what wraps.
+// remain - never by addition, which is what wraps.
 
 #include <charconv>
 #include <cstddef>
@@ -45,7 +45,7 @@ inline constexpr int kMaxHolesTotal      = 65536;
 // A ref LIST (fillet/chamfer edgerefs, shell/taper facerefs) is length-prefixed
 // records back to back. readLenRecord bounds each RECORD, but nothing bounded
 // how MANY: "0:" is a valid zero-length record in two bytes, so a run of them
-// yields one Ref per two input bytes — a ~50x memory amplification from an
+// yields one Ref per two input bytes - a ~50x memory amplification from an
 // otherwise-bounded file. Cap the count as well as each record's length.
 inline constexpr std::size_t kMaxRefsPerList = 65536;
 
@@ -72,7 +72,7 @@ private:
 };
 
 // Parses `s` in full as a decimal int. Returns false on an empty string, any
-// trailing junk ("12abc"), or a value outside int — where std::atoi would
+// trailing junk ("12abc"), or a value outside int - where std::atoi would
 // silently yield 0 or an implementation-defined result.
 //
 // A leading '-' IS accepted (the type is signed); range-checking the result is
@@ -90,7 +90,7 @@ inline bool parseWholeInt(const std::string& s, int& out) {
 }
 
 // Parses the index suffix of a key like "h12" (prefixLen == 1). Returns -1 if the
-// suffix is absent, signed, non-numeric, has trailing junk, or overflows — so
+// suffix is absent, signed, non-numeric, has trailing junk, or overflows - so
 // "h12junk" is rejected outright rather than read as 12.
 inline int parseIndexKey(const std::string& key, std::size_t prefixLen) {
     if (key.size() <= prefixLen) return -1;

@@ -52,7 +52,7 @@ void Camera::orbitLevel(float yawDelta, float pitchDelta)
     // by entering a sketch. Pan and zoom intentionally keep ortho mode on.
     m_orthographic = false;
 
-    // Capture the view's CURRENT up before we reset it — a Top/Bottom ortho snap
+    // Capture the view's CURRENT up before we reset it - a Top/Bottom ortho snap
     // stored the screen orientation there, and we need it to recover the azimuth
     // at the pole (below). Then reset up to world-up so a turntable orbit always
     // shows a level horizon. Without the reset, a sketch's chosen up vector (which
@@ -69,14 +69,14 @@ void Camera::orbitLevel(float yawDelta, float pitchDelta)
     glm::vec3 dir = offset / radius;
 
     // Decompose into yaw (around world Y) and pitch (elevation above the ground
-    // plane). Rebuilding the offset from these keeps the view level — there is
+    // plane). Rebuilding the offset from these keeps the view level - there is
     // no roll term, so the horizon stays flat no matter how far we orbit.
     float pitch = std::asin(glm::clamp(dir.y, -1.0f, 1.0f));
     float yaw;
     const glm::vec2 upH(prevUp.x, prevUp.z); // horizontal part of the entering up
     if (std::abs(dir.y) > 0.9999f && glm::length(upH) > 1e-4f) {
         // Looking straight down/up (an ortho Top/Bottom view): yaw is indeterminate
-        // from `dir` alone — atan2(0,0) collapses to 0, snapping the first orbit to
+        // from `dir` alone - atan2(0,0) collapses to 0, snapping the first orbit to
         // the +X "Right" side. Recover the azimuth from the view's up vector, which
         // the ortho snap set to a horizontal direction, so the orbit tips off the
         // pole the way the screen is already oriented instead of jumping to Right.
@@ -135,7 +135,7 @@ void Camera::pan(float deltaX, float deltaY)
         // Exact screen-space pan: move the world by precisely one pixel's
         // world size per pixel of mouse motion, so the point you "grab"
         // stays under the cursor at every zoom level. In perspective the
-        // pixel size depends on depth — use the pan anchor (the content
+        // pixel size depends on depth - use the pan anchor (the content
         // under the cursor at drag start) when the app provided one; the
         // target distance is only the fallback, because on large projects
         // it can sit metres from the geometry on screen (stale after
@@ -153,7 +153,7 @@ void Camera::pan(float deltaX, float deltaY)
         panScale *= m_mouseSensitivity;
     } else {
         // Legacy distance-fraction pan (no viewport height known). In ortho,
-        // visible size depends on m_orthoSize (not distance) — otherwise
+        // visible size depends on m_orthoSize (not distance) - otherwise
         // panning at distance 0.1 looks frozen while panning at distance 100
         // throws the model off-screen.
         float scaleRef =
@@ -196,13 +196,13 @@ void Camera::zoomToward(const glm::vec3& focus, float delta)
     // Scale-around-focus formulation: a single uniform factor scales both the
     // camera→focus and target→focus vectors. The focus point stays put on
     // screen, position and target both slide toward (or away from) it, and
-    // subsequent orbits pivot around the new target — which is now near the
+    // subsequent orbits pivot around the new target - which is now near the
     // thing the user was zooming on. This eliminates the "I have to pan to
     // re-aim before zoom feels right" dance for off-origin parts.
     float factor = 1.0f - delta * m_zoomSpeed * m_mouseSensitivity;
     factor = glm::clamp(factor, 0.1f, 10.0f);
     if (m_orthographic) {
-        // In ortho, both the camera/target slide AND the view extent scale —
+        // In ortho, both the camera/target slide AND the view extent scale -
         // otherwise the focus would shift on screen as we narrow the frustum.
         m_orthoSize = std::max(0.01f, m_orthoSize * factor);
         m_position  = focus + (m_position - focus) * factor;
@@ -211,7 +211,7 @@ void Camera::zoomToward(const glm::vec3& focus, float delta)
     }
     glm::vec3 newPos    = focus + (m_position - focus) * factor;
     glm::vec3 newTarget = focus + (m_target   - focus) * factor;
-    // Don't let the camera pass through (or onto) the focus point — keep at
+    // Don't let the camera pass through (or onto) the focus point - keep at
     // least 0.1 mm of standoff so the view doesn't degenerate.
     if (glm::length(newPos - newTarget) < 0.1f) return;
     if (glm::length(newPos - focus)     < 0.1f) return;

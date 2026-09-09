@@ -4,7 +4,7 @@
 // through a GTransform, so sliding a box's top sideways drags every interior
 // feature with it; this rebuilds three vertices and leaves the rest of the
 // solid byte-for-byte where it was. The tests below are written around that
-// distinction — volume and validity say the rebuild is sound, but the
+// distinction - volume and validity say the rebuild is sound, but the
 // assertions about untouched geometry are what say it is LOCAL.
 #include <gtest/gtest.h>
 
@@ -91,7 +91,7 @@ TEST(FaceTweak, OffsetAlongTheNormalChangesOnlyThatEnd) {
 TEST(FaceTweak, SlidingAFlatFaceInsideItsOwnPlaneIsRefused) {
     // Translating a plane along itself lands on the same plane, so every corner
     // re-solves exactly where it started. This is not a gap in the engine, it is
-    // what the geometry says — and it is the reason MoveFaceOp exists to answer
+    // what the geometry says - and it is the reason MoveFaceOp exists to answer
     // the same gesture by shearing the whole body instead. Reporting it beats
     // returning an identical solid and calling it a success.
     const TopoDS_Shape box = BRepPrimAPI_MakeBox(10.0, 10.0, 10.0).Shape();
@@ -105,7 +105,7 @@ TEST(FaceTweak, SlidingAFlatFaceInsideItsOwnPlaneIsRefused) {
 
 TEST(FaceTweak, SlideCombinedWithAnOffsetIsJustTheOffset) {
     // The in-plane half contributes nothing, so this must behave exactly like
-    // the pure offset — same volume, same untouched base.
+    // the pure offset - same volume, same untouched base.
     const TopoDS_Shape box = BRepPrimAPI_MakeBox(10.0, 10.0, 10.0).Shape();
     gp_Trsf mixed;
     mixed.SetTranslation(gp_Vec(3, 0, 4));
@@ -162,7 +162,7 @@ TEST(FaceTweak, FlatTopOfACylinderOffsetsAlongItsWall) {
     // The lid of a cylinder: planar itself, with nothing but the curved wall
     // meeting it. There is no third plane at any of its corners, which is why
     // the three-plane version of this engine had to refuse it outright. Solving
-    // the corner off the LEAVING edge instead needs no such thing — the seam
+    // the corner off the LEAVING edge instead needs no such thing - the seam
     // runs up the wall and simply crosses the new plane higher up.
     const TopoDS_Shape cyl = BRepPrimAPI_MakeCylinder(5.0, 10.0).Shape();
     gp_Trsf up;
@@ -183,7 +183,7 @@ TEST(FaceTweak, FlatTopOfACylinderOffsetsAlongItsWall) {
 TEST(FaceTweak, TiltingACylinderLidCutsItToAnEllipse) {
     // Tilt the lid about a diameter through its own centre. The wedge added on
     // one side is the mirror of the wedge removed on the other, so the volume
-    // is unchanged — and the lid is no longer a circle but the ellipse where
+    // is unchanged - and the lid is no longer a circle but the ellipse where
     // the tilted plane crosses the wall. Nothing about that is expressible with
     // planes, which makes it the test that says curved neighbours work.
     const double r = 5.0, h = 10.0;
@@ -208,8 +208,8 @@ TEST(FaceTweak, TiltingACylinderLidCutsItToAnEllipse) {
 
 TEST(FaceTweak, TheBoreThroughAMovedFaceSurvivesIt) {
     // A box with a bore up through it, top face raised. Every corner of the
-    // hole in that face is a SEAM vertex where only two faces meet — no third
-    // surface to solve against — and the hole's rim is a circle, not a segment.
+    // hole in that face is a SEAM vertex where only two faces meet - no third
+    // surface to solve against - and the hole's rim is a circle, not a segment.
     // This is the case the planar version refused outright, and the one real
     // parts are full of.
     const TopoDS_Shape box =
@@ -300,7 +300,7 @@ TEST(FaceTweakOp, AppliesAndUndoes) {
 }
 
 TEST(FaceTweakOp, RefusalIsReportedNotSwallowed) {
-    // The cylinder's curved WALL — the moved face itself has to be planar, and
+    // The cylinder's curved WALL - the moved face itself has to be planar, and
     // that is still the real limit. (Its flat top is no longer a refusal: a
     // curved NEIGHBOUR is fine now.)
     Document doc;
@@ -322,7 +322,7 @@ TEST(FaceTweakOp, RefusalIsReportedNotSwallowed) {
     op.setTransform(out);
     EXPECT_FALSE(op.execute(doc));
     EXPECT_EQ(op.refusal(), tweak::Refusal::NotPlanar);
-    // The body must be exactly as it was — a refused op leaves no residue.
+    // The body must be exactly as it was - a refused op leaves no residue.
     EXPECT_NEAR(vol(doc.getBody(id)), M_PI * 25.0 * 10.0, 1e-6);
 }
 

@@ -43,7 +43,7 @@ public:
     std::string serializeWithDocument(const Document& doc) const;
 
     // Elements this step introduced (present in the after-snapshot but not the
-    // before-snapshot) — i.e. the line(s)/circle(s)/arc(s) the step draws or
+    // before-snapshot) - i.e. the line(s)/circle(s)/arc(s) the step draws or
     // resizes. Used to highlight "what's being edited" in the viewport when the
     // step is selected in the history panel. Falls back to nothing if there's
     // no before-snapshot.
@@ -59,7 +59,7 @@ public:
     // target is definitely in the document. serializeWithDocument uses it if
     // the live-pointer lookup fails at save time (a stale/replaced m_target
     // otherwise silently produced an EMPTY params blob, freezing the step on
-    // reload — the "Remove sketch element" warning).
+    // reload - the "Remove sketch element" warning).
     void setSketchId(int id) { m_sketchId = id; }
     int  getSketchId() const { return m_sketchId; }
     void setSnapshots(std::shared_ptr<Sketch> before, std::shared_ptr<Sketch> after) {

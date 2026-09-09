@@ -1,4 +1,4 @@
-## Materializr 0.5.0 — loft, sketches as construction planes, snap widget
+## Materializr 0.5.0 - loft, sketches as construction planes, snap widget
 
 This release brings a working **Loft** op, a workflow where any sketch can
 serve as a movable construction plane, a corner **snap-grid widget** that
@@ -7,12 +7,12 @@ the AppImage.
 
 ### Highlights
 
-- **Loft between two sketch profiles** — closed or open. A new toolbar entry
+- **Loft between two sketch profiles** - closed or open. A new toolbar entry
   in the Sketch and Region panels opens a live-previewed popup with
   **Solid / Shell**, **Smooth / Ruled**, and **Reverse profile B vertex
   order** toggles. Best results when both profiles sit on parallel planes
   with similar topology (the tooltip explains why orthogonal-plane lofts
-  fan into a tent surface — that's ThruSections being honest, not a bug).
+  fan into a tent surface - that's ThruSections being honest, not a bug).
 - **Sketches act as movable construction planes.** Select a sketch outside
   ortho / sketch-edit, click the new **Move** or **Rotate** under the
   Sketch panel's "Transform" header, and a gizmo appears at the sketch's
@@ -37,7 +37,7 @@ the AppImage.
 - **Construction Plane popup.** Replaces the no-op New Construction Plane
   button with a live-previewed popup (XY / XZ / YZ + Parallel-to-face +
   offset). Plane visibility in the Items panel + viewport is still a TODO
-  for 0.6 — for now the sketch-as-construction-plane workflow above is the
+  for 0.6 - for now the sketch-as-construction-plane workflow above is the
   recommended path.
 
 ### Polish
@@ -47,7 +47,7 @@ the AppImage.
 - Gizmo translate snap is absolute-position (lands on grid intersections)
   instead of delta-snap. Rotate is hard 15° when snap-on, free with a
   7° soft-snap near 45° when off.
-- Gizmo dimension line draws from the world origin to the current pivot —
+- Gizmo dimension line draws from the world origin to the current pivot -
   easier to read "where is this now" than "how far did I drag".
 - Gizmo hides while any interactive op (Push/Pull, Loft, Construction
   Plane, Pattern, Shell, Resize, …) is active.

@@ -31,7 +31,7 @@ std::atomic<double> g_budget{kDefaultProbeSeconds};
 
 // One probe's result slot. Shared by value between the caller and the detached
 // worker, so the worker can outlive the caller and still write somewhere valid
-// — the whole reason this is a shared_ptr and not a stack local.
+// - the whole reason this is a shared_ptr and not a stack local.
 struct Slot {
     std::mutex              m;
     std::condition_variable cv;
@@ -41,11 +41,11 @@ struct Slot {
 
 // Memo key. The shape is identified by its TShape pointer: a fillet's inputs are
 // the document's live body and its sub-edges, which keep identity between frames
-// of one interactive drag — exactly the window where re-probing would hurt.
+// of one interactive drag - exactly the window where re-probing would hurt.
 //
 // A raw pointer alone would be unsound: free a TShape and the allocator may hand
 // the same address to unrelated geometry, and a cached "this radius converges"
-// would then wave through a build that hangs — the exact failure this guard
+// would then wave through a build that hangs - the exact failure this guard
 // exists to prevent. Each entry therefore keeps a Handle to the TShape it was
 // keyed on, so that address cannot be recycled while the verdict is live.
 using Key = std::tuple<const void*, unsigned long long, long long, long long>;
@@ -56,7 +56,7 @@ struct Entry {
 };
 
 // Cap on remembered verdicts. A radius drag mints a key per frame, so an
-// unbounded map would grow for as long as the session lasts — and every entry
+// unbounded map would grow for as long as the session lasts - and every entry
 // pins a TShape. On overflow drop everything: the same wholesale flush
 // SketchRenderer uses for its static cache, and a re-probe costs one build.
 constexpr size_t kMaxCacheEntries = 512;
@@ -125,7 +125,7 @@ bool probe(const TopoDS_Shape& shape, const std::vector<TopoDS_Edge>& edges,
     // Deep copy for the worker. Mandatory, not defensive: OCCT lazily fills
     // BSplSLib caches inside Geom_BSplineSurface on first evaluation, so the
     // worker calling D1() on the SAME surface the render thread is meshing is a
-    // straight data race. The copy also remaps the edges — sub-shapes of the
+    // straight data race. The copy also remaps the edges - sub-shapes of the
     // original are not sub-shapes of the copy, and Add() on a foreign edge does
     // not build what the caller asked for.
     TopoDS_Shape             copy;
@@ -169,15 +169,15 @@ bool probe(const TopoDS_Shape& shape, const std::vector<TopoDS_Edge>& edges,
     }).detach();
     // Counted only once the worker is actually running. It used to be
     // incremented before the thread was constructed, so a thread-exhaustion
-    // failure below still counted as a run — and probeRunCount() is documented
+    // failure below still counted as a run - and probeRunCount() is documented
     // as "probes that have actually run a build" and is the sole assertion in
     // the memoisation test.
     g_runs.fetch_add(1);
     } catch (const std::system_error&) {
-        // Out of threads — every previously abandoned probe still holds one.
+        // Out of threads - every previously abandoned probe still holds one.
         // Refuse rather than propagate: the caller's only guard wraps Build().
         std::fprintf(stderr, "[Fillet] could not start probe worker (%d already "
-                             "abandoned) — refusing the build.\n",
+                             "abandoned) - refusing the build.\n",
                      g_abandoned.load());
         return false;
     }
@@ -191,11 +191,11 @@ bool probe(const TopoDS_Shape& shape, const std::vector<TopoDS_Edge>& edges,
             ok = slot->ok;
         } else {
             // Timed out. Mark the slot spent so the worker knows nobody is
-            // listening, and leave it running — there is no way to stop it.
+            // listening, and leave it running - there is no way to stop it.
             slot->done = true;
             g_abandoned.fetch_add(1);
             std::fprintf(stderr,
-                "[Fillet] probe exceeded %.1fs at R=%.4f — refusing the build "
+                "[Fillet] probe exceeded %.1fs at R=%.4f - refusing the build "
                 "(OCCT's blend cannot be interrupted; worker abandoned).\n",
                 budget, radius);
         }

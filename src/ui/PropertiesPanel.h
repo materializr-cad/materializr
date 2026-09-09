@@ -73,7 +73,7 @@ public:
 
     // Render. Returns true if a parameter was changed (needs history replay).
     bool render();
-    // Body only, no ImGui::Begin/End — for hosts that place it themselves
+    // Body only, no ImGui::Begin/End - for hosts that place it themselves
     // (the im-touch right panel's Props tab). Same return as render().
     bool renderContent();
 
@@ -129,7 +129,7 @@ private:
 
     // Per-body bbox-extent cache for the "Size: X × Y × Z mm" readout.
     // BRepBndLib::AddOptimal walks every face's surface densely (it's the
-    // "tight" variant — significantly more expensive than the regular Add)
+    // "tight" variant - significantly more expensive than the regular Add)
     // and on a complex NURBS body (airplane fuselage, etc.) runs 80-150ms.
     // Calling it every frame while the panel is open dropped the idle frame
     // rate to ~10 FPS the moment a body was selected. Key on the body's

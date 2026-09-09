@@ -136,7 +136,7 @@ static const char* mouseButtonName(int b) {
 #define M_PI 3.14159265358979323846
 #endif
 
-// Implementations split out of Application.cpp — the small modal/popup
+// Implementations split out of Application.cpp - the small modal/popup
 // renderers that don't share state with the main 3D viewport.
 namespace materializr {
 
@@ -144,7 +144,7 @@ void Application::renderSettings() {
     if (!m_showSettings) return;
     if (m_settingsRaise) {
         // An already-open Settings window can sit BURIED under the full-
-        // screen home page (it only auto-focuses on first appearance) — the
+        // screen home page (it only auto-focuses on first appearance) - the
         // gear then looks dead. Raise on every explicit open request.
         ImGui::SetNextWindowFocus();
         m_settingsRaise = false;
@@ -182,7 +182,7 @@ void Application::renderSettings() {
                     if (ImGui::Checkbox(materializr::tr("Reopen last session on launch"), &m_autoOpenLastProject)) {
                         changed = true;
                     }
-                    ImGui::TextWrapped("%s", materializr::tr("If on, Materializr reopens every project you had open when you quit — one tab each — and skips the home screen. Closing a project's tab before quitting leaves it out; projects that have never been saved aren't restored here (crash recovery offers those separately)."));
+                    ImGui::TextWrapped("%s", materializr::tr("If on, Materializr reopens every project you had open when you quit - one tab each - and skips the home screen. Closing a project's tab before quitting leaves it out; projects that have never been saved aren't restored here (crash recovery offers those separately)."));
 
                     ImGui::Spacing();
                     if (ImGui::Checkbox(materializr::tr("Check for updates on launch"), &m_checkForUpdatesOnLaunch)) {
@@ -194,7 +194,7 @@ void Application::renderSettings() {
                     if (ImGui::Checkbox(materializr::tr("Include pre-release (beta) builds"), &m_includePrereleases)) {
                         changed = true;
                     }
-                    ImGui::TextWrapped("%s", materializr::tr("Join the beta channel: update checks also consider pre-release builds (e.g. 1.3.0-beta.1) — early access to the next version's features, which may be rougher. Off keeps you on stable releases only."));
+                    ImGui::TextWrapped("%s", materializr::tr("Join the beta channel: update checks also consider pre-release builds (e.g. 1.3.0-beta.1) - early access to the next version's features, which may be rougher. Off keeps you on stable releases only."));
                     ImGui::EndTabItem();
                 }
 
@@ -233,7 +233,7 @@ void Application::renderSettings() {
                     ImGui::SeparatorText(materializr::tr("Units"));
                     // ONE mutually-exclusive choice, so a dropdown; order
                     // matches materializr::LengthUnit and the Settings int.
-                    // The model stays millimetres — this changes what every
+                    // The model stays millimetres - this changes what every
                     // length readout shows and what typed lengths mean.
                     {
                         int unit = m_displayUnit;
@@ -254,7 +254,7 @@ void Application::renderSettings() {
 
                     ImGui::SeparatorText(materializr::tr("Layout"));
                     // Interface layout is ONE mutually-exclusive choice
-                    // (UiLayout in io/Settings.h) — a dropdown so the modes
+                    // (UiLayout in io/Settings.h) - a dropdown so the modes
                     // can never combine into an inconsistent state. The combo
                     // order matches the enum's numeric values.
                     int layoutMode = static_cast<int>(m_uiLayout);
@@ -268,16 +268,16 @@ void Application::renderSettings() {
                     ImGui::Spacing();
                     if (ImGui::Button(materializr::tr("Reset panel layout"))) resetLayout();
                     if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip("%s", materializr::tr("Restore the default panel arrangement — use this if a panel gets dragged off-screen or docking gets messy. Also re-applies the interface scale to the panel widths."));
+                        ImGui::SetTooltip("%s", materializr::tr("Restore the default panel arrangement - use this if a panel gets dragged off-screen or docking gets messy. Also re-applies the interface scale to the panel widths."));
 
                     ImGui::Spacing();
                     // Touch mode is a separate axis (input model), independent of
-                    // the layout above — it swaps mouse/keyboard for finger
+                    // the layout above - it swaps mouse/keyboard for finger
                     // gestures + larger targets and takes full effect on restart.
                     if (ImGui::Checkbox(materializr::tr("Touch mode (large UI + touch gestures)"), &m_touchMode)) {
                         changed = true;
                     }
-                    ImGui::TextWrapped("%s", materializr::tr("On: finger-sized UI, long-press menus, on-screen toggles, trackpad navigation. Off: the desktop mouse/keyboard layout — use it with an attached mouse/keyboard. Takes full effect on restart."));
+                    ImGui::TextWrapped("%s", materializr::tr("On: finger-sized UI, long-press menus, on-screen toggles, trackpad navigation. Off: the desktop mouse/keyboard layout - use it with an attached mouse/keyboard. Takes full effect on restart."));
                     // Numeric entry rides on this flag (ui/NumField.h gates the
                     // in-app pad on touchMode()), which is not something anyone
                     // would guess from "Touch mode". Say so here rather than add
@@ -336,7 +336,7 @@ void Application::renderSettings() {
 
                     ImGui::Spacing();
                     ImGui::SeparatorText(materializr::tr("Selection"));
-                    // Selection line width — how boldly picked edges/bodies are outlined.
+                    // Selection line width - how boldly picked edges/bodies are outlined.
                     if (ImGui::SliderFloat(materializr::tr("Selection line width"), &m_selectionLineWidth, 1.0f, 10.0f, "%.1f px")) {
                         if (m_selectionLineWidth < 1.0f) m_selectionLineWidth = 1.0f;
                         if (m_selectionLineWidth > 10.0f) m_selectionLineWidth = 10.0f;
@@ -347,7 +347,7 @@ void Application::renderSettings() {
 
                     ImGui::Spacing();
                     ImGui::SeparatorText(materializr::tr("Sketch"));
-                    // Sketch line width — how boldly sketch geometry reads over the grid.
+                    // Sketch line width - how boldly sketch geometry reads over the grid.
                     if (ImGui::SliderFloat(materializr::tr("Sketch line width"), &m_sketchLineWidth, 1.0f, 6.0f, "%.1f px")) {
                         if (m_sketchLineWidth < 1.0f) m_sketchLineWidth = 1.0f;
                         if (m_sketchLineWidth > 6.0f) m_sketchLineWidth = 6.0f;
@@ -381,7 +381,7 @@ void Application::renderSettings() {
                     {
                         // The combo edits the live sketch tool inference level,
                         // which currentSettings() then reads back when the file
-                        // saves below — so the user's last-set level survives a
+                        // saves below - so the user's last-set level survives a
                         // relaunch regardless of whether they used this combo or
                         // the toolbar's live cycle button.
                         using IL = SketchTool::InferenceLevel;
@@ -399,7 +399,7 @@ void Application::renderSettings() {
                             }
                             changed = true;
                         }
-                        ImGui::SetItemTooltip("%s", materializr::tr("Max widens snap/alignment catch ranges for fingertips — stronger than Full. Full and below behave the same on every device."));
+                        ImGui::SetItemTooltip("%s", materializr::tr("Max widens snap/alignment catch ranges for fingertips - stronger than Full. Full and below behave the same on every device."));
                     }
 
                     ImGui::Spacing();
@@ -424,7 +424,7 @@ void Application::renderSettings() {
                                         &m_showInferenceToolbarToggle)) {
                         changed = true;
                     }
-                    ImGui::TextWrapped("%s", materializr::tr("Off hides the live Full / Reduced / Off cycle button from the sketch toolbar — use this combo instead. On (default) keeps the per-session button visible."));
+                    ImGui::TextWrapped("%s", materializr::tr("Off hides the live Full / Reduced / Off cycle button from the sketch toolbar - use this combo instead. On (default) keeps the per-session button visible."));
 
                     ImGui::EndTabItem();
                 }
@@ -478,7 +478,7 @@ void Application::renderSettings() {
                     ImGui::Spacing();
                     ImGui::SeparatorText(materializr::tr("Mouse sensitivity"));
                     // One uniform multiplier on orbit / pan / zoom input deltas
-                    // — so a trackpad that's already slow at the OS level
+                    // - so a trackpad that's already slow at the OS level
                     // doesn't whip the camera around. Applied live (the camera
                     // multiplies it onto each delta on the next mouse event).
                     {
@@ -493,7 +493,7 @@ void Application::renderSettings() {
 
                     ImGui::Spacing();
                     ImGui::SeparatorText(materializr::tr("Orbit behaviour"));
-                    // Level (turntable) orbit toggle — applied live.
+                    // Level (turntable) orbit toggle - applied live.
                     bool level = m_viewport->getCamera().isLevelOrbit();
                     if (ImGui::Checkbox(materializr::tr("Level orbit (keep horizon flat)"), &level)) {
                         m_viewport->getCamera().setLevelOrbit(level);
@@ -522,7 +522,7 @@ void Application::renderSettings() {
 
                     ImGui::Spacing();
                     ImGui::SeparatorText(materializr::tr("Panels (Materializr classic UI)"));
-                    ImGui::TextWrapped("%s", materializr::tr("Show or hide the classic interface's docked panels. Applies to the classic UI only — the im-touch shell arranges its own panels."));
+                    ImGui::TextWrapped("%s", materializr::tr("Show or hide the classic interface's docked panels. Applies to the classic UI only - the im-touch shell arranges its own panels."));
                     if (ImGui::Checkbox(materializr::tr("Tools"),        &m_showTools))        changed = true;
                     if (ImGui::Checkbox(materializr::tr("Interactions"), &m_showInteractions)) changed = true;
                     if (ImGui::Checkbox(materializr::tr("History"),      &m_showHistory))      changed = true;
@@ -534,7 +534,7 @@ void Application::renderSettings() {
                 // ── Rendering ─────────────────────────────────────────────
                 if (ImGui::BeginTabItem(materializr::tr("Rendering###Rendering"))) {
                     ImGui::SeparatorText(materializr::tr("Lighting"));
-                    // Lighting — tame the harsh single-direction shadows.
+                    // Lighting - tame the harsh single-direction shadows.
                     ImGui::TextWrapped("%s", materializr::tr("Lighting controls how evenly the model is lit."));
                     if (ImGui::SliderFloat(materializr::tr("Ambient"), &m_lightAmbient, 0.0f, 1.0f, "%.2f")) {
                         applyRenderingSettings();
@@ -565,7 +565,7 @@ void Application::renderSettings() {
                     }
                     ImGui::SetItemTooltip("%s", materializr::tr("Multisampling (MSAA) smooths jagged edges in the viewport."));
 
-                    // Mesh quality — denser tessellation for smoother curved surfaces.
+                    // Mesh quality - denser tessellation for smoother curved surfaces.
                     const char* mqItems[] = { materializr::tr("Low"), materializr::tr("Medium"),
                                               materializr::tr("High"), materializr::tr("Ultra") };
                     if (ImGui::Combo(materializr::tr("Mesh quality"), &m_meshQuality, mqItems, 4)) {
@@ -578,7 +578,7 @@ void Application::renderSettings() {
 
                     ImGui::Spacing();
                     ImGui::SeparatorText(materializr::tr("Imported meshes (STL)"));
-                    // Wireframe of imported mesh bodies — toggling applies live by
+                    // Wireframe of imported mesh bodies - toggling applies live by
                     // re-running just the mesh bodies' edge rebuild.
                     if (ImGui::Checkbox(materializr::tr("Show mesh wireframe"), &m_meshShowWireframe)) {
                         for (int id : m_document->getAllBodyIds())
@@ -645,6 +645,7 @@ void Application::renderMirrorPopup() {
         // axis (the copy lands flush beside the original).
         auto mirrorAxis = [&](int axis) {
             try {
+                auto trackBodies = trackBodyChanges(); // re-tessellate only what changes
                 const TopoDS_Shape& shape = m_document->getBody(m_mirrorBodyId);
                 Bnd_Box bb; BRepBndLib::Add(shape, bb);
                 if (bb.IsVoid()) return;
@@ -659,7 +660,7 @@ void Application::renderMirrorPopup() {
                 op->setPlane(MirrorPlane::Custom);
                 op->setCustomPlane(gp_Ax2(pt, dir));
                 op->setKeepOriginal(true);
-                if (m_history->pushOperation(std::move(op), *m_document)) m_meshesDirty = true;
+                m_history->pushOperation(std::move(op), *m_document);
             } catch (...) {}
         };
 
@@ -682,11 +683,11 @@ void Application::renderUpdatePopup() {
     // on renderProjectRecoveryPrompt/renderSketchRecoveryPrompt): this popup
     // and the crash-recovery prompts both call OpenPopup() unconditionally
     // every frame, and two such raw reopens contending for the same level
-    // closes each other every frame forever — neither ever draws, while the
+    // closes each other every frame forever - neither ever draws, while the
     // modal dim still blocks all input (see run()'s comment on this class of
     // bug). The launch-time update check resolves on a background thread and
     // can flip m_showUpdatePopup true at ANY frame, including while a
-    // recovery prompt is up — hold off exactly like those prompts hold off
+    // recovery prompt is up - hold off exactly like those prompts hold off
     // for Welcome, until they've resolved.
     if (m_welcomeScreen && m_welcomeScreen->isVisible()) return;
     if (m_pendingProjectRecovery || m_pendingSketchRecovery) return;
@@ -725,8 +726,8 @@ void Application::renderUpdatePopup() {
             ImGui::TextWrapped("%s", materializr::tr("Download the new build from the release page; the installer or portable zip will replace this one."));
             ImGui::Spacing();
             if (ImGui::Button(materializr::tr("Open Release Page"), materializr::uiSz(180, 0))) {
-                // m_updateReleaseUrl is the GitHub API's html_url — server
-                // controlled — so open it via the shell-free helper, pinned to
+                // m_updateReleaseUrl is the GitHub API's html_url - server
+                // controlled - so open it via the shell-free helper, pinned to
                 // github.com (a tampered response can neither inject a shell
                 // command nor redirect the user elsewhere).
                 materializr::openUrl(m_updateReleaseUrl, "https://github.com/");
@@ -752,7 +753,7 @@ void Application::renderUpdatePopup() {
 }
 
 // Multi-body Rotate type-in panel. Visible only when the Rotate gizmo is the
-// active mode AND 2+ bodies are selected — the case where the live gizmo path
+// active mode AND 2+ bodies are selected - the case where the live gizmo path
 // gets pathologically slow on big selections. The user can dial in an exact
 // per-axis rotation and click Apply to commit it in a single frame, instead of
 // dragging through many laggy preview frames.
@@ -760,7 +761,7 @@ void Application::renderMultiTransformPanel() {
     // Track whether the panel's display conditions are currently met. When the
     // conditions transition from "not met" to "met", reopen the panel so the
     // user can dismiss it once and still get it back next time they enter the
-    // state — without having to dig through menus.
+    // state - without having to dig through menus.
     bool conditionsMet = m_gizmo && m_gizmo->getMode() == GizmoMode::Rotate &&
                          m_selection && m_selection->selectedBodyCount() >= 2;
     if (conditionsMet && !m_multiTransformConditionsMet) {
@@ -774,11 +775,11 @@ void Application::renderMultiTransformPanel() {
     std::snprintf(title, sizeof(title), "Rotate %d Bodies###MultiTransform", n);
 
     ImGui::SetNextWindowSize(uiSz(360, 0), ImGuiCond_FirstUseEver);
-    // The window-titlebar X also closes the panel — same state as the Close
+    // The window-titlebar X also closes the panel - same state as the Close
     // button below, so either way auto-reopen logic above takes effect.
     if (!ImGui::Begin(title, &m_multiTransformPanelOpen)) { ImGui::End(); return; }
 
-    ImGui::TextWrapped("%s", materializr::tr("Type exact angles instead of dragging the gizmo — useful when the selection is too large for a smooth live drag. Rotation is composed X → Y → Z around the selection centroid."));
+    ImGui::TextWrapped("%s", materializr::tr("Type exact angles instead of dragging the gizmo - useful when the selection is too large for a smooth live drag. Rotation is composed X → Y → Z around the selection centroid."));
     ImGui::Spacing();
 
     const char* axisLabels[3] = { "X", "Y", "Z" };
@@ -825,6 +826,7 @@ void Application::renderMultiTransformPanel() {
 
 void Application::applyMultiBodyRotation() {
     if (!m_selection || !m_document || !m_history) return;
+    auto trackBodies = trackBodyChanges(); // re-tessellate only what changes
 
     // Snapshot every selected body's current state.
     std::vector<std::pair<int, TopoDS_Shape>> bodies;
@@ -893,7 +895,6 @@ void Application::applyMultiBodyRotation() {
         std::move(beforeState), std::move(afterState),
         /*fromReload=*/false);
     m_history->pushExecuted(std::move(op));
-    m_meshesDirty = true;
 
     // Zero the sliders so the next Apply is relative to the new orientation.
     m_multiRotate[0] = m_multiRotate[1] = m_multiRotate[2] = 0.0f;
@@ -904,7 +905,7 @@ void Application::renderScalePanel() {
     if (m_inSketchMode || !m_selection->hasSelectedBodies()) return;
     if (m_gizmo->getMode() != GizmoMode::Scale) return;
 
-    // mm mode only makes sense for a single body — multi-body scale needs a
+    // mm mode only makes sense for a single body - multi-body scale needs a
     // dimensionless factor. Force Percent if more than one body is in the
     // selection so the popup stays coherent.
     const bool singleBody = (m_selection->selectedBodyCount() == 1);
@@ -952,7 +953,7 @@ void Application::renderScalePanel() {
     const bool mm = (m_scaleUnitMode == ScaleUnitMode::Millimeter);
     // Two calls, not one format string with a conditional: TextColored is
     // printf-style, and the mm branch takes an argument the other does not.
-    // Sharing one call left "%s" with nothing to consume it — undefined
+    // Sharing one call left "%s" with nothing to consume it - undefined
     // behaviour, and the compiler said so (-Wformat-insufficient-args).
     if (mm)
         ImGui::TextColored(materializr::accentText(), "Scale (target %s)",
@@ -961,7 +962,7 @@ void Application::renderScalePanel() {
         ImGui::TextColored(materializr::accentText(), "Scale (%% of current)");
     ImGui::Separator();
 
-    // Unit toggle. mm disabled when multi-body so we don't mislead — there's
+    // Unit toggle. mm disabled when multi-body so we don't mislead - there's
     // no single "current dimension" to type a target against.
     ImGui::BeginDisabled(!singleBody);
     if (ImGui::RadioButton("%", !mm))  m_scaleUnitMode = ScaleUnitMode::Percent;
@@ -1001,7 +1002,7 @@ void Application::renderScalePanel() {
             ImGui::PopID();
         }
     } else {
-        // mm mode — show current dim, target on commit applies a per-axis
+        // mm mode - show current dim, target on commit applies a per-axis
         // ratio anchored at bbox-min so growth happens along +axis only
         // (predictable, matches the old body-dim-editor anchor).
         for (int i = 0; i < 3; ++i) {
@@ -1094,12 +1095,16 @@ void Application::renderScalePanel() {
                 (std::abs(sx - 1) > 1e-4f ||
                  std::abs(sy - 1) > 1e-4f ||
                  std::abs(sz - 1) > 1e-4f)) {
+                // Around the PUSH, not around the bounding-box read above: that
+                // try block closes before the operation runs, so a scope there
+                // would observe no change and leave the scaled body stale.
+                auto trackBodies = trackBodyChanges(); // re-tessellate only what changes
                 auto op = std::make_unique<TransformOp>();
                 op->setBodyId(bodyId);
                 op->setType(TransformType::Scale);
                 op->setCenter(cx, cy, cz);
                 op->setScaleXYZ(sx, sy, sz);
-                if (m_history->pushOperation(std::move(op), *m_document)) m_meshesDirty = true;
+                m_history->pushOperation(std::move(op), *m_document);
             }
             // Reset % fields after Apply. mm-mode fields reseed naturally
             // from the new bbox next frame.
@@ -1118,7 +1123,7 @@ void Application::renderScalePanel() {
 void Application::renderInteractionsPanel() {
     // A quick-reference of the viewport interactions, docked above Items. The
     // camera rows reflect the live mouse bindings chosen in File > Settings.
-    // No collapse handle — Settings > Panels owns show/hide now, so the per-window
+    // No collapse handle - Settings > Panels owns show/hide now, so the per-window
     // minimize is just wasted title-bar space.
     ImGui::Begin("Interactions", nullptr, ImGuiWindowFlags_NoCollapse);
     // Action label in a fixed left column, keys to its right. Keeping the action
@@ -1127,7 +1132,7 @@ void Application::renderInteractionsPanel() {
     // Action label, then the binding. Desktop aligns the binding in a fixed
     // column (120 px); touch lays it out ragged (binding right after the label
     // with default spacing) because the 2x font makes a fixed column either
-    // overlap the label or force the panel wide — ragged never overlaps and
+    // overlap the label or force the panel wide - ragged never overlaps and
     // needs the least width.
     const bool touchRagged = materializr::touchMode();
     auto row = [touchRagged](const char* action, const char* keys) {
@@ -1302,7 +1307,7 @@ void Application::renderSketchPatternPopup() {
             if (ImGui::Button(materializr::tr("Pick origin in sketch"), ImVec2(-1, materializr::uiW(0)))) {
                 m_sketchPatternPickingOrigin = true;
             }
-            ImGui::TextDisabled("%s", materializr::tr("Click in the sketch — snaps to the grid."));
+            ImGui::TextDisabled("%s", materializr::tr("Click in the sketch - snaps to the grid."));
         }
     }
 
@@ -1324,7 +1329,7 @@ void Application::renderSketchPatternPopup() {
 void Application::renderPatternPanel() {
     if (!m_patternActive) return;
 
-    // Same anchor-then-drag pattern as Edit Diameter — first appearance only,
+    // Same anchor-then-drag pattern as Edit Diameter - first appearance only,
     // then the user can move the popup somewhere convenient.
     ImGui::SetNextWindowPos(ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - 280,
                                     ImGui::GetWindowPos().y + 50),
@@ -1399,7 +1404,7 @@ void Application::renderPatternPanel() {
                                        sizeof(m_patternCountBuf),
                                        ImGuiInputTextFlags_EnterReturnsTrue |
                                        ImGuiInputTextFlags_CharsDecimal);
-    // Clamp — see the sketch-pattern count above (billion-instance hang guard).
+    // Clamp - see the sketch-pattern count above (billion-instance hang guard).
     int parsedCount = std::min(1000, std::max(2, std::atoi(m_patternCountBuf)));
     bool countChanged = parsedCount != m_patternCount;
     if (countChanged) m_patternCount = parsedCount;
@@ -1423,7 +1428,7 @@ void Application::renderPatternPanel() {
             materializr::formatLengthDigits(m_patternDistanceBuf,
                                             sizeof(m_patternDistanceBuf), m_patternDistance);
         }
-        // Slider that mirrors the text field — quick sweep without retyping.
+        // Slider that mirrors the text field - quick sweep without retyping.
         if (materializr::lengthSlider("##patdistslider", &m_patternDistance, 0.1f, 100.0f)) {
             materializr::formatLengthDigits(m_patternDistanceBuf, sizeof(m_patternDistanceBuf), m_patternDistance);
             distChanged = true;
@@ -1462,7 +1467,7 @@ void Application::renderPatternPanel() {
         ImGui::Separator();
         ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Axis origin"));
         if (m_patternAxisId >= 0) {
-            // A construction axis defines its own origin — copies orbit its
+            // A construction axis defines its own origin - copies orbit its
             // centreline, so the manual origin picker doesn't apply.
             if (const auto* a = m_document->getAxis(m_patternAxisId)) {
                 ImGui::Text("(%.2f, %.2f, %.2f)", a->origin.X(), a->origin.Y(), a->origin.Z());
@@ -1479,7 +1484,7 @@ void Application::renderPatternPanel() {
                 if (ImGui::Button(materializr::tr("Pick axis origin in viewport"), ImVec2(-1, materializr::uiW(0)))) {
                     m_patternPickingOrigin = true;
                 }
-                ImGui::TextDisabled("%s", materializr::tr("Click a point in the viewport — snaps to the grid."));
+                ImGui::TextDisabled("%s", materializr::tr("Click a point in the viewport - snaps to the grid."));
             }
         }
     }
@@ -1513,22 +1518,28 @@ void Application::renderThreadPanel() {
     if (m_threadComputing) {
         if (m_threadFuture.wait_for(std::chrono::milliseconds(0)) ==
             std::future_status::ready) {
+            // Inside the landing branch, not around the poll: the poll runs
+            // every frame the cut is computing, and a document snapshot per
+            // frame is the cost this whole change exists to remove.
+            auto trackBodies = trackBodyChanges(); // re-tessellate only what changes
             TopoDS_Shape result = m_threadFuture.get();
             m_threadComputing = false;
             if (!result.IsNull()) {
+                if (m_shapeRenderer)
+                    m_shapeRenderer->notePreMeshed(result, m_threadPreMeshDefl,
+                                                   m_threadPreMeshAng);
                 auto op = makeThreadOpFromState();
                 op->setPrecomputedResult(result);
                 if (!m_history->pushOperation(std::move(op), *m_document)) {
                     std::fprintf(stderr, "[Thread] push failed unexpectedly\n");
                 }
             } else {
-                std::fprintf(stderr, "[Thread] failed — pitch/depth may be too "
+                std::fprintf(stderr, "[Thread] failed - pitch/depth may be too "
                                      "large for the face (or > 300 turns)\n");
             }
             m_threadActive = false;
             m_threadBodyId = -1;
             m_selection->clear();
-            m_meshesDirty = true;
         } else {
             ImGui::OpenPopup("Cutting thread…");
             ImVec2 center = ImGui::GetMainViewport()->GetCenter();
@@ -1542,9 +1553,9 @@ void Application::renderThreadPanel() {
                 drawIndeterminateBar();
                 ImGui::Spacing();
                 // Standard sweeps in ~200ms; the maker profiles cut per-turn,
-                // so a long thread is a genuinely heavy op — set expectations.
+                // so a long thread is a genuinely heavy op - set expectations.
                 if (m_threadProfile != 0)
-                    ImGui::TextDisabled("%s", materializr::tr("Shaped profiles cut per-turn \xE2\x80\x94 a long thread can take up to a minute."));
+                    ImGui::TextDisabled("%s", materializr::tr("Shaped profiles cut per-turn - a long thread can take up to a minute."));
                 else
                     ImGui::TextDisabled("%s", materializr::tr("A few seconds for typical threads."));
                 ImGui::Spacing();
@@ -1566,7 +1577,7 @@ void Application::renderThreadPanel() {
     }
 
     // Async thread RE-CUT (reflow / cascade): the worker saturates the cores
-    // and the app reads as "not responding" anyway — draw the same blocking
+    // and the app reads as "not responding" anyway - draw the same blocking
     // modal honestly instead of a toast, with the same escape hatch.
     if (!m_threadRecuts.empty()) {
         ImGui::OpenPopup("Re-cutting thread…");
@@ -1642,7 +1653,7 @@ void Application::renderThreadPanel() {
     // Depth beyond ~0.65·pitch merges grooves into floating helical fins;
     // beyond ~45% of the radius it eats the core. Multi-start Rounded cuts
     // with the semicircular rope tool whose radius IS the depth, capped at
-    // 0.45·pitch so a land survives between the interleaved grooves — the
+    // 0.45·pitch so a land survives between the interleaved grooves - the
     // panel must advertise the depth the engine will actually cut, not one
     // it silently truncates. Clamp + say so.
     {
@@ -1660,7 +1671,7 @@ void Application::renderThreadPanel() {
     }
 
     // Cross-section profile. Standard is the fast shipped V-thread; the others
-    // are the maker/printing set — clean, but a boolean cut per turn, so a long
+    // are the maker/printing set - clean, but a boolean cut per turn, so a long
     // thread is slow (the progress bar on Apply shows it working).
     {
         const char* kProfiles[] = {"Standard (V)", "Trapezoidal (ACME)",
@@ -1678,7 +1689,7 @@ void Application::renderThreadPanel() {
         }
         // Groove width: normally a fixed fraction of the pitch, so a coarse
         // pitch always means a wide groove. Setting it explicitly decouples
-        // the two — a narrow groove on a long lead (a wire seat, a grip
+        // the two - a narrow groove on a long lead (a wire seat, a grip
         // spiral, a cable channel). Only the straight-flanked profiles size
         // their groove this way; Standard and Rounded are swept forms.
         if (ThreadOp::profileTakesGrooveWidth(
@@ -1696,7 +1707,7 @@ void Application::renderThreadPanel() {
             if (m_threadGrooveWidth <= 0.0f)
                 ImGui::TextDisabled("%s", materializr::trFormat("automatic: %s at this pitch", materializr::fmtLength(autoW)).c_str());
             else if (m_threadGrooveWidth > 0.9f * m_threadPitch)
-                ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.3f, 1.0f), "%s", materializr::trFormat("Capped at %s — a crest must survive between turns.", materializr::fmtLength(0.9f * m_threadPitch)).c_str());
+                ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.3f, 1.0f), "%s", materializr::trFormat("Capped at %s - a crest must survive between turns.", materializr::fmtLength(0.9f * m_threadPitch)).c_str());
         }
     }
 
@@ -1705,7 +1716,7 @@ void Application::renderThreadPanel() {
     // Multi-start: N interleaved helixes; crest spacing stays = pitch, each
     // helix advances N x pitch per turn (a quarter-turn bottle cap = 3-4
     // starts with a coarse pitch). Stepped field, not a slider (Steve);
-    // im-touch gets bare +/- buttons — a text field would summon the mobile
+    // im-touch gets bare +/- buttons - a text field would summon the mobile
     // keyboard for a single-digit value.
     ImGui::Text("%s", materializr::tr("Starts")); ImGui::SameLine();
     if (imTouchLayout()) {
@@ -1726,16 +1737,16 @@ void Application::renderThreadPanel() {
         ImGui::TextDisabled("%s", materializr::trFormat("lead %s/turn", materializr::fmtLength(m_threadStarts *
                             std::max(0.1f, m_threadPitch))).c_str());
         // The single-start sweep shortcuts don't apply to interleaved
-        // helixes — every multi-start thread is a boolean cut.
+        // helixes - every multi-start thread is a boolean cut.
         if (m_threadProfile == 0 || m_threadProfile == 4)
-            ImGui::TextDisabled("%s", materializr::tr("Multi-start cuts per-groove — slower than a single start."));
+            ImGui::TextDisabled("%s", materializr::tr("Multi-start cuts per-groove - slower than a single start."));
     }
 
     // "Turns" a user perceives = revolutions of one helix (length/lead);
     // crest count (length/pitch) is what sets the boolean cost, so the
     // guards key on it. The engine refuses >300 crests outright, and the
     // per-turn fallback (which a multi-start cut lands on whenever the
-    // compound tool demotes) tops out at 120 zones — warn before Apply
+    // compound tool demotes) tops out at 120 zones - warn before Apply
     // instead of failing after a minute of cutting.
     double crests = m_threadLength / std::max(0.1f, m_threadPitch);
     if (m_threadStarts > 1)
@@ -1743,14 +1754,14 @@ void Application::renderThreadPanel() {
     else
         ImGui::TextDisabled(materializr::tr("%.0f turns over the face"), crests);
     if (crests > 300.0) {
-        ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.3f, 1.0f), "%s", materializr::tr("Too many turns (max 300) — raise the pitch."));
+        ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.3f, 1.0f), "%s", materializr::tr("Too many turns (max 300) - raise the pitch."));
     } else if (m_threadStarts > 1 && crests > 120.0) {
-        ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.3f, 1.0f), "%s", materializr::tr("Multi-start beyond 120 crests can fail the cut — raise the pitch."));
+        ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.3f, 1.0f), "%s", materializr::tr("Multi-start beyond 120 crests can fail the cut - raise the pitch."));
     }
-    ImGui::TextDisabled("%s", materializr::tr("Computed on Apply — may take a few seconds."));
+    ImGui::TextDisabled("%s", materializr::tr("Computed on Apply - may take a few seconds."));
     ImGui::TextWrapped("%s", materializr::tr("Later cuts (holes, slots, chamfers) reorder beneath the thread automatically; the thread then re-cuts in the background. Sharp profiles on long threads can take a while each re-cut, so threading last is still fastest."));
 
-    // Apply / Cancel — im-touch hosts them as corner ✓/✗ FABs instead.
+    // Apply / Cancel - im-touch hosts them as corner ✓/✗ FABs instead.
     bool applyClicked = false, cancelClicked = false;
     if (!imTouchActionCorner()) {
         ImGui::Separator();
@@ -1761,7 +1772,7 @@ void Application::renderThreadPanel() {
     bool escPressed = ImGui::IsKeyPressed(ImGuiKey_Escape, false);
 
     // >300 crests is the engine's hard refusal; the multi-start >120 case is
-    // only a warning (the compound path can still land it — per-turn is the
+    // only a warning (the compound path can still land it - per-turn is the
     // fallback ceiling, not the front door).
     if (applyClicked && crests <= 300.0) {
         commitThread();
@@ -1832,7 +1843,7 @@ void Application::renderLoftPanel() {
     //    its neighbours).
     ImGui::TextColored(materializr::accentText(), materializr::tr("Sections (%d)"),
                        static_cast<int>(m_loftSections.size()));
-    ImGui::SetItemTooltip("%s", materializr::tr("Profiles are skinned in this order — top of the list is one end of the loft. Reorder with the arrows if the surface jumps back and forth. Flip a section if the loft pinches or twists there."));
+    ImGui::SetItemTooltip("%s", materializr::tr("Profiles are skinned in this order - top of the list is one end of the loft. Reorder with the arrows if the surface jumps back and forth. Flip a section if the loft pinches or twists there."));
     for (int i = 0; i < static_cast<int>(m_loftSections.size()); ++i) {
         LoftSection& sec = m_loftSections[i];
         ImGui::PushID(i);
@@ -1858,13 +1869,13 @@ void Application::renderLoftPanel() {
                                    : "Face");
         ImGui::SameLine(ImGui::GetContentRegionAvail().x - uiSz(50, 0).x);
         if (ImGui::Checkbox(materializr::tr("Flip"), &sec.reverse)) changed = true;
-        ImGui::SetItemTooltip("%s", materializr::tr("Reverse this profile's vertex order. Use it if the loft pinches to an apex or twists at this section — usually means its start vertex isn't lined up with the neighbouring profiles'."));
+        ImGui::SetItemTooltip("%s", materializr::tr("Reverse this profile's vertex order. Use it if the loft pinches to an apex or twists at this section - usually means its start vertex isn't lined up with the neighbouring profiles'."));
         ImGui::PopID();
     }
 
     // Warn when the sections don't sit on (roughly) parallel planes: the loft
     // skins them in list order, so perpendicular "wall" profiles make the
-    // surface double back through itself — the boundary-fill / guide-rails
+    // surface double back through itself - the boundary-fill / guide-rails
     // feature that case wants doesn't exist yet, and the weave otherwise looks
     // like a bug rather than a modelling-intent mismatch.
     if (m_document && m_loftSections.size() >= 2) {
@@ -1886,9 +1897,9 @@ void Application::renderLoftPanel() {
 
     ImGui::Separator();
     if (ImGui::Checkbox(materializr::tr("Solid (off = surface shell)"), &m_loftSolid)) changed = true;
-    ImGui::SetItemTooltip("%s", materializr::tr("On: ThruSections caps the ends and produces a solid body. Off: open shell — useful when one profile is open or you want a swept surface."));
+    ImGui::SetItemTooltip("%s", materializr::tr("On: ThruSections caps the ends and produces a solid body. Off: open shell - useful when one profile is open or you want a swept surface."));
     if (ImGui::Checkbox(materializr::tr("Ruled surface (off = smooth)"), &m_loftRuled)) changed = true;
-    ImGui::SetItemTooltip("%s", materializr::tr("Ruled draws straight-line ribs between matching vertices on adjacent profiles. Smooth interpolates a curved surface — usually nicer between similar profiles, less predictable between dissimilar ones."));
+    ImGui::SetItemTooltip("%s", materializr::tr("Ruled draws straight-line ribs between matching vertices on adjacent profiles. Smooth interpolates a curved surface - usually nicer between similar profiles, less predictable between dissimilar ones."));
 
     ImGui::Separator();
     bool applyClicked  = ImGui::Button(materializr::tr("Apply"), materializr::uiSz(120, 0));
@@ -1924,9 +1935,9 @@ bool Application::loadRefImageFile(const std::string& path, RefImageEntry& out,
     int w = 0, h = 0;
     if (!materializr::probeImageSize(bytes.data(), bytes.size(), w, h)) {
         // probeImageSize also refuses images that are readable but too large to
-        // decode safely, so the message has to cover both — "not readable" alone
+        // decode safely, so the message has to cover both - "not readable" alone
         // is simply untrue for a valid 30000x30000 photo.
-        showToast("Could not use this image — it must be a PNG / JPEG / BMP "
+        showToast("Could not use this image - it must be a PNG / JPEG / BMP "
                   "no larger than 16384 x 16384.");
         return false;
     }
@@ -1957,7 +1968,7 @@ void Application::attachRefImageToPlane(int planeId) {
             m_document->setRefImage(planeId, std::move(e));
             showToast(replacing
                           ? "Reference image replaced."
-                          : "Reference image attached \xe2\x80\x94 set its real size with "
+                          : "Reference image attached - set its real size with "
                             "Calibrate, then sketch over it.",
                       6.0);
             m_meshesDirty = true;
@@ -1974,10 +1985,10 @@ void Application::beginRefImageImport() {
             RefImageEntry e;
             std::string base;
             if (!loadRefImageFile(path, e, base)) return;
-            // Host plane: the GROUND plane at the origin — where a top-down
+            // Host plane: the GROUND plane at the origin - where a top-down
             // "photo with a ruler" naturally lives; move/rotate it with the
             // gizmo like any construction plane afterwards. The world is Y-up
-            // internally (the user-facing "XY" sketch plane is normal +Y —
+            // internally (the user-facing "XY" sketch plane is normal +Y -
             // same pose as Sketch on XY), so normal (0,0,1) would be a wall.
             // For any OTHER pose, build the plane first and attach the image
             // to it from the plane's properties.
@@ -1992,11 +2003,11 @@ void Application::beginRefImageImport() {
                 se.planeId = planeId;
                 m_selection->select(se);
             }
-            showToast("Reference image imported — set its real size with "
+            showToast("Reference image imported - set its real size with "
                       "Calibrate, then sketch over it.", 6.0);
             m_meshesDirty = true;
             // Reference images aren't a history op, so they don't move the
-            // history step — mark the non-history dirty flag so crash-recovery
+            // history step - mark the non-history dirty flag so crash-recovery
             // re-snapshots (else a recovered project loses the image; the
             // blob lives in the doc, but the sidecar was never rewritten).
             markDirty();
@@ -2006,7 +2017,7 @@ void Application::beginRefImageImport() {
 void Application::renderRefImagePanel() {
     // Gate: exactly the case where a construction plane hosting an image is
     // selected (outside sketch mode). The plane click / Items-panel click is
-    // the selection path — no separate tool state.
+    // the selection path - no separate tool state.
     if (!m_selection || !m_document || m_inSketchMode) return;
     int planeId = -1;
     for (const auto& e : m_selection->getSelection()) {
@@ -2025,7 +2036,7 @@ void Application::renderRefImagePanel() {
         return;
     }
     if (!img) {
-        // Selection moved off the image — drop the calibration popup state
+        // Selection moved off the image - drop the calibration popup state
         // and the preview texture so we don't hold a stale GL object.
         if (m_refImgPreviewTex) {
             glDeleteTextures(1, &m_refImgPreviewTex);
@@ -2071,7 +2082,7 @@ void Application::renderRefImageControls(int planeId) {
         m_document->setRefImageOpacity(planeId, opacity);
         markDirty();
     }
-    ImGui::SetItemTooltip("%s", materializr::tr("Underlay strength — drop it until your sketch lines read clearly on top of the photo."));
+    ImGui::SetItemTooltip("%s", materializr::tr("Underlay strength - drop it until your sketch lines read clearly on top of the photo."));
 
     float widthMM = static_cast<float>(img->widthMM);
     ImGui::SetNextItemWidth(uiSz(120, 0).x);
@@ -2097,7 +2108,7 @@ void Application::renderRefImageControls(int planeId) {
     // instead; that detaches the image and leaves the plane being placed.
     ImGui::BeginDisabled(m_planeOpActive);
     if (ImGui::Button(materializr::tr("Remove"), ImVec2(uiSz(90, 0).x, 0))) {
-        // Removing the image removes its host plane too — the plane existed
+        // Removing the image removes its host plane too - the plane existed
         // only to carry the photo. (No history op: reference scaffolding,
         // same as sketch drafts.)
         m_document->removePlane(planeId);
@@ -2125,7 +2136,7 @@ void Application::renderRefImageCalibrationPopup(int planeId) {
 
     // (Re)build the preview texture for this plane's image if needed. The
     // decode is at most a few hundred ms for a phone photo and happens once
-    // per popup open — acceptable without a spinner.
+    // per popup open - acceptable without a spinner.
     if (m_refImgPreviewPlane != planeId || !m_refImgPreviewTex) {
         if (m_refImgPreviewTex) {
             glDeleteTextures(1, &m_refImgPreviewTex);
@@ -2143,7 +2154,7 @@ void Application::renderRefImageCalibrationPopup(int planeId) {
             // Pin unpack state (same trap as the logo texture): this upload
             // inherits whatever GL_UNPACK_ROW_LENGTH / alignment a prior frame's
             // texture upload left set. If it's non-zero the preview reads its
-            // rows at the wrong stride and comes out as garbled static — clean
+            // rows at the wrong stride and comes out as garbled static - clean
             // the first time, corrupt on every later open once something dirties
             // the state. Save/pin/restore so tightly-packed RGBA reads right.
             GLint prevRowLen = 0, prevAlign = 4;
@@ -2175,7 +2186,7 @@ void Application::renderRefImageCalibrationPopup(int planeId) {
     ImGui::TextWrapped("%s", materializr::tr("Click two points a KNOWN distance apart (e.g. two marks on the ruler in your photo), then enter that distance."));
     ImGui::Spacing();
 
-    // Fit the image INSIDE the viewport, preserving aspect — sizing by width
+    // Fit the image INSIDE the viewport, preserving aspect - sizing by width
     // alone let a portrait phone photo (3000×4000 px) blow the popup past the
     // bottom of the screen. Cap both dimensions against the work area and take
     // the tighter constraint.
@@ -2188,7 +2199,7 @@ void Application::renderRefImageCalibrationPopup(int planeId) {
     float dispH = dispW * aspect;
     if (dispH > maxH) { dispH = maxH; dispW = dispH / aspect; }
     // Zoomable, pannable preview inside a clipped child: scroll zooms about
-    // the cursor, right-drag pans — a 4000 px phone photo's ruler ticks are
+    // the cursor, right-drag pans - a 4000 px phone photo's ruler ticks are
     // unpickable at fit-to-window scale.
     ImVec2 viewPos = ImGui::GetCursorScreenPos();
     ImGui::BeginChild("##calibView", ImVec2(dispW, dispH), false,
@@ -2380,8 +2391,8 @@ void Application::renderPatchPanel() {
                             static_cast<int>(m_patchSupports.size()));
     // Why the patch is (or isn't) going to join the body. Three different
     // reasons produce the same loose surface, and the one that reads as the
-    // tool ignoring you — a hole that goes right THROUGH, which capping one end
-    // cannot close — used to say nothing at all.
+    // tool ignoring you - a hole that goes right THROUGH, which capping one end
+    // cannot close - used to say nothing at all.
     if (auto* pop = static_cast<PatchOp*>(m_patchPreview.op())) {
         switch (pop->healOutcome()) {
             case PatchOp::Heal::Sewn:
@@ -2534,7 +2545,7 @@ void Application::renderPatchPanel() {
 
     ImGui::Separator();
     // Touch has no Escape key and Patch is not in anyInteractivePreviewActive(),
-    // so im-touch hosts no confirm corner for it — these two buttons are the
+    // so im-touch hosts no confirm corner for it - these two buttons are the
     // only way out of the gesture on a tablet. Full-height so a finger can hit
     // them, matching the other op popups.
     const ImVec2 btn = materializr::uiSz(130, materializr::touchMode() ? 44 : 0);
@@ -2554,10 +2565,10 @@ void Application::renderPatchPanel() {
 }
 
 void Application::renderSketchMovePanel() {
-    // Only when Move gizmo is active on a single standalone sketch — counted
+    // Only when Move gizmo is active on a single standalone sketch - counted
     // as the number of DISTINCT parent sketch ids across Sketch and
     // SketchRegion entries (a region clicked inside is the user pointing at
-    // its sketch). No bodies — those route through the multi-transform path.
+    // its sketch). No bodies - those route through the multi-transform path.
     int distinctSketches = 0;
     if (m_selection) {
         std::vector<int> seen;
@@ -2571,7 +2582,7 @@ void Application::renderSketchMovePanel() {
         }
     }
     // Only appears when the user has explicitly armed the sketch gizmo (via
-    // Move in the Tools panel) for the currently-selected sketch — matches
+    // Move in the Tools panel) for the currently-selected sketch - matches
     // the visibility rule for the gizmo itself. Without this gate the panel
     // pops up as soon as you select a sketch, because the gizmo's mode
     // persists across selections and defaults to Translate.
@@ -2655,6 +2666,7 @@ void Application::applySketchMove() {
         std::fprintf(stderr, "[SketchMove] missing selection/document/history\n");
         return;
     }
+    auto trackBodies = trackBodyChanges(); // re-tessellate only what changes
     int sketchId = -1;
     for (const auto& e : m_selection->getSelection()) {
         if ((e.type == SelectionType::Sketch ||
@@ -2680,12 +2692,11 @@ void Application::applySketchMove() {
     m_sketchMove[0] = m_sketchMove[1] = m_sketchMove[2] = 0.0f;
     for (int i = 0; i < 3; ++i)
         std::snprintf(m_sketchMoveBuf[i], sizeof(m_sketchMoveBuf[i]), "0");
-    m_meshesDirty = true;
 }
 
 void Application::renderSnapWidget() {
     // im-touch hosts snap in its top button cluster instead (next to Multi)
-    // — no corner widget there, and no hover latch keeping viewport picks
+    // - no corner widget there, and no hover latch keeping viewport picks
     // away from a square that isn't drawn.
     if (imTouchLayout()) {
         m_snapWidgetHovered = false;
@@ -2693,7 +2704,7 @@ void Application::renderSnapWidget() {
     }
     // The snap square tucks just under the ViewCube. Only the cases where the
     // cube itself moved need the cube-tracking anchor: TOUCH mode enlarges the
-    // cube (1.5x) and im-touch-LITE drops it below the floating button cluster —
+    // cube (1.5x) and im-touch-LITE drops it below the floating button cluster -
     // there the widget follows the cube's cached bottom, scaled to match. In
     // classic and modern on desktop the cube is at its default size and spot, so
     // keep the ORIGINAL fixed tuck (the position Steve is used to) unchanged.
@@ -2702,14 +2713,14 @@ void Application::renderSnapWidget() {
     // ALWAYS anchor to the cube's cached bottom. The desktop path used to
     // re-derive the position from its own copy of the cube's layout constants
     // (pad 10, widgetR 38, +26, +96) on the assumption that "on desktop the
-    // cube is at its default size and spot" — true until the cube started
+    // cube is at its default size and spot" - true until the cube started
     // scaling with the interface, after which the cube grew and this square
     // stayed put. Reading the anchors means it can't drift again the next time
     // the cube's geometry changes.
     //
     // The nudges differ only to preserve each mode's existing position: touch
     // keeps the (0, 10) it already had, and at scale 1 the desktop pair
-    // (20, 12) reproduces the old fixed tuck exactly — in CLASSIC. In modern it
+    // (20, 12) reproduces the old fixed tuck exactly - in CLASSIC. In modern it
     // lands ~8px up and left of where it used to, because the cube there takes
     // a setExtraOffset(8, -8) nudge that the old hand-rolled position ignored;
     // the square now follows the cube instead of sitting beside it. Measured on
@@ -2729,7 +2740,7 @@ void Application::renderSnapWidget() {
     (void)wp; (void)ws;
     ImVec2 widgetEnd(widgetPos.x + size, widgetPos.y + size);
 
-    // Manual hit-test — same pattern the ViewCube uses to anchor in a corner
+    // Manual hit-test - same pattern the ViewCube uses to anchor in a corner
     // without polluting the parent window's layout cursor (which is what
     // ImGui's boundary-extension assert was complaining about when we used
     // SetCursorScreenPos + InvisibleButton).
@@ -2782,9 +2793,9 @@ void Application::renderSnapWidget() {
     // The badge shows the step in the DISPLAY unit, like the presets that set
     // it. It used to bucket the raw millimetre value against fixed thresholds
     // and print a literal, so choosing "1" under centimetres stored 10 mm and
-    // the badge then read "10" — the widget contradicting the popup that had
+    // the badge then read "10" - the widget contradicting the popup that had
     // just set it. %.3g so a converted step stays short enough for the square.
-    // The EFFECTIVE step, which is what the cursor snaps to at this zoom —
+    // The EFFECTIVE step, which is what the cursor snaps to at this zoom -
     // not the base preset. A badge naming a step the cursor ignores is the
     // same contradiction the display-unit conversion already fixed here once.
     char buf[16];
@@ -2796,7 +2807,7 @@ void Application::renderSnapWidget() {
     dl->AddText(tp, IM_COL32(240, 240, 245, 255), buf);
     ImGui::PopFont();
 
-    // Settings popup — checkbox + radio buttons. Each change saves to the
+    // Settings popup - checkbox + radio buttons. Each change saves to the
     // settings file immediately so the choice survives the next launch.
     renderSnapSettingsPopup();
 
@@ -2828,14 +2839,14 @@ void Application::renderSnapSettingsPopup() {
             if (ImGui::Combo(materializr::tr("Display unit"), &unit, unitNames, 5)) {
                 applyDisplayUnitChange(unit);
                 saveAppSettings();
-                // Close, for the same reason the step presets below do — and
+                // Close, for the same reason the step presets below do - and
                 // here it is not just convenience. m_snapWidgetHovered is held
                 // true for as long as this popup is open, and that flag gates
                 // the WHOLE sketch input block (onMouseMove, onMouseDown,
                 // onMouseUp alike). Leaving it open froze the rubber-band
                 // preview and swallowed every canvas click, so after picking a
                 // unit mid-sketch the only thing that still responded was the
-                // dimension field — "I can only click and input".
+                // dimension field - "I can only click and input".
                 ImGui::CloseCurrentPopup();
             }
         }
@@ -2844,7 +2855,7 @@ void Application::renderSnapSettingsPopup() {
         ImGui::Text("%s", materializr::trFormat("Step (%s)", materializr::unitSuffix()).c_str());
         // The presets are in the DISPLAY unit, not millimetres. They used to be
         // literal mm under a header that already said "(cm)" or "(in)", so the
-        // label named one unit while the button set another — 1 meant 1 mm while
+        // label named one unit while the button set another - 1 meant 1 mm while
         // the popup claimed centimetres. m_sketchGridStep stays mm; only the
         // choice offered is converted.
         const float stepsDisp[] = { 0.1f, 0.5f, 1.0f, 10.0f };
@@ -2858,7 +2869,7 @@ void Application::renderSnapSettingsPopup() {
                 m_sketchGridStep = stepMm;
                 if (m_toolbar) m_toolbar->setGridStep(m_sketchGridStep);
                 saveAppSettings();
-                // Picking a step is the task — close the popup so drawing
+                // Picking a step is the task - close the popup so drawing
                 // resumes immediately (no click-away-to-dismiss).
                 ImGui::CloseCurrentPopup();
             }
@@ -2905,7 +2916,7 @@ void Application::renderConstructionPlanePanel() {
         ImGui::TextDisabled("%s", materializr::tr("(Select a planar face to enable Parallel-to-face.)"));
     }
 
-    // Derived modes — each enabled only when its required selection exists.
+    // Derived modes - each enabled only when its required selection exists.
     if (m_planeOpHaveTwoPlanes) {
         if (ImGui::RadioButton(materializr::tr("Midplane (between 2 planes/faces)"), m_planeOpKindIdx == 4)) {
             m_planeOpKindIdx = 4; kindChanged = true;
@@ -3111,7 +3122,7 @@ void Application::beginRevolve() {
     // each); collect EVERY body so Rotate Body can multi-rotate them
     // around a single axis. Sweep Sketch only uses the primary body for
     // boolean targeting.
-    // ANY entry that names a body — Body / Face / Edge / Vertex — counts
+    // ANY entry that names a body - Body / Face / Edge / Vertex - counts
     // its parent body as a rotate target. The user's "ctrl-click two
     // bodies, click Revolve" flow often lands one as Body and the other
     // as Face (depending on where they clicked); treating both as body
@@ -3171,7 +3182,7 @@ void Application::renderRevolvePopup() {
                             ImGuiCond_Appearing);
     ImGui::SetNextWindowSize(uiSz(320, 0), ImGuiCond_Appearing);
     // The mode is chosen by the selection (sketch → Lathe, body → Revolve) in
-    // beginRevolve(); the window title reflects it. No in-popup mode switch —
+    // beginRevolve(); the window title reflects it. No in-popup mode switch -
     // to change mode you change the selection.
     const bool lathe = (m_revolveWhatIdx == 1);
     ImGui::Begin(lathe ? "Lathe###RevolvePopup" : "Revolve###RevolvePopup", nullptr,
@@ -3190,7 +3201,7 @@ void Application::renderRevolvePopup() {
                     m_document->getBodyName(m_revolveBodyId).c_str(),
                     m_revolveBodyId);
     } else if (bodyCount > 1) {
-        ImGui::Text(materializr::tr("• %d bodies — rotate together around the axis"), bodyCount);
+        ImGui::Text(materializr::tr("• %d bodies - rotate together around the axis"), bodyCount);
     } else {
         ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.35f, 1.0f), "%s", materializr::tr("• Body: none"));
     }
@@ -3200,11 +3211,11 @@ void Application::renderRevolvePopup() {
                         m_document->getSketchName(m_revolveSketchId).c_str(),
                         m_revolveSketchId);
         } else {
-            ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.35f, 1.0f), "%s", materializr::tr("• Sketch: none — select one and re-open."));
+            ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.35f, 1.0f), "%s", materializr::tr("• Sketch: none - select one and re-open."));
         }
     }
 
-    // Axis picker — combo box listing every construction axis in the
+    // Axis picker - combo box listing every construction axis in the
     // document plus the canonical user-Z-up world axes at the bottom.
     // Solves the "I can't pick the axis I just made" report.
     ImGui::Separator();
@@ -3278,7 +3289,7 @@ void Application::renderRevolvePopup() {
         revolveLiveApply(m_revolveAngle);
     }
 
-    // Boolean mode applies only to Sweep Sketch — Rotate Body is always
+    // Boolean mode applies only to Sweep Sketch - Rotate Body is always
     // an in-place transform, no mode choice.
     if (m_revolveWhatIdx == 1) {
         ImGui::Separator();
@@ -3468,6 +3479,10 @@ bool Application::computeAlignTransform(gp_Trsf& rotOut, gp_Trsf& moveOut,
 
 void Application::applyAlignPreview() {
     if (!m_alignActive || !m_document) return;
+    // Marked by id, not diffed: this runs again on every value edit while the
+    // popup is open, and it moves exactly one known body (the sketch branch
+    // moves no body at all), so a whole-document snapshot per edit would cost
+    // more than the move it is tracking.
     if (m_alignSketchId >= 0) {
         auto sk = m_document->getSketch(m_alignSketchId);
         if (!sk) return;
@@ -3481,14 +3496,13 @@ void Application::applyAlignPreview() {
             next.Transform(full);
             sk->setPlane(next);
         }
-        m_meshesDirty = true;
         return;
     }
     if (m_alignBodyId < 0) return;
     gp_Trsf R, T; gp_Pnt c; bool nr, nm;
     if (!computeAlignTransform(R, T, c, nr, nm)) {
         m_document->updateBody(m_alignBodyId, m_alignSnapshot);
-        m_meshesDirty = true;
+        markBodyDirty(m_alignBodyId);
         return;
     }
     gp_Trsf full;
@@ -3498,21 +3512,28 @@ void Application::applyAlignPreview() {
     try {
         const TopoDS_Shape moved =
             BRepBuilderAPI_Transform(m_alignSnapshot, full, Standard_True).Shape();
-        if (!moved.IsNull()) m_document->updateBody(m_alignBodyId, moved);
+        if (!moved.IsNull()) {
+            m_document->updateBody(m_alignBodyId, moved);
+            markBodyDirty(m_alignBodyId);
+        }
     } catch (...) {}
-    m_meshesDirty = true;
 }
 
 void Application::cancelAlignFace() {
-    if (m_document && m_alignBodyId >= 0 && !m_alignSnapshot.IsNull())
-        m_document->updateBody(m_alignBodyId, m_alignSnapshot);
-    if (m_document && m_alignSketchId >= 0)
-        if (auto sk = m_document->getSketch(m_alignSketchId))
-            sk->setPlane(m_alignSketchPlaneBefore);
+    // The scope lives inside the null check, like every use below it: it
+    // takes a Document reference, so constructing it first would dereference
+    // the very pointer this function is careful about.
+    if (m_document) {
+        auto trackBodies = trackBodyChanges(); // re-tessellate only what changes
+        if (m_alignBodyId >= 0 && !m_alignSnapshot.IsNull())
+            m_document->updateBody(m_alignBodyId, m_alignSnapshot);
+        if (m_alignSketchId >= 0)
+            if (auto sk = m_document->getSketch(m_alignSketchId))
+                sk->setPlane(m_alignSketchPlaneBefore);
+    }
     m_alignSketchId = -1;
     m_alignActive = false;
     m_alignFace.Nullify(); m_alignSnapshot.Nullify();
-    m_meshesDirty = true;
 }
 
 void Application::renderAlignFacePopup() {
@@ -3599,6 +3620,7 @@ void Application::renderAlignFacePopup() {
     if (ImGui::IsKeyPressed(ImGuiKey_Escape, false)) cancelClicked = true;
 
     if (applyClicked && m_alignSketchId >= 0) {
+        auto trackBodies = trackBodyChanges(); // re-tessellate only what changes
         gp_Trsf R, T; gp_Pnt c; bool nr, nm;
         const bool any = computeAlignTransform(R, T, c, nr, nm);
         if (auto sk = m_document->getSketch(m_alignSketchId))
@@ -3614,8 +3636,8 @@ void Application::renderAlignFacePopup() {
         }
         m_alignSketchId = -1;
         m_alignActive = false;
-        m_meshesDirty = true;
     } else if (applyClicked) {
+        auto trackBodies = trackBodyChanges(); // re-tessellate only what changes
         // Restore the snapshot, then commit through the ordinary op path so
         // undo / reload capture everything (a rotate then a move, matching
         // what the preview showed).
@@ -3649,7 +3671,6 @@ void Application::renderAlignFacePopup() {
         }
         m_alignActive = false;
         m_alignFace.Nullify(); m_alignSnapshot.Nullify();
-        m_meshesDirty = true;
     } else if (cancelClicked) {
         cancelAlignFace();
     }
@@ -3660,7 +3681,7 @@ void Application::renderAlignFacePopup() {
 // Tilts / hinges an existing construction plane about a chosen line by a
 // typed angle, with live preview. Hinge candidates + the snapshot are seeded
 // by beginRotatePlaneAboutAxis(); this just drives the UI. Writes through
-// Document::setPlane (no history op — matches the plane gizmo). Apply leaves
+// Document::setPlane (no history op - matches the plane gizmo). Apply leaves
 // the current pose; Cancel / Escape restores the snapshot.
 void Application::renderRotatePlaneAboutAxisPopup() {
     if (!m_rotPlaneActive) return;
@@ -3678,7 +3699,7 @@ void Application::renderRotatePlaneAboutAxisPopup() {
         ImGui::Text(materializr::tr("Plane: %s"), m_document->getPlaneName(m_rotPlaneId).c_str());
     }
 
-    // Hinge picker — the lines computed at open time.
+    // Hinge picker - the lines computed at open time.
     ImGui::Separator();
     ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Hinge"));
     const char* curLabel =
@@ -3697,7 +3718,7 @@ void Application::renderRotatePlaneAboutAxisPopup() {
         ImGui::EndCombo();
     }
 
-    // Angle — typed entry + slider, both live-preview on change.
+    // Angle - typed entry + slider, both live-preview on change.
     ImGui::Separator();
     ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Angle"));
     ImGui::SetNextItemWidth(100);
@@ -3762,20 +3783,20 @@ void Application::renderRotatePlaneAboutAxisPopup() {
 
 void Application::revolveLiveBegin() {
     if (m_revolveLiveActive) {
-        std::fprintf(stderr, "[Revolve] revolveLiveBegin: ALREADY ACTIVE — "
+        std::fprintf(stderr, "[Revolve] revolveLiveBegin: ALREADY ACTIVE - "
                              "stale state from a previous popup? Force-restore "
                              "and rebegin to clear it.\n");
         revolveLiveRestore();
     }
     if (m_revolveWhatIdx != 0) {
         if (materializr::isVerbose())
-            std::fprintf(stderr, "[Revolve] revolveLiveBegin: skipped — what=%d\n",
+            std::fprintf(stderr, "[Revolve] revolveLiveBegin: skipped - what=%d\n",
                          m_revolveWhatIdx);
         return;
     }
     if (m_revolveBodyIds.empty()) {
         if (materializr::isVerbose())
-            std::fprintf(stderr, "[Revolve] revolveLiveBegin: skipped — no bodies\n");
+            std::fprintf(stderr, "[Revolve] revolveLiveBegin: skipped - no bodies\n");
         return;
     }
     m_revolveOrigBodyId = m_revolveBodyId;
@@ -3789,13 +3810,13 @@ void Application::revolveLiveBegin() {
 
 void Application::revolveLiveApply(float angle) {
     // GPU-matrix preview path: we no longer need m_revolveOrigBodyId or
-    // m_revolveOrigShape — those were guards from the old single-body
+    // m_revolveOrigShape - those were guards from the old single-body
     // geometric-rebuild preview that updateBody'd into the document. The
     // current path just sets a model-matrix uniform per slot, so the only
     // precondition is "we have bodies to preview and we've called Begin".
     if (!m_revolveLiveActive) return;
     if (m_revolveBodyIds.empty()) return;
-    // Resolve the axis once per call — the user might have switched
+    // Resolve the axis once per call - the user might have switched
     // between Construction Axis and a canonical world axis mid-preview.
     gp_Pnt axisOrigin(0, 0, 0);
     gp_Dir axisDir(0, 0, 1);
@@ -3812,7 +3833,7 @@ void Application::revolveLiveApply(float angle) {
 
     // GPU-only preview: build a model matrix for the rotation and push it
     // to the renderer's slot for this body. No geometry rebuild, no
-    // re-tessellation, no edge re-sampling — orders of magnitude cheaper
+    // re-tessellation, no edge re-sampling - orders of magnitude cheaper
     // than the previous BRepBuilderAPI_Transform + updateBody path on
     // complex bodies (the live-edit lag the user reported). Apply() will
     // do the real geometric transform once through TransformOp.
@@ -3825,7 +3846,7 @@ void Application::revolveLiveApply(float angle) {
     m = glm::translate(m, -pivot);
     // Apply to every body in the multi-selection. Each body's mesh slot
     // gets the same model matrix so they all rotate as a rigid group
-    // around the chosen axis — the natural reading of "revolve these
+    // around the chosen axis - the natural reading of "revolve these
     // around the axis together".
     int hits = 0, misses = 0;
     for (int bid : m_revolveBodyIds) {
@@ -3840,7 +3861,7 @@ void Application::revolveLiveApply(float angle) {
         }
         if (found) ++hits; else ++misses;
     }
-    // Per-drag-frame trace — --verbose only (stderr flush per slider tick).
+    // Per-drag-frame trace - --verbose only (stderr flush per slider tick).
     if (materializr::isVerbose())
         std::fprintf(stderr, "[Revolve] live-apply: angle=%.2f hits=%d misses=%d  "
                              "axis dir=(%.3f,%.3f,%.3f) origin=(%.2f,%.2f,%.2f)\n",
@@ -3853,7 +3874,7 @@ void Application::revolveLiveApply(float angle) {
 void Application::revolveLiveRestore() {
     if (!m_revolveLiveActive) return;
     // Reset every previewed body's model matrix to identity. Geometry
-    // never changed, so this is the only step needed — slots stay,
+    // never changed, so this is the only step needed - slots stay,
     // meshes stay, just the transform uniform goes back to identity.
     glm::mat4 id(1.0f);
     for (int bid : m_revolveBodyIds) {
@@ -3874,8 +3895,9 @@ void Application::revolveLiveRestore() {
 
 void Application::applyRevolve() {
     if (!m_history || !m_document) return;
+    auto trackBodies = trackBodyChanges(); // re-tessellate only what changes
 
-    // Resolve the axis once — both flows use the same picker.
+    // Resolve the axis once - both flows use the same picker.
     gp_Pnt axisOrigin(0, 0, 0);
     gp_Dir axisDir(0, 0, 1);
     if (m_revolveAxisId >= 0) {
@@ -3902,7 +3924,7 @@ void Application::applyRevolve() {
         // applying the transform, run the transform directly via OCCT
         // (skipping per-body TransformOp ops), snapshot the new shape, then
         // wrap before/after into a single ReplayOp the history pushes
-        // executed. The single op is enough — multi-body undo replays all
+        // executed. The single op is enough - multi-body undo replays all
         // bodies' before-states at once.
         gp_Trsf trsf;
         trsf.SetRotation(gp_Ax1(axisOrigin, axisDir),
@@ -3920,7 +3942,7 @@ void Application::applyRevolve() {
                 BRepBuilderAPI_Transform xf(src, trsf, /*copy=*/true);
                 xf.Build();
                 if (!xf.IsDone() || xf.Shape().IsNull()) {
-                    // Roll the before-entry off — couldn't transform this
+                    // Roll the before-entry off - couldn't transform this
                     // body, don't pretend we did.
                     before.pop_back();
                     std::fprintf(stderr, "[Revolve]   body %d: transform FAILED\n",
@@ -3951,7 +3973,6 @@ void Application::applyRevolve() {
             // document above; we just want history to know it happened so
             // Ctrl+Z can roll it back via the captured before-state.
             m_history->pushExecuted(std::move(op));
-            m_meshesDirty = true;
             if (materializr::isVerbose())
                 std::fprintf(stderr, "[Revolve] applied: %.1f° dir(%.3f,%.3f,%.3f) "
                                      "origin(%.2f,%.2f,%.2f) over %d bodies "
@@ -3963,12 +3984,12 @@ void Application::applyRevolve() {
         return;
     }
 
-    // Sweep Sketch path — original RevolveOp flow.
+    // Sweep Sketch path - original RevolveOp flow.
     if (m_revolveSketchId < 0) return;
     auto sk = m_document->getSketch(m_revolveSketchId);
     if (!sk) return;
     auto regions = sk->buildRegions();
-    // Pick the outermost region (largest outer bbox) — its face carries any
+    // Pick the outermost region (largest outer bbox) - its face carries any
     // inner boundaries as holes. Matches RevolveOp::rebuildProfileFromSketch
     // so reloads re-derive the same profile.
     int bestIdx = -1;
@@ -4005,7 +4026,6 @@ void Application::applyRevolve() {
     if (mode != RevolveMode::NewBody) op->setTargetBody(m_revolveBodyId);
 
     if (m_history->pushOperation(std::move(op), *m_document)) {
-        m_meshesDirty = true;
         std::fprintf(stdout, "[Revolve] sweep-sketch applied: angle=%.1f° mode=%d\n",
                      m_revolveAngle, m_revolveModeIdx);
     } else {
@@ -4081,7 +4101,7 @@ void Application::renderConstructionAxisPanel() {
 }
 
 // ---------------------------------------------------------------------------
-// Section View — render-only clip plane for inspecting interiors (thread
+// Section View - render-only clip plane for inspecting interiors (thread
 // profiles, wall thickness) without destructive booleans.
 
 gp_Pln Application::sectionBasePlane() const {
@@ -4111,7 +4131,7 @@ void Application::renderSectionPanel() {
     if (!m_sectionEnabled) return;
 
     // Top-centre, like the other tool popups. The first version pinned this
-    // top-RIGHT — squarely behind the Items/Properties panels, so the plane
+    // top-RIGHT - squarely behind the Items/Properties panels, so the plane
     // picker existed but was never seen.
     ImGuiViewport* vp = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(
@@ -4125,7 +4145,7 @@ void Application::renderSectionPanel() {
         static const char* kWorldNames[3] = {
             "World XY (front)", "World XZ (ground)", "World YZ (side)"};
 
-        // The selected construction plane may have been deleted — fall back
+        // The selected construction plane may have been deleted - fall back
         // to a world plane rather than sectioning by a stale gp_Pln.
         std::string current;
         if (m_sectionPlaneId >= 0) {
@@ -4162,7 +4182,7 @@ void Application::renderSectionPanel() {
         }
 
         // Offset range adapts to the model so large parts can be fully
-        // traversed — the old fixed ±100 mm couldn't reach the far side of a
+        // traversed - the old fixed ±100 mm couldn't reach the far side of a
         // bigger body. Use the largest bounding-box dimension of the visible
         // bodies (floored at 100 mm so small parts keep a usable range), cached
         // and refreshed every ~0.5 s so the bbox walk isn't run every frame.
@@ -4229,7 +4249,7 @@ void Application::renderTextToolPanel() {
         if (ImGui::InputText("##textString", buf, sizeof(buf)))
             m_sketchTool->setTextString(buf);
 
-        // Bundled fonts only — deterministic across machines, unlike a
+        // Bundled fonts only - deterministic across machines, unlike a
         // system-font scan.
         static const char* kFontNames[] = {"Mono (JetBrains)",
                                            "Sans (DejaVu)",
@@ -4414,7 +4434,7 @@ void Application::renderAirfoilToolPanel() {
 
         if (prof.bluntTrailingEdge) {
             ImGui::TextDisabled("%s", materializr::tr(
-                "Blunt trailing edge — closed with a straight segment."));
+                "Blunt trailing edge - closed with a straight segment."));
             ImGui::SetItemTooltip("%s", materializr::tr(
                 "The section's own trailing edge has thickness, which is what "
                 "you want for a printed or machined part; a knife edge cannot "
@@ -4539,7 +4559,7 @@ void Application::renderSvgToolPanel() {
         }
         if (ImGui::Button(materializr::tr("Finish")))
             m_sketchTool->setMode(SketchToolMode::Select);
-        ImGui::SetItemTooltip("%s", materializr::tr("Done placing — return to the Select tool (same as the window's X)."));
+        ImGui::SetItemTooltip("%s", materializr::tr("Done placing - return to the Select tool (same as the window's X)."));
     }
     ImGui::End();
     if (!open) m_sketchTool->setMode(SketchToolMode::Select);
@@ -4564,7 +4584,7 @@ void Application::renderMirrorToolPanel() {
             ? "Drag the line to move it; drag the end dot to rotate."
             : "Drag the line to move it; drag the end dot to rotate.");
 
-        // Quick orientation presets — snap the line vertical / horizontal.
+        // Quick orientation presets - snap the line vertical / horizontal.
         if (ImGui::Button(materializr::tr("Vertical")))
             m_sketchTool->setMirrorAngle(static_cast<float>(M_PI) * 0.5f);
         ImGui::SameLine();
@@ -4572,7 +4592,7 @@ void Application::renderMirrorToolPanel() {
             m_sketchTool->setMirrorAngle(0.0f);
         ImGui::SameLine();
         float degs = m_sketchTool->getMirrorAngle() * 180.0f / static_cast<float>(M_PI);
-        // Normalise to [0,180) — a line's direction and its reverse are the same.
+        // Normalise to [0,180) - a line's direction and its reverse are the same.
         while (degs < 0.0f)    degs += 180.0f;
         while (degs >= 180.0f) degs -= 180.0f;
         ImGui::TextDisabled(materializr::tr("%.0f deg"), degs);
@@ -4588,13 +4608,13 @@ void Application::renderMirrorToolPanel() {
 
         ImGui::Separator();
         if (ImGui::Button(materializr::tr("Mirror"))) {
+            auto trackBodies = trackBodyChanges(); // re-tessellate only what changes
             std::set<int> newPts, newLines;
             recordSketchMutation([&]{ m_sketchTool->commitMirror(newPts, newLines); });
             m_sketchTool->cancelMirror();
             m_sketchTool->setMode(SketchToolMode::Select);
             m_sketchTool->setSelection(newPts, newLines);
             markDirty();
-            m_meshesDirty = true;
         }
         ImGui::SameLine();
         if (ImGui::Button(materializr::tr("Cancel"))) {
@@ -4620,22 +4640,22 @@ void Application::renderOffsetToolPanel() {
     // the button below), so each lands inside recordSketchMutation as one undo
     // step and each reports the same way.
     auto commitOffsetNow = [&]() {
+        auto trackBodies = trackBodyChanges(); // re-tessellate only what changes
         std::set<int> newPts, newEls;
         recordSketchMutation([&]{ m_sketchTool->commitOffset(newPts, newEls); });
         // Without this the commit is genuinely hard to see: the new geometry
         // lands right beside the source, in the same colour, and the tool goes
         // quiet for the next pick. Say what happened.
         if (newEls.size() == 1) {
-            showToast(materializr::tr("Offset created — 1 new element"), 2.0);
+            showToast(materializr::tr("Offset created - 1 new element"), 2.0);
         } else if (!newEls.empty()) {
             char msg[128];
             std::snprintf(msg, sizeof(msg),
-                          materializr::tr("Offset created — %d new elements"),
+                          materializr::tr("Offset created - %d new elements"),
                           static_cast<int>(newEls.size()));
             showToast(msg, 2.0);
         }
         markDirty();
-        m_meshesDirty = true;
     };
 
     if (m_sketchTool->offsetReadyToCommit()) commitOffsetNow();
@@ -4654,14 +4674,14 @@ void Application::renderOffsetToolPanel() {
                      ImGuiWindowFlags_NoSavedSettings)) {
         if (!picked) {
             ImGui::TextDisabled("%s", materializr::tr(
-                "Hover a line, arc or circle — the whole connected chain "
+                "Hover a line, arc or circle - the whole connected chain "
                 "highlights. Click to choose it."));
         } else {
             ImGui::TextDisabled("%s", materializr::tr(
                 "Move the cursor to set the distance; the side it is on picks "
                 "the direction. Click or press Enter to place it."));
 
-            // Edited as a magnitude — the sign is a direction, and Flip owns it.
+            // Edited as a magnitude - the sign is a direction, and Flip owns it.
             float mag = std::abs(m_sketchTool->getOffsetDistance());
             ImGui::SetNextItemWidth(120.0f);
             if (materializr::lengthField("##offsetDist", &mag,
@@ -4761,7 +4781,7 @@ void Application::renderPrimitivePopup() {
     case 4: // Torus
         dimField("Major radius",  &m_primitivePopupRadius);
         dimField("Minor radius",  &m_primitivePopupMinorRadius);
-        ImGui::TextDisabled("%s", materializr::tr("Major must exceed minor — equal radii are a degenerate self-touching torus."));
+        ImGui::TextDisabled("%s", materializr::tr("Major must exceed minor - equal radii are a degenerate self-touching torus."));
         break;
     }
 
@@ -4772,7 +4792,7 @@ void Application::renderPrimitivePopup() {
     materializr::lengthField("Z", &m_primitivePopupOrigin[2]);
     ImGui::TextDisabled("%s", materializr::tr("Box origin = corner; the rest use it as the axis base / centre."));
 
-    // Geometric validity check — must mirror the bounds in PrimitiveOp::
+    // Geometric validity check - must mirror the bounds in PrimitiveOp::
     // execute(). If the user typed a degenerate combination (zero/negative
     // extent, torus minor ≥ major, etc.) we grey out Create and explain
     // WHY so they aren't left clicking a dead button. (Steve: a major <
@@ -4867,8 +4887,10 @@ void Application::commitStlImport() {
     // Defer the import: decimate + build + UnifySameDomain can take a few seconds
     // at high accuracy, so run it in the between-frames slot where it can paint a
     // progress frame instead of freezing the window (same path as project load).
-    m_deferredHeavyTask = [this, path, acc]() {
-        renderProgressFrame(-1.0f, "Importing STL\xE2\x80\xA6");
+    m_deferredHeavy.queue([this, path, acc]() {
+        // Honour Cancel: the reporter returns true when the user asked to
+        // stop, and importing anyway made the button look broken.
+        if (renderProgressFrame(-1.0f, "Importing STL\xE2\x80\xA6")) return;
         auto result = materializr::StlIO::import(path, *m_document, acc);
         if (result.success) {
             m_meshesDirty = true;
@@ -4879,7 +4901,7 @@ void Application::commitStlImport() {
                 e.bodyId = ids.back();
                 m_selection->select(e);
             }
-            std::string msg = "Imported STL \xE2\x80\x94 " +
+            std::string msg = "Imported STL - " +
                               std::to_string(result.faceCount) + " faces";
             if (result.trianglesAfter > 0 && result.trianglesAfter < result.trianglesBefore)
                 msg += " (simplified " + std::to_string(result.trianglesBefore) +
@@ -4889,7 +4911,7 @@ void Application::commitStlImport() {
         } else {
             showToast("STL import failed: " + result.errorMessage, 6.0);
         }
-    };
+    });
 }
 
 void Application::cancelStlImport() {
@@ -4948,7 +4970,7 @@ void Application::renderStlImportDialog() {
     ImGui::SetItemTooltip("%s", materializr::tr("Off gives a clean shaded body. You can also toggle this later in Settings \xE2\x96\xB8 Rendering."));
     if (m_stlDialogWireframe) {
         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 280.0f);
-        ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.35f, 1.0f), "%s", materializr::tr("Note: drawing the facet wireframe has a performance cost on dense meshes \xE2\x80\x94 turn it off if the viewport feels sluggish."));
+        ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.35f, 1.0f), "%s", materializr::tr("Note: drawing the facet wireframe has a performance cost on dense meshes - turn it off if the viewport feels sluggish."));
         ImGui::PopTextWrapPos();
     }
 
@@ -5064,7 +5086,7 @@ void pdff(std::string& s, const char* fmt, ...) {
     s += buf;
 }
 
-// Rotate a whole flat pattern by `deg` about its bounding-box centre — the
+// Rotate a whole flat pattern by `deg` about its bounding-box centre - the
 // viewer's Rotate control re-orients the layout (e.g. to fall on fewer PDF
 // pages); the same rotated copy feeds both the canvas and the exporters.
 materializr::FlatPattern rotatePattern(const materializr::FlatPattern& fp, double deg) {
@@ -5122,7 +5144,7 @@ PdfTiling computePdfTiling(const materializr::FlatPattern& fp, bool a4) {
 }
 
 // An alignment cross at a position (in drawing-mm) that falls inside a tile
-// overlap — so it prints on both adjacent sheets at the same spot.
+// overlap - so it prints on both adjacent sheets at the same spot.
 struct RegMark { double x, y; };
 // Build the registration lattice for a tiling: crosses along every column- and
 // row-overlap centreline (where adjacent sheets share content), with `spacingMm`
@@ -5166,7 +5188,7 @@ std::vector<RegMark> computeRegMarks(const PdfTiling& T, double spacingMm) {
 // Letter sheet carrying a slice of the pattern, with crop marks at the content
 // corners, an overlap between tiles for assembly, and a 50 mm scale bar in the
 // bottom strip so the print can be checked for true scale. Hand-rolled minimal
-// PDF (vector line art only) — no external dependency, matching the SVG path.
+// PDF (vector line art only) - no external dependency, matching the SVG path.
 bool writeFlatPatternPdf(const std::string& path, const materializr::FlatPattern& fp,
                          materializr::FoldMode foldMode, double thicknessMm, bool a4,
                          double regSpacingMm) {
@@ -5319,7 +5341,7 @@ void Application::beginUnfoldDialog() {
     std::vector<TopoDS_Face> faces;
     int bodyId = -1;
 
-    // Prefer an explicit FACE selection — unfold just the faces of one panel
+    // Prefer an explicit FACE selection - unfold just the faces of one panel
     // (e.g. a wing's top skin), not the whole closed body. Falls back to the
     // whole body only when no faces are picked.
     if (m_selection)
@@ -5393,7 +5415,7 @@ void Application::recomputeUnfold() {
     } else {
         // Papercraft net: unroll each face on its own and hinge whole faces along
         // shared edges (keeps cone/cylinder seams open, joins panels to the flat
-        // face they border — no triangle-soup jumble). Falls back to the raw mesh
+        // face they border - no triangle-soup jumble). Falls back to the raw mesh
         // unfold only if the net engine produces nothing.
         auto fp = materializr::unfoldDevelopableNet(m_unfoldSourceFaces, m_unfoldMaxBevelDeg, 1.0);
         if (!fp.ok)
@@ -5428,7 +5450,7 @@ void Application::renderUnfoldDialog() {
     ImGui::SetNextItemWidth(140.0f);
     if (ImGui::Combo(materializr::tr("Material"), &ri, rigs, 3)) {
         m_unfoldRigidity = static_cast<materializr::Rigidity>(ri);
-        // Material only drives the fold marks (score / bevel / mitre) — it no
+        // Material only drives the fold marks (score / bevel / mitre) - it no
         // longer flips the unwrap algorithm; Conformal stays as the user set it.
         persistSheet();
         recomputeUnfold();
@@ -5451,7 +5473,7 @@ void Application::renderUnfoldDialog() {
     }
 
     // Curve detail: how finely a curved surface is faceted. Drives the number of
-    // score lines AND the number of cut fragments/pieces — so it matters in every
+    // score lines AND the number of cut fragments/pieces - so it matters in every
     // material (a coarser setting = bigger, fewer facets), which is why it's
     // always shown, not just when there are folds.
     ImGui::SetNextItemWidth(160.0f);
@@ -5464,7 +5486,7 @@ void Application::renderUnfoldDialog() {
     // that conform (vinyl, Monokote, fabric); the cost is some area stretch.
     if (ImGui::Checkbox(materializr::tr("Conformal unwrap (stretch to fit)"), &m_unfoldConformal))
         recomputeUnfold();
-    ImGui::SetItemTooltip("%s", materializr::tr("LSCM, like a Blender UV unwrap. One connected piece with the distortion spread out — cut it and let a pliable material stretch to shape. Off = accurate developable pieces (for rigid stock)."));
+    ImGui::SetItemTooltip("%s", materializr::tr("LSCM, like a Blender UV unwrap. One connected piece with the distortion spread out - cut it and let a pliable material stretch to shape. Off = accurate developable pieces (for rigid stock)."));
 
     // Bind AFTER any recompute above (recomputeUnfold replaces m_unfoldPattern).
     if (!m_unfoldPattern) { ImGui::End(); return; }
@@ -5478,12 +5500,12 @@ void Application::renderUnfoldDialog() {
         // (holes don't count). Past that, suggest coarsening or splitting.
         if (fp.folds.size() > 30) {
             ImGui::SameLine();
-            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f), "%s", materializr::tr("  — a lot to cut; coarsen the bevel or split the piece"));
+            ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f), "%s", materializr::tr("  - a lot to cut; coarsen the bevel or split the piece"));
         }
     }
     if (fp.hasOverlap) {
         ImGui::SameLine();
-        ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f), "%s", materializr::tr("  ⚠ net overlaps — may need cutting into pieces"));
+        ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f), "%s", materializr::tr("  ⚠ net overlaps - may need cutting into pieces"));
     }
     // Developability: ~0 = unrolls exactly; large = doubly-curved.
     if (m_unfoldConformal) {
@@ -5493,23 +5515,23 @@ void Application::renderUnfoldDialog() {
             // one piece (a closed solid, or something far too curved). Steer back to
             // the developable net rather than present an unusable squashed blob.
             ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.3f, 1.0f),
-                materializr::tr("⚠ Can't flatten this in one piece (%.0f%% stretch — it'd be a squashed blob). Untick \"Conformal unwrap\" for accurate developable pieces."),
+                materializr::tr("⚠ Can't flatten this in one piece (%.0f%% stretch - it'd be a squashed blob). Untick \"Conformal unwrap\" for accurate developable pieces."),
                 fp.distortionPct);
         else if (fp.distortionPct > 0.5)
             ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f),
-                materializr::tr("Conformal unwrap — one piece, up to %.0f%% area stretch (a pliable material takes up the difference)."), fp.distortionPct);
+                materializr::tr("Conformal unwrap - one piece, up to %.0f%% area stretch (a pliable material takes up the difference)."), fp.distortionPct);
         else
-            ImGui::TextDisabled("%s", materializr::tr("Conformal unwrap — one piece, ~no stretch."));
+            ImGui::TextDisabled("%s", materializr::tr("Conformal unwrap - one piece, ~no stretch."));
         ImGui::PopTextWrapPos();
     } else if (fp.curvatureDeg > 12.0) {
         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 360.0f);
         ImGui::TextColored(ImVec4(1.0f, 0.55f, 0.3f, 1.0f),
-            materializr::tr("⚠ Doubly-curved (~%.0f° total) — won't lie flat as accurate developable pieces. Tick \"Conformal unwrap\" for one stretchy piece, or split into developable strips."), fp.curvatureDeg);
+            materializr::tr("⚠ Doubly-curved (~%.0f° total) - won't lie flat as accurate developable pieces. Tick \"Conformal unwrap\" for one stretchy piece, or split into developable strips."), fp.curvatureDeg);
         ImGui::PopTextWrapPos();
     } else if (fp.curvatureDeg > 1.5) {
         ImGui::TextDisabled(materializr::tr("Nearly developable (~%.1f° curvature)."), fp.curvatureDeg);
     } else {
-        ImGui::TextDisabled("%s", materializr::tr("Developable — unrolls exactly."));
+        ImGui::TextDisabled("%s", materializr::tr("Developable - unrolls exactly."));
     }
 
     // ── Layout: rotate the pattern + preview the PDF page split ──
@@ -5546,7 +5568,7 @@ void Application::renderUnfoldDialog() {
     }
     ImGui::SetItemTooltip("%s", materializr::tr("Rotate to the orientation that needs the fewest PDF pages."));
 
-    // The rotated pattern drives the canvas AND the exporters — what you see is
+    // The rotated pattern drives the canvas AND the exporters - what you see is
     // what you get.
     const materializr::FlatPattern rfp = rotatePattern(fp, m_unfoldRotationDeg);
     const PdfTiling tiling = computePdfTiling(rfp, m_unfoldPageA4);
@@ -5570,7 +5592,7 @@ void Application::renderUnfoldDialog() {
             }
     // With the page grid shown, fit the view to the whole sheet extent so every
     // page is visible; otherwise fit to the pattern alone.
-    // Only the PDF (tiled) export has page breaks — SVG is one 1:1 file, so its
+    // Only the PDF (tiled) export has page breaks - SVG is one 1:1 file, so its
     // preview stays clean (no "ghost paper edge" lines to confuse).
     const bool showGrid = (m_unfoldExportFmt == 1) && tiling.nCols > 0;
     auto regSpacingFor = [](int d) -> double {
@@ -5659,7 +5681,7 @@ void Application::renderUnfoldDialog() {
     // (clean preview), PDF = tiled sheets (page grid shown). PDF also gets a
     // page-size choice.
     ImGui::SetNextItemWidth(190);
-    ImGui::Combo(materializr::tr("Format"), &m_unfoldExportFmt, "SVG — one 1:1 file\0PDF — tiled, printable\0");
+    ImGui::Combo(materializr::tr("Format"), &m_unfoldExportFmt, "SVG - one 1:1 file\0PDF - tiled, printable\0");
     if (m_unfoldExportFmt == 1) {
         ImGui::SameLine();
         int pg = m_unfoldPageA4 ? 1 : 0;
@@ -5747,7 +5769,7 @@ bool Application::thumbCacheFresh(const std::string& ref) const {
     auto cached = std::filesystem::last_write_time(path, ec);
     if (ec) return false;
     auto src = std::filesystem::last_write_time(ref, ec);
-    if (ec) return true;   // project unreadable — a stale tile beats none
+    if (ec) return true;   // project unreadable - a stale tile beats none
     return cached >= src;
 }
 
@@ -5779,7 +5801,7 @@ void Application::showLandingPage(bool fromStartup) {
     m_landingPage->setCanDismiss(!fromStartup);
     // Tiles go up IMMEDIATELY: refs + names from the MRU, plus any preview the
     // cache can serve straight away (a small PNG read). Anything that needs
-    // the project file itself is left blank and filled in by a worker — a peek
+    // the project file itself is left blank and filled in by a worker - a peek
     // gunzips the WHOLE project to read one line near the end of the body
     // blocks, so doing ten of them inline froze startup for seconds on big
     // projects, and again on every return to the home screen.
@@ -5826,7 +5848,7 @@ void Application::startThumbnailPeeks(const std::vector<std::string>& refs) {
     m_thumbJob = job;
     // DETACHED, deliberately not std::async: destroying the previous future
     // would BLOCK the main thread until that worker finished, and the cancel
-    // flag can only be seen between files — mid-inflate of a 100MB project it
+    // flag can only be seen between files - mid-inflate of a 100MB project it
     // would stall exactly the startup this exists to keep smooth. The job is
     // shared_ptr-owned, so the thread never touches Application state.
     std::thread([job, refs]() {
@@ -5951,7 +5973,7 @@ void Application::goToHomeScreen() {
     // The home screen no longer CLOSES anything (Steve, 2026-07-28: "clicking
     // a tile with a currently open one should open a new tab"). It used to
     // prompt and close the project on the way in, which meant there was never
-    // an open project left for a tile to displace — the page is now just a
+    // an open project left for a tile to displace - the page is now just a
     // launcher laid over the session you already have. Nothing is lost, so
     // there is nothing to prompt about; the × takes you back, and opening
     // anything from here lands in its own tab.
@@ -6090,7 +6112,7 @@ void Application::renderPartsPickerDialog() {
                 auto cp = std::make_shared<Sketch>(*src);
                 // Sever the source-body/face link (the DuplicateSketchOp
                 // lesson): the copy must never drive or re-bind a body from
-                // ANOTHER project — it builds its region from its own loops.
+                // ANOTHER project - it builds its region from its own loops.
                 cp->setSourceBody(-1);
                 cp->setSourceFace(TopoDS_Face());
                 cp->setDetachedFromBody(false);
@@ -6101,7 +6123,7 @@ void Application::renderPartsPickerDialog() {
             m_meshesDirty = true;
             markDirty();
             // Frame the arrivals like a project open does (home orientation +
-            // zoom-fit) — otherwise the camera stays wherever it was and the
+            // zoom-fit) - otherwise the camera stays wherever it was and the
             // imported parts can fill the screen or sit out of view.
             handleViewCubeAction(static_cast<int>(ViewCubeAction::FrontTopRight));
             if (m_landingPage) m_landingPage->setVisible(false);
@@ -6139,13 +6161,13 @@ void Application::exportBodiesToNewProject(const std::vector<int>& bodyIds) {
     // in a workspace you can look at and keep working on, and saving is a
     // normal Ctrl+S afterwards if you want a file at all. Writing the file
     // first forced a naming decision before you could see what you'd got.
-    if (!openNewTab()) return;   // refused (mid-sketch etc.) — already toasted
+    if (!openNewTab()) return;   // refused (mid-sketch etc.) - already toasted
 
     for (const auto& p : parts) {
         const int nid = m_document->addBody(p.shape, p.name);
         m_document->setBodyColor(nid, p.color);
     }
-    // Name the tab after the part (single) — it is still UNSAVED, so the path
+    // Name the tab after the part (single) - it is still UNSAVED, so the path
     // stays empty and Save goes through the picker.
     m_currentProjectName = parts.size() == 1 && !parts.front().name.empty()
                                ? parts.front().name
@@ -6153,13 +6175,13 @@ void Application::exportBodiesToNewProject(const std::vector<int>& bodyIds) {
     m_currentProjectPath.clear();
     m_meshesDirty = true;
     markDirty();
-    // Frame the arrivals the way a project open does — otherwise the camera
+    // Frame the arrivals the way a project open does - otherwise the camera
     // sits wherever the source project left it.
     handleViewCubeAction(static_cast<int>(ViewCubeAction::FrontTopRight));
     showToast(parts.size() == 1
-                  ? "Opened in a new tab — unsaved."
+                  ? "Opened in a new tab - unsaved."
                   : std::to_string(parts.size()) +
-                        " parts opened in a new tab — unsaved.");
+                        " parts opened in a new tab - unsaved.");
 }
 
 void Application::renderLandingPage() {
@@ -6190,7 +6212,7 @@ void Application::renderLandingPage() {
         // (Steve, 2026-07-28). The home screen is reachable from a live
         // session via File → Home Screen, so loading in place would displace
         // work the user only meant to set aside. An untouched empty
-        // workspace is loaded into directly — no point stacking a blank tab.
+        // workspace is loaded into directly - no point stacking a blank tab.
         if (!activeSessionIsScratch() && !openNewTab()) break;
         openRecentProject(rp);   // resolves URIs, bumps the MRU, toasts failures
         break;
@@ -6202,7 +6224,7 @@ void Application::renderLandingPage() {
         break;
     case AT::ExportStep:
         exportRecentProjectAs(act.ref, act.name, /*asStl=*/false);
-        break;   // page stays up — export is a side errand, not a departure
+        break;   // page stays up - export is a side errand, not a departure
     case AT::ExportStl:
         exportRecentProjectAs(act.ref, act.name, /*asStl=*/true);
         break;

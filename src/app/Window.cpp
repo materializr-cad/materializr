@@ -5,7 +5,7 @@
 #include "mobile_files.h" // mobileShow/HideTextInput (no-ops on desktop and iOS)
 #include <SDL.h>
 #include <imgui_impl_sdl2.h>
-#include <imgui_internal.h> // g.MovingWindow — let tab-drag (re-dock) beat drag-to-scroll
+#include <imgui_internal.h> // g.MovingWindow - let tab-drag (re-dock) beat drag-to-scroll
 #include <stdexcept>
 #include <iostream>
 #include <string>
@@ -36,7 +36,7 @@ unsigned int g_windowFramebuffer = 0;
 // on Steve's Framework 16, 2026-08-18.
 //
 // Deliberately BINARY (1x or 2x), for two reasons. It exactly replaces the
-// setting it removes — which only ever offered Low/High — so nobody loses a
+// setting it removes - which only ever offered Low/High - so nobody loses a
 // choice they had. And the raw ratio is the wrong target anyway: 284/96 = 2.96
 // would give a 3x UI, where the compositor running that panel is at 200%. What
 // makes the app look native is matching the SESSION's scale, not the physics,
@@ -78,7 +78,7 @@ Window::Window(int width, int height, const std::string& title,
 
 #if defined(_WIN32)
     // Per-monitor-v2 DPI awareness (SDL 2.24+) so Windows renders us at NATIVE
-    // resolution instead of bitmap-upscaling a virtualised low-res desktop —
+    // resolution instead of bitmap-upscaling a virtualised low-res desktop -
     // the upscale is what made the whole UI blurry on a scaled (125–200%)
     // laptop display. We deliberately do NOT set SDL_HINT_WINDOWS_DPI_SCALING:
     // that makes SDL report the window in points and hand back a >1
@@ -93,9 +93,9 @@ Window::Window(int width, int height, const std::string& title,
     // assumes it is running a game and inhibits the screensaver at video init
     // (on Linux that's a GNOME/freedesktop idle inhibitor literally reasoned
     // "Playing a game"), which held the idle timer off for as long as the app
-    // was open — laptops left with a model on screen ran their battery flat
+    // was open - laptops left with a model on screen ran their battery flat
     // instead of suspending. A CAD app is a document editor: it should idle out
-    // like every other one. Must precede SDL_Init — the video subsystem reads
+    // like every other one. Must precede SDL_Init - the video subsystem reads
     // this once as it comes up.
     SDL_SetHint(SDL_HINT_VIDEO_ALLOW_SCREENSAVER, "1");
 
@@ -120,7 +120,7 @@ Window::Window(int width, int height, const std::string& title,
     // macOS only grants a 3.2+ context to a forward-compatible CORE profile;
     // without this flag the request silently falls back to legacy GL 2.1, which
     // can't compile the GLSL 330 shaders. (Forward-compatible drops removed-in-
-    // core legacy entry points — none of which this renderer uses.) This is the
+    // core legacy entry points - none of which this renderer uses.) This is the
     // only writer of SDL_GL_CONTEXT_FLAGS; if a debug-context flag is ever added,
     // OR it in rather than overwrite.
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
@@ -136,12 +136,12 @@ Window::Window(int width, int height, const std::string& title,
     // window-level FLAG_FULLSCREEN, which Lenovo/Samsung "desktop / PC mode" reads
     // as "maximize me and hide the taskbar" (normal apps like Chrome never set
     // it). The bare-tablet edge-to-edge look comes from MaterializrActivity's
-    // immersive system-UI flags instead — those hide the bars without that flag,
+    // immersive system-UI flags instead - those hide the bars without that flag,
     // so in a desktop dock the app stays a normal window with the taskbar intact.
 
     // The window is created in PHYSICAL pixels while the UI inside it is sized
     // by uiScale(), so the default 1600×900 has to be scaled by the SAME factor
-    // or a HiDPI panel gets a window holding half as much UI as a low-DPI one —
+    // or a HiDPI panel gets a window holding half as much UI as a low-DPI one -
     // 1600×900 physical at 2x is 800×450 of usable room, which jams every
     // toolbar against the viewport. Scaling by uiScale() keeps the LOGICAL size
     // constant: the app opens showing the same amount at any density.
@@ -158,7 +158,7 @@ Window::Window(int width, int height, const std::string& title,
         if (SDL_GetDisplayDPI(0, &ddpi, &hh, &vv) == 0 && ddpi > 96.0f)
             sc = std::min(ddpi / 96.0f, 3.0f);
 #elif defined(__linux__) && !defined(__ANDROID__)
-        // Whatever uiScale() will report — the CLI hint when one was passed
+        // Whatever uiScale() will report - the CLI hint when one was passed
         // (setUiScaleOverride lands too late to be read here), else detection.
         sc = (uiScaleHint > 0.0f) ? uiScaleHint : linuxAutoUiScale();
 #endif
@@ -194,7 +194,7 @@ Window::Window(int width, int height, const std::string& title,
 #if !defined(MZ_MOBILE)
         // On a screen too small for the default size, also start maximized so the
         // app fills the work area immediately. The clamped values above become the
-        // window's *restore* size, so un-maximizing — or a minimize→restore — drops
+        // window's *restore* size, so un-maximizing - or a minimize→restore - drops
         // back to a size that still fits the screen instead of overrunning it again.
         if (clamped) flags |= SDL_WINDOW_MAXIMIZED;
 #endif
@@ -225,7 +225,7 @@ Window::Window(int width, int height, const std::string& title,
 #endif
 
 #if defined(MZ_IOS)
-    // On iOS the screen is NOT framebuffer 0 — SDL backs the window with a
+    // On iOS the screen is NOT framebuffer 0 - SDL backs the window with a
     // renderbuffer FBO and binding 0 draws into the void. Capture the real
     // one (bound current by SDL_GL_CreateContext) so g_windowFramebuffer
     // binds the screen everywhere the code would otherwise bind 0. The color
@@ -269,7 +269,7 @@ Window::~Window() {
 
 void Window::swapBuffers() {
 #if defined(MZ_IOS)
-    // presentRenderbuffer presents the *currently bound* GL_RENDERBUFFER —
+    // presentRenderbuffer presents the *currently bound* GL_RENDERBUFFER -
     // restore SDL's color renderbuffer in case frame code bound another.
     glBindRenderbuffer(GL_RENDERBUFFER, m_windowRenderbuffer);
 #endif
@@ -312,7 +312,7 @@ int Window::pollEvents(int waitMs) {
                         case SDL_WINDOWEVENT_MAXIMIZED:
                         case SDL_WINDOWEVENT_MINIMIZED:
                             result = 2; break;
-                        default: // EXPOSED and others — need 1 repaint, not 5
+                        default: // EXPOSED and others - need 1 repaint, not 5
                             if (result < 1) result = 1; break;
                     }
                     break;
@@ -410,11 +410,11 @@ void Window::handleFingerEvent(unsigned type, std::int64_t id, float nx, float n
         if (!m_twoFinger) {
             // Two-finger gesture begins: cancel any in-progress orbit, set refs.
             if (m_leftDown) {
-                // Park the cursor off-screen BEFORE the forced release — same
+                // Park the cursor off-screen BEFORE the forced release - same
                 // trick as the drag-to-scroll latch above. ImGui buttons fire on
                 // release-while-hovered, so releasing at the finger's position
                 // made the widget under the first pinch finger CLICK when the
-                // second finger landed (Undo, a panel row, …; issue #39 — the
+                // second finger landed (Undo, a panel row, …; issue #39 - the
                 // ViewCube was the reported case, #38). Event order is
                 // preserved through ImGui's trickling, so the release is always
                 // applied with the cursor parked, even when the press itself is
@@ -442,13 +442,13 @@ void Window::handleFingerEvent(unsigned type, std::int64_t id, float nx, float n
                 // a running sum of per-frame deltas. Summing |Δspacing| each frame
                 // integrates the spacing wobble of two never-quite-parallel
                 // fingers, so a slow, deliberate pan accumulated enough phantom
-                // "zoom" to mis-lock — the slower you panned, the worse it got
+                // "zoom" to mis-lock - the slower you panned, the worse it got
                 // (issue #1). Net change cancels that wobble: only a sustained
                 // pinch grows zoomNet, while a real pan grows panNet.
                 const float panNet  = std::sqrt((cx - m_startCentroidX) * (cx - m_startCentroidX) +
                                                 (cy - m_startCentroidY) * (cy - m_startCentroidY));
                 const float zoomNet = std::fabs(dist - m_startPinchDist);
-                // Peak travel while undecided — the multi-finger tap check reads
+                // Peak travel while undecided - the multi-finger tap check reads
                 // these at lift-off (fingers are gone by then).
                 if (panNet  > m_sessionPanNet)  m_sessionPanNet  = panNet;
                 if (zoomNet > m_sessionZoomNet) m_sessionZoomNet = zoomNet;
@@ -473,7 +473,7 @@ void Window::handleFingerEvent(unsigned type, std::int64_t id, float nx, float n
             // survive a pinch only because the cursor froze at the first
             // finger's press position; with that position now parked
             // off-screen (see the takeover above), the centroid keeps the
-            // gate truthful — and keeps every coordinate ImGui hands the app
+            // gate truthful - and keeps every coordinate ImGui hands the app
             // finite while two fingers are down.
             io.AddMouseSourceEvent(ImGuiMouseSource_TouchScreen);
             io.AddMousePosEvent(cx, cy);
@@ -522,10 +522,10 @@ void Window::handleFingerEvent(unsigned type, std::int64_t id, float nx, float n
                 curCursor == ImGuiMouseCursor_ResizeNESW ||
                 curCursor == ImGuiMouseCursor_ResizeNWSE;
             // A tab/title drag to re-dock a panel sets g.MovingWindow (no resize
-            // cursor, so onSplitter misses it) — also a real drag, not a scroll.
+            // cursor, so onSplitter misses it) - also a real drag, not a scroll.
             ImGuiContext* g = ImGui::GetCurrentContext();
             const bool movingWindow = g && g->MovingWindow != nullptr;
-            // A scrollbar drag (including a CHILD window's — e.g. the Settings
+            // A scrollbar drag (including a CHILD window's - e.g. the Settings
             // body lives in a BeginChild) is a real interaction; don't release it
             // for a scroll latch or the bar just twitches and snaps back to top.
             bool onScrollbar = false;
@@ -539,7 +539,7 @@ void Window::handleFingerEvent(unsigned type, std::int64_t id, float nx, float n
                 !onSplitter && !movingWindow && !onScrollbar &&
                 (dx * dx + dy * dy) > 25.0f * 25.0f && std::fabs(dy) > std::fabs(dx);
             bool justLatched = false;
-            // Arm on the first frame past the threshold, commit on the next — that
+            // Arm on the first frame past the threshold, commit on the next - that
             // one frame lets ImGui set MovingWindow for a straight-down tab/title
             // drag (input is read a frame ahead of ImGui), so the move wins over
             // the scroll instead of being stolen.
@@ -548,7 +548,7 @@ void Window::handleFingerEvent(unsigned type, std::int64_t id, float nx, float n
             } else if (wantScroll && m_scrollArmed) {
                 // Switch press -> scroll: release the left button so the row the
                 // finger started on isn't selected/activated by the flick. Park
-                // the cursor off-screen BEFORE releasing — a release while still
+                // the cursor off-screen BEFORE releasing - a release while still
                 // over the button/row reads as a click (ImGui buttons fire on
                 // mouse-up over the active item), which is exactly the "scrolling
                 // also selects tools" bug. The justLatched block below moves the
@@ -562,7 +562,7 @@ void Window::handleFingerEvent(unsigned type, std::int64_t id, float nx, float n
                 m_panelScroll = true;
                 // NB: do NOT reset m_lastScrollY here. It carries from the press,
                 // so the latch frame's delta is the (non-zero) threshold distance
-                // already travelled — that fires a wheel event WHILE the mouse is
+                // already travelled - that fires a wheel event WHILE the mouse is
                 // still over the panel, which is what locks ImGui onto it
                 // (g.WheelingWindow). Zeroing it made inc==0 on the one frame the
                 // mouse was over the panel, so the lock never took and parking the
@@ -596,7 +596,7 @@ void Window::handleFingerEvent(unsigned type, std::int64_t id, float nx, float n
         return;
     }
 
-    // count == 0: everything lifted — release and reset.
+    // count == 0: everything lifted - release and reset.
     if (m_leftDown) { io.AddMouseButtonEvent(0, false); m_leftDown = false; }
     // Multi-finger tap: a short 2-/3-finger contact that never committed to
     // pan/zoom and barely moved = undo/redo gesture (Application consumes the
@@ -622,7 +622,7 @@ void Window::handleFingerEvent(unsigned type, std::int64_t id, float nx, float n
         const bool quickTap = !m_holdSelect && !m_movedBeyondHold && !m_suppressLeft &&
                               (nowT - m_downTicks) < 300u;
         if (quickTap) {
-            // A genuine tap — drive the viewport SELECTION off this lift (not the
+            // A genuine tap - drive the viewport SELECTION off this lift (not the
             // press frame) so a following nav gesture can't corrupt it (#68).
             m_singleTapPending = true;
             m_singleTapX = m_downX; m_singleTapY = m_downY;
@@ -655,7 +655,7 @@ void Window::handleFingerEvent(unsigned type, std::int64_t id, float nx, float n
 
 void Window::updateHoldSelect() {
     if (m_holdSelect) return;
-    // Only arm over the 3D canvas — a press on a slider/panel must never become a
+    // Only arm over the 3D canvas - a press on a slider/panel must never become a
     // long-press (slow slider drags were popping the context-menu ring).
     if (!m_touchOverViewport) return;
     if (m_fingers.size() != 1 || m_movedBeyondHold || m_suppressLeft || m_twoFinger) return;
@@ -753,7 +753,7 @@ void Window::updateTextInput(bool wantTextInput, bool retapPulse) {
     } else if (wantTextInput && m_textInputActive && retapPulse) {
         // Latch says "up" but the OS may have dismissed the keyboard behind
         // our back (Android back gesture / iOS dismiss key) with the field
-        // still focused — no falling edge ever fired, so a re-tap on the
+        // still focused - no falling edge ever fired, so a re-tap on the
         // field was silently ignored (the wedge: only the layout's Keyboard
         // toggle recovered, because a button tap defocuses the field for a
         // frame and forces a full edge cycle). Re-raise on the tap:
@@ -781,17 +781,17 @@ void Window::applyCursorScale() {
 #if defined(__linux__) && !defined(__ANDROID__)
     // Cursor size, for the same reason as the UI scale and with the same
     // answer. We never create a cursor ourselves, but ImGui's SDL backend makes
-    // eight system cursors from the X theme at init — and Xcursor sizes those
+    // eight system cursors from the X theme at init - and Xcursor sizes those
     // from XCURSOR_SIZE as it loads them. A Wayland session exports the
     // UNSCALED size (24) and scales cursors compositor-side for its OWN
     // surfaces; our XWayland window gets no such treatment, so the pointer
-    // renders at 24 PHYSICAL pixels and becomes a speck on a HiDPI panel —
+    // renders at 24 PHYSICAL pixels and becomes a speck on a HiDPI panel -
     // which is why it looked fine on the external monitors and vanished on the
     // Framework's built-in display.
     //
     // Call after the UI scale is final (so --ui-scale carries the cursor too)
     // and BEFORE ImGui_ImplSDL2_Init creates the cursors; nothing re-reads this
-    // afterwards. Only ever RAISES the size — a session that already exported
+    // afterwards. Only ever RAISES the size - a session that already exported
     // something larger has a user or a desktop environment behind it, and knows
     // more than this heuristic does.
     const int base = 24;   // the X default, and what Wayland sessions export
@@ -809,7 +809,7 @@ void Window::applyCursorScale() {
 float Window::uiScale() const {
     if (materializr::touchMode()) {
 #if defined(MZ_IOS)
-        // iOS window coords are POINTS — the OS already normalizes density
+        // iOS window coords are POINTS - the OS already normalizes density
         // (the drawable is the 2-3x pixel surface underneath). SDL's reported
         // display DPI is a synthetic 160·scale, not physical, so no formula:
         // desktop density is the right size in point space.
@@ -828,7 +828,7 @@ float Window::uiScale() const {
 #if defined(_WIN32)
     // Desktop Windows HiDPI: now that the process is per-monitor DPI-aware (see
     // the SDL_HINT_WINDOWS_DPI_AWARENESS above) the framebuffer is NATIVE-res
-    // and crisp, but window coordinates are physical pixels — so a 15 px font
+    // and crisp, but window coordinates are physical pixels - so a 15 px font
     // would render tiny on a 150% display. Scale the UI up by the display's DPI
     // (96 dpi = 100% = 1.0x, 144 = 150% = 1.5x, …) so it stays the same physical
     // size the user set in Windows, now sharp instead of bitmap-upscaled. Fonts
@@ -840,7 +840,7 @@ float Window::uiScale() const {
     if (s > 3.0f) s = 3.0f;     // 300% cap (Windows tops out ~250% on laptops)
     return s;
 #elif defined(__ANDROID__)
-    // Android only reaches here with touch mode turned OFF — a tablet driven by
+    // Android only reaches here with touch mode turned OFF - a tablet driven by
     // a mouse and keyboard, which is a supported setup. It must NOT fall into
     // the Linux desktop branch below: Android defines __linux__ too, but
     // linuxAutoUiScale() is guarded desktop-only at its definition, so building
@@ -854,7 +854,7 @@ float Window::uiScale() const {
     // scaling reaches it, so on a HiDPI panel the native-pixel framebuffer
     // renders the UI tiny. This USED to be a manual Low/High setting because
     // "auto-detection is unreliable across X11/Xwayland/GNOME/KDE" (issue #26)
-    // — see linuxAutoUiScale() for the measurement that overturned that.
+    // - see linuxAutoUiScale() for the measurement that overturned that.
     // --ui-scale / --hidpi still wins, as the escape hatch.
     if (m_uiScaleOverride > 0.0f) return m_uiScaleOverride;
     return materializr::linuxAutoUiScale();
@@ -876,8 +876,8 @@ bool Window::isCtrlDown() {
     // everywhere else in the app: ImGui turns on ConfigMacOSXBehaviors for
     // __APPLE__ and then SWAPS Cmd and Ctrl in AddKeyEvent, so every shortcut
     // reached through io.KeyCtrl (Save, Open, Import, Export, tab switching)
-    // is Cmd on a Mac. This function deliberately bypasses ImGui — it polls
-    // the hardware so undo/redo survive text-input focus — and therefore never
+    // is Cmd on a Mac. This function deliberately bypasses ImGui - it polls
+    // the hardware so undo/redo survive text-input focus - and therefore never
     // saw that swap, leaving Undo/Redo/Select-All alone on physical Control.
     // Reported by FlorianLoch (#74): "UI says Ctrl+O but it is actually bound
     // to Cmd+O... this doesn't apply to all bindings. Undo and redo are indeed

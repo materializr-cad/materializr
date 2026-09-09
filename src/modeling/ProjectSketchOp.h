@@ -8,7 +8,7 @@
 #include <vector>
 
 // Project a sketch onto a body face along the sketch-plane normal, then
-// ENGRAVE (cut in) or EMBOSS (raise out) the projected regions to a depth —
+// ENGRAVE (cut in) or EMBOSS (raise out) the projected regions to a depth -
 // the "wrap a logo onto a cylinder" operation. Each region's wires are
 // projected onto the target face (BRepProj_Projection), rebuilt as a face on
 // that surface, and swept along the projection direction into a stamp tool
@@ -51,7 +51,7 @@ private:
     std::vector<int> m_faceIndices; // SubShapeIndex ordinals (reloaded ops)
     // Topological name for the target face (see MoveFaceOp): minted on the
     // first execute, resolved when the handle goes stale because an upstream
-    // edit rebuilt/moved the face — a stale handle stamps at the OLD plane.
+    // edit rebuilt/moved the face - a stale handle stamps at the OLD plane.
     materializr::topo::Ref m_targetRef;
     std::vector<int> m_regionFilter; // region indices; empty = all
     double m_depth = 1.0;

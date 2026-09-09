@@ -3,7 +3,7 @@
 //  - sewing closes it into a SOLID,
 //  - ShapeUpgrade_UnifySameDomain merges the 12 facets back to 6 planar faces,
 //  - winding correction yields a positive volume.
-// (The STL import menu entry is parked/disabled — see StlImportPlugin — but the
+// (The STL import menu entry is parked/disabled - see StlImportPlugin - but the
 //  importer itself is exercised here so the parked code keeps building/working.)
 #include <gtest/gtest.h>
 
@@ -125,7 +125,7 @@ std::string writeCubeStlMixedWinding(float s) {
     return path;
 }
 
-// An open box: the cube with its top (z=s) face omitted — not watertight.
+// An open box: the cube with its top (z=s) face omitted - not watertight.
 std::string writeOpenBoxStl(float s) {
     const float o = 0.0f;
     std::string stl = "solid open\n";

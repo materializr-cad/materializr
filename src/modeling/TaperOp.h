@@ -9,10 +9,10 @@
 #include <vector>
 
 // Taper (draft) selected faces of a body: tilt each face by an angle about
-// a NEUTRAL PLANE (which stays fixed) along a PULL DIRECTION — OCCT's
+// a NEUTRAL PLANE (which stays fixed) along a PULL DIRECTION - OCCT's
 // BRepOffsetAPI_DraftAngle, the molding-draft operation. This is the
 // direct-modeling "tilt a face": a cylinder wall tapers into a cone, a
-// box's sides into a pyramid frustum — without needing Parasolid-class
+// box's sides into a pyramid frustum - without needing Parasolid-class
 // free-face moves.
 class TaperOp : public Operation {
 public:
@@ -38,6 +38,12 @@ public:
     std::string typeId() const override { return "taper"; }
     OperationDiff captureDiff() const override;
     std::vector<int> plannedBodyIds() const override { return {m_bodyId}; }
+    std::vector<TopoDS_Shape*> shapeParams() override {
+        std::vector<TopoDS_Shape*> out;
+        for (TopTools_ListIteratorOfListOfShape it(m_faces); it.More(); it.Next())
+            out.push_back(&it.ChangeValue());
+        return out;
+    }
     std::string serializeParams() const override;
     bool deserializeParams(const std::string& blob) override;
     bool rehydrateFromReload(const ReloadState& state, Document& doc) override;
@@ -48,7 +54,7 @@ private:
     std::vector<int> m_faceIndices; // SubShapeIndex ordinals (reloaded ops)
     // Topological names for the drafted faces (see ShellOp): minted on the
     // first execute, resolved when the stored handles go stale because an
-    // upstream edit rebuilt the body — without them a cascade replay strands
+    // upstream edit rebuilt the body - without them a cascade replay strands
     // the taper on faces of a body that no longer exists.
     std::vector<materializr::topo::Ref> m_faceRefs;
     double m_dirX = 0.0, m_dirY = 1.0, m_dirZ = 0.0; // pull direction

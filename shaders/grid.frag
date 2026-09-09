@@ -41,11 +41,11 @@ vec4 grid(vec3 fragPos3D, float scale, vec4 lineColor) {
     vec4 color = lineColor;
     color.a = 1.0 - min(line, 1.0);
 
-    // X-axis highlight (red) — where Z is near 0
+    // X-axis highlight (red) - where Z is near 0
     if (fragPos3D.z > -0.5 * minimumz && fragPos3D.z < 0.5 * minimumz) {
         color = vec4(0.8, 0.2, 0.2, 1.0);
     }
-    // Z-axis highlight (blue) — where X is near 0
+    // Z-axis highlight (blue) - where X is near 0
     if (fragPos3D.x > -0.5 * minimumx && fragPos3D.x < 0.5 * minimumx) {
         color = vec4(0.2, 0.2, 0.8, 1.0);
     }
@@ -70,9 +70,9 @@ void main() {
     float linearDepth = computeLinearDepth(fragPos3D);
     float fade = max(0.0, 1.0 - linearDepth);
 
-    // Minor grid (every 1 unit) — subtle gray
+    // Minor grid (every 1 unit) - subtle gray
     vec4 minorColor = grid(fragPos3D, 1.0, vec4(0.4, 0.4, 0.4, 1.0));
-    // Major grid (every 10 units) — slightly brighter
+    // Major grid (every 10 units) - slightly brighter
     vec4 majorColor = grid(fragPos3D, 0.1, vec4(0.6, 0.6, 0.6, 1.0));
 
     // Combine: major grid overrides minor where both are visible

@@ -1,6 +1,6 @@
 // SVG export -> re-import round trip. Steve's report: exporting a sketch and
 // re-importing it "was drawing lines on top of each other and not recognizing
-// a closed loop proper" — the old exporter wrote every line as its own
+// a closed loop proper" - the old exporter wrote every line as its own
 // two-point <path>, so a drawn loop arrived at import as disjoint fragments
 // (duplicate corner points, no closure, no regions). The exporter now walks
 // connected chains by shared sketch-point id and emits ONE closed path per
@@ -34,7 +34,7 @@ int countNonFromTextPoints(const Sketch& sk) {
 } // namespace
 
 TEST(SvgRoundTrip, ClosedLineLoopStaysOneClosedLoop) {
-    // An M-ish non-convex octagon — the logo case: 8 lines sharing corners.
+    // An M-ish non-convex octagon - the logo case: 8 lines sharing corners.
     Sketch sk;
     const float V[8][2] = {{0, 0}, {20, 0}, {20, 14}, {14, 14},
                            {14, 6}, {6, 6}, {6, 14}, {0, 14}};
@@ -87,7 +87,7 @@ TEST(SvgRoundTrip, CircleComesBackAsNativeCircle) {
 
 TEST(SvgRoundTrip, LineArcProfileStaysClosed) {
     // A rectangle whose top-right corner is a quarter-round: 4 lines + 1 arc,
-    // all sharing endpoints — the mixed-element closure case.
+    // all sharing endpoints - the mixed-element closure case.
     Sketch sk;
     int p0 = sk.addPoint({0, 0});
     int p1 = sk.addPoint({20, 0});

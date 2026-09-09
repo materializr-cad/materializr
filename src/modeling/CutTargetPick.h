@@ -2,8 +2,8 @@
 // Which body does a sketch Subtract actually cut, and which way does it sweep?
 //
 // Subtract-from-sketch used to demand that the sketch still carry a link to the
-// body it was drawn on (Sketch::getSourceBody). Anything else — a sketch on a
-// construction plane, on an origin plane, one that had been unlinked — printed a
+// body it was drawn on (Sketch::getSourceBody). Anything else - a sketch on a
+// construction plane, on an origin plane, one that had been unlinked - printed a
 // line to stderr and returned, so the toolbar button was a silent no-op. And even
 // with a live link the cut could quietly do nothing: a tool volume that misses
 // the body leaves BRepAlgoAPI_Cut handing back the body unchanged, which passes
@@ -15,10 +15,11 @@
 // case is unchanged; the fallbacks are what used to be dead ends.
 //
 // Lives here, not in Application, so it can be tested: ctest cannot see src/app.
-// Header-only on purpose — a new .cpp would have to be added to TWO source lists
+// Header-only on purpose - a new .cpp would have to be added to TWO source lists
 // (root CMakeLists.txt and tests/CMakeLists.txt) and one always gets forgotten.
 
 #include <BRepAlgoAPI_Common.hxx>
+#include "BoolArgs.h"
 #include <BRepBndLib.hxx>
 #include <BRepGProp.hxx>
 #include <Bnd_Box.hxx>
@@ -52,7 +53,8 @@ inline double removedVolume(const TopoDS_Shape& body, const TopoDS_Shape& tool) 
         BRepBndLib::Add(tool, tb);
         if (bb.IsVoid() || tb.IsVoid() || bb.IsOut(tb)) return 0.0;
 
-        BRepAlgoAPI_Common common(body, tool);
+        BRepAlgoAPI_Common common;
+        materializr::setBooleanShapes(common, body, tool);
         common.Build();
         if (!common.IsDone()) return 0.0;
         const TopoDS_Shape& s = common.Shape();
@@ -69,7 +71,7 @@ inline double removedVolume(const TopoDS_Shape& body, const TopoDS_Shape& tool) 
 // The body a swept tool volume should be cut from, or -1 when it reaches none.
 //
 // `preferred` (the sketch's own host body, or -1) wins whenever the tool removes
-// anything at all from it — a sketch drawn on a face keeps cutting that face's
+// anything at all from it - a sketch drawn on a face keeps cutting that face's
 // body even where it also clips a neighbour. Otherwise the biggest removal wins,
 // which is the only defensible reading of "cut the body it runs into".
 inline int pickCutTarget(const std::vector<std::pair<int, TopoDS_Shape>>& bodies,
@@ -88,8 +90,8 @@ inline int pickCutTarget(const std::vector<std::pair<int, TopoDS_Shape>>& bodies
 
 // EVERY body the tool volume removes material from, in id order.
 //
-// The one-target rule is right for the common case — a sketch drawn on a face
-// belongs to that face's body — but wrong whenever a profile is meant to pass
+// The one-target rule is right for the common case - a sketch drawn on a face
+// belongs to that face's body - but wrong whenever a profile is meant to pass
 // through a stack: only the host got cut, and the rest of the sweep vanished
 // into bodies it visibly passed through. This is the opt-in answer to that.
 // Deterministic order matters: the caller pushes one operation per body, and
@@ -109,7 +111,7 @@ inline std::vector<int> pickAllCutTargets(
 // Which way should a cut sweep from a sketch with no host body? +1 runs along the
 // plane normal, -1 against it.
 //
-// A face sketch has an answer for free — the face normal points OUT of its body,
+// A face sketch has an answer for free - the face normal points OUT of its body,
 // so a cut goes the other way. A sketch on a construction or origin plane has no
 // such convention: its normal points wherever the plane happens to face, and half
 // the time that is away from every body, so the arrow started out aimed at empty

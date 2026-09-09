@@ -1,5 +1,5 @@
 // Separate: a body holding disconnected solids (air-gapped lumps fused into
-// one body object — the boolean-remnant bug Steve hit) splits into one body
+// one body object - the boolean-remnant bug Steve hit) splits into one body
 // per lump, largest keeping the source. Also checks the menu gate (solidCount)
 // and clean undo/redo.
 #include <gtest/gtest.h>

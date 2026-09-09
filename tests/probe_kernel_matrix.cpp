@@ -1,4 +1,4 @@
-// probe_kernel_matrix — one-line-per-case battery of kernel-sensitive modeling
+// probe_kernel_matrix - one-line-per-case battery of kernel-sensitive modeling
 // operations, for diffing behavior ACROSS OCCT VERSIONS (7.6.3 apt baseline vs
 // source-built 7.9.3 vs 8.0.0). Each case runs in a forked child with a 90s
 // alarm, so a crash or hang (e.g. the known MakeThickSolid arc-join hang)
@@ -11,7 +11,7 @@
 // Also includes app-level repros for two reported bugs:
 //   bugB-prim-height-leak : creating cylinder #2 must not change #1's height
 //   bugA-copy-tshape-share: does CopyOp share TShapes with the source?
-//   bugA-copy-edit-follow : editStep() on the source primitive — does the copy
+//   bugA-copy-edit-follow : editStep() on the source primitive - does the copy
 //                           follow through replay? (documents the semantics)
 
 #include "core/Document.h"
@@ -165,11 +165,11 @@ int main() {
     std::printf("KERNEL %s\n", OCC_VERSION_COMPLETE);
     std::fflush(stdout);
 
-    // — booleans, the fragile corners first —
+    // - booleans, the fragile corners first -
     runCase("fuse-overlap", [] {
         report("fuse-overlap", BRepAlgoAPI_Fuse(box(10, 10, 10), box(10, 10, 10, 5, 5, 5)).Shape());
     });
-    runCase("fuse-coincident-face", [] {   // exact shared face — classic fragility
+    runCase("fuse-coincident-face", [] {   // exact shared face - classic fragility
         report("fuse-coincident-face", BRepAlgoAPI_Fuse(box(10, 10, 10), box(10, 10, 10, 10, 0, 0)).Shape());
     });
     runCase("fuse-identical", [] {         // self-coincident everything
@@ -204,7 +204,7 @@ int main() {
         report("section-curve", sec, note);
     });
 
-    // — fillet / chamfer —
+    // - fillet / chamfer -
     runCase("fillet-one-edge", [] {
         TopoDS_Shape b = box(10, 10, 10);
         BRepFilletAPI_MakeFillet f(b);
@@ -234,7 +234,7 @@ int main() {
         report("fillet-boolean-seam", f.NbContours() ? f.Shape() : TopoDS_Shape(),
                f.NbContours() ? "" : "note=no-seam-edges-found");
     });
-    runCase("fillet-radius-too-big", [] {  // r > face — must fail gracefully, not crash
+    runCase("fillet-radius-too-big", [] {  // r > face - must fail gracefully, not crash
         TopoDS_Shape b = box(10, 10, 10);
         BRepFilletAPI_MakeFillet f(b);
         TopExp_Explorer ex(b, TopAbs_EDGE);
@@ -249,7 +249,7 @@ int main() {
             c.Add(1.5, TopoDS::Edge(ex.Current()));
         report("chamfer-box", c.Shape());
     });
-    runCase("chamfer-through-fillet", [] { // known OCCT limit on 7.x — did 8.0 fix it?
+    runCase("chamfer-through-fillet", [] { // known OCCT limit on 7.x - did 8.0 fix it?
         TopoDS_Shape b = box(20, 20, 10);
         BRepFilletAPI_MakeFillet f(b);
         for (TopExp_Explorer ex(b, TopAbs_EDGE); ex.More(); ex.Next()) {
@@ -269,7 +269,7 @@ int main() {
         report("chamfer-through-fillet", c.Shape());
     });
 
-    // — shell / offset —
+    // - shell / offset -
     runCase("shell-open-top", [] {
         TopoDS_Shape b = box(20, 20, 10);
         TopTools_ListOfShape faces;
@@ -302,7 +302,7 @@ int main() {
         report("offset-outward", o.Shape());
     });
 
-    // — swept / lofted —
+    // - swept / lofted -
     runCase("revolve-270deg", [] {
         TopoDS_Shape prof = rectFace(5, 12);
         gp_Trsf mv; mv.SetTranslation(gp_Vec(8, 0, 0));
@@ -335,7 +335,7 @@ int main() {
         report("pipe-arc", BRepOffsetAPI_MakePipe(spine.Wire(), prof).Shape());
     });
 
-    // — meshing (what the viewport tessellates; counts quantify kernel diffs) —
+    // - meshing (what the viewport tessellates; counts quantify kernel diffs) -
     runCase("mesh-cylinder", [] {
         TopoDS_Shape s = cyl(10, 20);
         BRepMesh_IncrementalMesh mesh(s, 0.1);
@@ -363,7 +363,7 @@ int main() {
         report("mesh-boolean-result", s, note);
     });
 
-    // — app-level: the two reported bugs —
+    // - app-level: the two reported bugs -
     runCase("bugB-prim-height-leak", [] {
         Document doc;
         History hist;
@@ -446,7 +446,7 @@ int main() {
 
         // Documents the replay semantics per kernel. Known app defect:
         // PrimitiveOp::execute uses addBody (new id per re-execution) instead
-        // of addOrPutBody, so downstream CopyOp loses its source on replay —
+        // of addOrPutBody, so downstream CopyOp loses its source on replay -
         // expect editStep=0 + copy-alive=0 on every kernel until that's fixed.
         std::printf("CASE %-28s | build=1 editStep=%d copy-alive=%d "
                     "copy-y-before=%.2f copy-y-after=%.2f %s\n",

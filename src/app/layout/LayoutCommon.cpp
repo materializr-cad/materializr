@@ -1,6 +1,6 @@
 // Layout-shared chrome: everything every interface layout (classic / modern /
 // im-touch) renders from the SAME code so the layouts can't drift apart in
-// fundamentals — the menu item lists (incl. plugin menu contributions), the
+// fundamentals - the menu item lists (incl. plugin menu contributions), the
 // dockspace host, the overflow popup, and the shared undo helpers. See
 // LayoutCommon.h for the keep-in-lockstep contract.
 
@@ -47,7 +47,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-#include <algorithm>   // std::max — tab-row width reservation
+#include <algorithm>   // std::max - tab-row width reservation
 #include "../../i18n.h"
 #include "../../i18n.h"
 #include "../../i18n.h"
@@ -69,7 +69,7 @@ ImTextureID logoTexture() {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         // Pin the unpack state before the upload. This texture is created
         // lazily on the first frame it's drawn, inheriting whatever GL pixel-
-        // store state the prior frame left set — if some earlier texture upload
+        // store state the prior frame left set - if some earlier texture upload
         // left GL_UNPACK_ROW_LENGTH non-zero (or a non-4 alignment), the logo
         // reads its rows at the wrong stride and comes out garbled, and since
         // the texture is static that corruption sticks for the whole session.
@@ -113,7 +113,7 @@ void Application::renderDockspace() {
     // Transparent host + a pass-through central node so the OpenGL scene shows
     // through. This matters now that the host is submitted EVERY frame (incl.
     // modern/im-touch): there the viewport is undocked, leaving the central
-    // node empty — an opaque host/node would paint dark over the 3D view.
+    // node empty - an opaque host/node would paint dark over the 3D view.
     // Docked classic windows cover the host anyway, so it looks identical there.
     ImGui::SetNextWindowBgAlpha(0.0f);
     ImGui::Begin("DockHost", nullptr, hostFlags);
@@ -122,7 +122,7 @@ void Application::renderDockspace() {
                      ImGuiDockNodeFlags_PassthruCentralNode);
 
     // Per-node tab-bar policy. The viewport's tab bar is permanently OFF
-    // (NoTabBar = no tab AND no re-show triangle) — it's the whole app, never
+    // (NoTabBar = no tab AND no re-show triangle) - it's the whole app, never
     // something to label or hide. Every panel ALWAYS shows its tab (a label +
     // drag handle) and loses the "Hide tab bar" menu, so panel visibility is
     // owned solely by Settings > Panels. Applied to LocalFlags each frame so it
@@ -161,12 +161,11 @@ bool Application::touchCanUndo() const {
 
 void Application::touchUndo() {
     if (m_inSketchMode) {
-        // Mid-placement Undo backs out the in-progress shape first — the editor
+        // Mid-placement Undo backs out the in-progress shape first - the editor
         // convention, and what the sketch's own Ctrl+Z does.
         if (m_sketchTool && m_sketchTool->isPlacing()) {
             m_sketchTool->onCancel();
-            m_meshesDirty = true;
-            return;
+            return;   // sketch geometry only; no body mesh depends on it
         }
         // Undo committed sketch edits, but never past the sketch's entry into
         // history: rolling the host body back under a live sketch crashes.
@@ -240,7 +239,7 @@ bool Application::openNewTab() {
 void Application::renderNewTabMenuBody() {
     if (ImGui::MenuItem(materializr::tr("New Project"))) openNewTab();
     // The open flavors land IN the new tab. Cancelling the picker leaves an
-    // empty tab behind (browser-style about:blank) — one click to close.
+    // empty tab behind (browser-style about:blank) - one click to close.
     if (ImGui::MenuItem(materializr::tr("Open Project..."))) {
         if (openNewTab()) loadProject();
     }
@@ -262,14 +261,14 @@ void Application::renderNewTabMenuBody() {
 
 void Application::renderViewportTabBar() {
     // Classic only: the strip lives INSIDE the Viewport window, above the 3D
-    // image, styled like the dock tab bars — but it is a plain ImGui tab bar,
+    // image, styled like the dock tab bars - but it is a plain ImGui tab bar,
     // not a dock node, so tabs cannot be dragged into the Tools/Items docks.
     const ImGuiTabBarFlags barFlags = ImGuiTabBarFlags_FittingPolicyScroll;
     if (!ImGui::BeginTabBar("##projectTabs", barFlags)) return;
-    // On a sync frame (the active session changed OUTSIDE this bar — menus,
+    // On a sync frame (the active session changed OUTSIDE this bar - menus,
     // Ctrl+Tab, a refused switch), ImGui's internal selection still points at
     // the OLD tab for this frame. Interpreting that stale "visible" as a user
-    // click would silently switch right back — so clicks are ignored for the
+    // click would silently switch right back - so clicks are ignored for the
     // whole sync frame while SetSelected drags ImGui to the real active tab.
     const bool syncing = m_tabSelectionSync;
     m_tabSelectionSync = false;
@@ -301,7 +300,7 @@ void Application::renderViewportTabBar() {
             }
         }
         if (!open) {
-            // The tab's × — same guarded flow as the menu item.
+            // The tab's × - same guarded flow as the menu item.
             if (activateTabFor(i))
                 guardedOpen([this]() { closeSession(m_activeSession); });
             closedOne = true;   // indices may have shifted; finish this frame
@@ -332,8 +331,8 @@ void Application::renderTouchTabsSheet() {
         if (sessionDirty(i)) label += " \xe2\x80\xa2";
         // The row and its ... are SEPARATE hit areas. Previously the row was a
         // full-width MenuItem with the ... drawn on top of it, so a tap on the
-        // ... hit the MenuItem underneath: it switched tabs and — because a
-        // MenuItem closes its popup on activation — took the sheet down with
+        // ... hit the MenuItem underneath: it switched tabs and - because a
+        // MenuItem closes its popup on activation - took the sheet down with
         // it, so the menu could never appear. Reserve the width, and use a
         // Selectable (which does NOT auto-close) so the two can coexist.
         const ImGuiStyle& st = ImGui::GetStyle();
@@ -356,17 +355,17 @@ void Application::renderTouchTabsSheet() {
         ImGui::PopID();
     }
     ImGui::Separator();
-    // Same trio the desktop "+" offers — opens land in the new tab.
+    // Same trio the desktop "+" offers - opens land in the new tab.
     renderNewTabMenuBody();
     ImGui::EndPopup();
 }
 
 // The four menu bodies, shared by classic's menu bar and the modern/im-touch
-// overflow popup — one item list each, so the layouts cannot drift.
+// overflow popup - one item list each, so the layouts cannot drift.
 void Application::renderFileMenuItems(bool withSettings) {
     if (ImGui::MenuItem(materializr::tr("Home Screen"))) goToHomeScreen();
     if (ImGui::MenuItem(materializr::tr("Open Project..."), "Ctrl+O")) loadProject();
-    // Open Recent — persisted, most-recent-first. Greyed when empty.
+    // Open Recent - persisted, most-recent-first. Greyed when empty.
     if (ImGui::BeginMenu(materializr::tr("Open Recent"), !m_recentProjects.empty())) {
         // Snapshot: openRecentProject() mutates m_recentProjects.
         std::vector<AppSettings::RecentProject> snapshot = m_recentProjects;
@@ -387,7 +386,7 @@ void Application::renderFileMenuItems(bool withSettings) {
     }
     if (ImGui::MenuItem(materializr::tr("Save Project"), "Ctrl+S")) saveProjectQuick();
     if (ImGui::MenuItem(materializr::tr("Save Project As..."))) saveProject();
-    // A new project opens in its own tab (non-destructive — the current
+    // A new project opens in its own tab (non-destructive - the current
     // project keeps its tab); the landing page's New Project tile still
     // resets in place, where the leaving-home guard has already run.
     if (ImGui::MenuItem(materializr::tr("New Project"))) {
@@ -478,7 +477,7 @@ void Application::renderEditMenuItems() {
     // Disabled while a legacy preview is live: those previews
     // undo/re-push their op per frame, and an outside undo pops the
     // preview op so the preview's NEXT cycle pops the user's last
-    // COMMITTED op instead — which then gets erased for good when
+    // COMMITTED op instead - which then gets erased for good when
     // the preview pushes over the redo tail. (How "pull, confirm,
     // pull the other way" ate the first body.)
     const bool histLocked = anyInteractivePreviewActive();
@@ -493,7 +492,7 @@ void Application::renderEditMenuItems() {
 }
 
 void Application::renderConstructionMenuItems() {
-    // Detect which plane/axis derivations the current selection supports —
+    // Detect which plane/axis derivations the current selection supports -
     // mirrors Toolbar::renderAddPlaneMenu / renderAddAxisMenu (keep in sync).
     int planarFaces = 0, planeCount = 0, vertexCount = 0;
     bool haveCyl = false, straightEdge = false, haveAxis = false;
@@ -527,7 +526,7 @@ void Application::renderConstructionMenuItems() {
                           (haveCyl || straightEdge || twoVerts || faceNormal || midplane);
 
     // Plane ▸ and Axis ▸ are always present so the catalogue is discoverable.
-    // Each leads with the BASE "New …" creator (the world-plane/-axis popup —
+    // Each leads with the BASE "New …" creator (the world-plane/-axis popup -
     // always available, selection or not), then the modes derived FROM the
     // selection; with nothing suitable selected the derived section explains
     // what to pick instead of vanishing.
@@ -583,9 +582,9 @@ void Application::renderConstructionMenuItems() {
 
 void Application::renderViewMenuItems() {
     if (ImGui::MenuItem(materializr::tr("Reset Camera"), "Home")) m_viewport->getCamera().reset();
-    // The F shortcut's menu twin — and the only way to frame on touch.
+    // The F shortcut's menu twin - and the only way to frame on touch.
     if (ImGui::MenuItem(materializr::tr("Frame Selection"), "F")) frameSelection();
-    // Measure lives here now — one home for it across layouts instead of a
+    // Measure lives here now - one home for it across layouts instead of a
     // toolbar/rail button duplicated per context. Drops the user at the
     // measure mode picker (Object / Edge / Point-to-Point).
     if (ImGui::MenuItem(materializr::tr("Measure..."))) {
@@ -595,7 +594,7 @@ void Application::renderViewMenuItems() {
         m_sectionDirty = true;
         if (m_sectionEnabled) {
             // Aim the plane through the middle of the visible
-            // bodies so enabling it visibly halves the scene —
+            // bodies so enabling it visibly halves the scene -
             // a zero-offset plane at the world origin can sit
             // entirely outside (or under) everything.
             try {
@@ -618,7 +617,7 @@ void Application::renderViewMenuItems() {
     }
     ImGui::Separator();
     // Collapse the docked side panels to give the 3D view the whole
-    // window — a fallback for small screens (and a quick "maximize
+    // window - a fallback for small screens (and a quick "maximize
     // canvas" anywhere). The panels keep their docked widths and snap
     // back on toggle. F9 on a keyboard; touch gets edge tabs. This menu
     // item hides/shows BOTH columns at once; the checkmark = both hidden.
@@ -712,7 +711,7 @@ void Application::renderTouchOverflowPopup() {
 
 void Application::renderRailPolygonSidesPopup(bool clicked) {
     // Same side-count popout as the classic sketch toolbar (Toolbar.cpp): pick a
-    // named polygon, which sets the tool's side count and starts placement — so
+    // named polygon, which sets the tool's side count and starts placement - so
     // every layout drives the identical polygon flow. `clicked` is this frame's
     // rail-button result; the popup body renders every frame while open.
     if (clicked) ImGui::OpenPopup("##railPolySides");

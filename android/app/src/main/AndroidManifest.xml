@@ -50,7 +50,7 @@
 
     <!-- No broad storage permissions: file open/save go through the system
          Storage Access Framework picker (per-URI access), and export sharing
-         goes through a FileProvider. Play-Store clean — no MANAGE_EXTERNAL_STORAGE. -->
+         goes through a FileProvider. Play-Store clean - no MANAGE_EXTERNAL_STORAGE. -->
 
     <!-- if you want to capture audio, uncomment this. -->
     <!-- <uses-permission android:name="android.permission.RECORD_AUDIO" /> -->
@@ -104,7 +104,7 @@
         <!-- Share exported files (STL/STEP/...) via content:// URIs into the
              system share sheet. A tiny self-contained provider (no AndroidX
              dependency) serves files from the app cache; no storage permission
-             needed. SAF open/save (the file picker) needs no provider — those
+             needed. SAF open/save (the file picker) needs no provider - those
              use the system DocumentsUI + ContentResolver directly. -->
         <provider
             android:name=".MaterializrFileProvider"

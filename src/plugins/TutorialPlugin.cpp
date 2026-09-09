@@ -7,8 +7,8 @@
 //
 // The tour OPENS with a layout picker: three cards (Classic / Modern /
 // im-touch), each with a plain-language description. Tapping a card switches
-// the interface LIVE behind the modal — the running app is the preview, not a
-// screenshot — and every later step then points at the right place for the
+// the interface LIVE behind the modal - the running app is the preview, not a
+// screenshot - and every later step then points at the right place for the
 // layout the user picked (the highlighted "In this layout" line).
 //
 // Built entirely as a plugin (no Application changes beyond the generic plugin
@@ -51,7 +51,7 @@ const Step kSteps[] = {
     {
         "Welcome to Materializr",
         "Materializr is a parametric 3D CAD app: sketch a 2D shape, turn it into "
-        "a solid, then keep refining it. This quick tour covers the essentials — "
+        "a solid, then keep refining it. This quick tour covers the essentials - "
         "it takes a minute. You can reopen it anytime from Help > Getting Started.",
         nullptr, nullptr, {nullptr, nullptr, nullptr}
     },
@@ -71,7 +71,7 @@ const Step kSteps[] = {
     },
     {
         "Selecting things",
-        "Click a body, face or edge to select it — most tools act on the current "
+        "Click a body, face or edge to select it - most tools act on the current "
         "selection. A small context menu gives quick actions on whatever you're "
         "pointing at.",
         "Click to select, Ctrl+click to add more. Right-click for the context menu.",
@@ -100,7 +100,7 @@ const Step kSteps[] = {
         "Turn a closed sketch into a 3D body: select it and use Push/Pull to give "
         "it depth, or Revolve to spin it around an axis. On an existing solid, "
         "Push/Pull a face to move it, or add a Fillet/Chamfer to round or bevel "
-        "edges. Drag the arrow — or type a distance — to set the amount.",
+        "edges. Drag the arrow - or type a distance - to set the amount.",
         nullptr, nullptr,
         {
             "The Tools panel lists what applies to your selection (Face "
@@ -129,7 +129,7 @@ const Step kSteps[] = {
         "Organize, save and export",
         "Your bodies and sketches are listed so you can hide, rename and group "
         "them into folders. Save your work as a project, or export for 3D "
-        "printing and other CAD tools — STL, 3MF, STEP, OBJ, glTF, IGES or "
+        "printing and other CAD tools - STL, 3MF, STEP, OBJ, glTF, IGES or "
         "BREP. Export writes every VISIBLE body to one file, so hiding a "
         "body leaves it out; to send just a few, select them, right-click "
         "and use Export.",
@@ -148,7 +148,7 @@ const Step kSteps[] = {
     },
     {
         "Several projects at once",
-        "Each project opens in its own tab, with its own history and camera — "
+        "Each project opens in its own tab, with its own history and camera - "
         "handy for copying a part from one design into another. The home "
         "screen lists your recent projects with a picture of each; it doesn't "
         "close what you're working on, so you can go and come back.",
@@ -170,7 +170,7 @@ const Step kSteps[] = {
         {
             "Press F9 (or View > Hide Panels) to collapse the side panels.",
             "Tap the small chevron tabs on the left and right edges of the "
-            "viewport to fold a column away — tap again to bring it back. The "
+            "viewport to fold a column away - tap again to bring it back. The "
             "Focus button (top-right) cycles the same thing.",
             "im-touch is already minimal: panels appear only when something "
             "needs them and tuck away on their own."
@@ -291,7 +291,7 @@ void renderLayoutPicker(bool& close) {
     ImGui::SeparatorText(materializr::tr("Choose your workspace"));
     ImGui::PushTextWrapPos(0.0f);
     ImGui::TextUnformatted(
-        materializr::tr("Materializr has three interface styles. Tap one to try it — the app behind this window switches instantly, so you can see the real thing. You can change your mind anytime in Settings > Appearance."));
+        materializr::tr("Materializr has three interface styles. Tap one to try it - the app behind this window switches instantly, so you can see the real thing. You can change your mind anytime in Settings > Appearance."));
     ImGui::PopTextWrapPos();
     ImGui::Spacing();
 
@@ -373,7 +373,7 @@ void renderTutorial(materializr::PluginContext&) {
     const ImGuiViewport* vp = ImGui::GetMainViewport();
     // Fixed (slightly wider) width, but height auto-fits the CURRENT step every
     // frame (the 0 axis) so a longer step grows the window instead of forcing a
-    // scrollbar — the body and the Next/Skip row stay visible without scrolling.
+    // scrollbar - the body and the Next/Skip row stay visible without scrolling.
     // Re-centered each frame so it grows symmetrically and never runs off the
     // bottom; both width and height are clamped to the available screen.
     const float w = std::min(uiW(520.0f), vp->WorkSize.x * 0.90f);
@@ -410,7 +410,7 @@ void renderTutorial(materializr::PluginContext&) {
         ImGui::TextUnformatted(s.body);
 
         // Layout-specific location line: where to find this in the layout the
-        // user picked on the first page. Highlighted — it's the line that makes
+        // user picked on the first page. Highlighted - it's the line that makes
         // the step actionable on THIS screen.
         {
             const int li = std::clamp(currentUiLayoutIndex(), 0, 2);
@@ -472,7 +472,7 @@ void renderTutorial(materializr::PluginContext&) {
 
 REGISTER_PLUGIN(Tutorial, [](materializr::PluginContext& ctx) {
     // Launcher: Help > Getting Started (rendered via Application's generic
-    // plugin-menu wiring). Reopening also starts at the layout picker — it
+    // plugin-menu wiring). Reopening also starts at the layout picker - it
     // shows the current choice and is the friendliest place to change it.
     materializr::MenuContribution menu;
     menu.path = "Help > Getting Started";

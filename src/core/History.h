@@ -37,10 +37,10 @@ public:
     // Undo floor: forbid undo from crossing at or below this step index. Set
     // while a sketch is open so NO undo path (menu, History panel, Ctrl+Z, the
     // plugin command) can roll the document back past sketch entry into the host
-    // body — undoing the body while the live sketch renders against it crashes
+    // body - undoing the body while the live sketch renders against it crashes
     // (SIGABRT, heap corruption). canUndo() honours it, so the Undo buttons also
     // grey out at the floor. -1 = no floor.
-    // The step editStep() last hard-failed on (reset to -1 at each call) —
+    // The step editStep() last hard-failed on (reset to -1 at each call) -
     // lets the sketch-edit cascade DISABLE the un-followable step, retry, and
     // tell the user WHICH feature needs re-applying instead of reverting the
     // whole edit with a guess of a message (#53).
@@ -55,7 +55,7 @@ public:
 
     // Monotonic counter bumped by every mutating call (push/undo/redo/edit/
     // remove/replay/enable/clear/dropRedoTail). Lets callers memoize anything
-    // derived from the op list — e.g. the sketch↔body link map, which used to
+    // derived from the op list - e.g. the sketch↔body link map, which used to
     // be rebuilt (full history walk + captureDiff per op) EVERY FRAME by the
     // Properties panel's link hint. A spurious bump only invalidates a cache;
     // a missed one would serve stale data, so mutators bump unconditionally,
@@ -67,7 +67,7 @@ public:
     // at (where the op should be inserted); -1 = no reflow needed.
     int reflowInsertionIndex(const Operation& op) const;
     // Insertion index for the SHELL auto-reflow: a face transform (moveface)
-    // on a SHELLED body corrupts — the loft engine can't do cavities — but is
+    // on a SHELLED body corrupts - the loft engine can't do cavities - but is
     // perfectly computable the other way round: apply it to the pre-shell
     // solid, then re-run the shell on the moved body ("the order flipped").
     // Unlike threads (multi-second recompute → user-discipline refusal), a
@@ -76,11 +76,11 @@ public:
     int shellReflowIndex(const Operation& op) const;
     // True if a Thread step in the applied history modified this body.
     // Interactive ops (push/pull, resize, …) check this at BEGIN to refuse
-    // up front — their per-frame preview would otherwise run a boolean
+    // up front - their per-frame preview would otherwise run a boolean
     // against the thread's thousands of faces every frame and freeze,
     // never reaching the commit-time refusal in pushOperation.
     bool isBodyThreaded(int bodyId) const;
-    // True if a Shell step in the applied history modified this body — the
+    // True if a Shell step in the applied history modified this body - the
     // face-op UI uses it to explain that the drag preview stays put on a
     // hollow body (the transform applies pre-shell on release).
     bool isBodyShelled(int bodyId) const;
@@ -100,7 +100,7 @@ public:
     //
     // `transactional`: snapshot the whole model (bodies + sketches) before
     // replaying and, if any downstream op fails, restore it completely so the
-    // edit either fully applies or leaves the model exactly as it was — never a
+    // edit either fully applies or leaves the model exactly as it was - never a
     // half-built state. Pass true from one-shot Apply-Changes paths; leave false
     // for per-frame previews (the snapshot copy isn't free).
     bool editStep(int index, Document& doc, bool transactional = false);
@@ -118,7 +118,7 @@ public:
     // sits above the current index). -1 = none. The UI uses this to explain
     // what happened instead of leaving steps silently missing.
     int lastReplayFailure() const { return m_failedReplayAt; }
-    // Mark a step as failed-to-recompute AFTER the replay returned — used by
+    // Mark a step as failed-to-recompute AFTER the replay returned - used by
     // the async thread re-cut when the worker's result lands null (the new
     // geometry can't take the thread). Shows the same explainer banner.
     void suspendStep(int idx) { m_failedReplayAt = idx; }
@@ -136,18 +136,18 @@ public:
     bool replayAll(Document& doc);
 
     // Enable/disable a single step, rebuilding the model IN PLACE (no
-    // doc.clear()) so base/imported bodies that no operation recreates — e.g.
-    // the starting box a lone push/pull modifies — are preserved. Returns false
+    // doc.clear()) so base/imported bodies that no operation recreates - e.g.
+    // the starting box a lone push/pull modifies - are preserved. Returns false
     // if the rebuild left a dependent step unable to recompute (recorded via
     // lastReplayFailure()); the model is still valid, just partial. This is the
-    // toggle the history/properties UI should call — NOT replayAll, whose
+    // toggle the history/properties UI should call - NOT replayAll, whose
     // doc.clear() would delete non-operation base bodies.
     bool setStepEnabled(int index, bool enabled, Document& doc);
 
     // Mark every step applied and clear any replay-failure/suspend flags,
     // WITHOUT re-executing anything. The caller is responsible for having
     // restored the document bodies to the fully-applied (loaded) state by
-    // other means — used when an interactive edit can't rebuild and we revert
+    // other means - used when an interactive edit can't rebuild and we revert
     // to a saved body snapshot: those steps fail on execute() but were fine on
     // load (rehydrate ≠ replay), so there is no execute-based path back to the
     // clean state; this resets the bookkeeping to match the restored bodies.
@@ -162,7 +162,7 @@ public:
     // which run editStep NON-transactionally per preview frame (too hot for
     // per-frame snapshots). Snapshot every op's edit state once when the
     // interactive session BEGINS, restore it when the session reverts to its
-    // body snapshot — otherwise ops that executed during doomed preview
+    // body snapshot - otherwise ops that executed during doomed preview
     // replays keep resolution state pointing at discarded geometry, and the
     // step is wedged until reload (fails where a fresh session succeeds).
     void snapshotAllEditState() {

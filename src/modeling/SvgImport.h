@@ -7,8 +7,8 @@ namespace materializr {
 
 class Sketch;
 
-// SVG file → sketch geometry (parsed by the vendored nanosvg). Every path —
-// shapes, transforms, groups, viewBox included — arrives flattened to cubic
+// SVG file → sketch geometry (parsed by the vendored nanosvg). Every path -
+// shapes, transforms, groups, viewBox included - arrives flattened to cubic
 // béziers, which load() samples into fine polylines in the SVG's own
 // coordinate space (Y-down). place() then scales / rotates / Y-flips them
 // into the sketch as closed line loops, so an imported logo behaves exactly

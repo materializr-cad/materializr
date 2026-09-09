@@ -8,8 +8,8 @@
 //     level 6 : 1.01 s -> 8.7 MB      <- same bytes, a fifth of the time
 //     level 1 : 0.71 s -> 9.1 MB
 //
-// So user saves dropped to Balanced (6) and the crash-recovery sidecar — which
-// is rewritten every few seconds and read only after a crash — to Fastest (1).
+// So user saves dropped to Balanced (6) and the crash-recovery sidecar - which
+// is rewritten every few seconds and read only after a crash - to Fastest (1).
 //
 // What has to hold, and is what these tests pin: BOTH levels produce a file
 // that loads back identically. A gzip level is not supposed to be visible in
@@ -86,7 +86,7 @@ TEST(ProjectCompression, FastestRoundTrips) {
     checkRoundTrip(ProjectIO::Compression::Fastest, "Fastest");
 }
 
-// Either level must produce a real gzip file — the loader sniffs the magic, so
+// Either level must produce a real gzip file - the loader sniffs the magic, so
 // a level that somehow emitted raw deflate would still "save" and then fail to
 // open on the next launch.
 TEST(ProjectCompression, BothLevelsWriteGzip) {

@@ -9,7 +9,7 @@
 namespace materializr {
 
 // Draws reference images (photos hosted on construction planes) as textured
-// quads — the app's first and only textured 3D pass; every other renderer is
+// quads - the app's first and only textured 3D pass; every other renderer is
 // flat-shaded. Modeled on PlaneRenderer: same shader/VAO lifecycle, same
 // blend-on / depth-write-off draw so sketch lines and bodies stay legible on
 // top of the underlay. Textures are decoded (stb_image via ImageDecode) and
@@ -29,7 +29,7 @@ public:
         double heightMM = 100.0;
         float opacity = 0.6f;
         bool selected = false;
-        // Compressed file bytes — only READ when this plane id has no cached
+        // Compressed file bytes - only READ when this plane id has no cached
         // texture yet (first sight after import/load).
         const std::vector<uint8_t>* fileBytes = nullptr;
     };

@@ -41,7 +41,7 @@ rebuilds it (see **Reload & rehydrate** below).
 
 **Entry points.** `src/main.cpp` is the desktop entry (CLI parsing, a Linux
 backtrace handler, then `Application::run()`). `src/android_main.cpp` is the
-Android/SDL entry — SDL owns the real `main`, so this is renamed to `SDL_main`
+Android/SDL entry - SDL owns the real `main`, so this is renamed to `SDL_main`
 and mirrors desktop minus CLI args.
 
 ---
@@ -52,24 +52,24 @@ These patterns recur everywhere; understanding them once explains most files.
 
 ### The Operation model (`src/core/Operation.h`)
 Every modeling action is an `Operation` subclass. The key virtuals:
-- `execute(Document&)` / `undo(Document&)` — do/undo the geometry change.
-- `name()` / `description()` / `typeId()` — display + a stable serialization id.
-- `renderProperties()` — the op draws its own editor in the Properties panel.
-- `captureDiff()` — reports body changes *non-destructively* (read from stored
+- `execute(Document&)` / `undo(Document&)` - do/undo the geometry change.
+- `name()` / `description()` / `typeId()` - display + a stable serialization id.
+- `renderProperties()` - the op draws its own editor in the Properties panel.
+- `captureDiff()` - reports body changes *non-destructively* (read from stored
   undo data) so history can be serialised without re-running geometry.
-- `serializeParams()` / `deserializeParams()` — round-trip the op's input
+- `serializeParams()` / `deserializeParams()` - round-trip the op's input
   parameters (radii, distances, axes) as an opaque one-line blob.
-- `rehydrateFromReload()` — restore a deserialised op to its post-execution
+- `rehydrateFromReload()` - restore a deserialised op to its post-execution
   state so it stays **parameter-editable across sessions**. Returns `false` by
   default; ops that reference raw sub-shapes (fillet edges, face pulls) leave it
-  unimplemented because they need topological naming first — those fall back to
+  unimplemented because they need topological naming first - those fall back to
   a baked `ReplayOp`.
-- `plannedBodyIds()` / `cloneForBody()` — used by the **threads-last** reflow
+- `plannedBodyIds()` / `cloneForBody()` - used by the **threads-last** reflow
   (an op touching a threaded body is re-ordered before the trailing Thread step
   so its boolean runs on clean geometry).
-- `setProgressReporter()` / `reportProgress()` — long ops (thread cutting, dense
+- `setProgressReporter()` / `reportProgress()` - long ops (thread cutting, dense
   projection) pump the event loop and allow cancel.
-- `lastGoodParams()` / `rememberGoodParams()` — lets a rejected edit roll back
+- `lastGoodParams()` / `rememberGoodParams()` - lets a rejected edit roll back
   to the last values that executed cleanly.
 
 ### History & reload (`src/core/History.*`, `src/modeling/OperationFactory.*`, `ReplayOp.*`)
@@ -84,8 +84,8 @@ Features register themselves rather than being wired into the host. A plugin is
 a `REGISTER_PLUGIN("Name", initFn)` macro (`PluginMacro.h`) that auto-registers
 at static-init; `ForceLink.cpp` calls each plugin's force-link symbol so the
 linker doesn't strip the translation unit. In `initFn`, a plugin receives a
-`PluginContext` (`PluginContext.h`) — its window into `Document`, `History`,
-`SelectionManager`, `EventBus`, `Camera` — and registers **contributions**
+`PluginContext` (`PluginContext.h`) - its window into `Document`, `History`,
+`SelectionManager`, `EventBus`, `Camera` - and registers **contributions**
 (`Contributions.h`): toolbar buttons, commands, menu items, IO formats, render
 passes, property sections, overlays. Each contribution carries a
 `SelectionContext` so buttons show/hide based on what's selected. Ops that need
@@ -107,7 +107,7 @@ immediately to avoid "banding"), plane/axis lifecycle events, `ToastEvent`
 **Every** op with a live preview is an `InteractiveOpController` subclass, and
 they all live in one array on `Application`. Membership is what drives the
 Esc/Enter chains, single-flight cancellation, gizmo suppression and viewport
-input/overlay dispatch — so adding an op no longer means hand-editing four
+input/overlay dispatch - so adding an op no longer means hand-editing four
 separate lists, which was a recurring source of half-registered tools.
 
 Three structs are the whole boundary, and no ImGui or renderer type crosses
@@ -122,7 +122,7 @@ against the scene; `drawOverlay()` runs later, while the ImGui draw list is
 built. A raw GL call in the second phase hits the window framebuffer and the
 UI paints straight over it.
 
-A controller picks one of three preview models — see *Three preview models* in
+A controller picks one of three preview models - see *Three preview models* in
 `architecture.md` for what each is for and why choosing wrong is a bug:
 `SnapshotBody`, `LiveOp`, `HistoryEdit`.
 
@@ -135,37 +135,37 @@ apply this conversion so parts stand up correctly for printing.
 
 ## Directory reference
 
-### `src/` — entry points & platform glue
+### `src/` - entry points & platform glue
 | File | Purpose |
 |---|---|
 | `main.cpp` | Desktop entry: CLI parse (`--safe-mode`, `--verbose`), Linux signal/backtrace handler, constructs and runs `Application`. |
 | `android_main.cpp` | Android/SDL entry (renamed to `SDL_main`); desktop `main` minus CLI args. |
-| `android_platform.{cpp,h}` | Android platform glue — asset/data paths, JNI bridge bits. |
+| `android_platform.{cpp,h}` | Android platform glue - asset/data paths, JNI bridge bits. |
 | `android_files.{cpp,h}` | Android Storage Access Framework file open/save via content URIs. |
 | `android_shims.cpp` | Small shims/stubs for symbols absent on the Android NDK. |
 | `gl_common.h` | Single switch point for GL headers (desktop Core vs GLES3). |
 | `gl_shader.cpp` | Shader compile/link helper used by the renderers. |
-| `touch_mode.h` | Runtime touch-mode flag — adapts gestures and hit-target sizes. |
+| `touch_mode.h` | Runtime touch-mode flag - adapts gestures and hit-target sizes. |
 | `ui_scale.h` | DPI / UI scale factor used across panels. |
 
-### `src/app/` — the application host
+### `src/app/` - the application host
 | File | Purpose |
 |---|---|
 | `Application.{cpp,h}` | The host/god-class: lifecycle, the main run loop, render-on-demand gating, settings, panel ownership, font resolution. Split across the files below (one class, multiple translation units). |
 | `Application_Viewport.cpp` | Viewport input: camera control, picking, gizmo handling, grid, box-select, sketch picking (largest TU). |
 | `Application_InteractiveOps.cpp` | What is left of the ops here: the sketch↔body **link model**, `cascadeFromSketchEdit`, re-derive vs rigid-move logic, relink, sketch-region picking, and the ops that aren't controllers yet (thread, revolve, pattern, loft, sketch-pattern). |
 | `Application_Dialogs.cpp` | Modal popups: Revolve/Lathe, Thread, Text, Subtract, dimension/scale, plus their progress frames. |
-| `layout/LayoutCommon.{cpp,h}` | Chrome shared by ALL interface layouts: dockspace host, the menu item lists (incl. plugin menu contributions), overflow popup, shared undo helpers. Add features/plugin entry points HERE so every layout gets them — see the header's contract comment. |
+| `layout/LayoutCommon.{cpp,h}` | Chrome shared by ALL interface layouts: dockspace host, the menu item lists (incl. plugin menu contributions), overflow popup, shared undo helpers. Add features/plugin entry points HERE so every layout gets them - see the header's contract comment. |
 | `layout/classic/ClassicLayout.cpp` | Classic layout (`UiLayout::Classic`): main menu bar + touch panel-collapse handles (the docked panels render from `run()`). |
 | `layout/modern/ModernLayout.cpp` | Modern layout (`UiLayout::Modern`): top app bar, left tool rail, right side panel; pins the viewport rect. |
-| `layout/imtouch/ImTouchLayout.cpp` | im-touch layout (`UiLayout::ImTouch`): full-bleed viewport with floating overlays — chip, tool bar, model tree, history timeline, create FAB. |
+| `layout/imtouch/ImTouchLayout.cpp` | im-touch layout (`UiLayout::ImTouch`): full-bleed viewport with floating overlays - chip, tool bar, model tree, history timeline, create FAB. |
 | `InteractiveOpController.{cpp,h}` | Base class + `IopContext`: lifecycle, panel scaffold, and the three preview models. |
-| `IopViewport.h` | The viewport/drawing side of the boundary — `IopViewport`, `IopOverlay`, `IopGizmo3D`. |
+| `IopViewport.h` | The viewport/drawing side of the boundary - `IopViewport`, `IopOverlay`, `IopGizmo3D`. |
 | `FaceOpControllers.{cpp,h}` | Shell, Draft (TaperOp), Scale-Face, Project-Sketch, Defeature, Resize-Cylindrical, Move-Face. |
-| `ExtrudeController.{cpp,h}` | Interactive Extrude — the first `LiveOp` user. |
+| `ExtrudeController.{cpp,h}` | Interactive Extrude - the first `LiveOp` user. |
 | `PushPullController.{cpp,h}` + `PushPullState.h` | Interactive Push/Pull, incl. the ghost preview for dense bodies and the smart-cut commit reroute. |
 | `EdgeOpController.{cpp,h}` | Fillet / Chamfer. The only op with two preview models: `SnapshotBody` to create, `HistoryEdit` to re-open a committed one. |
-| `LiveOpPreview.{cpp,h}` | The `LiveOp` engine for ops that are NOT controllers — Pattern, Loft, Boundary Fill, the construction popups. |
+| `LiveOpPreview.{cpp,h}` | The `LiveOp` engine for ops that are NOT controllers - Pattern, Loft, Boundary Fill, the construction popups. |
 | `HistoryEditPreview.{cpp,h}` | Whole-document snapshot + `editStep` replay + restore-on-failure, behind `HistoryEdit`. |
 | `MoveFaceState.h` | Move Face's parameter block (owned by its controller). |
 | `CylindricalPick.{cpp,h}` | The cylindrical-face pick result, returned by value rather than left in members. |
@@ -175,7 +175,7 @@ apply this conversion so parts stand up correctly for printing.
 | `Window.{cpp,h}` | SDL window + GL context creation, foreground/focus state, swap. |
 | `IconData.h` | Embedded window/app icon bytes. |
 
-### `src/core/` — document model & app services
+### `src/core/` - document model & app services
 | File | Purpose |
 |---|---|
 | `Document.{cpp,h}` | The model: bodies, folders, sketches, construction planes/axes; add/remove/lookup; the source of truth renderers read. |
@@ -190,7 +190,7 @@ apply this conversion so parts stand up correctly for printing.
 | `NumFormat.h` | Shared numeric formatting helpers for UI labels/fields. |
 | `Verbose.{cpp,h}` | `--verbose` logging plumbing. |
 
-### `src/modeling/` — the geometry operations & sketch engine
+### `src/modeling/` - the geometry operations & sketch engine
 The heart of the kernel-facing code. Grouped by role:
 
 **Sketch engine**
@@ -212,8 +212,8 @@ The heart of the kernel-facing code. Grouped by role:
 |---|---|
 | `PrimitiveOp.{cpp,h}` | Box / Cylinder / Sphere / Cone / Torus (Z-up authored). |
 | `ExtrudeOp.{cpp,h}` | Extrude a sketch region into a solid (carries `ExtrudeMode`); remembers its regions for the sketch-edit cascade. |
-| `RevolveOp.{cpp,h}` | Spin a profile around an axis — UI "Lathe" (sketch) / "Revolve" (body). |
-| `LoftOp.{cpp,h}` · `SweepOp.{cpp,h}` | Loft between profiles (N sections) / sweep a profile along a path (dormant — no UI, replay-only). |
+| `RevolveOp.{cpp,h}` | Spin a profile around an axis - UI "Lathe" (sketch) / "Revolve" (body). |
+| `LoftOp.{cpp,h}` · `SweepOp.{cpp,h}` | Loft between profiles (N sections) / sweep a profile along a path (dormant - no UI, replay-only). |
 | `GuidedLoftOp.{cpp,h}` | Loft steered by guide curves. |
 | `BoundaryFillOp.{cpp,h}` | Fill a closed boundary of faces/edges into a solid. |
 
@@ -261,15 +261,15 @@ The heart of the kernel-facing code. Grouped by role:
 | `ReplayOp.{cpp,h}` | Baked geometry-replay fallback for ops that can't yet rehydrate. |
 | `SubShapeIndex.{cpp,h}` | Map ops to the sub-shapes (faces/edges) they generated. |
 | `FaceLineage.{cpp,h}` | Face → ancestry-id map (topological naming): which op made a face, surviving downstream splits/merges (#49/#51). |
-| `FaceSurfSig.h` | Geometric "same underlying surface?" test — tells created faces from re-trimmed ones for history-hover highlights. |
+| `FaceSurfSig.h` | Geometric "same underlying surface?" test - tells created faces from re-trimmed ones for history-hover highlights. |
 
-> Note: there is **no** `RotateOp` — rotation goes through `TransformOp` /
+> Note: there is **no** `RotateOp` - rotation goes through `TransformOp` /
 > `AxisTransformOp` driven by the gizmo. (The old map listed one in error.)
 
-### `src/io/` — persistence & exchange
+### `src/io/` - persistence & exchange
 | File | Purpose |
 |---|---|
-| `ProjectIO.{cpp,h}` | Native `.mzr` / `.materializr` save/load (v3 gzip format): bodies, sketches, full op history. Transactional on failure — a bad file leaves an empty document. |
+| `ProjectIO.{cpp,h}` | Native `.mzr` / `.materializr` save/load (v3 gzip format): bodies, sketches, full op history. Transactional on failure - a bad file leaves an empty document. |
 | `ProjectRecovery.{cpp,h}` | Crash-recovery autosave of the whole project (quiescence-debounced) + restore prompt. |
 | `Settings.{cpp,h}` | Persisted app settings (incl. `--safe-mode` recovery); ints clamped and strings sanitized on the `.cfg` round trip. |
 | `SketchRecovery.{cpp,h}` | Draft autosave sidecar + restore prompt for an uncommitted sketch. |
@@ -284,7 +284,7 @@ The heart of the kernel-facing code. Grouped by role:
 | `FileDialogs.{cpp,h}` | Native open/save dialog wrapper (scrubs AppImage env when spawning). |
 | `portable-file-dialogs.h` | Vendored single-header native-dialog bridge. |
 
-### `src/ui/` — panels, dialogs, theme
+### `src/ui/` - panels, dialogs, theme
 | File | Purpose |
 |---|---|
 | `Toolbar.{cpp,h}` | The main toolbar; context-sensitive buttons (e.g. Lathe vs Revolve). |
@@ -304,10 +304,10 @@ The heart of the kernel-facing code. Grouped by role:
 | `UpdateChecker.{cpp,h}` | Help → Check for Updates (libcurl HTTPS GET). |
 | `ThemeManager.{cpp,h}` · `UiTheme.h` | ImGui theme / colours. |
 
-### `src/viewport/` — rendering, picking, camera
+### `src/viewport/` - rendering, picking, camera
 | File | Purpose |
 |---|---|
-| `Viewport.{cpp,h}` | Viewport orchestration — sets up passes, owns render targets. |
+| `Viewport.{cpp,h}` | Viewport orchestration - sets up passes, owns render targets. |
 | `Camera.{cpp,h}` | Orbit/pan/zoom camera, projection, view matrices. |
 | `ShapeRenderer.{cpp,h}` | Tessellates + draws solid bodies (PBR). |
 | `EdgeRenderer.{cpp,h}` | Body edge/wireframe drawing. |
@@ -324,7 +324,7 @@ The heart of the kernel-facing code. Grouped by role:
 | `BackgroundRenderer.{cpp,h}` | Gradient/background pass. |
 | `PBRShaders.h` | Embedded PBR shader sources. |
 
-### `src/plugin/` — plugin infrastructure
+### `src/plugin/` - plugin infrastructure
 | File | Purpose |
 |---|---|
 | `PluginRegistry.{cpp,h}` | Static registry of all plugins; the host iterates it at startup. |
@@ -333,7 +333,7 @@ The heart of the kernel-facing code. Grouped by role:
 | `PluginMacro.h` | `REGISTER_PLUGIN` auto-registration + force-link macro. |
 | `InteractiveTool.h` | Interface for a plugin-supplied modal viewport tool. |
 
-### `src/plugins/` — the feature plugins
+### `src/plugins/` - the feature plugins
 Each self-registers via `REGISTER_PLUGIN`. `ForceLink.cpp` exists to keep them
 from being stripped.
 | File | Registers |
@@ -379,7 +379,7 @@ from being stripped.
 - **Push/Pull, Extrude or Fillet/Chamfer misbehaves** → their own controllers,
   `PushPullController.cpp` / `ExtrudeController.cpp` / `EdgeOpController.cpp`.
   If the symptom is "the preview left something behind" or "a body changed id
-  mid-drag", suspect the preview model first — see *Three preview models* in
+  mid-drag", suspect the preview model first - see *Three preview models* in
   `architecture.md`.
 - **A tool is missing from ONE layout** → it isn't in `Toolbar::railTools()`,
   which is the catalogue all three layouts read. (Sketch mode is the one
@@ -395,5 +395,5 @@ from being stripped.
 
 ---
 
-*Keep this map current when adding a directory, a plugin, or an op type — it is
+*Keep this map current when adding a directory, a plugin, or an op type - it is
 the fastest on-ramp into the codebase.*

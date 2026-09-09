@@ -31,7 +31,7 @@ bool HistoryEditPreview::restore(Document& doc, History& hist) {
     for (int id : doc.getAllBodyIds())
         if (!want.count(id)) { try { doc.removeBody(id); } catch (...) {} }
     // The preview replays mutated ops' resolution members against bodies we
-    // just discarded — that state has to come back too, or the step wedges.
+    // just discarded - that state has to come back too, or the step wedges.
     hist.restoreAllEditState();
     // Nothing re-executed, so tell history the model is fully applied and
     // undo/redo stay consistent with the restored bodies.

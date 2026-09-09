@@ -2,7 +2,7 @@
 // triangles produced BOP region faces whose wires contain TopAbs_REVERSED
 // edges; densifyWire2D sampled those f->l regardless of orientation, so the
 // densified polygon self-intersected and the even-odd point-in-polygon test
-// miscounted — interior clicks missed and the loop was only selectable near
+// miscounted - interior clicks missed and the loop was only selectable near
 // its edges. densifyWire2D now honours the wire traversal orientation.
 //
 // (Mirrors the user's Sketch 3: triangle A (90,90)-(90,55)-(25,90) and
@@ -28,7 +28,7 @@ void addTriangle(Sketch& sk, glm::vec2 a, glm::vec2 b, glm::vec2 c) {
     sk.addLine(pc, pa);
 }
 
-// Centroid of a triangle — guaranteed strictly interior.
+// Centroid of a triangle - guaranteed strictly interior.
 glm::vec2 centroid(glm::vec2 a, glm::vec2 b, glm::vec2 c) {
     return (a + b + c) / 3.0f;
 }
@@ -64,7 +64,7 @@ TEST(SketchRegions, TwoTrianglesInteriorSelectable) {
     EXPECT_EQ(interiorHits(glm::vec2(0, 45)), 0);
 }
 
-// Single triangle sanity — the simple case must keep working.
+// Single triangle sanity - the simple case must keep working.
 TEST(SketchRegions, SingleTriangleInterior) {
     Sketch sk;
     sk.setPlane(gp_Pln(gp_Ax3(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1), gp_Dir(1, 0, 0))));
@@ -80,7 +80,7 @@ TEST(SketchRegions, SingleTriangleInterior) {
 // Framing bounds must NOT include an arc's far centre. A subtle (nearly flat)
 // arc lies on a huge circle whose centre is far from the drawn geometry;
 // including it made "frame sketch" / sketch-entry zoom out to nothing
-// (Steve's report). The centre POINT still exists and stays interactive —
+// (Steve's report). The centre POINT still exists and stays interactive -
 // this only governs the camera box.
 TEST(SketchBounds, SubtleArcCentreExcludedFromFraming) {
     using materializr::Sketch;

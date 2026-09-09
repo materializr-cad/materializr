@@ -19,6 +19,11 @@ public:
     void setBody(int bodyId);
     void setEdges(const std::vector<TopoDS_Edge>& edges);
     void setDistance(double distance);
+    std::vector<TopoDS_Shape*> shapeParams() override {
+        std::vector<TopoDS_Shape*> out;
+        for (TopoDS_Shape& s : m_edges) out.push_back(&s);
+        return out;
+    }
     // Second setback (along the OTHER face of each edge). <= 0 means symmetric:
     // both faces use setDistance(). > 0 makes an asymmetric chamfer.
     void setDistance2(double distance) { m_distance2 = distance; }
@@ -41,10 +46,10 @@ public:
     static TopoDS_Face sharedReferenceFace(const TopoDS_Shape& body,
                                            const std::vector<TopoDS_Edge>& edges);
     const std::vector<TopoDS_Edge>& getEdges() const { return m_edges; }
-    // The bevel faces this chamfer produced on the live body — what ownsFace
+    // The bevel faces this chamfer produced on the live body - what ownsFace
     // matches and what the history-step preview highlights.
     const std::vector<TopoDS_Shape>& getGeneratedFaces() const { return m_generatedFaces; }
-    // Body shape from the last execute()'s pre-state — used by the interactive
+    // Body shape from the last execute()'s pre-state - used by the interactive
     // edit-by-clicking-face flow to preview an updated distance against the
     // body as it stood BEFORE this chamfer was applied.
     const TopoDS_Shape& getPreviousShape() const { return m_previousShape; }
@@ -78,12 +83,12 @@ private:
     // Chamfer faces produced by the last execute(), so a clicked face can be
     // mapped back to this op for re-editing.
     std::vector<TopoDS_Shape> m_generatedFaces;
-    // Result shape + parsed sub-shape indices — same reload scheme as
+    // Result shape + parsed sub-shape indices - same reload scheme as
     // FilletOp (see SubShapeIndex.h).
     TopoDS_Shape m_resultShape;
     std::vector<int> m_edgeIndices;
     std::vector<int> m_genFaceIndices;
-    // Stable lineage ids of this chamfer's bevel faces (FaceLineage.h) —
+    // Stable lineage ids of this chamfer's bevel faces (FaceLineage.h) -
     // minted at first execute, reused on re-execute, serialized (genids=).
     std::vector<int> m_genFaceIds;
     // Deterministic replay (topo naming, #52): the asymmetric reference
@@ -99,10 +104,10 @@ private:
 
     // Known-good builds: (input body, params) → result, kept for the loaded
     // original plus recent in-session successes. When a REBUILD at exact
-    // previously-successful values on the exact same input fails — the "put
+    // previously-successful values on the exact same input fails - the "put
     // it back to 15" case, where the new blend is everywhere coincident with
     // features built on the original bevel, the worst case for the boolean
-    // fallback — adopt the stored result outright: identical input +
+    // fallback - adopt the stored result outright: identical input +
     // identical params ⇒ that stored shape IS the answer. A single slot
     // wasn't enough: a successful 16-edit overwrote the original 15 answer,
     // so "back to 15" had nothing to adopt. Bounded; entry 0 (the loaded
@@ -139,16 +144,16 @@ public:
 
 private:
 
-    // Generative anchors (EdgeAnchor.h) — same scheme as FilletOp.
+    // Generative anchors (EdgeAnchor.h) - same scheme as FilletOp.
     int m_sourceSketchId = -1;
     std::vector<EdgeAnchor::Anchor> m_edgeAnchors;
-    // Topological names of the chamfered edges — LAST-RESORT resolution after
+    // Topological names of the chamfered edges - LAST-RESORT resolution after
     // rebindEdges and resolveAnchors both fail (the boolean-SEAM case; a seam
     // sits over no sketch feature so anchors can't name it, its gen-lineage
     // ref via the body's producing ledger can). Mirrors FilletOp.
     std::vector<materializr::topo::Ref> m_edgeRefs;
 
-    // Generation map (input edge -> chamfer bevel face) — lets the "gen"
+    // Generation map (input edge -> chamfer bevel face) - lets the "gen"
     // naming strategy name a bevel face by its generating edge (edit-stable).
     materializr::topo::GenerationLedger m_ledger;
 public:

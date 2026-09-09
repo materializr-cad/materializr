@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-// Patch — an N-sided surface fitted to a ring of picked edges, optionally
+// Patch - an N-sided surface fitted to a ring of picked edges, optionally
 // constrained to run TANGENT (G1) or CURVATURE-CONTINUOUS (G2) into the faces
 // on the other side of those edges.
 //
@@ -19,21 +19,21 @@
 // With continuity above C0 the patch doesn't just plug the hole, it flows out
 // of the surrounding surfaces without a visible crease.
 //
-// Engine: BRepOffsetAPI_MakeFilling (GeomPlate underneath) — a variational
+// Engine: BRepOffsetAPI_MakeFilling (GeomPlate underneath) - a variational
 // fit, not an interpolation. It minimises a bending energy subject to the
 // boundary constraints, which is why the solver parameters below are exposed:
 // they ARE the shape controls. In rough order of what a user reaches for:
 //
-//   * continuity   — C0 position only / G1 tangent / G2 curvature.
-//   * nbPtsOnCur   — samples per boundary curve. The single biggest lever on
+//   * continuity   - C0 position only / G1 tangent / G2 curvature.
+//   * nbPtsOnCur   - samples per boundary curve. The single biggest lever on
 //                    how closely the patch tracks a wiggly boundary.
-//   * degree       — degree of the initial surface the solver starts from.
+//   * degree       - degree of the initial surface the solver starts from.
 //                    Higher = more freedom to bulge, and more chance of a
 //                    wave the boundary never asked for.
-//   * maxDeg /     — the approximation budget spent turning the plate into a
+//   * maxDeg /     - the approximation budget spent turning the plate into a
 //     maxSegments    B-spline face. Too small and the tolerances below can't
 //                    be met; too large and the face is heavy to mesh.
-//   * tol3d / tolAng / tolCurv — how tightly G0 / G1 / G2 must actually be
+//   * tol3d / tolAng / tolCurv - how tightly G0 / G1 / G2 must actually be
 //                    met. Loosening them is what rescues a fit that refuses.
 //
 // The achieved errors come back out of the solver (g0Error() etc.) so the
@@ -47,7 +47,7 @@
 //     of the ring keeps its continuity).
 //
 // RESULT. When the picked edges bound an opening in one body, the patch is
-// sewn back into it and the body becomes closed again — the void is filled in
+// sewn back into it and the body becomes closed again - the void is filled in
 // place, not covered by a separate object. When it can't close (edges from two
 // different bodies, a ring that doesn't bound anything, a sew that leaves free
 // edges) the patch is added as its own surface body instead, which is still
@@ -57,11 +57,11 @@ public:
     // What became of the attempt to sew the patch into its body. The user sees
     // a loose surface either way, and the three reasons want three different
     // things done next, so the panel has to be able to tell them apart:
-    //   NoSingleBody   — the edges came from two bodies; pick one ring.
-    //   BodyIsClosed   — the body has no opening. A hole that goes right
+    //   NoSingleBody   - the edges came from two bodies; pick one ring.
+    //   BodyIsClosed   - the body has no opening. A hole that goes right
     //                    THROUGH cannot be closed by capping one end, which is
     //                    the case that reads as the tool ignoring you.
-    //   SewFailed      — there was an opening and the patch would not join it.
+    //   SewFailed      - there was an opening and the patch would not join it.
     enum class Heal { Sewn, NoSingleBody, BodyIsClosed, SewFailed };
 
     // Continuity the patch is asked to hold along its boundary. Stored as a
@@ -114,7 +114,7 @@ public:
     // boundary is only C0 no matter what continuity was asked for.
     int unsupportedEdgeCount() const { return m_unsupported; }
     // Did the fit actually deliver the continuity that was asked for? False
-    // means the surface is sound but only holds position — see the note on
+    // means the surface is sound but only holds position - see the note on
     // near-perpendicular supports in the .cpp. Always true for C0.
     bool continuityAchieved() const { return m_continuityAchieved; }
     const TopoDS_Face& patchFace() const { return m_patchFace; }

@@ -1,7 +1,7 @@
 // Split Body with an OFF-CENTRE plane (#split-dialog work).
 //
 // SplitBodyOp always accepted an arbitrary gp_Pln, but every caller handed it a
-// plane through the body's bounding-box centre — the three Split X/Y/Z buttons
+// plane through the body's bounding-box centre - the three Split X/Y/Z buttons
 // had no way to say anything else. The new Split dialog offers an offset, so
 // the off-centre case stops being theoretical: these pin that the two halves
 // come out where the plane actually is, and that undo puts the body back.
@@ -74,7 +74,7 @@ TEST(SplitOffset, PlaneClearOfTheBodyDoesNothing) {
     const size_t before = doc.getAllBodyIds().size();
 
     // Well outside the cube. The dialog clamps the offset inside the body for
-    // exactly this reason — a miss must not add a history step that produced
+    // exactly this reason - a miss must not add a history step that produced
     // no second body.
     SplitBodyOp op;
     op.setBody(id);

@@ -1,11 +1,11 @@
 #pragma once
 // Semantic icon names for the im-touch shell (and, later, the shared tool
 // catalogue). One indirection over the raw Iconoir glyphs so a design pass
-// can swap a glyph in exactly one place — UI code says MZ_ICON_UNDO, never
+// can swap a glyph in exactly one place - UI code says MZ_ICON_UNDO, never
 // ICON_IC_UNDO. The full Iconoir range is merged into the font atlas at
 // startup (Application ctor), so any ICON_IC_* glyph is always renderable.
 //
-// Iconoir: https://iconoir.com (MIT) — see assets/fonts/FONT-CREDITS.md.
+// Iconoir: https://iconoir.com (MIT) - see assets/fonts/FONT-CREDITS.md.
 #include "IconsIconoir.h"
 
 // Chrome / top bar
@@ -43,13 +43,13 @@
 #define MZ_ICON_SHELL      ICON_IC_CUBE_HOLE
 #define MZ_ICON_FILLET     ICON_IC_FILLET_3D
 // Sentinel (PUA U+E000, below Iconoir's first glyph at U+E024): no Iconoir
-// glyph reads as a straight corner cut — cube-cut-with-curve looked like a
+// glyph reads as a straight corner cut - cube-cut-with-curve looked like a
 // concave fillet. drawIconCentered (TouchWidgets.cpp) special-cases this and
 // draws a square outline with one chamfered corner.
 #define MZ_ICON_CHAMFER    "\xee\x80\x80"
 #define MZ_ICON_MOVE       ICON_IC_DRAG
 #define MZ_ICON_ROTATE     ICON_IC_REFRESH
-// Thread tool — sentinel (PUA U+E005): a hand-drawn flat-head screw with a
+// Thread tool - sentinel (PUA U+E005): a hand-drawn flat-head screw with a
 // threaded shaft (drawn in drawIconCentered). Iconoir has no screw/bolt glyph,
 // and the old MZ_ICON_ROTATE (refresh arrows) read as "reload", not "threads".
 #define MZ_ICON_THREAD     "\xee\x80\x85"
@@ -59,16 +59,16 @@
 #define MZ_ICON_AXES       ICON_IC_AXES
 // Sentinels drawn by drawIconCentered (TouchWidgets.cpp): a cube-unfold "Latin
 // cross" of squares, and the two pattern glyphs (a row of squares = linear, a
-// ring of squares = circular) — Iconoir has nothing that reads as these.
+// ring of squares = circular) - Iconoir has nothing that reads as these.
 #define MZ_ICON_UNFOLD           "\xee\x80\x82"  // U+E002
 #define MZ_ICON_PATTERN_LINEAR   "\xee\x80\x83"  // U+E003
 #define MZ_ICON_PATTERN_CIRCULAR "\xee\x80\x84"  // U+E004
 #define MZ_ICON_REPAIR     ICON_IC_CUBE_BANDAGE
 // Patch: a piece fitted into a gap. Distinct from REPAIR (the bandaged cube,
-// which is Defeature) on purpose — the two are offered on different selections
+// which is Defeature) on purpose - the two are offered on different selections
 // and do opposite things, one filling a hole and one dissolving a feature.
 #define MZ_ICON_PATCH      ICON_IC_PUZZLE
-// Sew: separate pieces becoming one. NOT ICON_IC_COMBINE — that is already
+// Sew: separate pieces becoming one. NOT ICON_IC_COMBINE - that is already
 // MZ_ICON_PROJECT, and a duplicate glyph in a set this small reads as a mistake.
 #define MZ_ICON_SEW        ICON_IC_HORIZONTAL_MERGE
 #define MZ_ICON_LATHE      ICON_IC_ROTATE_CAMERA_RIGHT
@@ -85,7 +85,7 @@
 #define MZ_ICON_SPLIT      ICON_IC_SPLIT_AREA
 #define MZ_ICON_GUIDES     ICON_IC_MAGNET     // sketch inference level cycle
 #define MZ_ICON_PROJECT    ICON_IC_COMBINE    // project/stamp a sketch onto a face
-// Rail "Primitive" group — sentinel (PUA U+E001): no Iconoir glyph reads as
+// Rail "Primitive" group - sentinel (PUA U+E001): no Iconoir glyph reads as
 // "basic solids", so drawIconCentered (TouchWidgets.cpp) draws a square
 // overlapping a circle (Steve's CAD-sketch reference: square top-left, larger
 // circle through its bottom-right corner). Distinct from MZ_ICON_EXTRUDE.
@@ -100,7 +100,7 @@
 #define MZ_ICON_SPLINE     ICON_IC_CURVE_ARRAY
 #define MZ_ICON_POLYGON    ICON_IC_PENTAGON
 #define MZ_ICON_TRIM       ICON_IC_SCISSOR
-// Offset — sentinel (PUA U+E006): two nested rounded rectangles, drawn in
+// Offset - sentinel (PUA U+E006): two nested rounded rectangles, drawn in
 // drawIconCentered. Iconoir has no glyph that reads as "a parallel copy at a
 // fixed distance"; expand/frame glyphs all read as resize.
 #define MZ_ICON_OFFSET     "\xee\x80\x86"  // U+E006

@@ -12,7 +12,7 @@ mkdir -p "$DEST"
 shopt -s nullglob
 libs=("$PREFIX"/lib/libTK*.so)
 if [ ${#libs[@]} -eq 0 ]; then
-    echo "No OCCT libraries found in $PREFIX/lib — build OCCT first." >&2
+    echo "No OCCT libraries found in $PREFIX/lib - build OCCT first." >&2
     exit 1
 fi
 cp -v "${libs[@]}" "$DEST"/

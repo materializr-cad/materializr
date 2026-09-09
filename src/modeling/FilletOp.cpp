@@ -1,4 +1,5 @@
 #include "ui/LengthField.h"
+#include "core/Units.h"
 #include "../core/NumFormat.h"
 #include "FilletOp.h"
 #include "BlendCut.h"
@@ -52,7 +53,7 @@ bool faceCenter(const TopoDS_Face& face, gp_Pnt& out) {
 
 // Blend radius of a fillet face, if it is a recognisable analytic blend
 // surface (cylinder on a straight edge, torus/sphere where edges curve or
-// meet). Returns <0 when the face isn't such a surface — those we can't
+// meet). Returns <0 when the face isn't such a surface - those we can't
 // discriminate by radius and must fall back to the saved indices.
 double faceBlendRadius(const TopoDS_Face& face) {
     try {
@@ -66,13 +67,13 @@ double faceBlendRadius(const TopoDS_Face& face) {
     } catch (...) { return -1.0; }
 }
 
-// Faces present in `result` but NOT in `prev` — the blend faces this fillet
+// Faces present in `result` but NOT in `prev` - the blend faces this fillet
 // created. Reload fallback for the history-hover highlight when a save lacks
 // generated-face indices (churn-dropped `gen=`).
 //
 // Matched by the unbounded SURFACE, not the centroid: when this fillet trims a
 // corner off an adjacent earlier blend, that face keeps its surface but its
-// centroid shifts — a centroid test would wrongly flag it as new and light up
+// centroid shifts - a centroid test would wrongly flag it as new and light up
 // earlier steps' blends on hover. Non-analytic faces (no cheap surface
 // signature) fall back to the centroid test, unchanged.
 std::vector<TopoDS_Shape> facesCreatedVsPrev(const TopoDS_Shape& result,
@@ -106,7 +107,7 @@ std::vector<TopoDS_Shape> facesCreatedVsPrev(const TopoDS_Shape& result,
 // Prefers the cascade override (the edited sketch's FINAL state) over the
 // live sketch: during a history replay the live sketch is rolled back through
 // its SketchEditOp snapshots, so it holds a stale state exactly when this op
-// re-executes — while the extrude below was rebuilt from the final one.
+// re-executes - while the extrude below was rebuilt from the final one.
 // `keep` extends the overrides' lifetime to the caller's scope.
 static std::vector<EdgeAnchor::SketchRef> anchorSketches(
         Document& doc, std::vector<std::shared_ptr<materializr::Sketch>>& keep) {
@@ -128,7 +129,7 @@ void FilletOp::computeAnchors(Document& doc) {
     std::vector<std::shared_ptr<materializr::Sketch>> keep;
     m_edgeAnchors = EdgeAnchor::compute(m_edges, anchorSketches(doc, keep));
     // Success trace is --verbose only: execute() (and thus this) runs per
-    // PREVIEW FRAME while a fillet is being dragged — an always-on stderr
+    // PREVIEW FRAME while a fillet is being dragged - an always-on stderr
     // flush per frame is real drag cost. Failure paths below stay loud.
     if (materializr::isVerbose()) {
         int corners = 0, rims = 0, arcs = 0, none = 0;
@@ -245,7 +246,7 @@ bool FilletOp::execute(Document& doc) {
         // Store previous shape for undo
         m_previousShape = doc.getBody(m_bodyId);
 
-        // Input lineage, completed so EVERY face has an id (see ChamferOp) —
+        // Input lineage, completed so EVERY face has an id (see ChamferOp) -
         // feeds the lineage-first edge resolution below and the post-build
         // pair capture, and is restored by undo (partial-replay lifeline).
         materializr::topo::FaceIdMap inLineage;
@@ -254,7 +255,7 @@ bool FilletOp::execute(Document& doc) {
                                     [&doc]() { return doc.mintFaceId(); });
 
         // Lineage-FIRST edge resolution (parity with ChamferOp, #52): each
-        // edge named by its two adjacent faces' ancestry ids — immune to
+        // edge named by its two adjacent faces' ancestry ids - immune to
         // ordinal drift AND alive when the runtime ledger is gone (partial
         // replay). All-or-nothing; on miss, fall through to the classic
         // rebind → anchors → topo-refs chain.
@@ -280,7 +281,7 @@ bool FilletOp::execute(Document& doc) {
                     }
                     if (!hasA || !hasB) continue;
                     // DISTINCT-CLAIM (see ChamferOp): fragments of one span
-                    // share the same face-id pair — first-hit collapsed the
+                    // share the same face-id pair - first-hit collapsed the
                     // selection onto one edge and starved the rebuild.
                     bool claimed = false;
                     for (const auto& u : found)
@@ -299,13 +300,13 @@ bool FilletOp::execute(Document& doc) {
         }
 
         // If an upstream edit regenerated the body, our stored edges have
-        // stale TShapes — re-bind them to their successors by carrier
+        // stale TShapes - re-bind them to their successors by carrier
         // geometry so editing (say) a neighbouring fillet's radius doesn't
         // kill this op. Fails (loudly, via editStep) only when an edge was
         // genuinely consumed by the upstream change.
         if (!edgesResolvedByLineage &&
             !SubShapeIndex::rebindEdges(m_previousShape, m_edges)) {
-            // Ordinal/carrier matching failed — the edges moved (e.g. a sketch
+            // Ordinal/carrier matching failed - the edges moved (e.g. a sketch
             // DIMENSION edit relocated a filleted corner). Try re-finding them
             // by the sketch vertex they sit over (generative anchoring).
             if (!resolveAnchors(doc, m_previousShape)) {
@@ -335,7 +336,7 @@ bool FilletOp::execute(Document& doc) {
                 if (!topoOk) {
                     std::fprintf(stderr,
                         "[Fillet] rebindEdges + anchors + topo refs failed "
-                        "(R=%.2f, %zu edges) — selected edge isn't in the "
+                        "(R=%.2f, %zu edges) - selected edge isn't in the "
                         "current body's edge map.\n",
                         m_radius, m_edges.size());
                     return false;
@@ -344,7 +345,7 @@ bool FilletOp::execute(Document& doc) {
         }
 
         // Deduplicate: fragmented topology unified upstream can resolve several
-        // stored fragment edges onto ONE current edge — feeding MakeFillet the
+        // stored fragment edges onto ONE current edge - feeding MakeFillet the
         // same edge repeatedly yields an invalid result (#54; chamfer twin).
         {
             std::vector<TopoDS_Edge> uniq;
@@ -355,12 +356,12 @@ bool FilletOp::execute(Document& doc) {
             }
             if (uniq.size() != m_edges.size()) {
                 std::fprintf(stderr, "[Fillet] %zu stored edges resolved to %zu "
-                             "distinct — deduped\n", m_edges.size(), uniq.size());
+                             "distinct - deduped\n", m_edges.size(), uniq.size());
                 m_edges = std::move(uniq);
             }
         }
         // Capture generative anchors from the (now-valid) edges the first time
-        // we run — so a later dimension edit can re-find them by sketch feature.
+        // we run - so a later dimension edit can re-find them by sketch feature.
         if (m_edgeAnchors.empty()) computeAnchors(doc);
         // And topological names (with the body's producing ledger in context,
         // so a SEAM edge gets its gen-lineage name).
@@ -404,7 +405,7 @@ bool FilletOp::execute(Document& doc) {
         // a GENUINE geometric limit is not nudged past it.
         const double kNudge[] = {0.0, -1e-3, 1e-3, -5e-3, 5e-3};
         // ONE budget for the whole ladder, not one per rung. Each probe blocks
-        // this thread — the render thread, during an interactive preview — so
+        // this thread - the render thread, during an interactive preview - so
         // five rungs at the full budget each would stall for five times as long
         // as the user asked to wait. That is still a freeze, just a bounded one.
         const auto  ladderStart  = std::chrono::steady_clock::now();
@@ -417,14 +418,14 @@ bool FilletOp::execute(Document& doc) {
             const double left = ladderBudget - spent;
             if (left <= 0.0) {
                 std::fprintf(stderr,
-                    "[Fillet] %.1fs budget spent across %zu radii — giving up "
+                    "[Fillet] %.1fs budget spent across %zu radii - giving up "
                     "rather than stalling further.\n",
                     ladderBudget, m_edges.size());
                 break;
             }
             // Never enter Build() blind. OCCT's blend cannot be interrupted
             // (ChFi3d_Builder::Compute takes no ProgressRange), so a radius it
-            // cannot resolve hangs this thread forever — and this runs from the
+            // cannot resolve hangs this thread forever - and this runs from the
             // render loop during an interactive preview, which is precisely how
             // FOB.mzr froze the app. probe() runs the same build on a detached
             // worker against a copy and gives up after a budget; reaching the
@@ -436,7 +437,7 @@ bool FilletOp::execute(Document& doc) {
             if (!attempt->IsDone()) {
                 std::fprintf(stderr,
                     "[Fillet] BRepFilletAPI.IsDone() returned false (R=%.4f)%s\n",
-                    r, rel == 0.0 ? " — retrying just off that radius." : "");
+                    r, rel == 0.0 ? " - retrying just off that radius." : "");
                 continue;
             }
             const TopoDS_Shape built = attempt->Shape();
@@ -449,7 +450,7 @@ bool FilletOp::execute(Document& doc) {
             fillet = std::move(attempt);
             if (rel != 0.0)
                 std::fprintf(stderr,
-                    "[Fillet] R=%.4f failed, R=%.4f built cleanly — using it "
+                    "[Fillet] R=%.4f failed, R=%.4f built cleanly - using it "
                     "(OCCT degenerates at isolated radii; difference %.1f micron).\n",
                     m_radius, r, std::fabs(r - m_radius) * 1000.0);
             break;
@@ -457,8 +458,8 @@ bool FilletOp::execute(Document& doc) {
 
         // IsDone() is necessary but NOT sufficient: when fillet radii on
         // adjacent edges overlap (the classic many-edges-at-once case), OCCT
-        // happily returns IsDone()==true with a topologically INVALID solid —
-        // self-intersecting blends or dropped faces — which is exactly the
+        // happily returns IsDone()==true with a topologically INVALID solid -
+        // self-intersecting blends or dropped faces - which is exactly the
         // "faces disappear / garbage geometry" failure. BRepCheck_Analyzer is
         // the authoritative validity test; reject anything it flags so a
         // corrupt body never gets committed to the document/history. (The bbox
@@ -467,12 +468,12 @@ bool FilletOp::execute(Document& doc) {
         if (!candidate.IsNull() && !BRepCheck_Analyzer(candidate).IsValid()) {
             std::fprintf(stderr,
                 "[Fillet] result failed BRepCheck_Analyzer (R=%.4f, %zu edges) "
-                "— invalid topology, refusing to commit.\n",
+                "- invalid topology, refusing to commit.\n",
                 usedRadius, m_edges.size());
             candidate.Nullify();
         }
 
-        // OCCT's fillet API is permissive — IsDone() returns true even when
+        // OCCT's fillet API is permissive - IsDone() returns true even when
         // the radius exceeds what the geometry can support, and the result
         // is then a self-intersecting / overlapping mess instead of a clean
         // refusal. Two narrow sanity checks reject those without flagging
@@ -480,12 +481,12 @@ bool FilletOp::execute(Document& doc) {
         // upper-bound volume check we used to have backwards):
         //   • Bounding box: a fillet should never GROW the body's bbox by
         //     more than a hair. Garbled-cube case (radius > half-extent)
-        //     produces inverted shells whose bbox blows out — that's the
+        //     produces inverted shells whose bbox blows out - that's the
         //     signal we catch.
         //   • Volume: must be strictly > 0. Truly degenerate output (zero
         //     or negative volume) is the other failure mode.
         // (Steve: a coffee-cup rim could only fillet to 1.5 mm on the
-        //  inside, and not at all on the outside — the old "volume must
+        //  inside, and not at all on the outside - the old "volume must
         //  not exceed input × 1.01" rule rejected the inside concave
         //  fillets even when geometrically fine.)
         if (!candidate.IsNull()) {
@@ -529,7 +530,7 @@ bool FilletOp::execute(Document& doc) {
         if (!candidate.IsNull()) {
             // Publish the generation map (input edge -> blend faces) so the
             // "gen" naming strategy can name a blend face by its generating
-            // edge — the general-kernel path for op-produced faces. Captured
+            // edge - the general-kernel path for op-produced faces. Captured
             // on every execute, so a rebuild's ledger reflects the current
             // geometry.
             m_ledger.capture(*fillet, m_previousShape, TopAbs_EDGE);
@@ -556,7 +557,7 @@ bool FilletOp::execute(Document& doc) {
         if (candidate.IsNull()) {
             // #55: the native blend can't resolve against a surface feature
             // crossing the edge. Build the same removal as a swept-arc
-            // boolean cut — collinear fragment selections merge into one
+            // boolean cut - collinear fragment selections merge into one
             // span, so the round passes straight through the feature,
             // exactly as if the fillet had preceded it in history. Only
             // reached after the native build failed, so models where
@@ -569,7 +570,7 @@ bool FilletOp::execute(Document& doc) {
                     m_radius, m_ledger, cutRes, blends)) {
                 candidate = cutRes;
                 m_generatedFaces = std::move(blends);
-                std::fprintf(stderr, "[Fillet] native blend failed — built "
+                std::fprintf(stderr, "[Fillet] native blend failed - built "
                              "as a swept-arc cut across the feature "
                              "(#55, R=%.2f)\n", m_radius);
             }
@@ -577,7 +578,7 @@ bool FilletOp::execute(Document& doc) {
         // LAST RESORT before failing: exact previously-successful params on
         // the exact same input body → adopt the stored result (see ChamferOp;
         // the "put the value back" case is the boolean fallback's worst case
-        // — everywhere-coincident geometry — yet the answer already exists).
+        // - everywhere-coincident geometry - yet the answer already exists).
         if (candidate.IsNull()) {
             for (auto it = m_storedResults.rbegin();
                  it != m_storedResults.rend(); ++it) {
@@ -587,7 +588,7 @@ bool FilletOp::execute(Document& doc) {
                 candidate = it->result;
                 m_generatedFaces = it->genFaces;
                 std::fprintf(stderr, "[Fillet] rebuild failed at known-good "
-                             "params — adopting the stored result (same "
+                             "params - adopting the stored result (same "
                              "input body, R=%.2f)\n", m_radius);
                 break;
             }
@@ -639,7 +640,7 @@ bool FilletOp::execute(Document& doc) {
         }
         // Remember this build for the adopt-stored-result path (see above).
         rememberResult(m_previousShape, m_resultShape);
-        guard.committed = true;   // success — keep the (re)resolved state
+        guard.committed = true;   // success - keep the (re)resolved state
         return true;
     } catch (...) {
         return false;
@@ -653,7 +654,7 @@ bool FilletOp::undo(Document& doc) {
 
     try {
         doc.updateBody(m_bodyId, m_previousShape);
-        // Restore the input lineage captured at execute — updateBody wiped
+        // Restore the input lineage captured at execute - updateBody wiped
         // it, and a partial replay won't re-run the op that minted it.
         if (!m_prevFaceIds.empty())
             doc.setBodyFaceIds(m_bodyId, m_prevFaceIds);
@@ -664,7 +665,7 @@ bool FilletOp::undo(Document& doc) {
 }
 
 std::string FilletOp::description() const {
-    return "Fillet R" + materializr::numStr(m_radius) + " on " +
+    return "Fillet R" + materializr::fmtLength(m_radius) + " on " +
            std::to_string(m_edges.size()) + " edge(s)";
 }
 
@@ -687,7 +688,7 @@ OperationDiff FilletOp::captureDiff() const {
 
 std::string FilletOp::serializeParams() const {
     // The edge set is persisted as ordinal indices into the INPUT shape's
-    // canonical sub-shape map (see SubShapeIndex.h) — BREP round-trips the
+    // canonical sub-shape map (see SubShapeIndex.h) - BREP round-trips the
     // shape byte-identically, so the indices resolve on reload. Generated
     // blend faces are indexed against the RESULT shape for click-to-edit.
     std::string blob;
@@ -720,7 +721,7 @@ std::string FilletOp::serializeParams() const {
                   + ":" + std::to_string(m_edgeFaceIdPairs[i].second);
     }
     if (!anc.empty()) blob += ";anchor=" + anc;
-    // Topological edge names (additive, LAST — length-prefixed opaque blobs
+    // Topological edge names (additive, LAST - length-prefixed opaque blobs
     // read to end-of-string). Persisting them keeps a SEAM fillet/chamfer
     // re-derivable after reload; absent in old files.
     if (!m_edgeRefs.empty()) {
@@ -747,7 +748,7 @@ bool FilletOp::deserializeParams(const std::string& blob) {
         size_t end = blob.find(';', eq);
         if (end == std::string::npos) end = blob.size();
         std::string key = blob.substr(pos, eq - pos);
-        // edgerefs holds length-prefixed opaque blobs, written last — read to
+        // edgerefs holds length-prefixed opaque blobs, written last - read to
         // end-of-string (not to the next ';').
         if (key == "edgerefs") {
             std::string rest = blob.substr(eq + 1);
@@ -802,7 +803,7 @@ bool FilletOp::rehydrateFromReload(const ReloadState& state, Document& /*doc*/) 
     if (m_previousShape.IsNull()) return false;
 
     // Re-resolve the filleted edges against the input shape. ALL must resolve
-    // — a partial set would fillet the wrong geometry, so decline to ReplayOp.
+    // - a partial set would fillet the wrong geometry, so decline to ReplayOp.
     std::vector<TopoDS_Shape> resolved;
     if (!SubShapeIndex::resolveAll(m_previousShape, m_edgeIndices,
                                    TopAbs_EDGE, resolved)) {
@@ -811,7 +812,7 @@ bool FilletOp::rehydrateFromReload(const ReloadState& state, Document& /*doc*/) 
     m_edges.clear();
     for (const auto& s : resolved) m_edges.push_back(TopoDS::Edge(s));
 
-    // Blend faces (click-to-edit mapping) resolve against the result —
+    // Blend faces (click-to-edit mapping) resolve against the result -
     // best-effort: their absence only disables face-click mapping.
     m_generatedFaces.clear();
     if (!m_resultShape.IsNull() && !m_genFaceIndices.empty()) {
@@ -836,7 +837,7 @@ bool FilletOp::rehydrateFromReload(const ReloadState& state, Document& /*doc*/) 
 void FilletOp::refreshGeneratedFaces(const TopoDS_Shape& currentBody,
                                      const materializr::topo::FaceIdMap* lineage) {
     if (currentBody.IsNull()) return;
-    // Lineage first — see ChamferOp::refreshGeneratedFaces.
+    // Lineage first - see ChamferOp::refreshGeneratedFaces.
     if (lineage && !m_genFaceIds.empty()) {
         std::vector<TopoDS_Shape> mine;
         for (const auto& e : *lineage)
@@ -865,13 +866,13 @@ void FilletOp::refreshGeneratedFaces(const TopoDS_Shape& currentBody,
 
     // Add any index-resolved faces the radius scan can't classify (free-form
     // blends), but exclude index faces whose radius clearly belongs to a
-    // DIFFERENT fillet — those are the drift this rebind exists to reject.
+    // DIFFERENT fillet - those are the drift this rebind exists to reject.
     std::vector<TopoDS_Shape> idxFaces;
     if (!m_genFaceIndices.empty() &&
         SubShapeIndex::resolveAll(currentBody, m_genFaceIndices, TopAbs_FACE, idxFaces)) {
         for (const auto& s : idxFaces) {
             // A fillet blend is a cylinder / torus / sphere, or a free-form
-            // (bspline) blend — NEVER a plane or a cone. Reject those: they're
+            // (bspline) blend - NEVER a plane or a cone. Reject those: they're
             // ordinal-index drift onto unrelated faces once downstream ops
             // reorder the body's face map (e.g. a later countersink chamfer's
             // cone), which the -1 "unclassifiable" radius below would otherwise
@@ -905,7 +906,7 @@ int FilletOp::ownsFaceScore(const TopoDS_Shape& face) const {
     // A fillet blend is NEVER a plane (straight edges blend to cylinders,
     // curved/corner cases to tori/spheres/bsplines). Rehydrated generated-face
     // indices can mis-resolve after an old-save reload (ordinal drift) and
-    // claim a big planar neighbour — clicking the slab top then opened the
+    // claim a big planar neighbour - clicking the slab top then opened the
     // fillet editor instead of the face's own properties.
     try {
         BRepAdaptor_Surface bs(TopoDS::Face(face));
@@ -915,7 +916,7 @@ int FilletOp::ownsFaceScore(const TopoDS_Shape& face) const {
         if (f.IsSame(face)) return 2;   // exact identity on the live body
     }
     // Geometric fallback for when the body's faces were rebuilt (e.g. after a
-    // replay) and are no longer IsSame to the stored ones — a WEAKER match, so
+    // replay) and are no longer IsSame to the stored ones - a WEAKER match, so
     // an exact owner elsewhere in history wins over this (#49).
     gp_Pnt q;
     if (!faceCenter(TopoDS::Face(face), q)) return 0;

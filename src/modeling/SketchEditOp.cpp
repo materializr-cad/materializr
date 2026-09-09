@@ -59,7 +59,7 @@ static const char* constraintName(ConstraintType t) {
 std::string SketchEditOp::description() const {
     if (!m_before || !m_after) return "Sketch edit";
 
-    // Constraint diff first — these read more specifically than the generic
+    // Constraint diff first - these read more specifically than the generic
     // geometry-count descriptions below.
     const auto& cBefore = m_before->getConstraints();
     const auto& cAfter  = m_after->getConstraints();
@@ -91,7 +91,7 @@ std::string SketchEditOp::description() const {
             }
             return "Add constraint";
         } else {
-            // Removed — name the removed type if we can identify it.
+            // Removed - name the removed type if we can identify it.
             for (const auto& b : cBefore) {
                 bool stillThere = false;
                 for (const auto& a : cAfter) if (a.id == b.id) { stillThere = true; break; }
@@ -102,7 +102,7 @@ std::string SketchEditOp::description() const {
             return "Remove constraint";
         }
     } else {
-        // Same count — check for a value edit on the same id.
+        // Same count - check for a value edit on the same id.
         for (size_t i = 0; i < cAfter.size(); ++i) {
             // Find matching id in before.
             const Constraint* bMatch = nullptr;
@@ -135,11 +135,11 @@ std::string SketchEditOp::description() const {
         }
     }
 
-    // No constraint diff — describe the GEOMETRY that was added, measured
+    // No constraint diff - describe the GEOMETRY that was added, measured
     // directly off the snapshot (no constraint required). Turns the generic
     // "Add sketch element" into "Rectangle 80 × 45 mm", "Circle Ø20 mm", etc.,
     // so the history reads meaningfully. (A "reference dimension" for display
-    // only — it drives nothing, so there's no over-constraint risk.)
+    // only - it drives nothing, so there's no over-constraint risk.)
     {
         auto posOf = [](const Sketch& sk, int ptId) -> glm::vec2 {
             for (const auto& p : sk.getPoints()) if (p.id == ptId) return p.pos;
@@ -200,7 +200,7 @@ std::string SketchEditOp::description() const {
         }
     }
 
-    // Anything else — fall back to the generic element-count diff.
+    // Anything else - fall back to the generic element-count diff.
     int delta = m_after->elementCount() - m_before->elementCount();
     if (delta > 0) return "Add sketch element";
     if (delta < 0) return "Remove sketch element";
@@ -304,11 +304,11 @@ static void writeSketchBody(std::ostream& os, const Sketch& sk, int sketchId,
 std::string SketchEditOp::serializeWithDocument(const Document& doc) const {
     if (!m_target || !m_before || !m_after) return "";
 
-    // The sketch this op edits — used as the rebind anchor at load time. Prefer
+    // The sketch this op edits - used as the rebind anchor at load time. Prefer
     // the live-pointer lookup, but fall back to the id cached at creation time
     // (setSketchId) if the target pointer no longer resolves in the document.
     // Without the fallback a stale/replaced m_target made this return "", which
-    // saved the step with NO params — so it reloaded as a frozen ReplayOp and
+    // saved the step with NO params - so it reloaded as a frozen ReplayOp and
     // raised the "frozen steps" warning for what is really a normal edit.
     int sketchId = doc.findSketchId(m_target.get());
     if (sketchId < 0) sketchId = m_sketchId;
@@ -335,7 +335,7 @@ void SketchEditOp::getEditedElements(std::set<int>& lines, std::set<int>& circle
         for (const auto& e : vec) if (e.id == id) return true;
         return false;
     };
-    // No before-snapshot (e.g. a reloaded op) — highlight everything in after,
+    // No before-snapshot (e.g. a reloaded op) - highlight everything in after,
     // so the user still sees which sketch the step touches.
     const bool haveBefore = static_cast<bool>(m_before);
     for (const auto& l : m_after->getLines())
@@ -362,7 +362,7 @@ void SketchEditOp::renderProperties() {
         return;
     }
     // Edit dimensional values inline. For each change we re-solve `m_after`
-    // so dependent geometry catches up — Apply Changes then copies the
+    // so dependent geometry catches up - Apply Changes then copies the
     // solved snapshot onto the live sketch via editStep / execute().
     auto resolveAfter = [&]() {
         SketchSolver solver;
@@ -375,7 +375,7 @@ void SketchEditOp::renderProperties() {
         Constraint& c = cs[i];
         // Show only what THIS step introduced or changed. m_after is a FULL
         // snapshot, so iterating it raw re-lists every dimension the sketch has
-        // ever gained — every later step then showed all four circle diameters
+        // ever gained - every later step then showed all four circle diameters
         // regardless of whether it drew a line, a rectangle, or removed
         // something. Same before/after delta the row description() already
         // uses: skip a constraint that existed UNCHANGED before this step.
@@ -435,10 +435,10 @@ void SketchEditOp::renderProperties() {
     }
 
     // Constraint-less geometry: let a newly-added circle's DIAMETER be edited
-    // directly here (its centre stays put — the unambiguous case). Editing
+    // directly here (its centre stays put - the unambiguous case). Editing
     // writes straight to m_after's circle; Apply Changes (execute) copies the
     // resized sketch onto the live one. Lines/rectangles/arcs are intentionally
-    // left out — which point/side stays fixed is ambiguous without constraints.
+    // left out - which point/side stays fixed is ambiguous without constraints.
     if (m_before) {
         std::vector<int> newCircleIds;
         for (const auto& c : m_after->getCircles()) {
@@ -462,7 +462,7 @@ void SketchEditOp::renderProperties() {
             if (materializr::lengthField(materializr::trFormat("Diameter (%s)", materializr::unitSuffix()).c_str(), &dia,
                                    ImGuiInputTextFlags_EnterReturnsTrue)) {
                 // Writes the after-snapshot AND records the edit so Apply can
-                // carry the new radius into later snapshots — otherwise the next
+                // carry the new radius into later snapshots - otherwise the next
                 // step's full snapshot overwrites it before any extrude reads it.
                 editCircleRadius(cid, std::max(dia, 1e-6) * 0.5);
             }
@@ -473,7 +473,7 @@ void SketchEditOp::renderProperties() {
 
     // NOTE: line / rectangle / arc *size* edits are intentionally NOT offered
     // here. They're edited live in the sketch's Properties panel (select the
-    // element while in the sketch) — editing them through a history step meant
+    // element while in the sketch) - editing them through a history step meant
     // replaying full per-step snapshots, which clobbered edits to anything but
     // the latest step. The Properties-panel path mutates the live sketch
     // directly and is undoable, so that's the single home for resizing.

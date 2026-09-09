@@ -30,7 +30,7 @@ namespace materializr {
 
 namespace {
 
-// Disk convention matches StepIO: files are Z-up (the CAD-world norm — FreeCAD
+// Disk convention matches StepIO: files are Z-up (the CAD-world norm - FreeCAD
 // included), the scene is Y-up. Rotate about +X by ±90°.
 TopoDS_Shape rotated(const TopoDS_Shape& s, double angle) {
     gp_Trsf t;
@@ -43,7 +43,7 @@ TopoDS_Shape rotated(const TopoDS_Shape& s, double angle) {
 }
 
 // Add a shape's solids as bodies; fall back to shells, then faces, then the
-// shape itself — the IgesIO cascade, so a faces-only file still lands visibly.
+// shape itself - the IgesIO cascade, so a faces-only file still lands visibly.
 int addShapeAsBodies(const TopoDS_Shape& shape, Document& doc, int& counter) {
     int added = 0;
     for (TopExp_Explorer ex(shape, TopAbs_SOLID); ex.More(); ex.Next()) {
@@ -72,12 +72,12 @@ int addShapeAsBodies(const TopoDS_Shape& shape, Document& doc, int& counter) {
 // Pre-scan guard against a length-prefix DoS in OCCT's BREP reader. The ASCII
 // BREP format is a run of section tables (Curves, Curve2ds, Surfaces, …) each
 // introduced by a "Keyword <count>" line, and BRepTools::Read trusts each
-// count — it reserves/reads that many records before validating anything. A
+// count - it reserves/reads that many records before validating anything. A
 // ~90-byte file whose header says "Curves 999999999" makes it spin/OOM for
 // many seconds, which neither OCC_CATCH_SIGNALS nor the try/catch below can
 // interrupt (it's a long allocation/read loop, not a signal or a throw). No
-// legitimate file can have a section count larger than its own byte size — a
-// single record is always several bytes on disk — so a count exceeding the
+// legitimate file can have a section count larger than its own byte size - a
+// single record is always several bytes on disk - so a count exceeding the
 // file length is provably fake. Reject those (and absurdly large files) up
 // front, before handing the path to the kernel reader.
 //
@@ -93,35 +93,35 @@ bool brepHeaderCountsSane(const std::string& filePath, std::string& why) {
     in.seekg(0, std::ios::end);
     std::streamoff endPos = in.tellg();
     in.seekg(0, std::ios::beg);
-    if (endPos < 0) return true; // unseekable — nothing to pre-scan, let OCCT try
+    if (endPos < 0) return true; // unseekable - nothing to pre-scan, let OCCT try
     const std::uintmax_t size = static_cast<std::uintmax_t>(endPos);
     if (size > kMaxBytes) {
-        why = "BREP file too large (> 512 MB) — refusing to load";
+        why = "BREP file too large (> 512 MB) - refusing to load";
         return false;
     }
 
     // The dangerous counts live on their own "Keyword <int>" lines in the
     // header run. Scan line-by-line; a section count can never exceed the file
-    // size in bytes, so that's the reject threshold (generous — real records
+    // size in bytes, so that's the reject threshold (generous - real records
     // are far bigger than a byte, so this never trips a valid file).
     //
     // A byte bound alone is not enough, though. A count that is small and
     // plausible but larger than the data actually present is just as fatal:
     // "TShapes 3" with no shape records behind it walks the reader off the end
-    // of a table it never populated and it dereferences the garbage —
+    // of a table it never populated and it dereferences the garbage -
     //
     //   #0 TopTools_ShapeSet::Read(TopoDS_Shape&, istream&, int)   <- SIGSEGV
     //   #1 TopTools_ShapeSet::Read(istream&, Message_ProgressRange&)
     //   #2 BRepTools::Read(...)
     //
-    // — which on Linux is caught by OSD's signal translation but on Windows is
+    // - which on Linux is caught by OSD's signal translation but on Windows is
     // an uncatchable SEH access violation that kills the process (verified on
     // CI with the app's own OSD::SetSignal in place; see readShapeGuarded).
     // Worse, it faults only sometimes, depending on what that memory holds.
     //
     // So bound each count by the LINES remaining after it as well. Every record
     // in the ASCII format is newline-terminated, and the multi-line ones (a
-    // TShape spans several) only make this more conservative — a section
+    // TShape spans several) only make this more conservative - a section
     // claiming N records needs at least N more lines in the file, whatever
     // those records are. That is a lower bound no valid file can violate, so it
     // costs no legitimate file, and it is the check that catches the crash.
@@ -149,7 +149,7 @@ bool brepHeaderCountsSane(const std::string& filePath, std::string& why) {
             if (!(ls >> count)) break; // not a count line for this keyword
             if (count > size) {
                 why = std::string("BREP header declares an impossible ") + kw +
-                      " count — refusing (likely a malformed/hostile file)";
+                      " count - refusing (likely a malformed/hostile file)";
                 return false;
             }
             if (count > 0) declared.push_back({kw, count, lineNo});
@@ -165,7 +165,7 @@ bool brepHeaderCountsSane(const std::string& filePath, std::string& why) {
             why = std::string("BREP file is truncated: the header declares ") +
                   std::to_string(d.count) + " " + d.keyword +
                   " but only " + std::to_string(remaining) +
-                  " lines follow — refusing";
+                  " lines follow - refusing";
             return false;
         }
     }
@@ -179,7 +179,7 @@ bool brepHeaderCountsSane(const std::string& filePath, std::string& why) {
 // Standard_Failure ("SIGSEGV 'segmentation violation' detected. Address 18.").
 // On Windows it is NOT. Measured on CI with OSD::SetSignal(Standard_False)
 // installed exactly as the app does at startup, a malformed file still ended
-// the process with "SEH exception with code 0xc0000005" — OCCT's translation
+// the process with "SEH exception with code 0xc0000005" - OCCT's translation
 // does not cover this path there, so the app died with the user's unsaved work.
 //
 // __try/__except catches it deterministically, which is the same containment
@@ -193,7 +193,7 @@ bool brepHeaderCountsSane(const std::string& filePath, std::string& why) {
 // the __try frame holding nothing but the call itself.
 //
 // Recovering from an access violation is a last line of defence, not a licence
-// to be careless — the guard above is what should keep us out of here. The
+// to be careless - the guard above is what should keep us out of here. The
 // shape is discarded on this path, so nothing half-built escapes.
 static bool readShapeRaw(TopoDS_Shape& shape, const char* path,
                          BRep_Builder& builder) {
@@ -236,12 +236,12 @@ ImportResult BrepIO::import(const std::string& filePath, Document& doc) {
             return result;
         }
         // Disk Z-up → scene Y-up: −90° about +X, matching StepIO/StlIO.
-        // (The signs were briefly inverted — self-consistent, so a round-trip
+        // (The signs were briefly inverted - self-consistent, so a round-trip
         // through our own pair looked fine, but files disagreed with our STEP
         // exports by 180°. #45.)
         shape = rotated(shape, -M_PI * 0.5);
 
-        // A top-level compound is our own multi-body export (or FreeCAD's) —
+        // A top-level compound is our own multi-body export (or FreeCAD's) -
         // each child becomes its own body so they stay individually editable.
         int counter = 0;
         int imported = 0;

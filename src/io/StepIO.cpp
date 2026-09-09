@@ -34,7 +34,7 @@ ImportResult StepIO::import(const std::string& filePath, Document& doc) {
     // OCCT can throw Standard_Failure on malformed or unusually complex STEP
     // geometry (during TransferRoots / shape handling). Catch it so a bad import
     // surfaces as a graceful error instead of an uncaught exception that aborts
-    // the whole process — which on Android shows up as an instant crash.
+    // the whole process - which on Android shows up as an instant crash.
     try {
     OCC_CATCH_SIGNALS // convert an OCCT kernel fault on a crafted file into the catch below
     STEPControl_Reader reader;
@@ -73,7 +73,7 @@ ImportResult StepIO::import(const std::string& filePath, Document& doc) {
     // keep imported models standing on their natural ground plane, rotate every
     // shape -90° around X so the source's +Z becomes world +Y. Y-up STEP files
     // would arrive tilted under this rule and can be straightened with the
-    // Rotate gizmo after import — a rare case in practice.
+    // Rotate gizmo after import - a rare case in practice.
     gp_Trsf zUpToYUp;
     zUpToYUp.SetRotation(gp_Ax1(gp_Pnt(0.0, 0.0, 0.0), gp_Dir(1.0, 0.0, 0.0)),
                          -M_PI * 0.5);

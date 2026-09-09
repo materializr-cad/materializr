@@ -2,13 +2,13 @@
 // that lands on it) must follow the sketch when the sketch is moved.
 //
 // Steve, 2026-07-31, looking at an irregular face: "the center marker might be
-// off." Two of the three things found were by design — the marker is the face's
+// off." Two of the three things found were by design - the marker is the face's
 // AREA centroid, so on an irregular face it isn't the middle of the bounding
 // box, and on a concave face it can sit outside the material; and holes count,
 // so an off-centre pocket pulls it away from itself.
 //
 // The third was a real bug. The centroid was cached in PLANE-RELATIVE 2D and
-// invalidated only by setSourceFace — but moving a sketch calls setPlane, which
+// invalidated only by setSourceFace - but moving a sketch calls setPlane, which
 // had no way to know the cache existed. The marker stayed behind by exactly the
 // distance moved. It is cached in 3D now (the centroid belongs to the face, not
 // to the plane) and projected on read.
@@ -36,7 +36,7 @@ gp_Pln xyPlane() {
 }
 
 // An L-shaped face at z=0: a 20x20 square with the top-right 10x10 removed.
-// Three 10x10 quadrants, so the area centroid is (25/3, 25/3) — NOT the
+// Three 10x10 quadrants, so the area centroid is (25/3, 25/3) - NOT the
 // bounding-box centre (10, 10), which is the notch corner.
 TopoDS_Face lFace() {
     BRepBuilderAPI_MakePolygon poly;

@@ -1,4 +1,4 @@
-# Sketch Dimension Tool — Design Spec
+# Sketch Dimension Tool - Design Spec
 
 **Date:** 2026-07-19
 **Status:** Approved (design), pending implementation
@@ -7,7 +7,7 @@
 ## Summary
 
 An Onshape-style dimension tool for sketch mode, bound to the `d` key. The user
-clicks sketch entities (points, lines, circles, arcs — regular or construction),
+clicks sketch entities (points, lines, circles, arcs - regular or construction),
 places a dimension label with a second click, and types a value. The tool
 creates driving constraints: distances, lengths, diameters, and angles.
 
@@ -32,7 +32,7 @@ time and no label placement.
 - Driven/reference dimensions (read-only dims on over-constrained geometry).
 - Dimensions on splines, polygons-as-units, or text glyph geometry.
 - Circle-to-line or circle-to-circle distance dimensions.
-- 3D (non-sketch) dimensioning — the existing `MeasureTool` covers measuring.
+- 3D (non-sketch) dimensioning - the existing `MeasureTool` covers measuring.
 
 ## UX Flow
 
@@ -45,7 +45,7 @@ time and no label placement.
 - `Esc` while in Dimension mode with no pending picks → back to Select mode.
   `Esc` with pending picks → clear picks, stay in Dimension mode.
 - Overlay hint text (same pattern as other sketch tools) shows current state:
-  "DIMENSION — click an entity" / "click second entity or place label" /
+  "DIMENSION - click an entity" / "click second entity or place label" /
   "click to place label".
 
 ### Entity picking
@@ -55,7 +55,7 @@ tolerances). Click sequence:
 
 | First pick | Then | Result |
 |---|---|---|
-| circle or arc | — | diameter dim → placing state |
+| circle or arc | - | diameter dim → placing state |
 | line | click empty space / place label | line length (Distance between endpoints) |
 | line | click second line, parallel within 1° | `DistancePointLine` (first line's start point ↔ second line) |
 | line | click second line, non-parallel | `Angle` |
@@ -89,7 +89,7 @@ constraint type replaces the old value instead of stacking a duplicate
 
 ### New constraint type
 
-`ConstraintType::DistancePointLine` — **appended** to the enum (append-only
+`ConstraintType::DistancePointLine` - **appended** to the enum (append-only
 policy for serialization stability).
 
 - `entityA` = point id, `entityB` = line id.
@@ -110,20 +110,20 @@ double labelOffX = 0.0;  // sketch-space offset of the dimension label
 double labelOffY = 0.0;  // from its auto-computed anchor; 0,0 = auto placement
 ```
 
-`(0,0)` means "legacy / auto placement" — existing constraints and old files
+`(0,0)` means "legacy / auto placement" - existing constraints and old files
 keep today's automatic label positioning.
 
 ### Tool state machine (`SketchTool`)
 
 `SketchToolMode::Dimension` added to the mode enum. New state on `SketchTool`:
 
-- `m_dimPickA` / `m_dimPickB` — picked entity refs (kind + id).
-- `m_dimPhase` — `PickFirst | PickSecondOrPlace | PlaceLabel`.
+- `m_dimPickA` / `m_dimPickB` - picked entity refs (kind + id).
+- `m_dimPhase` - `PickFirst | PickSecondOrPlace | PlaceLabel`.
 - Pair-resolution helper returning the constraint type + entity ids for a
   completed pick set (unit-testable pure logic).
 
 `SketchTool` owns picking and phase transitions. It does **not** create the
-constraint itself — it exposes the resolved pending dimension; the application
+constraint itself - it exposes the resolved pending dimension; the application
 layer commits it through the undo-recording path (same split as the existing
 `applyDimension` / `recordMutation` pattern in `SketchPlugin`).
 
@@ -140,7 +140,7 @@ layer commits it through the undo-recording path (same split as the existing
   - render `DistancePointLine` labels (anchor: midpoint of the perpendicular
     foot segment).
 - The existing click-to-edit popup (`##DimEdit`) works unchanged for the new
-  type — it edits `c.value` generically.
+  type - it edits `c.value` generically.
 
 ### Key binding (`Application.cpp`)
 
@@ -186,21 +186,21 @@ K id type entityA entityB value valueY labelOffX labelOffY
 
 - Zero-length line in `DistancePointLine` residual → 0 (no NaN into solver).
 - Deleting a referenced point/line: existing constraint-orphan cleanup path
-  must also cover the new type (entityB is a line id — verify the cleanup
+  must also cover the new type (entityB is a line id - verify the cleanup
   checks line ids for it).
 - Value input: parsed with the existing `parseFinite` guard; non-positive
   distance/diameter rejected (input stays open); angle clamped to (0°, 180°).
-- Over-constraint: no special casing — solver's existing
+- Over-constraint: no special casing - solver's existing
   `FullyConstrained/OverConstrained` status badge reports it, matching current
   behavior for the right-click menu.
 
 ## Testing
 
-Headless (ctest — run **unsandboxed**; sandboxed runs false-fail on /tmp writes):
+Headless (ctest - run **unsandboxed**; sandboxed runs false-fail on /tmp writes):
 
-1. **Solver:** `DistancePointLine` — free point converges to the target
+1. **Solver:** `DistancePointLine` - free point converges to the target
    distance from a fixed line; degenerate line doesn't NaN.
-2. **Pair resolution:** unit test the pure pick-resolution helper — all rows of
+2. **Pair resolution:** unit test the pure pick-resolution helper - all rows of
    the picking table above map to the right constraint type/entities,
    parallel-vs-angle threshold behaves at the 1° boundary.
 3. **Persistence:** round-trip a sketch containing a `DistancePointLine`

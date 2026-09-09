@@ -2,13 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Onshape-style dimension tool in sketch mode, bound to `d`: click entities, place a label, type a value — creating driving constraints (distance, length, diameter, angle, point-to-line).
+**Goal:** Onshape-style dimension tool in sketch mode, bound to `d`: click entities, place a label, type a value - creating driving constraints (distance, length, diameter, angle, point-to-line).
 
 **Architecture:** New `SketchToolMode::Dimension` state machine in `SketchTool` (picking + pair resolution, no mutations), a new solver constraint `DistancePointLine`, persisted label offsets on `Constraint`, and app-layer commit through `recordSketchMutation` reusing the existing `##DimEdit` popup for value entry.
 
 **Tech Stack:** C++17, ImGui, glm, OCCT (sketch plane only), GoogleTest + ctest, Unix Makefiles build in `build/`.
 
-**Spec:** `docs/superpowers/specs/2026-07-19-sketch-dimension-tool-design.md` — read it first.
+**Spec:** `docs/superpowers/specs/2026-07-19-sketch-dimension-tool-design.md` - read it first.
 
 ## Global Constraints
 
@@ -16,7 +16,7 @@
 - K-line format: new fields append at the END of the line; reader must accept 6-field legacy lines.
 - Repo root for all paths below: `materializr/` (the git repo). Build dir: `build/` (Unix Makefiles, already configured).
 - Build: `cmake --build build -j 8 --target <target>`; full: `cmake --build build -j 8`.
-- **ctest must run UNSANDBOXED** — sandboxed runs false-fail 5 file-IO suites on /tmp writes (see project memory).
+- **ctest must run UNSANDBOXED** - sandboxed runs false-fail 5 file-IO suites on /tmp writes (see project memory).
 - Existing `Angle` constraint semantics: **signed** angle of line B relative to line A, radians, wrapped to [-π, π] (`SketchSolver.cpp` `case ConstraintType::Angle`). Match it exactly.
 - Existing UI convention: circle/arc dims display and edit as **diameter**, stored as radius in `Constraint::value`.
 - Commits: normal messages, no Claude trailer (project policy).
@@ -33,7 +33,7 @@
 
 **Interfaces:**
 - Consumes: `Sketch::addPoint(glm::vec2)`, `Sketch::addLine(int,int)`, `Sketch::addConstraint(const Constraint&)` (assigns id, returns it), `SketchSolver::solve(Sketch&, int maxIterations, double tolerance)`.
-- Produces: `ConstraintType::DistancePointLine` — entityA = point id, entityB = line id, value = perpendicular distance to the infinite line. Later tasks rely on this exact meaning.
+- Produces: `ConstraintType::DistancePointLine` - entityA = point id, entityB = line id, value = perpendicular distance to the infinite line. Later tasks rely on this exact meaning.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -126,7 +126,7 @@ TEST(DistancePointLine, MissingEntitiesAreInert) {
 Register in `tests/CMakeLists.txt` (append at the end, matching neighbors):
 
 ```cmake
-# test_sketch_dimension — DistancePointLine solver, dimension pair resolution,
+# test_sketch_dimension - DistancePointLine solver, dimension pair resolution,
 # and K-line label-offset persistence (Onshape-style dimension tool).
 add_executable(test_sketch_dimension test_sketch_dimension.cpp)
 target_link_libraries(test_sketch_dimension PRIVATE materializr_core gtest gtest_main)
@@ -136,11 +136,11 @@ add_test(NAME test_sketch_dimension COMMAND test_sketch_dimension)
 - [ ] **Step 2: Run tests, verify they fail to compile**
 
 Run: `cmake --build build -j 8 --target test_sketch_dimension`
-Expected: compile error — `DistancePointLine` is not a member of `ConstraintType`.
+Expected: compile error - `DistancePointLine` is not a member of `ConstraintType`.
 
 - [ ] **Step 3: Add the enum value and implement the solver cases**
 
-`src/modeling/SketchConstraints.h` — append to the enum (comment style matches neighbors):
+`src/modeling/SketchConstraints.h` - append to the enum (comment style matches neighbors):
 
 ```cpp
     Concentric,    // two circles/arcs share same center
@@ -150,7 +150,7 @@ Expected: compile error — `DistancePointLine` is not a member of `ConstraintTy
 
 Do NOT add the label-offset fields yet (Task 2).
 
-`src/modeling/SketchSolver.cpp` — three additions:
+`src/modeling/SketchSolver.cpp` - three additions:
 
 1. In `solve()`'s `numEquations` switch:
 
@@ -221,7 +221,7 @@ Expected: all 3 tests PASS.
 
 - [ ] **Step 5: Orphan-cleanup sanity check (no code expected)**
 
-`Sketch::pruneOrphanPoints()` already drops any constraint whose `entityA`/`entityB` id vanished (generic id check over points AND elements — `src/modeling/Sketch.cpp:655`). Confirm by reading that function; `DistancePointLine` needs no special case. If that generic check has changed, add the new type to it.
+`Sketch::pruneOrphanPoints()` already drops any constraint whose `entityA`/`entityB` id vanished (generic id check over points AND elements - `src/modeling/Sketch.cpp:655`). Confirm by reading that function; `DistancePointLine` needs no special case. If that generic check has changed, add the new type to it.
 
 - [ ] **Step 6: Commit**
 
@@ -308,7 +308,7 @@ TEST(DimensionPersistence, KLineRoundTripsTypeAndLabelOffsets) {
 
 TEST(DimensionPersistence, LegacySixFieldKLineDefaultsOffsetsToZero) {
     // Save with the new writer, then truncate every K line back to the legacy
-    // 6-field form and reload — offsets must default to 0, load must succeed.
+    // 6-field form and reload - offsets must default to 0, load must succeed.
     Document doc;
     auto sk = std::make_shared<Sketch>();
     int a = sk->addPoint({0.0f, 0.0f});
@@ -364,7 +364,7 @@ Note: if `Document::getSketchIds()` doesn't exist under that name, find the real
 - [ ] **Step 2: Run tests, verify they fail**
 
 Run: `cmake --build build -j 8 --target test_sketch_dimension && ./build/tests/test_sketch_dimension --gtest_filter='DimensionPersistence.*'`
-Expected: FAIL — `labelOffX` not a member (compile), then after Step 3's header change, offsets not persisted (runtime).
+Expected: FAIL - `labelOffX` not a member (compile), then after Step 3's header change, offsets not persisted (runtime).
 
 - [ ] **Step 3: Implement**
 
@@ -378,7 +378,7 @@ Expected: FAIL — `labelOffX` not a member (compile), then after Step 3's heade
     double labelOffY = 0.0;
 ```
 
-`src/io/ProjectIO.cpp` writer (~line 328) — the K line becomes:
+`src/io/ProjectIO.cpp` writer (~line 328) - the K line becomes:
 
 ```cpp
         for (const auto& c : cns) {
@@ -391,7 +391,7 @@ Expected: FAIL — `labelOffX` not a member (compile), then after Step 3's heade
 
 Update the comment above it: the K line carries 8 fields, trailing two are label offsets, readers of older builds ignore trailing tokens.
 
-`src/io/ProjectIO.cpp` reader (~line 655) — after the existing extraction:
+`src/io/ProjectIO.cpp` reader (~line 655) - after the existing extraction:
 
 ```cpp
                 s >> t >> c.id >> tval >> c.entityA >> c.entityB >> c.value >> c.valueY;
@@ -579,12 +579,12 @@ TEST(DimensionResolve, InvalidCombosAreInvalid) {
 }
 ```
 
-Note on `resolveDimension` line-vs-line normalization: the tests pin **first-picked line = entityA / reference**; for the parallel case entityA is the SECOND line's start point measured against the FIRST line (`entityB` = first line id)… careful: `DistancePointLine` defines entityA = point, entityB = line. The test above encodes: pair (lineAB first, lineCD second) → point = `lnCD`'s start (`pC`), line = `lnAB`. That matches the spec ("first line's start point ↔ second line") mirrored — **the test is the source of truth here: point from the second-picked line, measured to the first-picked line**, which keeps the first pick as the reference entity for both the parallel and angle branches. (Deviation from spec wording, same geometry — note it in the commit message.)
+Note on `resolveDimension` line-vs-line normalization: the tests pin **first-picked line = entityA / reference**; for the parallel case entityA is the SECOND line's start point measured against the FIRST line (`entityB` = first line id)… careful: `DistancePointLine` defines entityA = point, entityB = line. The test above encodes: pair (lineAB first, lineCD second) → point = `lnCD`'s start (`pC`), line = `lnAB`. That matches the spec ("first line's start point ↔ second line") mirrored - **the test is the source of truth here: point from the second-picked line, measured to the first-picked line**, which keeps the first pick as the reference entity for both the parallel and angle branches. (Deviation from spec wording, same geometry - note it in the commit message.)
 
 - [ ] **Step 2: Run tests, verify they fail to compile**
 
 Run: `cmake --build build -j 8 --target test_sketch_dimension`
-Expected: compile error — `resolveDimension` / `DimPick` not declared.
+Expected: compile error - `resolveDimension` / `DimPick` not declared.
 
 - [ ] **Step 3: Implement in SketchTool**
 
@@ -609,13 +609,13 @@ Expected: compile error — `resolveDimension` / `DimPick` not declared.
 
 1. `setMode()`: entering or leaving `Dimension` calls `clearDimState()`.
 
-2. `onMouseDown()` dispatch: add `case SketchToolMode::Dimension: handleDimensionTool(pos); break;` (use the RAW cursor like Trim — no snapping; see the comment at the top of `onMouseDown`).
+2. `onMouseDown()` dispatch: add `case SketchToolMode::Dimension: handleDimensionTool(pos); break;` (use the RAW cursor like Trim - no snapping; see the comment at the top of `onMouseDown`).
 
 3. `onMouseMove()`: in Dimension mode just record `m_currentPos = pos;` (the viewport reads it for the ghost label) and return before snapping logic.
 
-4. `onCancel()`: in Dimension mode — if `m_dimPhase != DimPhase::PickFirst || m_dimReady`, `clearDimState()`; else `setMode(SketchToolMode::Select)`.
+4. `onCancel()`: in Dimension mode - if `m_dimPhase != DimPhase::PickFirst || m_dimReady`, `clearDimState()`; else `setMode(SketchToolMode::Select)`.
 
-5. Hit test — same priority and tolerance as `handleSelectTool` (point → line → circle/arc, `tol = std::max(m_gridStep * 0.5f, 0.5f) * snapScale()`); factor the shared scan or duplicate it (~40 lines), returning `DimPick`:
+5. Hit test - same priority and tolerance as `handleSelectTool` (point → line → circle/arc, `tol = std::max(m_gridStep * 0.5f, 0.5f) * snapScale()`); factor the shared scan or duplicate it (~40 lines), returning `DimPick`:
 
 ```cpp
 DimPick SketchTool::hitTestDimEntity(glm::vec2 pos) const {
@@ -629,7 +629,7 @@ DimPick SketchTool::hitTestDimEntity(glm::vec2 pos) const {
         return out;
     }
     const float tol = std::max(m_gridStep * 0.5f, 0.5f) * snapScale();
-    // Lines (segment distance), skipping fromText — same math as handleSelectTool.
+    // Lines (segment distance), skipping fromText - same math as handleSelectTool.
     float bestD = 0.0f; int bestLine = -1;
     for (const auto& l : m_sketch->getLines()) {
         if (l.fromText) continue;
@@ -644,7 +644,7 @@ DimPick SketchTool::hitTestDimEntity(glm::vec2 pos) const {
         if (d < tol && (bestLine < 0 || d < bestD)) { bestLine = l.id; bestD = d; }
     }
     if (bestLine >= 0) return {DimEntityKind::Line, bestLine};
-    // Circle then arc perimeters — same as handleSelectTool.
+    // Circle then arc perimeters - same as handleSelectTool.
     float bestCd = 0.0f; int bestCircle = -1;
     for (const auto& c : m_sketch->getCircles()) {
         const SketchPoint* ctr = m_sketch->getPoint(c.centerPointId);
@@ -791,7 +791,7 @@ PendingDimension SketchTool::resolveDimension(const Sketch& sk, DimPick a, DimPi
         if (!lineEnds(a.id, as, ae) || !lineEnds(b.id, bs, be)) return out;
         glm::vec2 da = ae - as, db = be - bs;
         if (glm::length(da) < 1e-10f || glm::length(db) < 1e-10f) return out;
-        // Signed angle of B relative to A, wrapped to [-π, π] — same
+        // Signed angle of B relative to A, wrapped to [-π, π] - same
         // convention as the solver's Angle error term.
         double ang = std::atan2(db.y, db.x) - std::atan2(da.y, da.x);
         while (ang >  M_PI) ang -= 2.0 * M_PI;
@@ -815,7 +815,7 @@ PendingDimension SketchTool::resolveDimension(const Sketch& sk, DimPick a, DimPi
 }
 ```
 
-Needs `#include <cmath>` and `M_PI` (already used elsewhere in the file's includes — verify).
+Needs `#include <cmath>` and `M_PI` (already used elsewhere in the file's includes - verify).
 
 Accessor bodies (header, inline): `getDimPhase`, `getDimPickA`, `getPendingDimension`, `getDimLabelPos`, `dimReadyToCommit` return the corresponding members; `dimHitTest(pos)` forwards to `hitTestDimEntity(pos)`.
 
@@ -838,7 +838,7 @@ git commit -m "sketch: Dimension tool state machine + pick resolution (line-line
 
 ---
 
-### Task 4: App integration — `d` key, click routing, commit path
+### Task 4: App integration - `d` key, click routing, commit path
 
 **Files:**
 - Modify: `src/app/Application.h` (declare `applyPendingDimension()`)
@@ -847,14 +847,14 @@ git commit -m "sketch: Dimension tool state machine + pick resolution (line-line
 
 **Interfaces:**
 - Consumes: `SketchTool` Dimension API (Task 3), `recordSketchMutation(fn)`, `m_activeSketch`, `m_dimEditingId` / `m_dimEditingBuf` / `m_dimEditingFocus` + `##DimEdit` popup (existing, `Application_Viewport.cpp` ~2344-2560).
-- Produces: `void Application::applyPendingDimension();` — commits the tool's pending dimension as one undoable constraint add (with dedup-replace), then opens the existing value-edit popup on it.
+- Produces: `void Application::applyPendingDimension();` - commits the tool's pending dimension as one undoable constraint add (with dedup-replace), then opens the existing value-edit popup on it.
 
 - [ ] **Step 1: Key binding**
 
 `src/app/Application.cpp`, immediately BEFORE the Ctrl+D duplicate block (~line 2340):
 
 ```cpp
-    // Plain D — Dimension tool in sketch mode (Onshape-style). Ctrl+D stays
+    // Plain D - Dimension tool in sketch mode (Onshape-style). Ctrl+D stays
     // Duplicate (handled below); text-input focus swallows the key.
     if (m_inSketchMode && m_sketchTool && !io.KeyCtrl && !io.WantTextInput &&
         ImGui::IsKeyPressed(ImGuiKey_D, false)) {
@@ -864,7 +864,7 @@ git commit -m "sketch: Dimension tool state machine + pick resolution (line-line
 
 - [ ] **Step 2: Commit path**
 
-`src/app/Application.h` — next to `applySketchConstraint` (line 338):
+`src/app/Application.h` - next to `applySketchConstraint` (line 338):
 
 ```cpp
     // Commit the Dimension tool's resolved pending dimension: one undoable
@@ -873,7 +873,7 @@ git commit -m "sketch: Dimension tool state machine + pick resolution (line-line
     void applyPendingDimension();
 ```
 
-`src/app/Application.cpp` — after `applySketchConstraint`:
+`src/app/Application.cpp` - after `applySketchConstraint`:
 
 ```cpp
 void Application::applyPendingDimension() {
@@ -884,14 +884,14 @@ void Application::applyPendingDimension() {
     // Label offset = placed position minus the auto anchor the renderer uses.
     // The renderer resolves anchor per type; store the raw placed position
     // relative to the dimension's geometric anchor (computed the same way the
-    // label pass does — see dimensionAutoAnchor in Application_Viewport.cpp).
+    // label pass does - see dimensionAutoAnchor in Application_Viewport.cpp).
     glm::vec2 anchor = dimensionAutoAnchor(pd);           // Task 5 helper
     glm::vec2 off = m_sketchTool->getDimLabelPos() - anchor;
 
     int editId = -1;
     recordSketchMutation([&] {
         // Dedup: same type on the same (unordered) entity pair replaces the
-        // value + label instead of stacking — matches applyDimension's policy.
+        // value + label instead of stacking - matches applyDimension's policy.
         for (const auto& c : m_activeSketch->getConstraints()) {
             if (c.type != pd.type) continue;
             bool same = (c.entityA == pd.entityA && c.entityB == pd.entityB);
@@ -915,7 +915,7 @@ void Application::applyPendingDimension() {
     });
     m_sketchTool->clearDimState();
 
-    // Open the existing edit popup, prefilled with the measured value —
+    // Open the existing edit popup, prefilled with the measured value -
     // Enter drives the geometry, Esc keeps the measured value.
     if (editId >= 0) {
         m_dimEditingId = editId;
@@ -934,8 +934,8 @@ void Application::applyPendingDimension() {
 ```
 
 Supporting pieces this step also adds:
-- `Sketch::updateConstraintValue(int id, double v)` and `Sketch::setConstraintLabelOffset(int id, double x, double y)` — if no value-setter exists yet (check `grep -n "updateConstraintValue\|setConstraint" src/modeling/Sketch.h`), add both as trivial find-and-set members in `Sketch.cpp` (the `##DimEdit` popup already writes values somehow — reuse THAT mechanism if present instead of adding a duplicate; adapt this code to whichever setter exists).
-- `bool m_dimOpenEditRequested = false;` on `Application` (`Application.h`, near `m_dimEditingId` — find with `grep -n "m_dimEditingId" src/app/Application.h`): the popup must be opened from the viewport window's ImGui scope; the existing label-click path calls `ImGui::OpenPopup("##DimEdit")` inline there. In the viewport's dimension-label section add:
+- `Sketch::updateConstraintValue(int id, double v)` and `Sketch::setConstraintLabelOffset(int id, double x, double y)` - if no value-setter exists yet (check `grep -n "updateConstraintValue\|setConstraint" src/modeling/Sketch.h`), add both as trivial find-and-set members in `Sketch.cpp` (the `##DimEdit` popup already writes values somehow - reuse THAT mechanism if present instead of adding a duplicate; adapt this code to whichever setter exists).
+- `bool m_dimOpenEditRequested = false;` on `Application` (`Application.h`, near `m_dimEditingId` - find with `grep -n "m_dimEditingId" src/app/Application.h`): the popup must be opened from the viewport window's ImGui scope; the existing label-click path calls `ImGui::OpenPopup("##DimEdit")` inline there. In the viewport's dimension-label section add:
 
 ```cpp
                 if (m_dimOpenEditRequested) {
@@ -948,11 +948,11 @@ Supporting pieces this step also adds:
 
 - [ ] **Step 3: Click routing**
 
-`src/app/Application_Viewport.cpp`, in the sketch mouse-down chain (~line 5805) — add a branch BEFORE the `materializr::touchMode()` branch (dimension picking must not fall into the press-drag-release paths):
+`src/app/Application_Viewport.cpp`, in the sketch mouse-down chain (~line 5805) - add a branch BEFORE the `materializr::touchMode()` branch (dimension picking must not fall into the press-drag-release paths):
 
 ```cpp
                     } else if (m_sketchTool->getMode() == SketchToolMode::Dimension) {
-                        // Picking mutates nothing — no undo record. The commit
+                        // Picking mutates nothing - no undo record. The commit
                         // below records the constraint add as one SketchEditOp.
                         m_sketchTool->onMouseDown(sketchCoord, false);
                         if (m_sketchTool->dimReadyToCommit())
@@ -969,12 +969,12 @@ Expected: clean. Manual smoke (needs a display; Little Snitch rule already persi
 
 ```bash
 git add src/app/Application.h src/app/Application.cpp src/app/Application_Viewport.cpp src/modeling/Sketch.h src/modeling/Sketch.cpp
-git commit -m "sketch: d-key Dimension tool — routing and constraint commit path"
+git commit -m "sketch: d-key Dimension tool - routing and constraint commit path"
 ```
 
 ---
 
-### Task 5: Viewport rendering — hover, ghost label, leaders, offsets
+### Task 5: Viewport rendering - hover, ghost label, leaders, offsets
 
 **Files:**
 - Modify: `src/app/Application_Viewport.cpp` (dimension-label pass at ~line 2344; sketch overlay for hover/ghost)
@@ -982,7 +982,7 @@ git commit -m "sketch: d-key Dimension tool — routing and constraint commit pa
 
 **Interfaces:**
 - Consumes: `SketchTool::dimHitTest`, `getDimPhase`, `getPendingDimension`, `getCurrentPos`, `Constraint::labelOffX/Y`.
-- Produces: `glm::vec2 Application::dimensionAutoAnchor(const PendingDimension&) const` — sketch-space auto anchor per dimension type; Task 4's commit already calls it (implement here, declare in the same commit as Task 4 if building incrementally — otherwise stub it returning the label pos so Task 4 compiles, then finish here).
+- Produces: `glm::vec2 Application::dimensionAutoAnchor(const PendingDimension&) const` - sketch-space auto anchor per dimension type; Task 4's commit already calls it (implement here, declare in the same commit as Task 4 if building incrementally - otherwise stub it returning the label pos so Task 4 compiles, then finish here).
 
 - [ ] **Step 1: Auto-anchor helper**
 
@@ -1097,7 +1097,7 @@ In the sketch overlay section (same scope as the label pass, where `dl`, `dim2wo
                 // entity; after picks resolve, ghost the pending label at the
                 // cursor with a leader from its anchor.
                 DimPick hov = m_sketchTool->dimHitTest(sketchCursor);
-                // sketchCursor: current mouse in sketch coords — reuse the
+                // sketchCursor: current mouse in sketch coords - reuse the
                 // same unprojection the click handler feeds onMouseDown.
                 if (hov.kind == DimEntityKind::Point) {
                     const SketchPoint* p = m_activeSketch->getPoint(hov.id);
@@ -1141,9 +1141,9 @@ In the sketch overlay section (same scope as the label pass, where `dl`, `dim2wo
                 }
 ```
 
-Also route mouse-move: where the sketch cursor position is computed each frame for other tools, call `m_sketchTool->onMouseMove(sketchCursor)` in Dimension mode too (check it isn't already called unconditionally — `grep -n "onMouseMove" src/app/Application_Viewport.cpp`).
+Also route mouse-move: where the sketch cursor position is computed each frame for other tools, call `m_sketchTool->onMouseMove(sketchCursor)` in Dimension mode too (check it isn't already called unconditionally - `grep -n "onMouseMove" src/app/Application_Viewport.cpp`).
 
-Overlay hint text — `SketchPlugin::renderOverlay` prints the mode banner; add a Dimension-mode banner (in `src/plugins/SketchPlugin.cpp`, `renderOverlay`):
+Overlay hint text - `SketchPlugin::renderOverlay` prints the mode banner; add a Dimension-mode banner (in `src/plugins/SketchPlugin.cpp`, `renderOverlay`):
 
 ```cpp
         // (inside renderOverlay, replacing the single Text call with a mode check)
@@ -1189,7 +1189,7 @@ git commit -m "sketch dimension tool: hover highlight, ghost label, leaders, sto
 
 - [ ] **Step 1: ToolAction + buttons + dispatch**
 
-`Toolbar.h` — in the sketch-tool group of the enum (line 17), append `SketchDimension` after `SketchSvg`.
+`Toolbar.h` - in the sketch-tool group of the enum (line 17), append `SketchDimension` after `SketchSvg`.
 
 `Toolbar.cpp` desktop row (after the Trim button, line ~649-650):
 
@@ -1219,7 +1219,7 @@ Update the mode-int comment at `Toolbar.cpp:126` to mention `12=Dimension`.
 
 - [ ] **Step 2: Help text**
 
-`HelpPanel.cpp` Sketching section — extend the existing string:
+`HelpPanel.cpp` Sketching section - extend the existing string:
 
 ```cpp
     section("Sketching",
@@ -1229,7 +1229,7 @@ Update the mode-int comment at `Toolbar.cpp:126` to mention `12=Dimension`.
         "lock the size. Press D for the Dimension tool: click a line, circle, "
         "two points, or two lines (parallel = distance, angled = angle), "
         "click to place the label, then type the value. Switch to Select / "
-        "Move to drag existing points and lines — double-click empties to "
+        "Move to drag existing points and lines - double-click empties to "
         "select the whole sketch, then use Copy / Mirror / Rotate. Click "
         "Finish Sketch (or press Enter) to exit.");
 ```
@@ -1266,5 +1266,5 @@ git commit -m "sketch dimension tool: toolbar button, D shortcut help"
 
 - **Spec deviation, line-line reference:** spec says "first line's start point ↔ second line"; the plan (and tests) use second line's start point ↔ first line, keeping the first pick as the reference entity in both parallel and angle branches. Same geometry, more consistent; noted in Task 3's commit message.
 - **Value input reuse:** spec's "inline input at the label" is implemented by opening the existing `##DimEdit` popup (already positioned at the clicked label, already converts diameter/degrees). One input path, not two.
-- **Orphan cleanup:** verified generic in `Sketch::pruneOrphanPoints()` — no per-type change needed (Task 1 Step 5 double-checks).
-- **Angle spec "clamped to (0°,180°)":** existing Angle is signed [-π,π] and `##DimEdit` already handles it; the ghost label shows `abs()`. No new clamping introduced — behavior matches existing Angle constraint edits.
+- **Orphan cleanup:** verified generic in `Sketch::pruneOrphanPoints()` - no per-type change needed (Task 1 Step 5 double-checks).
+- **Angle spec "clamped to (0°,180°)":** existing Angle is signed [-π,π] and `##DimEdit` already handles it; the ghost label shows `abs()`. No new clamping introduced - behavior matches existing Angle constraint edits.

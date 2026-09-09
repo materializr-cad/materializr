@@ -31,7 +31,7 @@ float distSqPointSegment(glm::vec2 q, glm::vec2 p1, glm::vec2 p2) {
     return glm::dot(v, v);
 }
 
-// True if theta lies within the arc sweeping CCW from startAngle to endAngle —
+// True if theta lies within the arc sweeping CCW from startAngle to endAngle -
 // the convention every SketchArc stores (see Sketch::addArc and the arc branch
 // of SketchTool's commitMirror).
 bool angleInArcCCW(float theta, float startAngle, float endAngle) {
@@ -387,7 +387,7 @@ namespace {
 
 // Right of travel: rotate the tangent by -90 degrees. For a counter-clockwise
 // closed chain this points outward, which is why a positive `d` reads as
-// "outward" there — but the caller must still take the sign from the cursor,
+// "outward" there - but the caller must still take the sign from the cursor,
 // because the walk's travel direction is arbitrary.
 glm::vec2 rightNormal(glm::vec2 t) { return {t.y, -t.x}; }
 
@@ -502,7 +502,7 @@ bool joinPoint(const OffsetSeg& a, const OffsetSeg& b, glm::vec2 v,
                glm::vec2& out) {
     std::vector<glm::vec2> cands;
     // A sampled curve carries no analytic curve to intersect. Rather than
-    // invent one, report "no join" — the caller rounds the corner instead,
+    // invent one, report "no join" - the caller rounds the corner instead,
     // which is exact.
     if (a.kind == OffsetSeg::Kind::Spline || b.kind == OffsetSeg::Kind::Spline)
         return false;
@@ -633,7 +633,7 @@ OffsetResult offsetChain(const OffsetChain& ch, float d, OffsetCorners corners) 
         if (std::abs(cross) < 1e-6f && dot > 0.0f) continue;
 
         const bool opening = (cross * d) > 0.0f;
-        // A full reversal (cusp) has no miter — it meets at infinity — so it is
+        // A full reversal (cusp) has no miter - it meets at infinity - so it is
         // always rounded regardless of the requested style.
         const bool reversal = std::abs(cross) < 1e-6f && dot <= 0.0f;
 
@@ -792,8 +792,8 @@ void pruneOffset(OffsetResult& res, const OffsetChain& src, float d) {
     const float ad = std::abs(d);
     // The invariant can only be enforced to the accuracy of the representation.
     // A line or arc offset is exact, so the band is razor-thin. A SPLINE offset
-    // is a sampled approximation whose error goes as curvature x spacing^2 —
-    // comfortably more than 1e-3 mm — so an analytic epsilon condemns perfectly
+    // is a sampled approximation whose error goes as curvature x spacing^2 -
+    // comfortably more than 1e-3 mm - so an analytic epsilon condemns perfectly
     // good curve and chops one smooth offset into three abutting pieces.
     bool hasSpline = false;
     for (const OffsetSeg& s : src.segs)
@@ -952,7 +952,7 @@ void applyOffset(Sketch& sk, const OffsetResult& res,
         case OffsetSeg::Kind::Spline: {
             if (s.pts.size() < 2) break;
             // The CAP matters more than the tolerance here. Chasing a very
-            // tight fit produced ~40 control points for a 5-point source — a
+            // tight fit produced ~40 control points for a 5-point source - a
             // solid mass of vertex markers that is horrible to edit and hides
             // the curve. An offset of a 5-point spline should be about a
             // 5-point spline, so allow at most double the source's density and
@@ -973,7 +973,7 @@ void applyOffset(Sketch& sk, const OffsetResult& res,
         case OffsetSeg::Kind::Arc: {
             int c = ptFor(s.c);
             // Sketch arcs are stored sweeping CCW from start to end, so a
-            // clockwise-travelled arc is committed with its ends swapped —
+            // clockwise-travelled arc is committed with its ends swapped -
             // geometrically the same arc, and arcs are undirected for region
             // building. (Same rule as commitMirror's reflected arcs.)
             glm::vec2 sp = (s.sweep >= 0.0f) ? s.p0 : s.p1;
@@ -1002,7 +1002,7 @@ void densifySegs(const std::vector<OffsetSeg>& segs,
 
     for (const OffsetSeg& s : segs) {
         // Start a new polyline whenever this segment does not continue the
-        // previous one — a pruned offset legitimately has gaps.
+        // previous one - a pruned offset legitimately has gaps.
         if (!run.empty()) {
             glm::vec2 d = s.p0 - run.back();
             if (glm::dot(d, d) > kJoinTol2) flush();

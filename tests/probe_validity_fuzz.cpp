@@ -1,4 +1,4 @@
-// probe_validity_fuzz — deterministic randomized validity sweep over the fragile
+// probe_validity_fuzz - deterministic randomized validity sweep over the fragile
 // kernel operations. Same seed => IDENTICAL case stream on every OCCT version,
 // so a divergence in valid/invalid/crash counts between kernels is a real kernel
 // behavior difference (not noise). Each case is fork-isolated (60s alarm) so a
@@ -9,7 +9,7 @@
 //   SUMMARY n=N valid=.. invalid=.. empty=.. exception=.. crash=.. hang=..
 //
 // "invalid" = op reported done (or a shape came back non-null) but
-// BRepCheck_Analyzer rejects it — i.e. a well-formedness bug in the kernel.
+// BRepCheck_Analyzer rejects it - i.e. a well-formedness bug in the kernel.
 
 #include <BRepAlgoAPI_Common.hxx>
 #include <BRepAlgoAPI_Cut.hxx>
@@ -122,7 +122,7 @@ static TopoDS_Shape doOp(int opcat, std::mt19937& rng, const char** label) {
             BRepOffsetAPI_MakeOffsetShape o;
             o.PerformByJoin(randPrim(rng), t(rng), 1e-3);
             return o.Shape(); }
-        default: { *label = "chain";   // cut then fillet the result — 2-stage
+        default: { *label = "chain";   // cut then fillet the result - 2-stage
             TopoDS_Shape b = BRepAlgoAPI_Cut(randPrim(rng), randPrim(rng)).Shape();
             if (b.IsNull() || nSolids(b) == 0) return b;
             std::uniform_real_distribution<double> r(0.2, 2.0);

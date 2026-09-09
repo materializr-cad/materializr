@@ -3,7 +3,7 @@
 // Portable scratch paths for tests.
 //
 // Several suites hardcoded "/tmp/...", which is fine on Linux and macOS and
-// simply does not exist on Windows — the file open fails and the surrounding
+// simply does not exist on Windows - the file open fails and the surrounding
 // ASSERT_TRUE(res.success) fires, so the test reports a product bug that is
 // really just an unwritable path. std::filesystem::temp_directory_path() picks
 // the right directory on all three (honouring TMPDIR on POSIX and

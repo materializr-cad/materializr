@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Cross-builds every native prerequisite of the iOS app into a static prefix:
 #   * FreeType 2.13.3 (static)
-#   * OpenCASCADE 7.9.3 (static — no dylib embedding, and static sidesteps the
+#   * OpenCASCADE 7.9.3 (static - no dylib embedding, and static sidesteps the
 #     empty-Standard_EXPORT inline-symbol problem documented for the Android
 #     shared build in android/scripts/setup-deps.sh)
 #   * SDL2 2.30.9 (static)
 #
-# Same pinned versions and SHA-256s as the Android build — one supply chain,
+# Same pinned versions and SHA-256s as the Android build - one supply chain,
 # two mobile targets. Run on macOS with Xcode 15+ and CMake 3.24+ installed.
 #
 # Env overrides:
@@ -40,7 +40,7 @@ xcrun --sdk "$SYSROOT" --show-sdk-path >/dev/null || { echo "Xcode SDK '$SYSROOT
 echo "SDK:    $SYSROOT (min iOS $MIN_IOS)"
 echo "PREFIX: $PREFIX"
 
-# Expected SHA-256 of each pinned source tarball — verified after download so a
+# Expected SHA-256 of each pinned source tarball - verified after download so a
 # corrupted mirror or tampered upstream can't slip in. Identical pins to
 # android/scripts/setup-deps.sh.
 SDL2_SHA256="24b574f71c87a763f50704bbb630cbe38298d544a1f890f099a4696b1d6beba4"
@@ -51,13 +51,13 @@ fetch() { # url dest sha256
     [ -f "$2" ] || curl -L --fail --retry 3 -o "$2" "$1"
     if [ -n "$3" ]; then
         echo "$3  $2" | shasum -a 256 -c - || {
-            echo "ERROR: checksum mismatch for $2 — refusing to build." >&2
+            echo "ERROR: checksum mismatch for $2 - refusing to build." >&2
             rm -f "$2"; exit 1
         }
     fi
 }
 
-# Shared iOS cross-compile settings. CMake supports iOS natively — no
+# Shared iOS cross-compile settings. CMake supports iOS natively - no
 # third-party toolchain file. TRY_COMPILE=STATIC_LIBRARY lets configure-time
 # feature checks link without an iOS code-signing identity.
 IOS_CMAKE_FLAGS=(
@@ -84,7 +84,7 @@ cmake -S "$SRC/freetype-$FT_VER" -B "$BUILD/freetype-$PLATFORM" \
 cmake --build "$BUILD/freetype-$PLATFORM" --target install -j"$JOBS"
 
 # ── OpenCASCADE (static) ─────────────────────────────────────────────────────
-# Same module set as Android. Keep 7.9.x — do not bump to 8.0.x without
+# Same module set as Android. Keep 7.9.x - do not bump to 8.0.x without
 # re-reading the version note in android/scripts/setup-deps.sh; the known
 # failure is shared-lib-specific, but stay in lockstep until verified.
 fetch "https://github.com/Open-Cascade-SAS/OCCT/archive/refs/tags/$OCCT_TAG.tar.gz" "$DL/occt.tar.gz" "$OCCT_SHA256"
@@ -110,7 +110,7 @@ fetch "https://github.com/libsdl-org/SDL/releases/download/release-$SDL_VER/SDL2
 [ -d "$SRC/SDL2-$SDL_VER" ] || tar -xzf "$DL/sdl2.tar.gz" -C "$SRC"
 rm -rf "$BUILD/sdl2-$PLATFORM"
 # Joystick/haptic/sensor/hidapi OFF: a CAD app uses none of them, and their
-# iOS backends reference CoreBluetooth/CoreMotion/CoreHaptics/GameController —
+# iOS backends reference CoreBluetooth/CoreMotion/CoreHaptics/GameController -
 # App Store validation (ITMS-90683) demands purpose strings for APIs the
 # binary merely references. SDL keeps its public API as stubs, so callers
 # (e.g. ImGui's gamepad path) still link; the subsystems just report absent.

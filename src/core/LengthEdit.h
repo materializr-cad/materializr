@@ -4,7 +4,7 @@
 // these: it submits the ImGui item and hands the result here.
 //
 // Every function takes and returns MILLIMETRES on the model side. The display
-// side is a transient value that exists for one frame or one commit — it is
+// side is a transient value that exists for one frame or one commit - it is
 // never stored, which is what stops mm -> display -> mm drift from accumulating
 // on the float members most Ops use.
 
@@ -16,21 +16,6 @@
 
 namespace materializr {
 
-// M_PI is NOT standard C++. MSVC defines it only when <cmath> is reached with
-// _USE_MATH_DEFINES, and this header cannot assume that: the app target sets
-// it (CMakeLists.txt, MSVC branch) but materializr_core — which the tests and
-// every modeling Op build against — does not. The other M_PI users in core get
-// away with it because they include OpenCASCADE headers first, and OCCT
-// defines the macro itself; this header deliberately includes no OCCT, so in a
-// translation unit where it lands first there is nothing to supply it. Windows
-// CI caught exactly that, in eighteen Ops at once.
-//
-// A header should not depend on a macro its consumer's build happens to set.
-// tests/test_length_edit.cpp POISONS M_PI before including this, so the
-// dependency cannot come back unnoticed. It poisons rather than #undefs
-// because a bare #undef does not hold: this header includes <cmath>, which
-// defines the macro straight back.
-constexpr double kPi = 3.14159265358979323846;
 
 // A numeric field reported a change: the value the user now sees, in display
 // units, becomes the model value in mm. This is the ONLY write-back path for
@@ -39,7 +24,7 @@ constexpr double kPi = 3.14159265358979323846;
 inline double lengthFieldCommit(double displayValue) { return toMm(displayValue); }
 
 // A slider must convert its VALUE and its BOUNDS together, or a converted value
-// slides against mm bounds and the usable range is off by the unit factor —
+// slides against mm bounds and the usable range is off by the unit factor -
 // 304.8x under feet. Quantise the display value to the unit's own step so a
 // drag lands on round numbers in the unit the user is looking at.
 struct SliderShadow { double value, lo, hi; };
@@ -56,14 +41,14 @@ inline double quantiseDragMm(double mm) {
 }
 
 // Format a mm value into a text buffer in display units, digits only (no
-// suffix — the field's label carries it). Returns false when the buffer is
+// suffix - the field's label carries it). Returns false when the buffer is
 // too small; the buffer is then left untouched.
 inline bool formatLengthDigits(char* buf, size_t n, double mm) {
     const int written = std::snprintf(buf, n, "%.*f", unitInfo(currentUnit()).decimals, toDisplay(mm));
     return written >= 0 && static_cast<size_t>(written) < n;
 }
 
-// Reseed a text buffer from the model — but ONLY when that field is not being
+// Reseed a text buffer from the model - but ONLY when that field is not being
 // edited. The caller decides `active` BEFORE submitting the item (ImGui's
 // GetActiveID() against the field's own id), so an external change or a unit
 // switch shows correctly this frame while a half-typed value is never
@@ -94,7 +79,7 @@ inline bool seedDimensionText(char* buf, size_t n, DimKind kind, bool isArc, dou
 // Commit a typed dimension. Angle: degrees -> radians, no unit involved.
 // Otherwise: typed text -> mm FIRST (suffix honoured, else current unit), and
 // only THEN is a circle's diameter halved to the stored radius. Convert, then
-// halve — never the reverse, never twice. Returns false (value untouched) on
+// halve - never the reverse, never twice. Returns false (value untouched) on
 // unparseable input or a non-positive length.
 inline bool applyDimensionEdit(DimKind kind, bool isArc, const char* buf, double& value) {
     if (kind == DimKind::Angle) {

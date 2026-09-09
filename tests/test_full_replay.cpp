@@ -1,6 +1,6 @@
-// FULL HISTORY REPLAY — the contract Steve asked for: a saved project's every
+// FULL HISTORY REPLAY - the contract Steve asked for: a saved project's every
 // step reloads as a REAL, editable, re-executable operation (zero frozen
-// ReplayOps), and the whole chain replays from step 0 — including after an
+// ReplayOps), and the whole chain replays from step 0 - including after an
 // upstream sketch edit. The chain below exercises every op type that ships in
 // a project file's history alongside the ones with existing coverage:
 //   extrude, sketchedit, fillet, shell, thread, copy, align, mirror,
@@ -155,7 +155,7 @@ TEST(FullReplay, EveryOpReloadsEditableAndChainReplays) {
         ASSERT_TRUE(hist.pushOperation(std::move(op), doc)) << what;
     };
 
-    // 1. extrude — base slab from a sketch.
+    // 1. extrude - base slab from a sketch.
     int pa[4];
     auto skA = makeRect(0, 0, 30, 20, pa);
     int sidA = doc.addSketch(skA);
@@ -168,7 +168,7 @@ TEST(FullReplay, EveryOpReloadsEditableAndChainReplays) {
     }
     const int bodyA = doc.getAllBodyIds().front();
 
-    // 2. sketchedit — widen the slab 30 -> 34 and cascade the extrude.
+    // 2. sketchedit - widen the slab 30 -> 34 and cascade the extrude.
     {
         auto before = std::make_shared<Sketch>(*skA);
         skA->movePoint(pa[1], {34.0f, 0.0f});
@@ -182,7 +182,7 @@ TEST(FullReplay, EveryOpReloadsEditableAndChainReplays) {
         ASSERT_TRUE(hist.editStep(0, doc, /*transactional=*/true));
     }
 
-    // 3. fillet — a vertical corner of the slab.
+    // 3. fillet - a vertical corner of the slab.
     {
         auto fil = std::make_unique<FilletOp>();
         fil->setBody(bodyA);
@@ -191,7 +191,7 @@ TEST(FullReplay, EveryOpReloadsEditableAndChainReplays) {
         push(std::move(fil), "fillet A");
     }
 
-    // 4. shell — hollow the slab, top open.
+    // 4. shell - hollow the slab, top open.
     {
         auto sh = std::make_unique<ShellOp>();
         sh->setBody(bodyA);
@@ -200,7 +200,7 @@ TEST(FullReplay, EveryOpReloadsEditableAndChainReplays) {
         push(std::move(sh), "shell A");
     }
 
-    // 5. extrude — a cylinder (thread target), well away from the slab.
+    // 5. extrude - a cylinder (thread target), well away from the slab.
     auto skB = std::make_shared<Sketch>();
     skB->setPlane(gp_Pln(gp_Ax3(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1), gp_Dir(1, 0, 0))));
     int cB = skB->addPoint({80.0f, 10.0f});
@@ -218,7 +218,7 @@ TEST(FullReplay, EveryOpReloadsEditableAndChainReplays) {
         ASSERT_GE(bodyB, 0);
     }
 
-    // 6. thread — on the cylinder (swept fast path).
+    // 6. thread - on the cylinder (swept fast path).
     {
         auto th = std::make_unique<ThreadOp>();
         th->setBody(bodyB);
@@ -232,7 +232,7 @@ TEST(FullReplay, EveryOpReloadsEditableAndChainReplays) {
         push(std::move(th), "thread B");
     }
 
-    // 7. copy — duplicate the slab at an offset.
+    // 7. copy - duplicate the slab at an offset.
     int bodyC = -1;
     {
         auto cp = std::make_unique<CopyOp>();
@@ -244,7 +244,7 @@ TEST(FullReplay, EveryOpReloadsEditableAndChainReplays) {
         ASSERT_GE(bodyC, 0);
     }
 
-    // 8. align — nudge the copy.
+    // 8. align - nudge the copy.
     {
         auto al = std::make_unique<AlignOp>();
         al->setBodyId(bodyC);
@@ -253,7 +253,7 @@ TEST(FullReplay, EveryOpReloadsEditableAndChainReplays) {
         push(std::move(al), "align C");
     }
 
-    // 9. mirror — the slab across a custom plane, keeping the original.
+    // 9. mirror - the slab across a custom plane, keeping the original.
     {
         auto mi = std::make_unique<MirrorOp>();
         mi->setBody(bodyA);
@@ -262,7 +262,7 @@ TEST(FullReplay, EveryOpReloadsEditableAndChainReplays) {
         push(std::move(mi), "mirror A");
     }
 
-    // 10. split — the copy, halfway up.
+    // 10. split - the copy, halfway up.
     {
         auto sp = std::make_unique<SplitBodyOp>();
         sp->setBody(bodyC);
@@ -271,7 +271,7 @@ TEST(FullReplay, EveryOpReloadsEditableAndChainReplays) {
         push(std::move(sp), "split C");
     }
 
-    // 11. transform — move the copy's lower half.
+    // 11. transform - move the copy's lower half.
     {
         auto tr = std::make_unique<TransformOp>();
         tr->setBodyId(bodyC);
@@ -317,7 +317,7 @@ TEST(FullReplay, EveryOpReloadsEditableAndChainReplays) {
         }
     }
 
-    // 16. sketchtransform — move a standalone sketch's plane.
+    // 16. sketchtransform - move a standalone sketch's plane.
     {
         auto skS = std::make_shared<Sketch>();
         skS->setPlane(gp_Pln(gp_Ax3(gp_Pnt(0, 0, 60), gp_Dir(0, 0, 1),
@@ -333,7 +333,7 @@ TEST(FullReplay, EveryOpReloadsEditableAndChainReplays) {
         push(std::move(st), "sketch transform");
     }
 
-    // 17. loft — between two rectangles at different heights.
+    // 17. loft - between two rectangles at different heights.
     {
         BRepBuilderAPI_MakePolygon w1, w2;
         w1.Add(gp_Pnt(120, 0, 0));  w1.Add(gp_Pnt(140, 0, 0));
@@ -347,7 +347,7 @@ TEST(FullReplay, EveryOpReloadsEditableAndChainReplays) {
         push(std::move(lo), "loft");
     }
 
-    // 18. sweep — a small disc along an L path; then 19. delete it.
+    // 18. sweep - a small disc along an L path; then 19. delete it.
     int sweepBody = -1;
     {
         std::vector<int> preIds = doc.getAllBodyIds();
@@ -374,7 +374,7 @@ TEST(FullReplay, EveryOpReloadsEditableAndChainReplays) {
         push(std::move(de), "delete sweep");
     }
 
-    // 20. extrude, face-driven — picked profile persists as a BREP blob.
+    // 20. extrude, face-driven - picked profile persists as a BREP blob.
     {
         gp_Circ c(gp_Ax2(gp_Pnt(200, 0, 0), gp_Dir(0, 0, 1)), 5.0);
         TopoDS_Edge ce = BRepBuilderAPI_MakeEdge(c).Edge();

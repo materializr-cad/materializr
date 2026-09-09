@@ -24,7 +24,7 @@ namespace materializr {
 namespace {
 
 // The ghost plane's colours, packed 0xAABBGGRR. A translucent fill so the body
-// still reads through it, with a solid outline — the fill alone disappears
+// still reads through it, with a solid outline - the fill alone disappears
 // against a light face, and the outline alone reads as a stray rectangle.
 //
 // AMBER, deliberately not blue: a body is selected whenever this tool is open,
@@ -52,7 +52,7 @@ gp_Dir SplitController::worldNormal(int userAxis) {
     // Axis labels follow user / 3D-printer convention (X = left/right,
     // Y = forward/back, Z = up), and Materializr's world is Y-up: user-Y is
     // world Z and user-Z is world Y. Same mapping the three Split plugin
-    // buttons carried before this controller replaced them — getting it wrong
+    // buttons carried before this controller replaced them - getting it wrong
     // silently cuts the body along the wrong axis, which still "works".
     switch (userAxis) {
         case 0:  return gp_Dir(1, 0, 0);
@@ -72,7 +72,7 @@ int SplitController::onBegin(const IopContext& ctx) {
     for (const auto& e : ctx.selection.getSelection())
         if (e.bodyId >= 0) { body = e.bodyId; break; }
     if (body < 0) return -1;
-    // Imported meshes decline topology edits — core/MeshGuard.h.
+    // Imported meshes decline topology edits - core/MeshGuard.h.
     if (ctx.refuseMesh && ctx.refuseMesh("Split")) return -1;
 
     try {

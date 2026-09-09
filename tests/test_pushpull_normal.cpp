@@ -1,6 +1,6 @@
 // Regression: push/pull ran BACKWARDS on a holed (annular) top face that was
 // orientation-reversed in a saved project. correctedOutwardNormal probed the
-// face's parametric centre — which on an annular face sits inside the hole — so
+// face's parametric centre - which on an annular face sits inside the hole - so
 // both ±ε classifier probes read OUTSIDE, the verdict was "ambiguous", and the
 // reversed (inward) normal was returned unchanged → the push/pull arrow + sign
 // inverted. The fix probes a point sampled ON the face material instead.
@@ -62,7 +62,7 @@ TEST(PushPullNormal, AnnularReversedTopFaceCorrectsOutward) {
 
 TEST(PushPullNormal, SolidTopFaceUnchanged) {
     // A plain solid plate: the (correctly oriented) top normal must be left
-    // outward, and a genuinely reversed one corrected — the common path still
+    // outward, and a genuinely reversed one corrected - the common path still
     // works after the holed-face fix.
     TopoDS_Shape part = BRepPrimAPI_MakeBox(gp_Pnt(0,0,0), 20, 20, 2).Shape();
     TopoDS_Face top = topFace(part, 2.0);

@@ -1,7 +1,7 @@
 // #55: a chamfer applied to an edge that a surface feature (drilled hole)
 // already crosses. OCCT's native blend fails there; the swept-wedge cut
 // fallback must produce EXACTLY the geometry of "chamfer first, feature
-// after" — the reorder the user would otherwise rebuild by hand. Also checks
+// after" - the reorder the user would otherwise rebuild by hand. Also checks
 // the fallback refuses what it can't honestly build (concave edges) and that
 // the native path still handles a plain box untouched.
 #include <gtest/gtest.h>
@@ -54,7 +54,7 @@ double volumeOf(const TopoDS_Shape& s) {
 
 // Count coplanar-adjacent face pairs: two planar faces in the SAME plane that
 // share an edge. The surface is geometrically flat there (a height map sees
-// nothing), but the viewport draws the shared edge as a boundary line — this
+// nothing), but the viewport draws the shared edge as a boundary line - this
 // is exactly the "fan of seams across the ramp" artifact. The right metric
 // for that class of bug; must be zero on a clean blend.
 int coplanarSeamPairs(const TopoDS_Shape& body) {
@@ -95,14 +95,14 @@ int coplanarSeamPairs(const TopoDS_Shape& body) {
 // Box 40x20x10; the "front top" edge runs along X at y=0, z=10.
 TopoDS_Shape plainBox() { return BRepPrimAPI_MakeBox(40.0, 20.0, 10.0).Shape(); }
 
-// Vertical 3mm-radius hole centred ON the front top edge at x=20 — bites a
+// Vertical 3mm-radius hole centred ON the front top edge at x=20 - bites a
 // half-cylinder channel through it, fragmenting the edge in two.
 TopoDS_Shape edgeCrossingHole() {
     gp_Ax2 ax(gp_Pnt(20.0, 0.0, -1.0), gp_Dir(0.0, 0.0, 1.0));
     return BRepPrimAPI_MakeCylinder(ax, 3.0, 12.0).Shape();
 }
 
-// Shallow rectangular pocket crossing the edge, floor at z=9 — INSIDE the
+// Shallow rectangular pocket crossing the edge, floor at z=9 - INSIDE the
 // 2mm bevel depth. This is the config where the native blend genuinely
 // fails on OCCT 7.9.3 (probe_chamfer_fail), so it exercises the fallback
 // end-to-end through ChamferOp.
@@ -181,7 +181,7 @@ double filletThenCutVolume(const TopoDS_Shape& tool, double r) {
 } // namespace
 
 // Native path untouched: a plain box chamfer must still build (and NOT via
-// the fallback — the bevel of a native chamfer is reported by the builder,
+// the fallback - the bevel of a native chamfer is reported by the builder,
 // but the simplest regression-proof is that it succeeds and stays valid).
 TEST(BlendCut, NativePathStillWorksOnPlainBox) {
     Document doc;
@@ -219,7 +219,7 @@ TEST(BlendCut, SymmetricChamferAcrossHoleMatchesReorder) {
     EXPECT_NEAR(volumeOf(out), ref, 1e-4);
 }
 
-// Same but asymmetric, with the setbacks aimed via the top face — including
+// Same but asymmetric, with the setbacks aimed via the top face - including
 // across the hole, where the reference face is the HOLED top (an inner wire,
 // same plane).
 TEST(BlendCut, AsymmetricChamferAcrossHoleMatchesReorder) {
@@ -244,7 +244,7 @@ TEST(BlendCut, AsymmetricChamferAcrossHoleMatchesReorder) {
 // Through the real op, on a config where the NATIVE build genuinely fails
 // (probe_chamfer_fail: shallow pocket whose floor sits inside the bevel
 // depth): ChamferOp must come back SUCCESSFUL with the reorder-equivalent
-// geometry — the fallback wiring end-to-end: ledger, generated faces,
+// geometry - the fallback wiring end-to-end: ledger, generated faces,
 // lineage ids.
 TEST(BlendCut, ChamferOpFallsBackAcrossShallowPocket) {
     Document doc;
@@ -295,7 +295,7 @@ TEST(BlendCut, ChamferOpFallsBackWhenBevelExceedsClearance) {
 
 // #56 / #59 follow-up: editing a FEATURE-CROSSED chamfer from history must
 // REBUILD it (through the same fallback the fresh apply took) to the same
-// geometry — not strand the step into a planar face. The graceful-revert of
+// geometry - not strand the step into a planar face. The graceful-revert of
 // #56 is the safety net; this pins that the net shouldn't need to fire for a
 // blend that the fallback CAN rebuild. editStep re-executes the op, so a
 // stranded rebuild would show as a changed final volume.
@@ -318,7 +318,7 @@ TEST(BlendCut, EditFeatureCrossedChamferRebuildsNotStrands) {
     ASSERT_GT(ref, 0.0);
     ASSERT_NEAR(vApplied, ref, 1e-4) << "setup: fresh apply took the fallback";
 
-    // THE EDIT: re-execute the step with UNCHANGED params — the case that
+    // THE EDIT: re-execute the step with UNCHANGED params - the case that
     // used to collapse to a planar face on the second pass.
     ASSERT_TRUE(hist.editStep(0, doc, /*transactional=*/true))
         << "editStep reverted instead of rebuilding the feature-crossed blend";
@@ -330,7 +330,7 @@ TEST(BlendCut, EditFeatureCrossedChamferRebuildsNotStrands) {
     const auto* c = dynamic_cast<const ChamferOp*>(hist.getStep(0));
     ASSERT_NE(c, nullptr);
     EXPECT_FALSE(c->getGeneratedFaces().empty())
-        << "no blend face after edit — collapsed to a planar face";
+        << "no blend face after edit - collapsed to a planar face";
 }
 
 // Fillet flavour of the core contract: hole first, then cutFillet over the
@@ -378,13 +378,13 @@ TEST(BlendCut, FilletOpFallsBackAcrossShallowPocket) {
 }
 
 // Steve's "chamfer through the hole" case (#57 follow-up): a rectangular
-// hole in the TOP FACE near — but not touching — the front edge. The edge
+// hole in the TOP FACE near - but not touching - the front edge. The edge
 // itself is whole; the bevel legitimately sweeps ACROSS the hole. Native
 // fails (hole inside the blend's reach); the fallback must build it and
 // match chamfer-first-then-hole exactly. The old single-midpoint setback
 // guard refused this whenever the hole sat across from the edge's middle.
 TEST(BlendCut, ChamferSweepsAcrossHoleInAdjacentFace) {
-    // Hole through the top face: x 15..25, y 3..7 — clearance 3mm from the
+    // Hole through the top face: x 15..25, y 3..7 - clearance 3mm from the
     // front edge, so a 5mm chamfer must pass over it.
     TopoDS_Shape holeTool = BRepPrimAPI_MakeBox(
         gp_Pnt(15.0, 3.0, 5.0), gp_Pnt(25.0, 7.0, 12.0)).Shape();
@@ -409,13 +409,13 @@ TEST(BlendCut, ChamferSweepsAcrossHoleInAdjacentFace) {
 }
 
 // Interior-corner chamfer (a FILL ramp) whose footprint crosses a hole in
-// the floor face — Steve's light-cover rim case (#57). Native handles the
+// the floor face - Steve's light-cover rim case (#57). Native handles the
 // clean corner but refuses once the ramp must cross the hole; the fill
 // fallback fuses the ramp over the full span and re-pierces the hole, which
 // must equal chamfer-first-then-hole exactly.
 TEST(BlendCut, FillRampSweepsAcrossHoleInFloor) {
     // Plate 40x20x2 with a 3mm wall along y=8..11; interior corner at y=8,
-    // z=2. Square hole through the plate at x 15..25, y 3..6 — 2mm clear of
+    // z=2. Square hole through the plate at x 15..25, y 3..6 - 2mm clear of
     // the corner, so a 2.5mm ramp must cross into it.
     auto plateWithWall = []() {
         TopoDS_Shape plate = BRepPrimAPI_MakeBox(40.0, 20.0, 2.0).Shape();
@@ -461,7 +461,7 @@ TEST(BlendCut, FillRampSweepsAcrossHoleInFloor) {
     }
     ASSERT_GT(ref, 0.0);
 
-    // Candidate: hole FIRST, then the same chamfer — the fill fallback.
+    // Candidate: hole FIRST, then the same chamfer - the fill fallback.
     Document doc;
     int id = doc.addBody(
         BRepAlgoAPI_Cut(plateWithWall(), holeTool).Shape(), "Holed");
@@ -480,7 +480,7 @@ TEST(BlendCut, FillRampSweepsAcrossHoleInFloor) {
 
 // Hip corner (#57 follow-up 3): a fill ramp ending at a corner whose
 // neighbouring edge already carries a (smaller) chamfer must MITER into that
-// bevel — hip-roof style — not punch a flat end wall up past it. Plate with
+// bevel - hip-roof style - not punch a flat end wall up past it. Plate with
 // two perpendicular walls: chamfer the short wall's base first (native),
 // then run the big fill ramp along the long wall (a pocket forces the fill
 // path). No material may stand above the neighbour's bevel plane.
@@ -541,7 +541,7 @@ TEST(BlendCut, FillRampMitersIntoNeighbourBevel) {
     }
     const TopoDS_Shape& out = doc.getBody(id);
     EXPECT_TRUE(BRepCheck_Analyzer(out).IsValid());
-    // The neighbour's bevel plane: from (4.5, y, 2) to (3, y, 3.5) —
+    // The neighbour's bevel plane: from (4.5, y, 2) to (3, y, 3.5) -
     // z = 2 + (4.5 - x). Sample just ABOVE it in the corner zone (where the
     // old flat prism cap poked through): all must be EMPTY.
     for (double x : {3.1, 3.5, 3.9, 4.3}) {
@@ -556,18 +556,18 @@ TEST(BlendCut, FillRampMitersIntoNeighbourBevel) {
     }
     // And the hip must EXIST: below BOTH slopes inside the corner strip there
     // is material (the ramp reaches the corner instead of stopping in a flat
-    // cap at the neighbour's toe — the old "weird angle" left this empty).
+    // cap at the neighbour's toe - the old "weird angle" left this empty).
     {
         gp_Pnt probe(4.0, 7.5, 2.3); // neighbour plane 2.5, own slope 4.25
         BRepClass3d_SolidClassifier sc(out, probe, 1e-7);
         EXPECT_EQ(sc.State(), TopAbs_IN)
-            << "hip region is hollow — ramp didn't reach the corner";
+            << "hip region is hollow - ramp didn't reach the corner";
     }
 }
 
 // Equal setbacks at the corner (#57 follow-up 4): when the fill ramp's
 // vertical setback MATCHES the neighbour's, the hip-clip plane passes
-// exactly through the prism's cap edge — the old half-space cut could hang
+// exactly through the prism's cap edge - the old half-space cut could hang
 // OCCT there (app went unresponsive). The bounded-box clip plus tangent-skip
 // must complete quickly and stay valid. (A hang fails via the test timeout.)
 TEST(BlendCut, EqualHeightCornerDoesNotHang) {
@@ -618,7 +618,7 @@ TEST(BlendCut, EqualHeightCornerDoesNotHang) {
         ChamferOp op;
         op.setBody(id);
         op.setEdges({eA});
-        op.setDistance(2.5);   // up wallA — equal heights at the corner
+        op.setDistance(2.5);   // up wallA - equal heights at the corner
         op.setDistance2(5.0);  // across the floor, over the hole
         ASSERT_TRUE(op.execute(doc));
     }
@@ -626,7 +626,7 @@ TEST(BlendCut, EqualHeightCornerDoesNotHang) {
 }
 
 // OUTSIDE plan corner (#57 follow-up 5): two interior-corner ramps wrapping
-// a raised block's corner sit in DISJOINT floor quadrants — no overlap, so
+// a raised block's corner sit in DISJOINT floor quadrants - no overlap, so
 // no clip can join them. The corner FAN tetra must fill the wrap so the
 // blends meet like native chamfers do, instead of two abrupt end walls.
 TEST(BlendCut, OutsideCornerGetsFan) {
@@ -637,7 +637,7 @@ TEST(BlendCut, OutsideCornerGetsFan) {
             gp_Pnt(0.0, 0.0, 2.0), gp_Pnt(20.0, 20.0, 5.0)).Shape();
         return BRepAlgoAPI_Fuse(plate, block).Shape();
     };
-    // Shallow pocket crossing the second edge's floor approach — forces the
+    // Shallow pocket crossing the second edge's floor approach - forces the
     // FILL path for it (native refuses a blend into a pocket floor).
     TopoDS_Shape pocket = BRepPrimAPI_MakeBox(
         gp_Pnt(8.0, 20.5, 1.0), gp_Pnt(14.0, 23.0, 3.0)).Shape();
@@ -687,13 +687,13 @@ TEST(BlendCut, OutsideCornerGetsFan) {
     const TopoDS_Shape& out = doc.getBody(id);
     EXPECT_TRUE(BRepCheck_Analyzer(out).IsValid());
     // The fan: material inside the wrap tetra {V(20,20,2) W(20,20,4.5)
-    // T1(20,22.5,2) T2(22.5,20,2)} — the old flat caps left this quadrant
+    // T1(20,22.5,2) T2(22.5,20,2)} - the old flat caps left this quadrant
     // empty at floor level right off the corner.
     {
         gp_Pnt probe(20.5, 20.5, 2.3);
         BRepClass3d_SolidClassifier sc(out, probe, 1e-7);
         EXPECT_EQ(sc.State(), TopAbs_IN)
-            << "outside corner has no fan — abrupt end walls";
+            << "outside corner has no fan - abrupt end walls";
     }
     EXPECT_EQ(coplanarSeamPairs(out), 0)
         << "ramp fragmented into coplanar facets (visible fan of seams)";
@@ -705,7 +705,7 @@ TEST(BlendCut, OutsideCornerGetsFan) {
 // leave NO coplanar-adjacent seam pairs (the "fan across the ramp"). NOTE:
 // this synthetic case does NOT reproduce the specific FixSmallEdges-corruption
 // that caused #59 on the real light cover (it passes on the pre-#59 code
-// too) — the genuine regression guard for that is the real-file rebuild probe
+// too) - the genuine regression guard for that is the real-file rebuild probe
 // (wip-tests/probe_rebuild_render, 27 seams pre-fix → 0 post-fix). This test
 // still holds the invariant against a DIFFERENT future merge regression.
 TEST(BlendCut, PictureFrameFillHasNoCoplanarSeams) {
@@ -770,7 +770,7 @@ TEST(BlendCut, PictureFrameFillHasNoCoplanarSeams) {
 }
 
 // The miter's clip face lies exactly IN the neighbour bevel's plane, so after
-// the fuse it must MERGE into the neighbour bevel — one face, no seam. The
+// the fuse it must MERGE into the neighbour bevel - one face, no seam. The
 // fuse can leave a zero-length edge at the toe junction (piece extension
 // collapsing against the body boundary when the neighbour's toe lands exactly
 // on the plate edge), and one degenerate edge made UnifySameDomain keep the
@@ -805,7 +805,7 @@ TEST(BlendCut, MiterWedgeMergesIntoNeighbourBevel) {
 
     Document doc;
     int id = doc.addBody(BRepAlgoAPI_Cut(body(), pocket).Shape(), "Blk");
-    // Side bevel: block edge x=30, 3 up / 10 out — toe exactly at x=40.
+    // Side bevel: block edge x=30, 3 up / 10 out - toe exactly at x=40.
     {
         TopoDS_Edge e = findEdge(doc.getBody(id), [](const gp_Pnt& p) {
             return std::abs(p.X() - 30.0) < 1e-7 &&
@@ -823,7 +823,7 @@ TEST(BlendCut, MiterWedgeMergesIntoNeighbourBevel) {
     // path with a miter into the side bevel at the (30,20) outside corner.
     {
         // After the side fill, its cap base merges coplanar with this wall
-        // base into one longer edge (may run past x=30) — match on y/z only.
+        // base into one longer edge (may run past x=30) - match on y/z only.
         TopoDS_Edge e = findEdge(doc.getBody(id), [](const gp_Pnt& p) {
             return std::abs(p.Y() - 20.0) < 1e-7 &&
                    std::abs(p.Z() - 2.0) < 1e-7;
@@ -867,7 +867,7 @@ TEST(BlendCut, MiterWedgeMergesIntoNeighbourBevel) {
     EXPECT_GT(zMaxTop, 4.5);
     // The plate's outer wall at x=40 (where the side bevel's toe lands) must
     // stay ONE face: an apex bulge dipping below the floor sweeps a coplanar
-    // strip + razor faces onto it — flush geometry, but the viewport draws
+    // strip + razor faces onto it - flush geometry, but the viewport draws
     // the fragment boundaries as a sliver under the toe.
     int wallFaces = 0;
     for (TopExp_Explorer fx(out, TopAbs_FACE); fx.More(); fx.Next()) {
@@ -888,7 +888,7 @@ TEST(BlendCut, MiterWedgeMergesIntoNeighbourBevel) {
 }
 
 // A cut can only REMOVE material, so a concave (inside-corner) edge must be
-// refused — silently "chamfering" it with a cut would dig a groove instead
+// refused - silently "chamfering" it with a cut would dig a groove instead
 // of adding the bevel sliver.
 TEST(BlendCut, ConcaveEdgeRefused) {
     TopoDS_Shape lower = BRepPrimAPI_MakeBox(40.0, 20.0, 10.0).Shape();

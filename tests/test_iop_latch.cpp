@@ -4,12 +4,12 @@
 // becomes suppressCamDrag: a latch left set kills camera ORBIT and PAN for the
 // rest of the session. The ViewCube keeps working because it never goes through
 // the drag path, so the symptom reads as "the mouse broke" rather than "an op
-// never finished" — which is exactly what made it hard to place when it was
+// never finished" - which is exactly what made it hard to place when it was
 // reported.
 //
 // cleanup() has always cleared the latch. setActive(false) did not, and Move
 // Face is a custom-lifecycle controller that commits and cancels through
-// setActive(false) instead — so tilting a face and then opening another project
+// setActive(false) instead - so tilting a face and then opening another project
 // (which cancels every active controller) wedged navigation.
 #include <gtest/gtest.h>
 
@@ -65,7 +65,7 @@ TEST(IopHandleLatch, TeardownDropsItToo) {
 }
 
 TEST(IopHandleLatch, ActivatingDoesNotLatchByItself) {
-    // Only an actual handle grab may set it — otherwise merely opening a tool
+    // Only an actual handle grab may set it - otherwise merely opening a tool
     // would stand the camera off.
     StubController c;
     c.setActive(true);
