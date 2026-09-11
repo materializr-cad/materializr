@@ -11,14 +11,17 @@
 // (SplitBodyOp's uncopied siblings; see claimShape in ParallelMesh.cpp) and
 // for one concurrent-allocator hazard (BRepMeshData_Model's private,
 // thread-safe allocator; OSD::SetThreadLocalSignal on each worker),
-// against the installed macOS/Linux OCCT builds. This is not a guarantee
-// against every possible OCCT-internal concurrency hazard, only the ones
-// checked. Windows lacks the same /EHa exception-model verification and
-// mobile builds were never checked at all - both fall back to the existing
-// sequential loop. Named once here so every #if that gates the pool (this
-// header, ParallelMesh.cpp, Application.cpp, the tests) shares one
-// definition rather than repeating the raw condition.
-#if !defined(_WIN32) && !defined(MZ_MOBILE)
+// against the installed macOS/Linux OCCT builds, and against Windows via a
+// source/config-level audit (vcpkg's pinned 7.9.3 portfile, Microsoft's own
+// CRT heap thread-safety guarantee, and a real hardware-fault test exercised
+// on Windows CI - see windows-parallel-mesh-audit.md project memory). This
+// is not a guarantee against every possible OCCT-internal concurrency
+// hazard, only the ones checked. Mobile builds were never checked at all -
+// they still fall back to the existing sequential loop. Named once here so
+// every #if that gates the pool (this header, ParallelMesh.cpp,
+// Application.cpp, the tests) shares one definition rather than repeating
+// the raw condition.
+#if !defined(MZ_MOBILE)
 #define MZR_PARALLEL_MESH_SUPPORTED 1
 #endif
 

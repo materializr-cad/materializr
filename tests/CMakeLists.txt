@@ -347,41 +347,46 @@ add_executable(test_draw_throttle test_draw_throttle.cpp)
 target_link_libraries(test_draw_throttle PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_draw_throttle COMMAND test_draw_throttle)
 
-# The pool is core-only; the load integration also compiles the real caller.
+# The pool is core-only; the load integration also compiles the real caller
+# on every desktop platform. Windows uses a dedicated sink that initializes
+# GLEW's function pointers instead of defining ordinary GL symbols.
 add_executable(test_parallel_mesh test_parallel_mesh.cpp)
 target_link_libraries(test_parallel_mesh PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_parallel_mesh COMMAND test_parallel_mesh)
 set_tests_properties(test_parallel_mesh PROPERTIES TIMEOUT 60)
-if(NOT WIN32)
-    get_target_property(_parmesh_app_sources materializr SOURCES)
-    get_target_property(_parmesh_core_sources materializr_core SOURCES)
-    foreach(_source IN LISTS _parmesh_app_sources)
-        if(_source MATCHES "^src/" AND NOT _source STREQUAL "src/main.cpp")
-            set(_absolute "${CMAKE_SOURCE_DIR}/${_source}")
-            if(NOT _absolute IN_LIST _parmesh_core_sources)
-                target_sources(test_parallel_mesh PRIVATE "${_absolute}")
-            endif()
+get_target_property(_parmesh_app_sources materializr SOURCES)
+get_target_property(_parmesh_core_sources materializr_core SOURCES)
+foreach(_source IN LISTS _parmesh_app_sources)
+    if(_source MATCHES "^src/" AND NOT _source STREQUAL "src/main.cpp")
+        set(_absolute "${CMAKE_SOURCE_DIR}/${_source}")
+        if(NOT _absolute IN_LIST _parmesh_core_sources)
+            target_sources(test_parallel_mesh PRIVATE "${_absolute}")
         endif()
-    endforeach()
-    # Compile the pool with its test-only invocation counter too. The archive
-    # copy stays unreferenced; production and the other core tests keep it.
-    # This relies on materializr_core being a STATIC archive, whose members
-    # are pulled in only to resolve an otherwise-undefined symbol - the two
-    # ParallelMesh.o's coexist because neither is ever forced to resolve
-    # against the other from this target. If materializr_core (or any of the
-    # other MZR_PARALLEL_MESH_TESTING-gated files: ShapeRenderer.cpp,
-    # Application.cpp) ever becomes a shared/object library, or is force-
-    # linked whole, this becomes a silent ODR violation with no compiler
-    # diagnostic.
-    target_sources(test_parallel_mesh PRIVATE parallel_mesh_gl_sinks.cpp
-        ${CMAKE_SOURCE_DIR}/src/viewport/ParallelMesh.cpp)
-    target_compile_definitions(test_parallel_mesh PRIVATE MZR_PARALLEL_MESH_TESTING
-        $<TARGET_PROPERTY:materializr,COMPILE_DEFINITIONS>)
-    target_include_directories(test_parallel_mesh PRIVATE
-        $<TARGET_PROPERTY:materializr,INCLUDE_DIRECTORIES>)
-    target_link_libraries(test_parallel_mesh PRIVATE
-        $<TARGET_PROPERTY:materializr,LINK_LIBRARIES>)
+    endif()
+endforeach()
+# Compile the pool with its test-only invocation counter too. The archive
+# copy stays unreferenced; production and the other core tests keep it.
+# This relies on materializr_core being a STATIC archive, whose members
+# are pulled in only to resolve an otherwise-undefined symbol - the two
+# ParallelMesh.o's coexist because neither is ever forced to resolve
+# against the other from this target. If materializr_core (or any of the
+# other MZR_PARALLEL_MESH_TESTING-gated files: ShapeRenderer.cpp,
+# Application.cpp) ever becomes a shared/object library, or is force-
+# linked whole, this becomes a silent ODR violation with no compiler
+# diagnostic.
+target_sources(test_parallel_mesh PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/viewport/ParallelMesh.cpp)
+if(WIN32)
+    target_sources(test_parallel_mesh PRIVATE parallel_mesh_gl_sinks_win32.cpp)
+else()
+    target_sources(test_parallel_mesh PRIVATE parallel_mesh_gl_sinks.cpp)
 endif()
+target_compile_definitions(test_parallel_mesh PRIVATE MZR_PARALLEL_MESH_TESTING
+    $<TARGET_PROPERTY:materializr,COMPILE_DEFINITIONS>)
+target_include_directories(test_parallel_mesh PRIVATE
+    $<TARGET_PROPERTY:materializr,INCLUDE_DIRECTORIES>)
+target_link_libraries(test_parallel_mesh PRIVATE
+    $<TARGET_PROPERTY:materializr,LINK_LIBRARIES>)
 
 # test_iop_async_preview - the SnapshotBody engine's off-thread preview: inline until slow, trails the slider, cancel/commit mid-job
 add_executable(test_iop_async_preview test_iop_async_preview.cpp)
