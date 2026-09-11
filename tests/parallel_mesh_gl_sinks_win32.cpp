@@ -15,23 +15,31 @@
 #include "gl_common.h"
 
 namespace {
-void APIENTRY sinkGenVertexArrays(GLsizei n, GLuint* ids) { while (n--) *ids++ = 0; }
-void APIENTRY sinkGenBuffers(GLsizei n, GLuint* ids) { while (n--) *ids++ = 0; }
-void APIENTRY sinkBindVertexArray(GLuint) {}
-void APIENTRY sinkBindBuffer(GLenum, GLuint) {}
-void APIENTRY sinkBufferData(GLenum, GLsizeiptr, const void*, GLenum) {}
-void APIENTRY sinkEnableVertexAttribArray(GLuint) {}
-void APIENTRY sinkVertexAttribPointer(GLuint, GLint, GLenum, GLboolean, GLsizei, const void*) {}
-void APIENTRY sinkDeleteVertexArrays(GLsizei, const GLuint*) {}
-void APIENTRY sinkDeleteBuffers(GLsizei, const GLuint*) {}
-void APIENTRY sinkGenFramebuffers(GLsizei n, GLuint* ids) { while (n--) *ids++ = 0; }
-void APIENTRY sinkBindFramebuffer(GLenum, GLuint) {}
-void APIENTRY sinkFramebufferTexture2D(GLenum, GLenum, GLenum, GLuint, GLint) {}
-void APIENTRY sinkGenRenderbuffers(GLsizei n, GLuint* ids) { while (n--) *ids++ = 0; }
-void APIENTRY sinkBindRenderbuffer(GLenum, GLuint) {}
-void APIENTRY sinkRenderbufferStorage(GLenum, GLenum, GLsizei, GLsizei) {}
-void APIENTRY sinkRenderbufferStorageMultisample(GLenum, GLsizei, GLenum, GLsizei, GLsizei) {}
-void APIENTRY sinkFramebufferRenderbuffer(GLenum, GLenum, GLenum, GLuint) {}
+// __stdcall directly, not the APIENTRY macro: on a real Windows CI run this
+// macro failed to expand as expected in this translation unit (each sink
+// below was misparsed as an implicit-int redeclaration of a variable named
+// APIENTRY), even though GLEW's own headers use it internally without
+// issue. __stdcall is a native MSVC keyword, not dependent on any macro
+// resolving correctly, and matches what PFNGL*PROC's typedefs expect on x86;
+// on x64 (this project's vcpkg triplet) __stdcall is a no-op, so this is
+// safe either way.
+void __stdcall sinkGenVertexArrays(GLsizei n, GLuint* ids) { while (n--) *ids++ = 0; }
+void __stdcall sinkGenBuffers(GLsizei n, GLuint* ids) { while (n--) *ids++ = 0; }
+void __stdcall sinkBindVertexArray(GLuint) {}
+void __stdcall sinkBindBuffer(GLenum, GLuint) {}
+void __stdcall sinkBufferData(GLenum, GLsizeiptr, const void*, GLenum) {}
+void __stdcall sinkEnableVertexAttribArray(GLuint) {}
+void __stdcall sinkVertexAttribPointer(GLuint, GLint, GLenum, GLboolean, GLsizei, const void*) {}
+void __stdcall sinkDeleteVertexArrays(GLsizei, const GLuint*) {}
+void __stdcall sinkDeleteBuffers(GLsizei, const GLuint*) {}
+void __stdcall sinkGenFramebuffers(GLsizei n, GLuint* ids) { while (n--) *ids++ = 0; }
+void __stdcall sinkBindFramebuffer(GLenum, GLuint) {}
+void __stdcall sinkFramebufferTexture2D(GLenum, GLenum, GLenum, GLuint, GLint) {}
+void __stdcall sinkGenRenderbuffers(GLsizei n, GLuint* ids) { while (n--) *ids++ = 0; }
+void __stdcall sinkBindRenderbuffer(GLenum, GLuint) {}
+void __stdcall sinkRenderbufferStorage(GLenum, GLenum, GLsizei, GLsizei) {}
+void __stdcall sinkRenderbufferStorageMultisample(GLenum, GLsizei, GLenum, GLsizei, GLsizei) {}
+void __stdcall sinkFramebufferRenderbuffer(GLenum, GLenum, GLenum, GLuint) {}
 
 struct InstallGlewSinks {
     InstallGlewSinks() {
