@@ -237,6 +237,12 @@ LITERAL_ALLOW = [
     ("src/app/Application_Dialogs.cpp", "Gap %.4f mm",          "achieved G0 fit residual, same range as the tolerance that drove it"),
     ("src/modeling/PatchOp.cpp",        "Fit: gap %.4f mm",     "achieved G0 fit residual"),
     ("src/modeling/SewOp.cpp",          "Joined at %.4f mm.",   "the sewing tolerance actually used, a solver quantity"),
+    # AI tool parameter descriptions (Task 11: Feature)
+    # These are not user-facing readouts but parameter specs sent to the LLM in JSON.
+    # The model needs to understand mm is the unit but doesn't need fmtLength conversion.
+    ("src/ai/AiToolSchema.cpp",         "position in mm",       "AI tool parameter description for LLM"),
+    ("src/ai/AiToolSchema.cpp",         "in mm.",              "AI tool parameter description for LLM"),
+    ("src/ai/AiToolSchema.cpp",         "in mm;",              "AI tool parameter description for LLM"),
 ]
 
 def classify_literal(f, code, ln=None):

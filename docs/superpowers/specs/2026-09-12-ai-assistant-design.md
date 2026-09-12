@@ -1,5 +1,7 @@
 # AI Assistant Design
 
+**Status: Implemented** (2026-09-12, Task 11 integration pass complete)
+
 ## Goal
 
 A user types what they want in plain language ("make a 20mm cube with a 5mm
