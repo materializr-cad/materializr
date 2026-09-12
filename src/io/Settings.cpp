@@ -74,6 +74,10 @@ const char* uiLayoutName(UiLayout l) {
     }
 }
 
+const char* aiProviderName(AiProvider p) {
+    return p == AiProvider::OpenAiCompatible ? "openai_compatible" : "anthropic";
+}
+
 // Map a bag of string key/values onto the struct. Shared by the `.cfg` text
 // loader and the JSON importer so both honour the same keys and tolerance
 // rules (unknown keys ignored, missing keys keep their defaults).
@@ -144,6 +148,18 @@ void applyKv(const std::map<std::string, std::string>& kv, AppSettings& s) {
     readBool(kv, "includePrereleases",   s.includePrereleases);
     readBool(kv, "supporter",            s.supporter);
     readBool(kv, "snapToGrid",           s.snapToGrid);
+    {
+        std::string v;
+        readString(kv, "aiProvider", v);
+        if (v == "openai_compatible") s.ai.provider = AiProvider::OpenAiCompatible;
+        else if (v == "anthropic")    s.ai.provider = AiProvider::Anthropic;
+        // unknown/missing value: keep the default (Anthropic)
+    }
+    readString(kv, "aiAnthropicApiKey", s.ai.anthropicApiKey);
+    readString(kv, "aiAnthropicModel",  s.ai.anthropicModel);
+    readString(kv, "aiOpenAiApiKey",    s.ai.openAiApiKey);
+    readString(kv, "aiOpenAiBaseUrl",   s.ai.openAiBaseUrl);
+    readString(kv, "aiOpenAiModel",     s.ai.openAiModel);
     // Normalised HERE, before anything reads it. An out-of-range value means
     // millimetres, never a clamp to the nearest legal index - clamping made 99
     // mean Feet during the grid-step migration below while the same 99 meant
@@ -455,6 +471,12 @@ bool SettingsIO::save(const std::string& path, const AppSettings& s) {
     ofs << "includePrereleases = "      << (s.includePrereleases ? "true" : "false") << "\n";
     ofs << "supporter = "               << (s.supporter ? "true" : "false") << "\n";
     ofs << "snapToGrid = "              << (s.snapToGrid ? "true" : "false") << "\n";
+    ofs << "aiProvider = "         << aiProviderName(s.ai.provider)      << "\n";
+    ofs << "aiAnthropicApiKey = "  << sanitizeValue(s.ai.anthropicApiKey) << "\n";
+    ofs << "aiAnthropicModel = "   << sanitizeValue(s.ai.anthropicModel)  << "\n";
+    ofs << "aiOpenAiApiKey = "     << sanitizeValue(s.ai.openAiApiKey)    << "\n";
+    ofs << "aiOpenAiBaseUrl = "    << sanitizeValue(s.ai.openAiBaseUrl)   << "\n";
+    ofs << "aiOpenAiModel = "      << sanitizeValue(s.ai.openAiModel)     << "\n";
     ofs << "sketchGridStepUnits = "     << s.sketchGridStep      << "\n";
     ofs << "inferenceLevel = "          << s.inferenceLevel      << "\n";
     ofs << "language = "                << s.language            << "\n";
@@ -588,6 +610,12 @@ AppSettings SettingsIO::importJson(const std::string& path, bool* ok) {
     // file can't inject this machine's session state (a lastProjectPath that
     // becomes a silent save target, a lastFileDir, or fabricated recents).
     kv.erase("lastProjectPath");
+    kv.erase("aiProvider");
+    kv.erase("aiAnthropicApiKey");
+    kv.erase("aiAnthropicModel");
+    kv.erase("aiOpenAiApiKey");
+    kv.erase("aiOpenAiBaseUrl");
+    kv.erase("aiOpenAiModel");
     kv.erase("lastFileDir");
     kv.erase("sessionActive");
     for (auto it = kv.begin(); it != kv.end(); ) {
