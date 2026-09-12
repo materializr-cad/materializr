@@ -280,6 +280,12 @@ add_executable(materializr
     src/plugins/SvgImportPlugin.cpp
     src/plugins/PrimitivesPlugin.cpp
     src/plugins/TutorialPlugin.cpp
+    src/plugins/AiAssistantPlugin.cpp
+    src/ai/AiToolSchema.cpp
+    src/ai/AiToolDispatcher.cpp
+    src/ai/AnthropicClient.cpp
+    src/ai/OpenAiCompatibleClient.cpp
+    src/ai/AiSessionController.cpp
     src/core/Document.cpp
     src/core/History.cpp
     src/core/SelectionManager.cpp

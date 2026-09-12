@@ -40,6 +40,8 @@ void forceLink_Primitives();
 // Phase 5 plugins
 void forceLink_Tutorial();
 void forceLink_Mate();
+// Phase 6
+void forceLink_AiAssistant();
 
 void linkAll() {
     // Phase 1
@@ -78,6 +80,8 @@ void linkAll() {
     // Phase 5
     forceLink_Tutorial();
     forceLink_Mate();
+    // Phase 6
+    forceLink_AiAssistant();
 }
 
 }} // namespace materializr::force_link
