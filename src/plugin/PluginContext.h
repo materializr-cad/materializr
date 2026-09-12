@@ -1,6 +1,7 @@
 #pragma once
 #include "Contributions.h"
 #include "InteractiveOp.h"
+#include "../io/Settings.h"
 #include <memory>
 #include <string>
 
@@ -21,6 +22,11 @@ public:
     SelectionManager& selection();
     EventBus& events();
     const Camera& camera() const;
+    // The AI Assistant's provider/key/model config. A pointer, not a value,
+    // because it must reflect the LIVE settings if the user edits them in
+    // the Settings dialog mid-session - the plugin re-reads it on every
+    // send, it doesn't cache it.
+    const AppSettings::AiSettings& aiSettings() const;
 
     void markMeshesDirty();
     // For a plugin mutation outside History (e.g. MatePlugin moving a body
@@ -68,6 +74,7 @@ public:
     void _bind(Document* doc, History* hist, SelectionManager* sel,
                EventBus* bus, Camera* cam, bool* meshesDirtyFlag,
                const bool* sketchModeFlag,
+               const AppSettings::AiSettings* aiSettings,
                std::function<void()> markDirtyFn = {});
 
 private:
@@ -78,6 +85,7 @@ private:
     Camera* m_camera = nullptr;
     bool* m_meshesDirtyFlag = nullptr;
     const bool* m_sketchModeFlag = nullptr;
+    const AppSettings::AiSettings* m_aiSettings = nullptr;
     std::function<void()> m_markDirtyFn;
     InteractiveOp m_pendingInteractiveOp = InteractiveOp::None;
 };

@@ -64,9 +64,15 @@ void PluginContext::registerOverlay(OverlayContribution contrib) {
     PluginRegistry::instance().overlayContributions().push_back(std::move(contrib));
 }
 
+const AppSettings::AiSettings& PluginContext::aiSettings() const {
+    static const AppSettings::AiSettings kEmpty;
+    return m_aiSettings ? *m_aiSettings : kEmpty;
+}
+
 void PluginContext::_bind(Document* doc, History* hist, SelectionManager* sel,
                           EventBus* bus, Camera* cam, bool* meshesDirtyFlag,
                           const bool* sketchModeFlag,
+                          const AppSettings::AiSettings* aiSettings,
                           std::function<void()> markDirtyFn) {
     m_document = doc;
     m_history = hist;
@@ -75,6 +81,7 @@ void PluginContext::_bind(Document* doc, History* hist, SelectionManager* sel,
     m_camera = cam;
     m_meshesDirtyFlag = meshesDirtyFlag;
     m_sketchModeFlag = sketchModeFlag;
+    m_aiSettings = aiSettings;
     if (markDirtyFn) m_markDirtyFn = std::move(markDirtyFn);
 }
 

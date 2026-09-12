@@ -480,6 +480,7 @@ void Application::wireDocumentConsumers() {
         m_pluginContext->_bind(m_document, m_history, m_selection,
                                m_eventBus.get(), &m_viewport->getCamera(),
                                &m_meshesDirty, &m_inSketchMode,
+                               &m_aiSettings,
                                [this]{ markDirty(); });
     // Tell everything that caches DOCUMENT-DERIVED state to rebuild. The
     // setters above only reach consumers Application knows by name; plugins
@@ -2016,6 +2017,7 @@ AppSettings Application::currentSettings() const {
     s.sessionActive = static_cast<int>(m_activeSession);
     s.lastFileDir = materializr::FileDialogs::getLastDir();
     s.checkForUpdatesOnLaunch = m_checkForUpdatesOnLaunch;
+    s.ai = m_aiSettings;
     s.includePrereleases = m_includePrereleases;
     s.supporter = m_supporter;
     s.snapToGrid = m_snapToGrid;
@@ -2115,6 +2117,7 @@ void Application::applyAppSettings(const AppSettings& s) {
     m_autoOpenLastProject = s.autoOpenLastProject;
     m_recentProjects = s.recentProjects;
     m_checkForUpdatesOnLaunch = s.checkForUpdatesOnLaunch;
+    m_aiSettings = s.ai;
     m_includePrereleases = s.includePrereleases;
     m_supporter = s.supporter;
     m_snapToGrid = s.snapToGrid;
