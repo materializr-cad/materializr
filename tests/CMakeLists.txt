@@ -218,6 +218,7 @@ target_link_libraries(materializr_core PUBLIC
     TKShHealing  # ShapeUpgrade_UnifySameDomain for StlIO
     TKMesh       # BRepMesh_IncrementalMesh for Unfold (curved faces)
     ZLIB::ZLIB
+    nlohmann_json::nlohmann_json
 )
 
 # ─── Test executables ────────────────────────────────────────────────────────
