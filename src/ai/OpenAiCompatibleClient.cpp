@@ -25,6 +25,14 @@ nlohmann::json OpenAiCompatibleClient::buildRequestBody(
         if (m.role == ChatRole::ToolResult) {
             msgs.push_back({{"role", "tool"}, {"tool_call_id", m.toolCallId},
                             {"content", m.text}});
+        } else if (m.role == ChatRole::Assistant && !m.toolCalls.empty()) {
+            nlohmann::json toolCalls = nlohmann::json::array();
+            for (const auto& c : m.toolCalls)
+                toolCalls.push_back({{"id", c.id}, {"type", "function"},
+                                     {"function", {{"name", c.name},
+                                                   {"arguments", c.args.dump()}}}});
+            msgs.push_back({{"role", "assistant"}, {"content", nullptr},
+                            {"tool_calls", toolCalls}});
         } else {
             msgs.push_back({{"role", m.role == ChatRole::User ? "user" : "assistant"},
                             {"content", m.text}});
@@ -58,7 +66,13 @@ LlmTurnResult OpenAiCompatibleClient::parseResponse(const nlohmann::json& body,
             call.id = tc.value("id", "");
             const auto& fn = tc["function"];
             call.name = fn.value("name", "");
-            std::string argsStr = fn.value("arguments", "{}");
+            // "arguments" is normally a JSON-encoded string, but a
+            // misbehaving local server can send it as a JSON object/other
+            // type directly - guard the type before touching it as a string,
+            // in addition to catching malformed JSON *inside* the string.
+            std::string argsStr = "{}";
+            if (fn.contains("arguments") && fn["arguments"].is_string())
+                argsStr = fn["arguments"].get<std::string>();
             try {
                 call.args = nlohmann::json::parse(argsStr);
             } catch (const nlohmann::json::parse_error&) {
@@ -116,9 +130,17 @@ LlmTurnResult OpenAiCompatibleClient::sendTurn(const std::vector<ChatMessage>& m
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_POST, 1L);
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, requestStr.c_str());
-    // NOT pinned to HTTPS: a local Ollama/LM Studio endpoint is plain HTTP
-    // by default (http://localhost:11434), unlike the two fixed cloud
-    // endpoints AnthropicClient and the default OpenAI base URL use.
+    // Allows BOTH http and https (unlike AnthropicClient's https-only): a
+    // local Ollama/LM Studio endpoint is plain HTTP by default
+    // (http://localhost:11434). Still restricted to those two so a
+    // malformed/malicious base URL (file://, scp://, ...) can't be honored.
+#if LIBCURL_VERSION_NUM >= 0x075500
+    curl_easy_setopt(curl, CURLOPT_PROTOCOLS_STR, "http,https");
+    curl_easy_setopt(curl, CURLOPT_REDIR_PROTOCOLS_STR, "http,https");
+#else
+    curl_easy_setopt(curl, CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
+    curl_easy_setopt(curl, CURLOPT_REDIR_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
+#endif
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 20L);
     curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeToString);
@@ -136,7 +158,14 @@ LlmTurnResult OpenAiCompatibleClient::sendTurn(const std::vector<ChatMessage>& m
         r.error = curl_easy_strerror(code);
         return r;
     }
-    return parseResponseFromRawBody(responseBody, httpStatus);
+    try {
+        return parseResponseFromRawBody(responseBody, httpStatus);
+    } catch (const std::exception& e) {
+        LlmTurnResult r;
+        r.ok = false;
+        r.error = e.what();
+        return r;
+    }
 }
 
 } } // namespace materializr::ai

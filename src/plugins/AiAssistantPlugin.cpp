@@ -23,6 +23,7 @@ using materializr::ai::LlmClient;
 std::unique_ptr<AiSessionController> g_session;
 materializr::AiProvider g_sessionProvider;
 std::string g_sessionKeyOrUrlFingerprint;
+static bool g_overlayOpen = true;
 
 std::string fingerprint(const materializr::AppSettings::AiSettings& s) {
     return s.provider == materializr::AiProvider::Anthropic
@@ -32,6 +33,12 @@ std::string fingerprint(const materializr::AppSettings::AiSettings& s) {
 
 AiSessionController& sessionFor(const materializr::AppSettings::AiSettings& ai) {
     const std::string fp = fingerprint(ai);
+    // Never rebuild while a turn is in flight: destroying g_session would
+    // block on std::future's destructor (waiting for the async task, up to
+    // the full curl timeout) on the render thread. Keep using the stale
+    // session for the remainder of the in-flight turn; the rebuild happens
+    // on the next call once the turn completes and settings still differ.
+    if (g_session && g_session->isBusy()) return *g_session;
     if (!g_session || g_sessionProvider != ai.provider ||
         g_sessionKeyOrUrlFingerprint != fp) {
         std::unique_ptr<LlmClient> client;
@@ -56,11 +63,14 @@ bool hasApiKeyConfigured(const materializr::AppSettings::AiSettings& ai) {
 void renderOverlay(materializr::PluginContext& ctx) {
     static char inputBuf[2048] = {};
 
-    if (!ImGui::Begin("AI Assistant")) { ImGui::End(); return; }
-
     const auto& ai = ctx.aiSettings();
     AiSessionController& session = sessionFor(ai);
+    // Poll unconditionally so an in-flight turn keeps advancing even while
+    // the window is collapsed or closed - otherwise isBusy() never clears.
     session.poll(ctx);
+
+    if (!g_overlayOpen) return;
+    if (!ImGui::Begin("AI Assistant", &g_overlayOpen)) { ImGui::End(); return; }
 
     ImGui::BeginChild("AiScrollback", ImVec2(0, -60), true);
     for (const auto& line : session.scrollback()) {
@@ -100,11 +110,7 @@ void renderOverlay(materializr::PluginContext& ctx) {
 
 REGISTER_PLUGIN(AiAssistant, [](materializr::PluginContext& ctx) {
     ctx.registerCommand({"AI Assistant", "", [](materializr::PluginContext&) {
-        // The overlay renders unconditionally below; this command exists so
-        // the feature is reachable from the menu/command surface even
-        // though it needs no per-click action - matches every other
-        // free-floating OverlayContribution's registerCommand-just-for-
-        // discoverability pattern.
+        g_overlayOpen = !g_overlayOpen;
     }});
     ctx.registerOverlay({"AI Assistant", 100, renderOverlay});
 });

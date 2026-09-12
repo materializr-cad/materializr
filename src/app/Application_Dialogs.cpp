@@ -658,7 +658,8 @@ void Application::renderSettings() {
                         "LM Studio's local server address, to run without any cloud key.");
 
                     // Test Connection: fires one minimal, tool-free request against
-                    // whatever is CURRENTLY TYPED (not yet saved) so the user gets a
+                    // the current in-memory settings (auto-persisted the same frame
+                    // they change, via saveAppSettings() below) so the user gets a
                     // yes/no on their setup before ever opening the chat overlay - the
                     // whole point of "quick and simple" per the spec.
                     static std::future<materializr::ai::LlmTurnResult> testFuture;

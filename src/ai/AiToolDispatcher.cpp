@@ -101,6 +101,7 @@ ToolResult addPrimitive(PluginContext& ctx, PrimitiveOp::Kind kind,
                  optNumber(args, "z", 0.0));
     if (!ctx.history().pushOperation(std::move(op), ctx.document()))
         return {false, "the operation failed to execute"};
+    // PrimitiveOp appends the new body, so its id is the last one - see Document::addBody.
     int newId = ctx.document().getAllBodyIds().back();
     return {true, "Created body " + std::to_string(newId)};
 }

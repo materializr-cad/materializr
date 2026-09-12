@@ -5,16 +5,6 @@
 namespace materializr { namespace ai {
 
 namespace {
-const char* roleName(ChatRole r) {
-    // Anthropic has exactly two roles on the wire; a ToolResult message
-    // rides inside a "user" message as a tool_result content block (see
-    // buildRequestBody below), and an Assistant message with no text (the
-    // tool_use turn itself) is skipped entirely - the tool_use block that
-    // produced it lived only in the RESPONSE this client already returned
-    // to the caller, so there is nothing to replay here for v1's stateless
-    // (each turn rebuilds the whole request) client.
-    return r == ChatRole::User ? "user" : "assistant";
-}
 size_t writeToString(void* contents, size_t size, size_t nmemb, void* userp) {
     size_t total = size * nmemb;
     std::string* out = static_cast<std::string*>(userp);
@@ -32,17 +22,32 @@ nlohmann::json AnthropicClient::buildRequestBody(const std::vector<ChatMessage>&
     out["model"] = model;
     out["max_tokens"] = 4096;
     nlohmann::json msgs = nlohmann::json::array();
+    nlohmann::json pendingToolResults = nlohmann::json::array();
+    auto flushToolResults = [&]() {
+        if (pendingToolResults.empty()) return;
+        msgs.push_back({{"role", "user"}, {"content", pendingToolResults}});
+        pendingToolResults = nlohmann::json::array();
+    };
     for (const auto& m : messages) {
-        if (m.role == ChatRole::Assistant && m.text.empty()) continue; // see roleName
         if (m.role == ChatRole::ToolResult) {
-            msgs.push_back({{"role", "user"},
-                            {"content", {{{"type", "tool_result"},
+            pendingToolResults.push_back({{"type", "tool_result"},
                                           {"tool_use_id", m.toolCallId},
-                                          {"content", m.text}}}}});
+                                          {"content", m.text}});
             continue;
         }
-        msgs.push_back({{"role", roleName(m.role)}, {"content", m.text}});
+        flushToolResults();
+        if (m.role == ChatRole::Assistant && !m.toolCalls.empty()) {
+            nlohmann::json blocks = nlohmann::json::array();
+            for (const auto& c : m.toolCalls)
+                blocks.push_back({{"type", "tool_use"}, {"id", c.id},
+                                  {"name", c.name}, {"input", c.args}});
+            msgs.push_back({{"role", "assistant"}, {"content", blocks}});
+            continue;
+        }
+        msgs.push_back({{"role", m.role == ChatRole::User ? "user" : "assistant"},
+                        {"content", m.text}});
     }
+    flushToolResults();
     out["messages"] = msgs;
     if (!tools.empty()) out["tools"] = toolsToAnthropicJson(tools);
     return out;
@@ -142,7 +147,14 @@ LlmTurnResult AnthropicClient::sendTurn(const std::vector<ChatMessage>& messages
         r.error = curl_easy_strerror(code);
         return r;
     }
-    return parseResponseFromRawBody(responseBody, httpStatus);
+    try {
+        return parseResponseFromRawBody(responseBody, httpStatus);
+    } catch (const std::exception& e) {
+        LlmTurnResult r;
+        r.ok = false;
+        r.error = e.what();
+        return r;
+    }
 }
 
 } } // namespace materializr::ai

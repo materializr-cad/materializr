@@ -5,7 +5,7 @@
 using namespace materializr::ai;
 
 TEST(OpenAiCompatibleClient, BuildRequestBodyIncludesModelMessagesAndTools) {
-    std::vector<ChatMessage> messages = {{ChatRole::User, "make a box", ""}};
+    std::vector<ChatMessage> messages = {{ChatRole::User, "make a box", "", {}}};
     nlohmann::json body = OpenAiCompatibleClient::buildRequestBody(
         messages, allTools(), "gpt-4o");
 
@@ -19,13 +19,31 @@ TEST(OpenAiCompatibleClient, BuildRequestBodyIncludesModelMessagesAndTools) {
 TEST(OpenAiCompatibleClient, BuildRequestBodyMapsToolResultToARealToolRole) {
     // Unlike Anthropic, OpenAI's shape HAS a dedicated "tool" role.
     std::vector<ChatMessage> messages = {
-        {ChatRole::ToolResult, "Created body 1", "call_abc"},
+        {ChatRole::ToolResult, "Created body 1", "call_abc", {}},
     };
     nlohmann::json body = OpenAiCompatibleClient::buildRequestBody(messages, {}, "gpt-4o");
     const auto& last = body["messages"].back();
     EXPECT_EQ(last["role"], "tool");
     EXPECT_EQ(last["tool_call_id"], "call_abc");
     EXPECT_EQ(last["content"], "Created body 1");
+}
+
+TEST(OpenAiCompatibleClient, BuildRequestBodyEmitsAssistantToolCallsArray) {
+    std::vector<ChatMessage> messages = {
+        {ChatRole::Assistant, "", "",
+         {{"call_1", "add_box", {{"width", 10}}}}},
+    };
+    nlohmann::json body = OpenAiCompatibleClient::buildRequestBody(messages, {}, "gpt-4o");
+    const auto& last = body["messages"].back();
+    EXPECT_EQ(last["role"], "assistant");
+    EXPECT_TRUE(last["content"].is_null());
+    ASSERT_EQ(last["tool_calls"].size(), 1u);
+    EXPECT_EQ(last["tool_calls"][0]["id"], "call_1");
+    EXPECT_EQ(last["tool_calls"][0]["type"], "function");
+    EXPECT_EQ(last["tool_calls"][0]["function"]["name"], "add_box");
+    nlohmann::json parsedArgs =
+        nlohmann::json::parse(last["tool_calls"][0]["function"]["arguments"].get<std::string>());
+    EXPECT_EQ(parsedArgs["width"], 10);
 }
 
 TEST(OpenAiCompatibleClient, ParseResponseExtractsFinalTextWhenNoToolCalls) {

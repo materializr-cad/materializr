@@ -18,8 +18,9 @@ class ScriptedClient : public LlmClient {
 public:
     explicit ScriptedClient(std::vector<LlmTurnResult> turns)
         : m_turns(std::move(turns)) {}
-    LlmTurnResult sendTurn(const std::vector<ChatMessage>&,
+    LlmTurnResult sendTurn(const std::vector<ChatMessage>& messages,
                           const std::vector<ToolDef>&) override {
+        m_capturedCalls.push_back(messages);
         if (m_next >= m_turns.size()) {
             LlmTurnResult r;
             r.ok = false;
@@ -28,9 +29,13 @@ public:
         }
         return m_turns[m_next++];
     }
+    const std::vector<std::vector<ChatMessage>>& capturedCalls() const {
+        return m_capturedCalls;
+    }
 private:
     std::vector<LlmTurnResult> m_turns;
     size_t m_next = 0;
+    std::vector<std::vector<ChatMessage>> m_capturedCalls;
 };
 
 PluginContext makeCtx(Document& doc, History& hist) {
@@ -43,7 +48,8 @@ PluginContext makeCtx(Document& doc, History& hist) {
 // iterations is hit (a real hang here is a bug the test must fail on, not
 // spin forever).
 void pumpUntilIdle(AiSessionController& sess, PluginContext& ctx) {
-    for (int i = 0; i < 100 && sess.isBusy(); ++i) {
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    while (sess.isBusy() && std::chrono::steady_clock::now() < deadline) {
         sess.poll(ctx);
         if (sess.isBusy()) std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
@@ -116,7 +122,7 @@ TEST(AiSessionController, StopsAfterTheStepCapInsteadOfLoopingForever) {
     pumpUntilIdle(sess, ctx);
 
     EXPECT_FALSE(sess.isBusy());
-    EXPECT_LE(doc.getAllBodyIds().size(), 8u)
+    EXPECT_EQ(doc.getAllBodyIds().size(), 8u)
         << "the 8-step cap must actually bound how many tool calls run";
 }
 
@@ -137,6 +143,33 @@ TEST(AiSessionController, AnInvalidToolCallFeedsTheErrorBackRatherThanStopping) 
     EXPECT_TRUE(doc.getAllBodyIds().empty())
         << "the invalid call must not have created a body";
     EXPECT_EQ(sess.scrollback().back().text, "Fixed it.");
+}
+
+TEST(AiSessionController, TheSecondTurnReplaysTheAssistantsToolUseAndItsResult) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    auto scripted = std::make_unique<ScriptedClient>(
+        std::vector<LlmTurnResult>{
+            toolCall("call_1", "add_box",
+                     {{"width", 10.0}, {"height", 10.0}, {"depth", 10.0}}),
+            finalText("Made your box."),
+        });
+    ScriptedClient* rawClient = scripted.get();
+    AiSessionController sess(std::move(scripted));
+
+    sess.submitPrompt("make a box");
+    pumpUntilIdle(sess, ctx);
+
+    ASSERT_EQ(rawClient->capturedCalls().size(), 2u);
+    const std::vector<ChatMessage>& secondCall = rawClient->capturedCalls()[1];
+    ASSERT_EQ(secondCall.size(), 3u);
+    EXPECT_EQ(secondCall[0].role, ChatRole::User);
+    EXPECT_EQ(secondCall[1].role, ChatRole::Assistant);
+    ASSERT_EQ(secondCall[1].toolCalls.size(), 1u);
+    EXPECT_EQ(secondCall[1].toolCalls[0].id, "call_1");
+    EXPECT_EQ(secondCall[2].role, ChatRole::ToolResult);
+    EXPECT_EQ(secondCall[2].toolCallId, "call_1");
 }
 
 TEST(AiSessionController, ANetworkFailureEndsTheSessionWithAnErrorLine) {

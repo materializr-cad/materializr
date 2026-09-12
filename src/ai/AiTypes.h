@@ -7,17 +7,20 @@ namespace materializr { namespace ai {
 
 enum class ChatRole { User, Assistant, ToolResult };
 
-struct ChatMessage {
-    ChatRole role;
-    std::string text;       // user/assistant text, or the tool result string
-    std::string toolCallId; // only meaningful when role == ToolResult -
-                             // must match the ToolCall::id it answers
-};
-
 struct ToolCall {
     std::string id;
     std::string name;
     nlohmann::json args;
+};
+
+struct ChatMessage {
+    ChatRole role;
+    std::string text;                // user/assistant text, or the tool result string
+    std::string toolCallId;          // only meaningful when role == ToolResult -
+                                      // must match the ToolCall::id it answers
+    std::vector<ToolCall> toolCalls; // only meaningful when role == Assistant; empty
+                                      // for a plain text reply, non-empty for a
+                                      // tool-calling turn
 };
 
 struct LlmTurnResult {

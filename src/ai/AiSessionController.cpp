@@ -32,8 +32,14 @@ void AiSessionController::poll(materializr::PluginContext& ctx) {
     if (!m_future.valid()) return;
     if (m_future.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return;
 
-    LlmTurnResult result = m_future.get(); // future becomes invalid; isBusy() -> false
-                                            // again unless we start a new one below
+    LlmTurnResult result;
+    try {
+        result = m_future.get(); // future becomes invalid; isBusy() -> false
+                                  // again unless we start a new one below
+    } catch (const std::exception& e) {
+        result.ok = false;
+        result.error = e.what();
+    }
 
     if (!result.ok) {
         m_scrollback.push_back({ScrollbackLine::Kind::Error,
@@ -42,15 +48,17 @@ void AiSessionController::poll(materializr::PluginContext& ctx) {
     }
     if (result.toolCalls.empty()) {
         m_scrollback.push_back({ScrollbackLine::Kind::Assistant, result.finalText});
+        m_messages.push_back({ChatRole::Assistant, result.finalText, "", {}});
         return;
     }
 
+    m_messages.push_back({ChatRole::Assistant, "", "", result.toolCalls});
     for (const auto& call : result.toolCalls) {
         ToolResult toolResult = executeTool(ctx, call.name, call.args);
         m_scrollback.push_back({toolResult.ok ? ScrollbackLine::Kind::ToolSummary
                                               : ScrollbackLine::Kind::Error,
                                 "-> " + toolResult.message});
-        m_messages.push_back({ChatRole::ToolResult, toolResult.message, call.id});
+        m_messages.push_back({ChatRole::ToolResult, toolResult.message, call.id, {}});
     }
     ++m_stepCount;
     if (m_stepCount >= kMaxStepsPerPrompt) {
