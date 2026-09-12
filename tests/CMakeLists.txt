@@ -51,6 +51,7 @@ add_library(materializr_core STATIC
     ${CMAKE_SOURCE_DIR}/src/ai/AiToolDispatcher.cpp
     ${CMAKE_SOURCE_DIR}/src/ai/AnthropicClient.cpp
     ${CMAKE_SOURCE_DIR}/src/ai/OpenAiCompatibleClient.cpp
+    ${CMAKE_SOURCE_DIR}/src/ai/AiSessionController.cpp
     ${CMAKE_SOURCE_DIR}/src/plugin/PluginContext.cpp
     ${CMAKE_SOURCE_DIR}/src/plugin/PluginRegistry.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/ShellOp.cpp
@@ -851,6 +852,11 @@ add_executable(test_ai_openai_client test_ai_openai_client.cpp
     TestSignalInit.cpp)
 target_link_libraries(test_ai_openai_client PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_ai_openai_client COMMAND test_ai_openai_client)
+
+add_executable(test_ai_session_controller test_ai_session_controller.cpp
+    TestSignalInit.cpp)
+target_link_libraries(test_ai_session_controller PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_ai_session_controller COMMAND test_ai_session_controller)
 
 # test_multibody_export - several disjoint solids export as ONE file with
 # their spacing intact (print-in-place), and visibility selects the subset.
