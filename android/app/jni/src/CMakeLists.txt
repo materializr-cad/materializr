@@ -59,6 +59,13 @@ target_link_libraries(imgui_lib PUBLIC SDL2)
 file(GLOB_RECURSE MZ_SOURCES CONFIGURE_DEPENDS "${MZ_SRC}/*.cpp")
 list(FILTER MZ_SOURCES EXCLUDE REGEX "/main\\.cpp$")            # desktop CLI entry
 list(FILTER MZ_SOURCES EXCLUDE REGEX "/UpdateChecker\\.cpp$")   # libcurl (desktop-only)
+# AI Assistant: every backend is a network call, and Android gates loopback
+# traffic behind INTERNET the same as any other host - there is no way to
+# reach even a local Ollama/LM Studio server without it. Desktop only; see
+# docs/superpowers/specs/2026-09-12-ai-assistant-design.md's "Platform Scope"
+# section.
+list(FILTER MZ_SOURCES EXCLUDE REGEX "/src/ai/")
+list(FILTER MZ_SOURCES EXCLUDE REGEX "/AiAssistantPlugin\\.cpp$")
 # FileDialogs.cpp IS built on Android: it compiles the in-app ImGui browser
 # (pfd is #ifdef'd out). android_main.cpp (SDL_main) + android_shims.cpp
 # (update-check stub) replace the remaining desktop-only entry points.

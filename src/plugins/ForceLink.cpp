@@ -41,7 +41,9 @@ void forceLink_Primitives();
 void forceLink_Tutorial();
 void forceLink_Mate();
 // Phase 6
+#if !defined(__ANDROID__)
 void forceLink_AiAssistant();
+#endif
 
 void linkAll() {
     // Phase 1
@@ -81,7 +83,9 @@ void linkAll() {
     forceLink_Tutorial();
     forceLink_Mate();
     // Phase 6
+#if !defined(__ANDROID__)
     forceLink_AiAssistant();
+#endif
 }
 
 }} // namespace materializr::force_link
