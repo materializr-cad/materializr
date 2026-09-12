@@ -47,6 +47,9 @@ add_library(materializr_core STATIC
     ${CMAKE_SOURCE_DIR}/src/modeling/Mate.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/MateSolver.cpp
     ${CMAKE_SOURCE_DIR}/src/ai/AiToolSchema.cpp
+    ${CMAKE_SOURCE_DIR}/src/ai/AiToolDispatcher.cpp
+    ${CMAKE_SOURCE_DIR}/src/plugin/PluginContext.cpp
+    ${CMAKE_SOURCE_DIR}/src/plugin/PluginRegistry.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/ShellOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/MoveFaceOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/ThreadOp.cpp
@@ -829,6 +832,11 @@ add_executable(test_ai_tool_schema test_ai_tool_schema.cpp
     TestSignalInit.cpp)
 target_link_libraries(test_ai_tool_schema PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_ai_tool_schema COMMAND test_ai_tool_schema)
+
+add_executable(test_ai_tool_dispatcher test_ai_tool_dispatcher.cpp
+    TestSignalInit.cpp)
+target_link_libraries(test_ai_tool_dispatcher PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_ai_tool_dispatcher COMMAND test_ai_tool_dispatcher)
 
 # test_multibody_export - several disjoint solids export as ONE file with
 # their spacing intact (print-in-place), and visibility selects the subset.
