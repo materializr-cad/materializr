@@ -16,6 +16,11 @@ namespace materializr {
 //             (the name is an homage to ImGui).
 enum class UiLayout { Classic = 0, Modern = 1, ImTouch = 2 };
 
+// The AI Assistant's backend choice. OpenAiCompatible covers OpenAI itself
+// and any server that mimics its Chat Completions API (Ollama, LM Studio),
+// distinguished only by openAiBaseUrl.
+enum class AiProvider { Anthropic, OpenAiCompatible };
+
 // User-facing application preferences that persist between launches. Defaults
 // here are the out-of-the-box behaviour and are also the fallback whenever a
 // key is missing or unreadable in the settings file.
@@ -215,6 +220,22 @@ struct AppSettings {
     // clean shaded body to sketch on; the merged flat-region edges are still
     // useful, so it defaults on and the import dialog/Settings can disable it.
     bool  meshShowWireframe  = true;
+
+    // AI Assistant configuration. Kept as one sub-struct rather than six
+    // scattered top-level fields since nothing outside this feature reads
+    // an individual field - PluginContext::aiSettings() hands the whole
+    // thing to the plugin. Excluded from JSON export/import (see
+    // SettingsIO::exportJson/importJson) so a shared settings backup can't
+    // leak an API key, same treatment as lastProjectPath.
+    struct AiSettings {
+        AiProvider provider = AiProvider::Anthropic;
+        std::string anthropicApiKey;
+        std::string anthropicModel = "claude-sonnet-4-5";
+        std::string openAiApiKey;
+        std::string openAiBaseUrl = "https://api.openai.com/v1";
+        std::string openAiModel = "gpt-4o";
+    };
+    AiSettings ai;
 };
 
 // Reads/writes AppSettings as a simple `key = value` text file. The reader is

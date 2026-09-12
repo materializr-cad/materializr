@@ -7,6 +7,8 @@
 #include "touch_mode.h"
 #include "gl_common.h"
 #include "url_open.h"
+#include "../ai/AnthropicClient.h"
+#include "../ai/OpenAiCompatibleClient.h"
 
 #include <cstdlib>
 #include <filesystem>
@@ -595,6 +597,110 @@ void Application::renderSettings() {
                     ImGui::SetItemTooltip("%s", materializr::tr("Pre-fills the STL import dialog. Lower = coarser/faster with larger merged flat faces; higher = more faithful but heavier."));
                     ImGui::EndTabItem();
                 }
+
+#if !defined(__ANDROID__)
+                if (ImGui::BeginTabItem("AI Assistant")) {
+                    static char anthropicKeyBuf[256] = {};
+                    static char anthropicModelBuf[128] = {};
+                    static char openAiKeyBuf[256] = {};
+                    static char openAiUrlBuf[256] = {};
+                    static char openAiModelBuf[128] = {};
+                    static bool buffersLoaded = false;
+                    if (!buffersLoaded) {
+                        std::snprintf(anthropicKeyBuf, sizeof(anthropicKeyBuf), "%s",
+                                     m_aiSettings.anthropicApiKey.c_str());
+                        std::snprintf(anthropicModelBuf, sizeof(anthropicModelBuf), "%s",
+                                     m_aiSettings.anthropicModel.c_str());
+                        std::snprintf(openAiKeyBuf, sizeof(openAiKeyBuf), "%s",
+                                     m_aiSettings.openAiApiKey.c_str());
+                        std::snprintf(openAiUrlBuf, sizeof(openAiUrlBuf), "%s",
+                                     m_aiSettings.openAiBaseUrl.c_str());
+                        std::snprintf(openAiModelBuf, sizeof(openAiModelBuf), "%s",
+                                     m_aiSettings.openAiModel.c_str());
+                        buffersLoaded = true;
+                    }
+
+                    int providerIdx = m_aiSettings.provider == materializr::AiProvider::Anthropic ? 0 : 1;
+                    const char* providerNames[] = {"Anthropic", "OpenAI-compatible (OpenAI/Ollama/LM Studio)"};
+                    if (ImGui::Combo("Provider", &providerIdx, providerNames, 2)) {
+                        m_aiSettings.provider = providerIdx == 0 ? materializr::AiProvider::Anthropic
+                                                                  : materializr::AiProvider::OpenAiCompatible;
+                        changed = true;
+                    }
+
+                    if (m_aiSettings.provider == materializr::AiProvider::Anthropic) {
+                        if (ImGui::InputText("API Key", anthropicKeyBuf, sizeof(anthropicKeyBuf),
+                                             ImGuiInputTextFlags_Password)) {
+                            m_aiSettings.anthropicApiKey = anthropicKeyBuf;
+                            changed = true;
+                        }
+                        if (ImGui::InputText("Model", anthropicModelBuf, sizeof(anthropicModelBuf))) {
+                            m_aiSettings.anthropicModel = anthropicModelBuf;
+                            changed = true;
+                        }
+                    } else {
+                        if (ImGui::InputText("API Key", openAiKeyBuf, sizeof(openAiKeyBuf),
+                                             ImGuiInputTextFlags_Password)) {
+                            m_aiSettings.openAiApiKey = openAiKeyBuf;
+                            changed = true;
+                        }
+                        if (ImGui::InputText("Base URL", openAiUrlBuf, sizeof(openAiUrlBuf))) {
+                            m_aiSettings.openAiBaseUrl = openAiUrlBuf;
+                            changed = true;
+                        }
+                        if (ImGui::InputText("Model", openAiModelBuf, sizeof(openAiModelBuf))) {
+                            m_aiSettings.openAiModel = openAiModelBuf;
+                            changed = true;
+                        }
+                    }
+                    ImGui::TextWrapped(
+                        "Point the base URL at http://localhost:11434/v1 for Ollama, or "
+                        "LM Studio's local server address, to run without any cloud key.");
+
+                    // Test Connection: fires one minimal, tool-free request against
+                    // the current in-memory settings (auto-persisted the same frame
+                    // they change, via saveAppSettings() below) so the user gets a
+                    // yes/no on their setup before ever opening the chat overlay - the
+                    // whole point of "quick and simple" per the spec.
+                    static std::future<materializr::ai::LlmTurnResult> testFuture;
+                    static std::string testResultText;
+                    static bool testResultIsError = false;
+                    const bool testBusy = testFuture.valid() &&
+                        testFuture.wait_for(std::chrono::seconds(0)) != std::future_status::ready;
+                    if (testFuture.valid() &&
+                        testFuture.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+                        materializr::ai::LlmTurnResult r = testFuture.get();
+                        testResultIsError = !r.ok;
+                        testResultText = r.ok ? "Connection OK." : ("Failed: " + r.error);
+                    }
+                    ImGui::BeginDisabled(testBusy);
+                    if (ImGui::Button("Test Connection")) {
+                        std::unique_ptr<materializr::ai::LlmClient> client;
+                        if (m_aiSettings.provider == materializr::AiProvider::Anthropic)
+                            client = std::make_unique<materializr::ai::AnthropicClient>(
+                                m_aiSettings.anthropicApiKey, m_aiSettings.anthropicModel);
+                        else
+                            client = std::make_unique<materializr::ai::OpenAiCompatibleClient>(
+                                m_aiSettings.openAiApiKey, m_aiSettings.openAiBaseUrl,
+                                m_aiSettings.openAiModel);
+                        testResultText.clear();
+                        testFuture = std::async(std::launch::async,
+                            [c = std::shared_ptr<materializr::ai::LlmClient>(std::move(client))]() {
+                                std::vector<materializr::ai::ChatMessage> msgs = {
+                                    {materializr::ai::ChatRole::User, "Reply with OK.", ""}};
+                                return c->sendTurn(msgs, {});
+                            });
+                    }
+                    ImGui::EndDisabled();
+                    if (testBusy) { ImGui::SameLine(); ImGui::TextDisabled("Testing..."); }
+                    if (!testResultText.empty()) {
+                        ImGui::TextColored(testResultIsError ? ImVec4(1.0f, 0.4f, 0.4f, 1.0f)
+                                                             : ImVec4(0.4f, 1.0f, 0.4f, 1.0f),
+                                           "%s", testResultText.c_str());
+                    }
+                    ImGui::EndTabItem();
+                }
+#endif // !defined(__ANDROID__)
 
                 ImGui::EndTabBar();
             }

@@ -66,6 +66,18 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(glm)
 
+# nlohmann/json - header-only, pinned to an exact release tag (see the imgui
+# block above for why this repo never pins a branch). Needed by the AI
+# Assistant feature's two LLM clients to build/parse request and response
+# bodies; UpdateChecker's hand-rolled findJsonString stays as-is for the one
+# field it reads.
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG        v3.11.3
+)
+FetchContent_MakeAvailable(nlohmann_json)
+
 # ImGui (docking), pinned to a RELEASE TAG.
 #
 # GIT_TAG was `docking` - a BRANCH HEAD, so every configure resolved to whatever
@@ -268,6 +280,12 @@ add_executable(materializr
     src/plugins/SvgImportPlugin.cpp
     src/plugins/PrimitivesPlugin.cpp
     src/plugins/TutorialPlugin.cpp
+    src/plugins/AiAssistantPlugin.cpp
+    src/ai/AiToolSchema.cpp
+    src/ai/AiToolDispatcher.cpp
+    src/ai/AnthropicClient.cpp
+    src/ai/OpenAiCompatibleClient.cpp
+    src/ai/AiSessionController.cpp
     src/core/Document.cpp
     src/core/History.cpp
     src/core/SelectionManager.cpp
@@ -545,6 +563,7 @@ endif()
 # GitHub's releases API). Required on both platforms.
 find_package(CURL REQUIRED)
 target_link_libraries(materializr PRIVATE CURL::libcurl)
+target_link_libraries(materializr PRIVATE nlohmann_json::nlohmann_json)
 
 # ─── Tests ───────────────────────────────────────────────────────────────────
 

@@ -2215,6 +2215,7 @@ private:
     // on save/load and cleared on closeProject().
     bool m_autoOpenLastProject = false;
     bool m_checkForUpdatesOnLaunch = true;
+    AppSettings::AiSettings m_aiSettings;
     // Beta channel opt-in: update checks also consider GitHub pre-releases.
     bool m_includePrereleases = false;
     // Supporter state: silences the every-launch support prompt (see

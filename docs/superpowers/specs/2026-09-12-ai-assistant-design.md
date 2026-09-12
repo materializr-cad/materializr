@@ -1,5 +1,7 @@
 # AI Assistant Design
 
+**Status: Implemented** (2026-09-12, Task 11 integration pass complete)
+
 ## Goal
 
 A user types what they want in plain language ("make a 20mm cube with a 5mm
@@ -47,15 +49,24 @@ One new plugin owns the whole feature end to end, per this project's rule
 that features live in plugins and core stays generic infrastructure:
 
 ```
-src/plugins/ai_assistant/
-    AiAssistantPlugin.cpp   - REGISTER_PLUGIN, toolbar button, OverlayContribution
-    AiSessionController.h/.cpp - conversation state machine (see Data Flow)
-    AiToolSchema.h/.cpp     - the fixed tool definitions, provider-agnostic
-    AiToolDispatcher.h/.cpp - tool call -> concrete Operation -> pushOperation
-    LlmClient.h             - abstract sendTurn() interface + shared types
-    AnthropicClient.h/.cpp  - Messages API implementation
+src/ai/                     - testable logic, linked into materializr_core
+    AiTypes.h                    - shared ChatMessage/ToolCall/LlmTurnResult types
+    AiToolSchema.h/.cpp          - the fixed tool definitions, provider-agnostic
+    AiToolDispatcher.h/.cpp      - tool call -> concrete Operation -> pushOperation
+    LlmClient.h                  - abstract sendTurn() interface
+    AnthropicClient.h/.cpp       - Messages API implementation
     OpenAiCompatibleClient.h/.cpp - Chat Completions shape (OpenAI/Ollama/LM Studio)
+    AiSessionController.h/.cpp   - conversation state machine (see Data Flow)
+src/plugins/
+    AiAssistantPlugin.cpp    - REGISTER_PLUGIN, toolbar button, OverlayContribution
+                               (untested UI glue only)
 ```
+
+This split - testable logic under `src/ai/`, untested UI glue as a single
+`src/plugins/AiAssistantPlugin.cpp` - was a deliberate, superior adaptation
+made during planning so the logic could be linked into the test-only
+`materializr_core` library, matching the existing `Mate.cpp`/`MateSolver.cpp`
+(testable) vs `MatePlugin.cpp` (untested UI) precedent.
 
 One small core addition: `PluginContext` gets a way to read the AI-relevant
 slice of `AppSettings` (provider, keys, base URL, model):
@@ -239,6 +250,17 @@ Overlay's OverlayContribution::render() (already called every frame) polls:
 
 The loop is entirely driven by the overlay's own per-frame render call -
 no new polling infrastructure on `Application`, no cross-plugin wiring.
+
+**The assistant's own tool-use turn MUST be replayed into conversation
+history on the next request.** After executing tool calls, `poll()` must
+push an `Assistant`-role `ChatMessage` carrying those `ToolCall`s (in
+addition to the `ToolResult` messages) before starting the next turn -
+otherwise both Anthropic and OpenAI reject the follow-up request, since a
+`tool_result`/`role:"tool"` message must follow an assistant message that
+actually made the corresponding tool call. This was a real bug found in the
+final whole-branch review (missed by every per-task review because the
+scripted test fake discarded the `messages` argument); recorded here so it
+isn't reintroduced.
 
 ## Error Handling
 

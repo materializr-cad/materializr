@@ -19,6 +19,7 @@ enable_testing()
 # OpenCASCADE and imgui_lib are already available from the parent CMakeLists.txt
 
 find_package(ZLIB REQUIRED)
+find_package(CURL REQUIRED)
 
 add_library(materializr_core STATIC
     ${CMAKE_SOURCE_DIR}/src/core/Document.cpp
@@ -46,6 +47,13 @@ add_library(materializr_core STATIC
     ${CMAKE_SOURCE_DIR}/src/modeling/SketchSolver.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/Mate.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/MateSolver.cpp
+    ${CMAKE_SOURCE_DIR}/src/ai/AiToolSchema.cpp
+    ${CMAKE_SOURCE_DIR}/src/ai/AiToolDispatcher.cpp
+    ${CMAKE_SOURCE_DIR}/src/ai/AnthropicClient.cpp
+    ${CMAKE_SOURCE_DIR}/src/ai/OpenAiCompatibleClient.cpp
+    ${CMAKE_SOURCE_DIR}/src/ai/AiSessionController.cpp
+    ${CMAKE_SOURCE_DIR}/src/plugin/PluginContext.cpp
+    ${CMAKE_SOURCE_DIR}/src/plugin/PluginRegistry.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/ShellOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/MoveFaceOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/ThreadOp.cpp
@@ -218,6 +226,8 @@ target_link_libraries(materializr_core PUBLIC
     TKShHealing  # ShapeUpgrade_UnifySameDomain for StlIO
     TKMesh       # BRepMesh_IncrementalMesh for Unfold (curved faces)
     ZLIB::ZLIB
+    nlohmann_json::nlohmann_json
+    CURL::libcurl
 )
 
 # ─── Test executables ────────────────────────────────────────────────────────
@@ -817,6 +827,36 @@ add_executable(test_settings_sessions test_settings_sessions.cpp
     ${CMAKE_SOURCE_DIR}/src/io/Settings.cpp)
 target_link_libraries(test_settings_sessions PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_settings_sessions COMMAND test_settings_sessions)
+
+add_executable(test_ai_settings test_ai_settings.cpp
+    ${CMAKE_SOURCE_DIR}/src/io/Settings.cpp)
+target_link_libraries(test_ai_settings PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_ai_settings COMMAND test_ai_settings)
+
+add_executable(test_ai_tool_schema test_ai_tool_schema.cpp
+    TestSignalInit.cpp)
+target_link_libraries(test_ai_tool_schema PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_ai_tool_schema COMMAND test_ai_tool_schema)
+
+add_executable(test_ai_tool_dispatcher test_ai_tool_dispatcher.cpp
+    TestSignalInit.cpp)
+target_link_libraries(test_ai_tool_dispatcher PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_ai_tool_dispatcher COMMAND test_ai_tool_dispatcher)
+
+add_executable(test_ai_anthropic_client test_ai_anthropic_client.cpp
+    TestSignalInit.cpp)
+target_link_libraries(test_ai_anthropic_client PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_ai_anthropic_client COMMAND test_ai_anthropic_client)
+
+add_executable(test_ai_openai_client test_ai_openai_client.cpp
+    TestSignalInit.cpp)
+target_link_libraries(test_ai_openai_client PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_ai_openai_client COMMAND test_ai_openai_client)
+
+add_executable(test_ai_session_controller test_ai_session_controller.cpp
+    TestSignalInit.cpp)
+target_link_libraries(test_ai_session_controller PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_ai_session_controller COMMAND test_ai_session_controller)
 
 # test_multibody_export - several disjoint solids export as ONE file with
 # their spacing intact (print-in-place), and visibility selects the subset.
