@@ -4,6 +4,8 @@
 #include "plugin/PluginContext.h"
 
 #include <gtest/gtest.h>
+#include <thread>
+#include <chrono>
 
 using namespace materializr::ai;
 using materializr::PluginContext;
@@ -41,7 +43,10 @@ PluginContext makeCtx(Document& doc, History& hist) {
 // iterations is hit (a real hang here is a bug the test must fail on, not
 // spin forever).
 void pumpUntilIdle(AiSessionController& sess, PluginContext& ctx) {
-    for (int i = 0; i < 100 && sess.isBusy(); ++i) sess.poll(ctx);
+    for (int i = 0; i < 100 && sess.isBusy(); ++i) {
+        sess.poll(ctx);
+        if (sess.isBusy()) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
 }
 
 LlmTurnResult finalText(const std::string& text) {
