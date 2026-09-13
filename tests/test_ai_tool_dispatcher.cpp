@@ -221,6 +221,35 @@ TEST(AiToolDispatcher, MoveBodyRejectsAnOutOfRangeBodyId) {
     EXPECT_FALSE(r.ok);
 }
 
+TEST(AiToolDispatcher, RotateBodyAboutUpAxisMatchesTheHandedTransformOpRotation) {
+    // rotate_body swaps axis_y/axis_z (op->setRotation(ax, az, ay, -angle))
+    // to match the user->world axis convention, and negates the angle to
+    // undo the reflection that swap introduces (see rotateBody's comment).
+    // With axis_z=1 the world rotation axis is (0,1,0); TransformOp applies
+    // gp_Trsf::SetRotation(axis, angleRad) which for axis Y implements the
+    // standard right-hand rotation matrix x'=x*cos(t)+z*sin(t),
+    // z'=-x*sin(t)+z*cos(t). Here t = -angle_degrees (in radians), so a
+    // world point (x,y,z) maps to (-z,y,x) for a 90 degree request.
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+
+    nlohmann::json addArgs = {{"width", 2.0}, {"height", 2.0}, {"depth", 2.0}, {"x", 10.0}};
+    ASSERT_TRUE(executeTool(ctx, "add_box", addArgs).ok);
+    int id = doc.getAllBodyIds().front();
+
+    nlohmann::json rotateArgs = {{"body_id", id}, {"axis_x", 0.0}, {"axis_y", 0.0},
+                                 {"axis_z", 1.0}, {"angle_degrees", 90.0}};
+    ToolResult r = executeTool(ctx, "rotate_body", rotateArgs);
+    ASSERT_TRUE(r.ok) << r.message;
+
+    double x, y, z;
+    bboxWorldOrigin(doc, id, x, y, z);
+    EXPECT_NEAR(x, -2.0, 1e-6);
+    EXPECT_NEAR(y, 0.0, 1e-6);
+    EXPECT_NEAR(z, 10.0, 1e-6);
+}
+
 TEST(AiToolDispatcher, AddBoxRejectsANonNumericOptionalPosition) {
     Document doc;
     History hist;

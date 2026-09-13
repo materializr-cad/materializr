@@ -53,8 +53,12 @@ LlmTurnResult OpenAiCompatibleClient::parseResponse(const nlohmann::json& body,
                       : ("Request returned HTTP " + std::to_string(httpStatus));
         return r;
     }
-    if (!body.contains("choices") || body["choices"].empty() ||
-        !body["choices"][0].is_object() || !body["choices"][0].contains("message")) {
+    if (!body.contains("choices") || body["choices"].empty()) {
+        r.ok = false;
+        r.error = "Response had no 'choices'";
+        return r;
+    }
+    if (!body["choices"][0].is_object() || !body["choices"][0].contains("message")) {
         r.ok = false;
         r.error = "Response choice had no 'message'";
         return r;

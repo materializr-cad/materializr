@@ -178,7 +178,10 @@ ToolResult rotateBody(PluginContext& ctx, const nlohmann::json& args) {
     // Same user-to-world axis swap as moveBody's setTranslation (see its comment)
     // applied to the rotation axis, so an AI-issued axis of (0,0,1) ("rotate
     // around up") means world Y, consistent with add_*'s origin convention.
-    op->setRotation(ax, az, ay, angle);
+    // The (x,y,z)->(x,z,y) map has determinant -1 (a reflection, not a pure
+    // rotation), so swapping only the axis flips the rotation's handedness;
+    // negating the angle restores the sense the user intended.
+    op->setRotation(ax, az, ay, -angle);
     if (!ctx.history().pushOperation(std::move(op), ctx.document()))
         return {false, "the operation failed to execute"};
     return {true, "Rotated body " + std::to_string(bodyId)};

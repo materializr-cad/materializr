@@ -218,3 +218,47 @@ TEST(AiSessionController, ATurnWithMoreToolCallsThanTheCapStopsPartway) {
     EXPECT_EQ(doc.getAllBodyIds().size(), 8u)
         << "the cap must stop execution partway through a single oversized turn";
 }
+
+TEST(AiSessionController, ACappedTurnKeepsHistoryBalancedForTheNextPrompt) {
+    // The capped turn bundles 12 tool calls but only 8 run. Every one of the
+    // 12 tool_use ids in the assistant message must still get a matching
+    // ToolResult, or the next submitPrompt() sends unbalanced history and the
+    // provider rejects it with HTTP 400.
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+
+    LlmTurnResult bigTurn;
+    bigTurn.ok = true;
+    for (int i = 0; i < 12; ++i) {
+        ToolCall c{"call_" + std::to_string(i), "add_box",
+                  {{"width", 1.0}, {"height", 1.0}, {"depth", 1.0}}};
+        bigTurn.toolCalls.push_back(std::move(c));
+    }
+    auto scripted = std::make_unique<ScriptedClient>(
+        std::vector<LlmTurnResult>{bigTurn, finalText("ok")});
+    ScriptedClient* rawClient = scripted.get();
+    AiSessionController sess(std::move(scripted));
+
+    sess.submitPrompt("make twelve boxes");
+    pumpUntilIdle(sess, ctx);
+    ASSERT_FALSE(sess.isBusy())
+        << "the cap must have stopped the first prompt without starting a new turn";
+
+    sess.submitPrompt("go on");
+    pumpUntilIdle(sess, ctx);
+
+    ASSERT_EQ(rawClient->capturedCalls().size(), 2u);
+    const std::vector<ChatMessage>& secondPromptMessages = rawClient->capturedCalls()[1];
+    size_t assistantToolCallCount = 0;
+    size_t toolResultCount = 0;
+    for (const auto& msg : secondPromptMessages) {
+        if (msg.role == ChatRole::Assistant && !msg.toolCalls.empty())
+            assistantToolCallCount += msg.toolCalls.size();
+        if (msg.role == ChatRole::ToolResult)
+            ++toolResultCount;
+    }
+    ASSERT_EQ(assistantToolCallCount, 12u);
+    EXPECT_EQ(toolResultCount, assistantToolCallCount)
+        << "every tool_use id from the capped turn must have a matching ToolResult";
+}

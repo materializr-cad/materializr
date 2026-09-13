@@ -61,11 +61,20 @@ void AiSessionController::poll(materializr::PluginContext& ctx) {
     }
 
     m_messages.push_back({ChatRole::Assistant, "", "", result.toolCalls});
-    for (const auto& call : result.toolCalls) {
+    for (size_t i = 0; i < result.toolCalls.size(); ++i) {
+        const auto& call = result.toolCalls[i];
         if (m_stepCount >= kMaxStepsPerPrompt) {
             m_scrollback.push_back({ScrollbackLine::Kind::Error,
                                     "Stopped after " + std::to_string(kMaxStepsPerPrompt) +
                                     " steps."});
+            // Every tool_use id in the assistant message above must have a
+            // matching result or the next submitPrompt() sends an unbalanced
+            // history and the provider rejects it with HTTP 400.
+            for (size_t j = i; j < result.toolCalls.size(); ++j) {
+                m_messages.push_back({ChatRole::ToolResult,
+                                      "not executed: step limit reached",
+                                      result.toolCalls[j].id, {}});
+            }
             return; // do not start another turn, and don't run remaining calls
         }
         ToolResult toolResult;
