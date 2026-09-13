@@ -53,15 +53,22 @@ LlmTurnResult OpenAiCompatibleClient::parseResponse(const nlohmann::json& body,
                       : ("Request returned HTTP " + std::to_string(httpStatus));
         return r;
     }
-    if (!body.contains("choices") || body["choices"].empty()) {
+    if (!body.contains("choices") || body["choices"].empty() ||
+        !body["choices"][0].is_object() || !body["choices"][0].contains("message")) {
         r.ok = false;
-        r.error = "Response had no 'choices'";
+        r.error = "Response choice had no 'message'";
         return r;
     }
     const auto& message = body["choices"][0]["message"];
     r.ok = true;
+    std::string text;
+    if (message.contains("content") && message["content"].is_string())
+        text = message["content"].get<std::string>();
     if (message.contains("tool_calls") && message["tool_calls"].is_array()) {
         for (const auto& tc : message["tool_calls"]) {
+            if (!tc.is_object() || !tc.contains("function") ||
+                !tc["function"].is_object())
+                continue; // malformed entry - skip it, don't index blindly
             ToolCall call;
             call.id = tc.value("id", "");
             const auto& fn = tc["function"];
@@ -84,9 +91,10 @@ LlmTurnResult OpenAiCompatibleClient::parseResponse(const nlohmann::json& body,
             }
             r.toolCalls.push_back(std::move(call));
         }
-    } else if (message.contains("content") && message["content"].is_string()) {
-        r.finalText = message["content"].get<std::string>();
     }
+    // Capture accompanying text unconditionally - a response can legitimately
+    // carry both commentary and tool_calls in the same message.
+    r.finalText = text;
     return r;
 }
 

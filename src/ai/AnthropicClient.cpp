@@ -81,7 +81,9 @@ LlmTurnResult AnthropicClient::parseResponse(const nlohmann::json& body, long ht
         }
     }
     r.ok = true;
-    if (r.toolCalls.empty()) r.finalText = text;
+    // Capture accompanying text unconditionally - a turn can legitimately carry
+    // both commentary text and tool_use blocks in the same response.
+    r.finalText = text;
     return r;
 }
 

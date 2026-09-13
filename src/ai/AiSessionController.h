@@ -9,6 +9,12 @@ namespace materializr { class PluginContext; }
 
 namespace materializr { namespace ai {
 
+// KNOWN LIMITATION: AiSessionController is bound to whatever Document/History
+// the PluginContext passed to poll() currently points at. If the active
+// project changes while a turn is in flight, an in-flight tool call executes
+// against the NEW active project, not the one the conversation started in.
+// Not fixed in v1 - would need conversations bound to a stable project identity.
+//
 // Drives one AI conversation: submitPrompt() starts a turn, poll() (called
 // once per frame from the chat overlay's OverlayContribution::render, the
 // same way UpdateChecker's result is polled from Application's main loop)

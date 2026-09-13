@@ -106,3 +106,19 @@ TEST(AnthropicClient, ParseResponseHandlesUnparseableJsonGracefully) {
     EXPECT_FALSE(r.ok);
     EXPECT_FALSE(r.error.empty());
 }
+
+TEST(AnthropicClient, ParseResponseCapturesTextAlongsideToolCalls) {
+    // A turn can legitimately carry both commentary text and a tool_use block -
+    // finalText must not be dropped just because toolCalls is non-empty.
+    nlohmann::json response = {
+        {"content", {
+            {{"type", "text"}, {"text", "Sure, I'll make that box now."}},
+            {{"type", "tool_use"}, {"id", "call_1"}, {"name", "add_box"},
+             {"input", {{"width", 10}, {"height", 10}, {"depth", 10}}}},
+        }},
+    };
+    LlmTurnResult r = AnthropicClient::parseResponse(response, 200);
+    ASSERT_TRUE(r.ok);
+    ASSERT_EQ(r.toolCalls.size(), 1u);
+    EXPECT_EQ(r.finalText, "Sure, I'll make that box now.");
+}

@@ -2178,7 +2178,13 @@ void Application::importSettings() {
             // Apply the imported preferences live, then persist them to the
             // regular settings file so they survive the next launch. Theme is
             // applied explicitly since applyAppSettings only stages it.
+            // AI settings are session-local and excluded from the portable
+            // import/export flow entirely - SettingsIO::importJson strips them to
+            // defaults (so a shared backup can't leak/inject an API key), but that
+            // must not wipe the user's OWN live AI config on an ordinary import.
+            AppSettings::AiSettings savedAiSettings = m_aiSettings;
             applyAppSettings(s);
+            m_aiSettings = savedAiSettings;
             m_themeManager->apply();
             m_orbitButton = m_settingsOrbitButton; // commit staged camera buttons
             m_panButton = m_settingsPanButton;

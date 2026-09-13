@@ -6,6 +6,9 @@
 #include "../modeling/TransformOp.h"
 #include "../modeling/BooleanOp.h"
 
+#include <cmath>
+#include <limits>
+
 namespace materializr { namespace ai {
 
 namespace {
@@ -35,14 +38,34 @@ bool requireBodyId(Document& doc, const nlohmann::json& args, const char* key,
                    int& out, std::string& err) {
     double raw;
     if (!requireNumber(args, key, raw, err)) return false;
+    if (!std::isfinite(raw) ||
+        raw < static_cast<double>(std::numeric_limits<int>::min()) ||
+        raw > static_cast<double>(std::numeric_limits<int>::max())) {
+        err = std::string("'") + key + "' is out of range";
+        return false;
+    }
+    if (raw != std::floor(raw)) {
+        err = std::string("'") + key + "' must be a whole number, got " +
+              std::to_string(raw);
+        return false;
+    }
     out = static_cast<int>(raw);
     for (int id : doc.getAllBodyIds()) if (id == out) return true;
     err = std::string("no body with id ") + std::to_string(out);
     return false;
 }
-double optNumber(const nlohmann::json& args, const char* key, double fallback) {
-    if (args.contains(key) && args[key].is_number()) return args[key].get<double>();
-    return fallback;
+// Distinguishes "absent" (use fallback) from "present but wrong type" (reject) -
+// optNumber's single-return-value shape couldn't tell those apart, silently
+// defaulting a malformed call instead of rejecting it.
+bool optionalNumber(const nlohmann::json& args, const char* key, double& out,
+                    double fallback, std::string& err) {
+    if (!args.contains(key)) { out = fallback; return true; }
+    if (!args[key].is_number()) {
+        err = std::string("'") + key + "' must be a number";
+        return false;
+    }
+    out = args[key].get<double>();
+    return true;
 }
 
 ToolResult addPrimitive(PluginContext& ctx, PrimitiveOp::Kind kind,
@@ -57,7 +80,9 @@ ToolResult addPrimitive(PluginContext& ctx, PrimitiveOp::Kind kind,
                 !requirePositive(args, "height", h, err) ||
                 !requirePositive(args, "depth", d, err))
                 return {false, err};
-            op->setBoxExtents(w, h, d);
+            // PrimitiveOp::setBoxExtents(x,y,z) takes W(x)/D(y)/H(z) - depth in the
+            // middle slot, height last - so the call order is (w, d, h), not (w, h, d).
+            op->setBoxExtents(w, d, h);
             break;
         }
         case PrimitiveOp::Kind::Cylinder: {
@@ -92,13 +117,19 @@ ToolResult addPrimitive(PluginContext& ctx, PrimitiveOp::Kind kind,
             if (!requirePositive(args, "major_radius", major, err) ||
                 !requirePositive(args, "minor_radius", minor, err))
                 return {false, err};
+            if (major <= minor)
+                return {false, "'major_radius' must be greater than 'minor_radius'"};
             op->setRadius(major);
             op->setMinorRadius(minor);
             break;
         }
     }
-    op->setOrigin(optNumber(args, "x", 0.0), optNumber(args, "y", 0.0),
-                 optNumber(args, "z", 0.0));
+    double x, y, z;
+    if (!optionalNumber(args, "x", x, 0.0, err) ||
+        !optionalNumber(args, "y", y, 0.0, err) ||
+        !optionalNumber(args, "z", z, 0.0, err))
+        return {false, err};
+    op->setOrigin(x, y, z);
     if (!ctx.history().pushOperation(std::move(op), ctx.document()))
         return {false, "the operation failed to execute"};
     // PrimitiveOp appends the new body, so its id is the last one - see Document::addBody.
@@ -118,7 +149,12 @@ ToolResult moveBody(PluginContext& ctx, const nlohmann::json& args) {
     auto op = std::make_unique<TransformOp>();
     op->setBodyId(bodyId);
     op->setType(TransformType::Translate);
-    op->setTranslation(dx, dy, dz);
+    // TransformOp::setTranslation passes its args straight through as raw world
+    // coordinates, unlike PrimitiveOp::setOrigin, which remaps user (x,y,z) to
+    // world (x,z,y) - see PrimitiveOp.cpp's worldPnt() comment (user Z "up" ->
+    // world Y, user Y "depth" -> world Z). Swap dy/dz here so move_body uses the
+    // SAME user-space convention as add_* - do not "fix" this back to (dx,dy,dz).
+    op->setTranslation(dx, dz, dy);
     if (!ctx.history().pushOperation(std::move(op), ctx.document()))
         return {false, "the operation failed to execute"};
     return {true, "Moved body " + std::to_string(bodyId)};
@@ -139,7 +175,10 @@ ToolResult rotateBody(PluginContext& ctx, const nlohmann::json& args) {
     auto op = std::make_unique<TransformOp>();
     op->setBodyId(bodyId);
     op->setType(TransformType::Rotate);
-    op->setRotation(ax, ay, az, angle);
+    // Same user-to-world axis swap as moveBody's setTranslation (see its comment)
+    // applied to the rotation axis, so an AI-issued axis of (0,0,1) ("rotate
+    // around up") means world Y, consistent with add_*'s origin convention.
+    op->setRotation(ax, az, ay, angle);
     if (!ctx.history().pushOperation(std::move(op), ctx.document()))
         return {false, "the operation failed to execute"};
     return {true, "Rotated body " + std::to_string(bodyId)};

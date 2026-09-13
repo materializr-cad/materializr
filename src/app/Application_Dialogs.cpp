@@ -7,8 +7,11 @@
 #include "touch_mode.h"
 #include "gl_common.h"
 #include "url_open.h"
+#include "../platform_defs.h"
+#if !defined(MZ_MOBILE)
 #include "../ai/AnthropicClient.h"
 #include "../ai/OpenAiCompatibleClient.h"
+#endif
 
 #include <cstdlib>
 #include <filesystem>
@@ -598,13 +601,18 @@ void Application::renderSettings() {
                     ImGui::EndTabItem();
                 }
 
-#if !defined(__ANDROID__)
+#if !defined(MZ_MOBILE)
                 if (ImGui::BeginTabItem("AI Assistant")) {
                     static char anthropicKeyBuf[256] = {};
                     static char anthropicModelBuf[128] = {};
                     static char openAiKeyBuf[256] = {};
                     static char openAiUrlBuf[256] = {};
                     static char openAiModelBuf[128] = {};
+                    // buffersLoaded only ever populates once per process lifetime. If
+                    // m_aiSettings changes from outside this tab, the displayed fields go
+                    // stale; no other tab in this dialog has a "reload on dialog open"
+                    // pattern to follow, and Import no longer touches m_aiSettings (see
+                    // Application::importSettings), so this is an accepted limitation.
                     static bool buffersLoaded = false;
                     if (!buffersLoaded) {
                         std::snprintf(anthropicKeyBuf, sizeof(anthropicKeyBuf), "%s",
@@ -657,6 +665,11 @@ void Application::renderSettings() {
                         "Point the base URL at http://localhost:11434/v1 for Ollama, or "
                         "LM Studio's local server address, to run without any cloud key.");
 
+                    // NOTE: this constructs AI clients and drives Test Connection directly
+                    // in Application_Dialogs.cpp rather than in the AiAssistant plugin,
+                    // which deviates from this repo's plugin-ownership rule (see
+                    // CONTRIBUTING.md). Known, accepted for v1; a real fix would move
+                    // client construction into the plugin and is out of scope here.
                     // Test Connection: fires one minimal, tool-free request against
                     // the current in-memory settings (auto-persisted the same frame
                     // they change, via saveAppSettings() below) so the user gets a
@@ -669,9 +682,14 @@ void Application::renderSettings() {
                         testFuture.wait_for(std::chrono::seconds(0)) != std::future_status::ready;
                     if (testFuture.valid() &&
                         testFuture.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-                        materializr::ai::LlmTurnResult r = testFuture.get();
-                        testResultIsError = !r.ok;
-                        testResultText = r.ok ? "Connection OK." : ("Failed: " + r.error);
+                        try {
+                            materializr::ai::LlmTurnResult r = testFuture.get();
+                            testResultIsError = !r.ok;
+                            testResultText = r.ok ? "Connection OK." : ("Failed: " + r.error);
+                        } catch (const std::exception& e) {
+                            testResultIsError = true;
+                            testResultText = std::string("Failed: ") + e.what();
+                        }
                     }
                     ImGui::BeginDisabled(testBusy);
                     if (ImGui::Button("Test Connection")) {
@@ -700,7 +718,7 @@ void Application::renderSettings() {
                     }
                     ImGui::EndTabItem();
                 }
-#endif // !defined(__ANDROID__)
+#endif // !defined(MZ_MOBILE)
 
                 ImGui::EndTabBar();
             }

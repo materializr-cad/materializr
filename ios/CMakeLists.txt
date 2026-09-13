@@ -75,6 +75,8 @@ file(GLOB_RECURSE MZ_SOURCES CONFIGURE_DEPENDS "${MZ_SRC}/*.cpp")
 list(FILTER MZ_SOURCES EXCLUDE REGEX "/main\\.cpp$")            # desktop CLI entry
 list(FILTER MZ_SOURCES EXCLUDE REGEX "/android_main\\.cpp$")    # Android SDL_main (unguarded)
 list(FILTER MZ_SOURCES EXCLUDE REGEX "/UpdateChecker\\.cpp$")   # libcurl (desktop-only)
+list(FILTER MZ_SOURCES EXCLUDE REGEX "/src/ai/")                # AI Assistant is network-only; no INTERNET-equivalent entitlement requested for iOS
+list(FILTER MZ_SOURCES EXCLUDE REGEX "/AiAssistantPlugin\\.cpp$") # same reason as above
 
 set(MZ_OBJCXX_SOURCES
     "${MZ_SRC}/ios_platform.mm"

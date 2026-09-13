@@ -52,15 +52,34 @@ void AiSessionController::poll(materializr::PluginContext& ctx) {
         return;
     }
 
+    if (!result.finalText.empty()) {
+        // Surface commentary the model sent alongside tool calls before the
+        // tool-execution lines, so the user sees the model's stated intent.
+        // Not added to m_messages: the replay format for an Assistant-with-
+        // toolCalls turn only carries the tool_use/tool_calls blocks.
+        m_scrollback.push_back({ScrollbackLine::Kind::Assistant, result.finalText});
+    }
+
     m_messages.push_back({ChatRole::Assistant, "", "", result.toolCalls});
     for (const auto& call : result.toolCalls) {
-        ToolResult toolResult = executeTool(ctx, call.name, call.args);
+        if (m_stepCount >= kMaxStepsPerPrompt) {
+            m_scrollback.push_back({ScrollbackLine::Kind::Error,
+                                    "Stopped after " + std::to_string(kMaxStepsPerPrompt) +
+                                    " steps."});
+            return; // do not start another turn, and don't run remaining calls
+        }
+        ToolResult toolResult;
+        try {
+            toolResult = executeTool(ctx, call.name, call.args);
+        } catch (const std::exception& e) {
+            toolResult = {false, std::string("internal error: ") + e.what()};
+        }
         m_scrollback.push_back({toolResult.ok ? ScrollbackLine::Kind::ToolSummary
                                               : ScrollbackLine::Kind::Error,
                                 "-> " + toolResult.message});
         m_messages.push_back({ChatRole::ToolResult, toolResult.message, call.id, {}});
+        ++m_stepCount;
     }
-    ++m_stepCount;
     if (m_stepCount >= kMaxStepsPerPrompt) {
         m_scrollback.push_back({ScrollbackLine::Kind::Error,
                                 "Stopped after " + std::to_string(kMaxStepsPerPrompt) +

@@ -1,3 +1,5 @@
+#include "../platform_defs.h"
+
 namespace materializr { namespace force_link {
 
 // Phase 1 plugins
@@ -41,7 +43,7 @@ void forceLink_Primitives();
 void forceLink_Tutorial();
 void forceLink_Mate();
 // Phase 6
-#if !defined(__ANDROID__)
+#if !defined(MZ_MOBILE)
 void forceLink_AiAssistant();
 #endif
 
@@ -83,7 +85,7 @@ void linkAll() {
     forceLink_Tutorial();
     forceLink_Mate();
     // Phase 6
-#if !defined(__ANDROID__)
+#if !defined(MZ_MOBILE)
     forceLink_AiAssistant();
 #endif
 }

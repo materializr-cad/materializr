@@ -99,3 +99,43 @@ TEST(OpenAiCompatibleClient, ParseResponseHandlesMalformedFunctionArgumentsGrace
     EXPECT_TRUE(r.toolCalls[0].args.empty())
         << "unparseable arguments must fall back to an empty object, not crash";
 }
+
+TEST(OpenAiCompatibleClient, ParseResponseCapturesTextAlongsideToolCalls) {
+    // A response can legitimately carry both commentary content and tool_calls -
+    // finalText must not be dropped just because tool_calls is non-empty.
+    nlohmann::json response = {{"choices", {{{"message", {
+        {"role", "assistant"},
+        {"content", "Sure, I'll make that box now."},
+        {"tool_calls", {{
+            {"id", "call_1"},
+            {"type", "function"},
+            {"function", {{"name", "add_box"},
+                         {"arguments", "{\"width\":10,\"height\":10,\"depth\":10}"}}},
+        }}},
+    }}}}}};
+    LlmTurnResult r = OpenAiCompatibleClient::parseResponse(response, 200);
+    ASSERT_TRUE(r.ok);
+    ASSERT_EQ(r.toolCalls.size(), 1u);
+    EXPECT_EQ(r.finalText, "Sure, I'll make that box now.");
+}
+
+TEST(OpenAiCompatibleClient, ParseResponseRejectsAChoiceWithNoMessage) {
+    nlohmann::json response = {{"choices", {nlohmann::json::object()}}};
+    LlmTurnResult r = OpenAiCompatibleClient::parseResponse(response, 200);
+    EXPECT_FALSE(r.ok);
+    EXPECT_FALSE(r.error.empty());
+}
+
+TEST(OpenAiCompatibleClient, ParseResponseSkipsAToolCallMissingFunction) {
+    // A malformed tool_calls entry lacking "function" must be skipped, not
+    // indexed blindly (operator[] on a missing key is UB on a const json).
+    nlohmann::json response = {{"choices", {{{"message", {
+        {"role", "assistant"},
+        {"tool_calls", {
+            nlohmann::json::object({{"id", "call_1"}}), // missing "function"
+        }},
+    }}}}}};
+    LlmTurnResult r = OpenAiCompatibleClient::parseResponse(response, 200);
+    ASSERT_TRUE(r.ok);
+    EXPECT_TRUE(r.toolCalls.empty());
+}

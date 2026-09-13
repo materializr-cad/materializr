@@ -109,8 +109,13 @@ void renderOverlay(materializr::PluginContext& ctx) {
 } // namespace
 
 REGISTER_PLUGIN(AiAssistant, [](materializr::PluginContext& ctx) {
-    ctx.registerCommand({"AI Assistant", "", [](materializr::PluginContext&) {
-        g_overlayOpen = !g_overlayOpen;
-    }});
+    // registerCommand/CommandContribution has no consumer anywhere in this
+    // codebase (no menu or toolbar ever reads it), so closing the overlay left
+    // no way to reopen it. registerToolbarButton has a real consumer
+    // (src/ui/Toolbar.cpp / LayoutCommon.cpp).
+    ctx.registerToolbarButton({"AI Assistant", "AI Assistant",
+        materializr::SelectionContext::Always, 100,
+        [](materializr::PluginContext&) { g_overlayOpen = !g_overlayOpen; },
+        nullptr, "Open the AI Assistant chat."});
     ctx.registerOverlay({"AI Assistant", 100, renderOverlay});
 });

@@ -193,3 +193,28 @@ TEST(AiSessionController, ANetworkFailureEndsTheSessionWithAnErrorLine) {
             sawError = true;
     EXPECT_TRUE(sawError);
 }
+
+TEST(AiSessionController, ATurnWithMoreToolCallsThanTheCapStopsPartway) {
+    // A single turn bundling more tool calls than the 8-step cap must stop
+    // partway through THAT turn's loop, not run all of them before checking.
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+
+    LlmTurnResult bigTurn;
+    bigTurn.ok = true;
+    for (int i = 0; i < 12; ++i) {
+        ToolCall c{"call_" + std::to_string(i), "add_box",
+                  {{"width", 1.0}, {"height", 1.0}, {"depth", 1.0}}};
+        bigTurn.toolCalls.push_back(std::move(c));
+    }
+    AiSessionController sess(std::make_unique<ScriptedClient>(
+        std::vector<LlmTurnResult>{bigTurn}));
+
+    sess.submitPrompt("make twelve boxes");
+    pumpUntilIdle(sess, ctx);
+
+    EXPECT_FALSE(sess.isBusy());
+    EXPECT_EQ(doc.getAllBodyIds().size(), 8u)
+        << "the cap must stop execution partway through a single oversized turn";
+}
