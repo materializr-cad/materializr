@@ -77,8 +77,7 @@ struct AppSettings {
     // the hard-coded baseline; below 1 calms a touchy trackpad, above 1
     // snappier. Persisted so the user doesn't have to re-set it every launch.
     float mouseSensitivity  = 1.0f;
-    bool autosaveEnabled    = false;
-    int  autosaveIntervalSec = 120;
+    bool autosaveEnabled    = false; // save automatically on project/tab close
     bool invertCubeDrag     = false; // ViewCube drag-to-orbit direction
     // Max seconds between two clicks for them to register as a double-click
     // (ImGui default 0.30). Trackpad users often double-tap slower than a

@@ -164,15 +164,8 @@ void Application::renderSettings() {
                 // ── General ───────────────────────────────────────────────
                 if (ImGui::BeginTabItem(materializr::tr("General###General"))) {
                     ImGui::SeparatorText(materializr::tr("Autosave"));
-                    if (ImGui::Checkbox(materializr::tr("Autosave saved projects"), &m_autosaveEnabled)) changed = true;
-                    ImGui::TextWrapped("%s", materializr::tr("Periodically re-saves the project once it has been saved to a file at least once."));
-                    ImGui::BeginDisabled(!m_autosaveEnabled);
-                    int interval = static_cast<int>(m_autosaveIntervalSec);
-                    if (ImGui::SliderInt(materializr::tr("Interval (s)"), &interval, 15, 600, "%d s")) {
-                        m_autosaveIntervalSec = static_cast<float>(interval);
-                        changed = true;
-                    }
-                    ImGui::EndDisabled();
+                    if (ImGui::Checkbox(materializr::tr("Autosave on close"), &m_autosaveEnabled)) changed = true;
+                    ImGui::TextWrapped("%s", materializr::tr("Saves the project automatically when you close it or quit, once it has been saved to a file at least once - no prompt needed. Crash recovery is separate and always on."));
                     if (m_autosaveEnabled && m_currentProjectPath.empty()) {
                         ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s", materializr::tr("Save the project once to start autosaving."));
                     }

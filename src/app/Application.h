@@ -1125,10 +1125,10 @@ private:
     bool m_railTabDragged = false, m_rightTabDragged = false;
 
     // Autosave: once the project has been saved at least once (has a path on
-    // disk), periodically re-save dirty changes. Toggled in File > Settings.
+    // disk), save it again automatically on close (Application::closeProject)
+    // so quitting/closing a dirty tab doesn't need the save prompt. Toggled in
+    // File > Settings. No longer a periodic timer - see closeProject().
     bool m_autosaveEnabled = false;
-    float m_autosaveIntervalSec = 120.0f;
-    double m_lastAutosaveTime = 0.0;
 
     // Invert the cube-drag → orbit direction (Settings).
     bool m_invertCubeDrag = false;
