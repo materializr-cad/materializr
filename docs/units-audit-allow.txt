@@ -185,6 +185,8 @@ src/modeling/SewOp.cpp:199:
 src/modeling/ShellOp.cpp:221:
 src/modeling/ShellOp.cpp:337:
 src/modeling/Sketch.cpp:556:
+src/modeling/Sketch.cpp:631:
+src/modeling/Sketch.cpp:636:
 src/modeling/SketchConstraints.h:84:
 src/modeling/SketchEditOp.cpp:140:
 src/modeling/SketchOffset.cpp:796:
