@@ -366,6 +366,7 @@ void Document::removePlane(int id) {
             // its pose/selection/visibility. Drop it silently (the
             // PlaneRemovedEvent below is what the image renderer watches).
             removeRefImage(id);
+            removeMeshTrace(id);
             if (m_eventBus) {
                 m_eventBus->publish(materializr::PlaneRemovedEvent{id});
                 m_eventBus->publish(materializr::DocumentModifiedEvent{true});
@@ -443,6 +444,64 @@ std::vector<int> Document::getAllRefImagePlaneIds() const {
     std::vector<int> ids;
     ids.reserve(m_refImages.size());
     for (const auto& r : m_refImages) ids.push_back(r.planeId);
+    return ids;
+}
+
+// ─── Mesh traces (STL cross-sections hosted on construction planes) ────────
+
+void Document::setMeshTrace(int planeId, MeshTraceEntry entry) {
+    entry.planeId = planeId;
+    for (auto& t : m_meshTraces) {
+        if (t.planeId == planeId) {
+            t = entry;
+            if (m_eventBus) {
+                m_eventBus->publish(materializr::PlaneChangedEvent{planeId});
+                m_eventBus->publish(materializr::DocumentModifiedEvent{true});
+            }
+            return;
+        }
+    }
+    m_meshTraces.push_back(entry);
+    if (m_eventBus) {
+        m_eventBus->publish(materializr::PlaneChangedEvent{planeId});
+        m_eventBus->publish(materializr::DocumentModifiedEvent{true});
+    }
+}
+
+const MeshTraceEntry* Document::getMeshTrace(int planeId) const {
+    for (const auto& t : m_meshTraces)
+        if (t.planeId == planeId) return &t;
+    return nullptr;
+}
+
+void Document::removeMeshTrace(int planeId) {
+    for (auto it = m_meshTraces.begin(); it != m_meshTraces.end(); ++it) {
+        if (it->planeId == planeId) {
+            m_meshTraces.erase(it);
+            if (m_eventBus) {
+                m_eventBus->publish(materializr::PlaneChangedEvent{planeId});
+                m_eventBus->publish(materializr::DocumentModifiedEvent{true});
+            }
+            return;
+        }
+    }
+}
+
+void Document::setMeshTraceOpacity(int planeId, float opacity) {
+    for (auto& t : m_meshTraces) {
+        if (t.planeId == planeId) {
+            t.opacity = opacity;
+            if (m_eventBus)
+                m_eventBus->publish(materializr::PlaneChangedEvent{planeId});
+            return;
+        }
+    }
+}
+
+std::vector<int> Document::getAllMeshTracePlaneIds() const {
+    std::vector<int> ids;
+    ids.reserve(m_meshTraces.size());
+    for (const auto& t : m_meshTraces) ids.push_back(t.planeId);
     return ids;
 }
 
@@ -621,6 +680,7 @@ void Document::clear() {
     m_bodies.clear();
     m_planes.clear();
     m_refImages.clear();
+    m_meshTraces.clear();
     m_axes.clear();
     m_sketches.clear();
     m_folders.clear();

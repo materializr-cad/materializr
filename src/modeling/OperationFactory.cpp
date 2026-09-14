@@ -25,6 +25,7 @@
 #include "RevolveOp.h"
 #include "ConstructionPlaneOp.h"
 #include "ConstructionAxisOp.h"
+#include "MeshTraceSetupOp.h"
 #include "FilletOp.h"
 #include "ChamferOp.h"
 #include "ShellOp.h"
@@ -64,6 +65,10 @@ std::unique_ptr<Operation> create(const std::string& typeId) {
     if (typeId == "revolve")  return std::make_unique<RevolveOp>();
     if (typeId == "construction_plane") return std::make_unique<ConstructionPlaneOp>();
     if (typeId == "construction_axis")  return std::make_unique<ConstructionAxisOp>();
+    // "mesh_trace_setup": no rehydrateFromReload (see MeshTraceSetupOp.h) -
+    // falls back to a baked ReplayOp on reload, same as any op that hasn't
+    // opted into full replay-editability.
+    if (typeId == "mesh_trace_setup")   return std::make_unique<MeshTraceSetupOp>();
     //   - plane/axis gizmo transforms: pure pose snapshots, fully in the blob.
     //     Without these a brand-new file containing one plane move reloaded
     //     with frozen steps and the misleading "older save" amber banner.

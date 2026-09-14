@@ -401,4 +401,20 @@ private:
 // unit conversion with it. Shared so that cannot recur.
 bool constraintIsArcRadius(const Sketch& sk, const Constraint& c);
 
+// Turns a sampled point sequence (SVG bezier flattening, a raster-traced
+// mesh-shadow boundary - any dense polyline in the sketch's own 2D plane
+// coords) into native sketch geometry instead of one SketchLine per sample:
+// a closed loop that fits a circle becomes a SketchCircle; otherwise the
+// loop is split at sharp corners (turn angle > ~30 deg) so real straight
+// edges stay straight, and each run is Douglas-Peucker simplified into a
+// single SketchLine (2 points left) or a SketchSpline threaded through the
+// kept samples (a centripetal Catmull-Rom, so adjacent runs join exactly,
+// unlike a fitted arc that doesn't pass through the sampled endpoints).
+// Anything jagged or oversized falls back to the original dense polyline as
+// plain (fromText) lines - the worst case is the old one-line-per-sample
+// behaviour. Shared by SvgImport and mesh-trace's Shadow outline insertion,
+// which both start from "loop of sampled points" and want the same result.
+// Returns true if anything was placed.
+bool recoverSketchLoop(Sketch* sk, const std::vector<glm::vec2>& points, bool closed);
+
 } // namespace materializr

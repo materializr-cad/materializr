@@ -38,6 +38,8 @@
 #include <cmath>
 #include <vector>
 
+using materializr::computeMeshShadow;
+using materializr::computeMeshShadowOutline;
 using materializr::computeSectionCap;
 using materializr::faceMeshes;
 using materializr::SectionSlice;
@@ -217,6 +219,162 @@ TEST(SectionCap, TangentPlaneNoCap) {
     EXPECT_TRUE(pos.empty());
     EXPECT_FALSE(computeSectionCap(box, gp_Pln(gp_Pnt(0, 0, 20), gp_Dir(0, 0, 1)), pos));
     EXPECT_TRUE(pos.empty());
+}
+
+// ─── computeMeshShadow (mesh-trace's live Shadow overlay) ───────────────────
+// The simple, robust half: every triangle flattened onto the plane, no
+// loop-chaining, no classification, no dedup - just raw filled triangles
+// appended as-is. Unlike sliceSection/computeMeshShadowOutline the plane's
+// LOCATION doesn't matter here - only its orientation. A closed solid's
+// faces that are parallel to the plane (a box's top AND bottom, viewed along
+// Z) each flatten onto the SAME footprint, so the raw triangles legitimately
+// overlap and a naive sum of triangle areas double-counts - that's fine, and
+// exactly the tradeoff this function is built for: blended rendering doesn't
+// care about overlap (see MeshTraceRenderer), only a bounding-box/coverage
+// check does, so that's what these assert instead of a total area.
+
+double positionsFootprintArea(const std::vector<float>& positions) {
+    float x0 = 1e30f, x1 = -1e30f, y0 = 1e30f, y1 = -1e30f;
+    for (size_t i = 0; i + 2 < positions.size(); i += 3) {
+        x0 = std::min(x0, positions[i]); x1 = std::max(x1, positions[i]);
+        y0 = std::min(y0, positions[i + 1]); y1 = std::max(y1, positions[i + 1]);
+    }
+    return double(x1 - x0) * double(y1 - y0);
+}
+
+TEST(SectionCapShadow, MeshesAnUntessellatedShapeInsteadOfFindingNothing) {
+    // A shape loaded straight from a project file (ProjectIO reads BREP
+    // topology only) has no cached Poly_Triangulation yet - the running
+    // app's own render pipeline normally provides one before Shadow mode
+    // ever runs, but this must not silently come back empty the one time
+    // that assumption doesn't hold. Deliberately NOT calling meshLikeRenderer.
+    TopoDS_Shape box = BRepPrimAPI_MakeBox(20.0, 20.0, 30.0).Shape();
+    std::vector<float> positions;
+    ASSERT_TRUE(computeMeshShadow(box, gp_Pln(gp_Pnt(10, 10, 15), gp_Dir(0, 0, 1)), positions));
+    EXPECT_NEAR(positionsFootprintArea(positions), 20.0 * 20.0, 0.5);
+}
+
+TEST(SectionCapShadow, ConvexBoxMatchesItsFootprint) {
+    // A box has no self-occlusion from any axis-aligned direction, so the
+    // flattened triangles' bounding footprint is exactly the box's X x Y
+    // footprint - same shape sliceSection would find for a cross-section
+    // through its middle.
+    TopoDS_Shape box = BRepPrimAPI_MakeBox(20.0, 20.0, 30.0).Shape();
+    meshLikeRenderer(box);
+    std::vector<float> positions;
+    ASSERT_TRUE(computeMeshShadow(box, gp_Pln(gp_Pnt(10, 10, 15), gp_Dir(0, 0, 1)), positions));
+    EXPECT_NEAR(positionsFootprintArea(positions), 20.0 * 20.0, 0.5);
+}
+
+TEST(SectionCapShadow, FlippingPlaneNormalGivesTheSameFootprint) {
+    // Flattening projects onto the plane; it never classifies a triangle as
+    // front/back-facing, so unlike the facing-flip technique this replaced,
+    // it is trivially symmetric under negating the plane's normal.
+    TopoDS_Shape box = BRepPrimAPI_MakeBox(20.0, 20.0, 30.0).Shape();
+    meshLikeRenderer(box);
+    std::vector<float> up, down;
+    ASSERT_TRUE(computeMeshShadow(box, gp_Pln(gp_Pnt(10, 10, 15), gp_Dir(0, 0, 1)), up));
+    ASSERT_TRUE(computeMeshShadow(box, gp_Pln(gp_Pnt(10, 10, 15), gp_Dir(0, 0, -1)), down));
+    EXPECT_NEAR(capArea(up), capArea(down), 0.5);
+}
+
+// ─── computeMeshShadowOutline (Shadow mode's "Insert Outline into Sketch") ──
+// The slower, one-shot half: a true 2D union (BOPAlgo_Builder General Fuse +
+// ShapeUpgrade_UnifySameDomain) of every flattened triangle, producing real
+// closed loops. No facing classification means no near-tangent-triangle
+// numerical noise to fragment a loop, and no front/back ambiguity to resolve
+// for occlusion - coverage is coverage, so a disjoint interior feature simply
+// disappears into the union instead of needing a special case.
+
+TEST(SectionCapShadowOutline, MeshesAnUntessellatedShapeInsteadOfFindingNothing) {
+    TopoDS_Shape box = BRepPrimAPI_MakeBox(20.0, 20.0, 30.0).Shape();
+    SectionSlice slice;
+    ASSERT_TRUE(computeMeshShadowOutline(box, gp_Pln(gp_Pnt(10, 10, 15), gp_Dir(0, 0, 1)), slice));
+    ASSERT_EQ(slice.loops.size(), 1u);
+    EXPECT_NEAR(capArea(slice.cap), 20.0 * 20.0, 0.5);
+}
+
+TEST(SectionCapShadowOutline, ConvexBoxMatchesItsCrossSection) {
+    TopoDS_Shape box = BRepPrimAPI_MakeBox(20.0, 20.0, 30.0).Shape();
+    meshLikeRenderer(box);
+    SectionSlice slice;
+    ASSERT_TRUE(computeMeshShadowOutline(box, gp_Pln(gp_Pnt(10, 10, 15), gp_Dir(0, 0, 1)), slice));
+    ASSERT_EQ(slice.loops.size(), 1u);
+    EXPECT_NEAR(lineLength(slice.lines), 2.0 * (20.0 + 20.0), 0.5);
+    EXPECT_NEAR(capArea(slice.cap), 20.0 * 20.0, 0.5);
+}
+
+TEST(SectionCapShadowOutline, BoredBoxSilhouetteIsAnAnnulus) {
+    // The bore runs all the way through along Z, so no triangle ever
+    // projects onto that region - the union naturally leaves a real gap
+    // there, same nested odd/even fill sliceSection uses for a real
+    // cross-section (both funnel through the shared finishSlice helper).
+    TopoDS_Shape hollow = boredBox();
+    meshLikeRenderer(hollow);
+    SectionSlice slice;
+    ASSERT_TRUE(computeMeshShadowOutline(hollow, gp_Pln(gp_Pnt(10, 10, 10), gp_Dir(0, 0, 1)), slice));
+    ASSERT_EQ(slice.loops.size(), 2u) << "outer square + the bore's hole loop";
+    EXPECT_NEAR(capArea(slice.cap), 400.0 - M_PI * 25.0, 2.0);
+}
+
+TEST(SectionCapShadowOutline, LoopsAreOrderedForSketchInsertion) {
+    // Application::insertMeshTraceIntoSketch walks `loops` edge-to-edge with
+    // no re-chaining of its own - prove that actually retraces the same
+    // perimeter the unordered `lines` segments do.
+    TopoDS_Shape box = BRepPrimAPI_MakeBox(20.0, 20.0, 30.0).Shape();
+    meshLikeRenderer(box);
+    SectionSlice slice;
+    ASSERT_TRUE(computeMeshShadowOutline(box, gp_Pln(gp_Pnt(10, 10, 15), gp_Dir(0, 0, 1)), slice));
+    ASSERT_EQ(slice.loops.size(), 1u);
+    const auto& loop = slice.loops.front();
+    double perimeter = 0.0;
+    for (size_t i = 0, n = loop.size(); i < n; ++i) {
+        const glm::vec2& a = loop[i];
+        const glm::vec2& b = loop[(i + 1) % n];
+        perimeter += std::hypot(double(b.x - a.x), double(b.y - a.y));
+    }
+    EXPECT_NEAR(perimeter, 2.0 * (20.0 + 20.0), 0.5);
+}
+
+TEST(SectionCapShadowOutline, DisjointOccludedFeatureIsDroppedNotTreatedAsGarbage) {
+    // A small box sitting entirely WITHIN a big box's footprint but not
+    // touching/fused to it - viewed along Z, it's a second, unrelated
+    // visible feature (like a rib or boss elsewhere on a real part), not a
+    // hole and not part of the outer boundary. A "shadow" should show only
+    // the big box's outline. This used to need a dedicated occlusion filter
+    // (BRepClass3d_SolidClassifier probing for genuine gaps); the union
+    // approach gets it for free - the small box's footprint is already fully
+    // covered by the big box's, so unioning it in changes nothing.
+    TopoDS_Shape big = BRepPrimAPI_MakeBox(20.0, 20.0, 5.0).Shape();
+    TopoDS_Shape small = BRepPrimAPI_MakeBox(gp_Pnt(5, 5, 5), 5, 5, 10).Shape();
+    TopoDS_Compound both;
+    BRep_Builder bb;
+    bb.MakeCompound(both);
+    bb.Add(both, big);
+    bb.Add(both, small);
+    meshLikeRenderer(both);
+
+    SectionSlice slice;
+    ASSERT_TRUE(computeMeshShadowOutline(both, gp_Pln(gp_Pnt(10, 10, 10), gp_Dir(0, 0, 1)), slice));
+    ASSERT_EQ(slice.loops.size(), 1u)
+        << "the small disjoint box must be dropped, not kept as a spurious second loop";
+    EXPECT_NEAR(capArea(slice.cap), 20.0 * 20.0, 0.5)
+        << "cap area should be exactly the big box's footprint, not smaller "
+           "(a hole punched by the small box) or larger (garbage added)";
+}
+
+TEST(SectionCapShadowOutline, FlippingPlaneNormalGivesTheSameLoops) {
+    // Projection onto the plane doesn't depend on which way the normal
+    // points, so this is symmetric under negating it - a stronger guarantee
+    // than the old facing-flip technique had (it relied on front/back labels
+    // flipping consistently together; this never labels anything at all).
+    TopoDS_Shape box = BRepPrimAPI_MakeBox(20.0, 20.0, 30.0).Shape();
+    meshLikeRenderer(box);
+    SectionSlice up, down;
+    ASSERT_TRUE(computeMeshShadowOutline(box, gp_Pln(gp_Pnt(10, 10, 15), gp_Dir(0, 0, 1)), up));
+    ASSERT_TRUE(computeMeshShadowOutline(box, gp_Pln(gp_Pnt(10, 10, 15), gp_Dir(0, 0, -1)), down));
+    EXPECT_NEAR(capArea(up.cap), capArea(down.cap), 0.5);
+    ASSERT_EQ(up.loops.size(), down.loops.size());
 }
 
 TEST(SectionSlice, LinesFollowEveryLoop) {

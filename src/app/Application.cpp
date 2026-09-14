@@ -382,6 +382,7 @@ Application::Application(bool safeMode, float uiScaleOverride)
     m_itemsPanel->setCombineSketchesCallback(
         [this](const std::vector<int>& ids) { combineSketches(ids); });
     m_itemsPanel->setRotatePlaneCallback([this](int planeId) { beginRotatePlaneAboutAxis(planeId); });
+    m_itemsPanel->setMeshTraceCallback([this](int bodyId) { beginMeshTraceSetup(bodyId); });
     m_propertiesPanel->setRotatePlaneCallback([this](int planeId) { beginRotatePlaneAboutAxis(planeId); });
     m_propertiesPanel->setAttachRefImageCallback(
         [this](int planeId) { attachRefImageToPlane(planeId); });
@@ -8156,6 +8157,8 @@ void Application::run() {
             renderBoundaryFillPanel();
             renderPatchPanel();
             renderRefImagePanel();
+            renderMeshTracePanel();
+            renderMeshTraceSetupDialog();
             renderConstructionPlanePanel();
             renderConstructionAxisPanel();
             renderPrimitivePopup();

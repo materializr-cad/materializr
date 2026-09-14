@@ -1795,6 +1795,50 @@ private:
     void attachRefImageToPlane(int planeId);
     bool loadRefImageFile(const std::string& path, RefImageEntry& out,
                           std::string& baseName);
+
+    // Mesh trace: three orthogonal construction planes through a mesh body's
+    // bbox center, each hosting a live cross-section of it (MeshTraceEntry).
+    // Reached from the mesh body's Items-panel context menu. Opens the guided
+    // setup dialog (renderMeshTraceSetupDialog) rather than baking geometry
+    // immediately - the overlay is a live PREVIEW while the user positions
+    // each plane; nothing becomes real sketch geometry until they click
+    // "Place Sketch" for it.
+    void beginMeshTraceSetup(int bodyId);
+    // The guided 3-plane setup session's dialog: Top/Front/Right selector
+    // buttons (so a viewport misclick can't switch which plane you're
+    // adjusting or end the session - see m_meshTraceSetupActive), the same
+    // controls renderMeshTraceControls draws, a Place Sketch button, and a
+    // Finish button that closes the session. Stays open across misclicks by
+    // design: unlike renderMeshTracePanel it does NOT depend on live
+    // selection.
+    void renderMeshTraceSetupDialog();
+    // Offset slider / opacity / Cross-section-vs-Shadow / Insert Outline /
+    // Remove Trace for one plane's mesh trace - shared body used by both
+    // renderMeshTracePanel (post-session, selection-driven touch-ups) and
+    // renderMeshTraceSetupDialog (during setup, driven by the plane selector
+    // buttons instead of selection). Mirrors renderRefImageControls's split
+    // from renderRefImagePanel.
+    void renderMeshTraceControls(int planeId);
+    // Floating panel (wraps renderMeshTraceControls) while a trace-hosting
+    // plane is selected and no setup session is active.
+    void renderMeshTracePanel();
+    // Computes the plane's CURRENT capture (CrossSection: sliceSection;
+    // Shadow: computeMeshShadowOutline) and appends each closed loop into
+    // the trace's paired sketch - as lines for Cross-section (exact mesh-
+    // edge intersections already), as recoverSketchLoop's line/spline mix
+    // for Shadow (a raster trace, so worth curve-fitting). Returns true if
+    // anything was inserted. Additive: call again after moving the plane to
+    // capture another slice into the same sketch (e.g. loft guide curves),
+    // or after switching back from Shadow.
+    bool insertMeshTraceIntoSketch(int planeId);
+    // Guided mesh-trace setup session state (see beginMeshTraceSetup /
+    // renderMeshTraceSetupDialog). Index 0/1/2 = Top/Front/Right, matching
+    // beginMeshTraceSetup's plane-creation order.
+    bool m_meshTraceSetupActive = false;
+    int  m_meshTraceSetupBodyId = -1;
+    int  m_meshTraceSetupPlaneIds[3] = {-1, -1, -1};
+    bool m_meshTraceSetupPlaced[3] = {false, false, false};
+    int  m_meshTraceSetupCurrent = 0;
     // Calibration popup state: which plane's image is being calibrated
     // (-1 = closed), the ImGui preview texture (panel-owned, one at a time),
     // and up to two picked points in IMAGE-PIXEL coordinates.

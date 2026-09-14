@@ -763,6 +763,12 @@ bool ItemsPanel::renderBodyRow(int id) {
             m_bodyDeleted = true;
             deleted = true;
         }
+        // Mesh-only: sketch on 3 planes through the imported STL to trace it
+        // back into parametric geometry. See Application::beginMeshTraceSetup.
+        if (!deleted && isMesh && m_meshTrace &&
+            ImGui::MenuItem(materializr::tr("Set Up Tracing Planes"))) {
+            m_meshTrace(id);
+        }
         if (!deleted && ImGui::MenuItem(materializr::tr("Isolate"))) {
             isolateBody(*m_document, id, m_markBodyDirty);
         }

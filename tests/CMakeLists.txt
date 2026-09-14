@@ -67,6 +67,7 @@ add_library(materializr_core STATIC
     ${CMAKE_SOURCE_DIR}/src/modeling/SewOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/SweepOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/ConstructionPlaneOp.cpp
+    ${CMAKE_SOURCE_DIR}/src/modeling/MeshTraceSetupOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/ConstructionAxisOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/OperationFactory.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/PatternOp.cpp
@@ -965,6 +966,17 @@ add_test(NAME test_iop_latch COMMAND test_iop_latch)
 add_executable(test_sew test_sew.cpp)
 target_link_libraries(test_sew PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_sew COMMAND test_sew)
+
+# ─── wip-tests: staged, gitignored headless suites (see wip-tests/README.md) ─
+# Each .cpp there gets its own ctest target linking materializr_core, same
+# shape as every add_executable above. No-op when the folder is empty/absent.
+file(GLOB _mzr_wip_tests "${CMAKE_SOURCE_DIR}/wip-tests/*.cpp")
+foreach(_wip_src ${_mzr_wip_tests})
+    get_filename_component(_wip_name ${_wip_src} NAME_WE)
+    add_executable(${_wip_name} ${_wip_src})
+    target_link_libraries(${_wip_name} PRIVATE materializr_core gtest gtest_main)
+    add_test(NAME ${_wip_name} COMMAND ${_wip_name})
+endforeach()
 
 # ─── Loader path for a source-built OCCT ─────────────────────────────────────
 # With MZR_OCCT_PREFIX the kernel lives outside the loader's default search

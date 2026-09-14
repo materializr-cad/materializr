@@ -6,6 +6,9 @@
 // milliseconds and lands on the same pixels as the clipped body.
 #include "SectionCap.h"
 
+#include "../core/MeshParams.h"
+
+#include <BRepMesh_IncrementalMesh.hxx>
 #include <BRepMesh_Triangulator.hxx>
 #include <BRepBndLib.hxx>
 #include <BRep_Tool.hxx>
@@ -30,6 +33,8 @@
 #include <limits>
 #include <cstdint>
 #include <cstddef>
+#include <cstdio>
+#include <cstdlib>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -272,6 +277,82 @@ void fillRegion(const std::vector<gp_Pnt2d>& pts, const std::vector<Ring>& rings
     }
 }
 
+// Shared tail for both sliceSection (segments from where the plane crosses
+// triangles) and computeMeshSilhouette (segments from facing-flip/boundary
+// edges): chain into loops, export them ordered (SectionSlice::loops),
+// emit the outline (`lines`), and - when `fill` - nest the loops odd/even
+// and fill each material region with its holes (`cap`). `fill` is false
+// only for sliceSection's "a bare face left a gap" case: outline still
+// makes sense there, a solid guess at the fill does not.
+void finishSlice(Slice& sl, std::vector<std::vector<int>> loops,
+                 const std::vector<std::vector<int>>& openChains,
+                 const gp_Ax3& frame, bool fill, SectionSlice& out)
+{
+    for (auto& loop : loops) mergeCollinear(sl.pts, loop);
+
+    for (const auto& loop : loops) {
+        std::vector<glm::vec2> pts2d;
+        pts2d.reserve(loop.size());
+        for (int idx : loop) {
+            const gp_Pnt2d& p = sl.pts[idx];
+            pts2d.emplace_back(static_cast<float>(p.X()), static_cast<float>(p.Y()));
+        }
+        out.loops.push_back(std::move(pts2d));
+    }
+
+    const gp_Pnt o = frame.Location();
+    const gp_Vec ex(frame.XDirection()), ey(frame.YDirection());
+    auto emit = [&](const gp_Pnt2d& a, const gp_Pnt2d& b) {
+        for (const gp_Pnt2d* p : {&a, &b}) {
+            const gp_XYZ w = o.XYZ() + ex.XYZ() * p->X() + ey.XYZ() * p->Y();
+            out.lines.push_back(static_cast<float>(w.X()));
+            out.lines.push_back(static_cast<float>(w.Y()));
+            out.lines.push_back(static_cast<float>(w.Z()));
+        }
+    };
+    for (const auto& loop : loops)
+        for (size_t i = 0, n = loop.size(); i < n; ++i)
+            emit(sl.pts[loop[i]], sl.pts[loop[(i + 1) % n]]);
+    for (const auto& chain : openChains)
+        for (size_t i = 0; i + 1 < chain.size(); ++i)
+            emit(sl.pts[chain[i]], sl.pts[chain[i + 1]]);
+
+    if (!fill || loops.empty()) return;
+
+    // Nesting: a loop inside an even number of others bounds material, an
+    // odd number a hole; each hole belongs to the smallest loop around it.
+    const size_t L = loops.size();
+    std::vector<double> area(L);
+    std::vector<int> depth(L, 0), parent(L, -1);
+    for (size_t i = 0; i < L; ++i) area[i] = signedArea(sl.pts, loops[i]);
+    for (size_t i = 0; i < L; ++i) {
+        const gp_Pnt2d& p0 = sl.pts[loops[i][0]];
+        const gp_Pnt2d& p1 = sl.pts[loops[i][1]];
+        const gp_Pnt2d probe((p0.X() + p1.X()) * 0.5, (p0.Y() + p1.Y()) * 0.5);
+        for (size_t j = 0; j < L; ++j) {
+            if (i == j || !contains(sl.pts, loops[j], probe)) continue;
+            ++depth[i];
+            if (parent[i] < 0 || std::fabs(area[j]) < std::fabs(area[parent[i]])) parent[i] = static_cast<int>(j);
+        }
+    }
+    // Fill each material loop with its holes.
+    for (size_t i = 0; i < L; ++i) {
+        if (depth[i] % 2 != 0) continue;
+        std::vector<Ring> rings{{&loops[i], area[i] < 0.0}}; // outer counter-clockwise
+        for (size_t h = 0; h < L; ++h)
+            if (depth[h] == depth[i] + 1 && parent[h] == static_cast<int>(i))
+                rings.push_back({&loops[h], area[h] > 0.0}); // holes clockwise
+        if (std::getenv("MZR_DBG_SILHOUETTE")) {
+            const size_t cap0dbg = out.cap.size();
+            fillRegion(sl.pts, rings, frame, out.cap);
+            std::fprintf(stderr, "[Silhouette] fillRegion root loop %zu (%zu pts, %zu rings) -> %zu tris\n",
+                        i, loops[i].size(), rings.size(), (out.cap.size() - cap0dbg) / 9);
+            continue;
+        }
+        fillRegion(sl.pts, rings, frame, out.cap);
+    }
+}
+
 } // namespace
 
 std::vector<FaceMesh> faceMeshes(const TopoDS_Shape& shape)
@@ -299,7 +380,7 @@ std::vector<FaceMesh> faceMeshes(const TopoDS_Shape& shape)
 bool sliceSection(const std::vector<FaceMesh>& faces, const gp_Pln& cuttingPlane,
                   SectionSlice& out)
 {
-    const size_t lines0 = out.lines.size(), cap0 = out.cap.size();
+    const size_t lines0 = out.lines.size(), cap0 = out.cap.size(), loops0 = out.loops.size();
     try {
         const gp_Ax3 frame = cuttingPlane.Position();
         Slice sl;
@@ -317,62 +398,205 @@ bool sliceSection(const std::vector<FaceMesh>& faces, const gp_Pln& cuttingPlane
         if (!(dLo < -straddleEps && dHi > straddleEps)) return false;
         if (sl.segs.empty()) return false;
         Chains ch = followSegments(sl);
-        std::vector<std::vector<int>>& loops = ch.loops;
-        for (auto& loop : loops) mergeCollinear(sl.pts, loop);
-
-        // Outline: every loop edge, plus the open chains as they are.
-        const gp_Pnt o = frame.Location();
-        const gp_Vec ex(frame.XDirection()), ey(frame.YDirection());
-        auto emit = [&](const gp_Pnt2d& a, const gp_Pnt2d& b) {
-            for (const gp_Pnt2d* p : {&a, &b}) {
-                const gp_XYZ w = o.XYZ() + ex.XYZ() * p->X() + ey.XYZ() * p->Y();
-                out.lines.push_back(static_cast<float>(w.X()));
-                out.lines.push_back(static_cast<float>(w.Y()));
-                out.lines.push_back(static_cast<float>(w.Z()));
-            }
-        };
-        for (const auto& loop : loops)
-            for (size_t i = 0, n = loop.size(); i < n; ++i)
-                emit(sl.pts[loop[i]], sl.pts[loop[(i + 1) % n]]);
-        for (const auto& chain : ch.open)
-            for (size_t i = 0; i + 1 < chain.size(); ++i)
-                emit(sl.pts[chain[i]], sl.pts[chain[i + 1]]);
-
-        if (loops.empty()) return out.lines.size() > lines0;
         // A face without a triangulation left a gap in the slice. A missing
         // OUTER wall leaves the loop open and nothing fills; a missing INNER
-        // wall (a bore) leaves its loop out entirely, and the outer loop would
-        // be filled solid over the hole. Outline only until the body is whole.
-        if (!complete) return true;
-        // Nesting: a loop inside an even number of others bounds material, an
-        // odd number a hole; each hole belongs to the smallest loop around it.
-        const size_t L = loops.size();
-        std::vector<double> area(L);
-        std::vector<int> depth(L, 0), parent(L, -1);
-        for (size_t i = 0; i < L; ++i) area[i] = signedArea(sl.pts, loops[i]);
-        for (size_t i = 0; i < L; ++i) {
-            const gp_Pnt2d& p0 = sl.pts[loops[i][0]];
-            const gp_Pnt2d& p1 = sl.pts[loops[i][1]];
-            const gp_Pnt2d probe((p0.X() + p1.X()) * 0.5, (p0.Y() + p1.Y()) * 0.5);
-            for (size_t j = 0; j < L; ++j) {
-                if (i == j || !contains(sl.pts, loops[j], probe)) continue;
-                ++depth[i];
-                if (parent[i] < 0 || std::fabs(area[j]) < std::fabs(area[parent[i]])) parent[i] = static_cast<int>(j);
-            }
-        }
-
-        // Fill each material loop with its holes.
-        for (size_t i = 0; i < L; ++i) {
-            if (depth[i] % 2 != 0) continue;
-            std::vector<Ring> rings{{&loops[i], area[i] < 0.0}}; // outer counter-clockwise
-            for (size_t h = 0; h < L; ++h)
-                if (depth[h] == depth[i] + 1 && parent[h] == static_cast<int>(i))
-                    rings.push_back({&loops[h], area[h] > 0.0}); // holes clockwise
-            fillRegion(sl.pts, rings, frame, out.cap);
-        }
+        // wall (a bore) leaves its loop out entirely, and the outer loop
+        // would be filled solid over the hole. Outline only until the body
+        // is whole - finishSlice's `fill` flag gates exactly that.
+        finishSlice(sl, std::move(ch.loops), ch.open, frame, complete, out);
     } catch (...) {
         out.lines.resize(lines0);
         out.cap.resize(cap0);
+        out.loops.resize(loops0);
+        return false;
+    }
+    return out.lines.size() > lines0 || out.cap.size() > cap0;
+}
+
+// Triangulation for `shape`, meshing it first if it has none yet - unlike
+// sliceSection/computeSectionCap (which only measure vertex DISTANCE, so a
+// mesh-less shape is just an unhelpful "no cut"), Shadow mode needs the
+// actual triangles to exist. A shape loaded straight from a project file
+// (not through the running app's own render pipeline, which meshes every
+// body before its first frame) has none yet. Mesh once, defensively, only
+// when it's actually missing - BRepMesh_IncrementalMesh is a real cost, and
+// every caller in the live render path already has a tessellated shape by
+// the time it gets here.
+std::vector<FaceMesh> meshedFaces(const TopoDS_Shape& shape) {
+    std::vector<FaceMesh> faces = faceMeshes(shape);
+    if (std::all_of(faces.begin(), faces.end(),
+                    [](const FaceMesh& f) { return f.tri.IsNull(); })) {
+        BRepMesh_IncrementalMesh(shape, meshParams(0.05, 0.25, true));
+        faces = faceMeshes(shape);
+    }
+    return faces;
+}
+
+bool computeMeshShadow(const TopoDS_Shape& shape, const gp_Pln& plane,
+                       std::vector<float>& outPositions)
+{
+    const size_t cap0 = outPositions.size();
+    try {
+        const gp_Ax3 frame = plane.Position();
+        const gp_Pnt o = frame.Location();
+        const gp_Vec n(frame.Direction());
+        auto flatten = [&](const gp_Pnt& p) {
+            const double d = gp_Vec(o, p).Dot(n);
+            return p.XYZ() - n.XYZ() * d;
+        };
+        auto placed = [&](const FaceMesh& f, int idx) {
+            gp_Pnt p = f.tri->Node(idx);
+            if (f.moved) p.Transform(f.trsf);
+            return p;
+        };
+        for (const FaceMesh& f : meshedFaces(shape)) {
+            if (f.tri.IsNull()) continue;
+            for (int t = 1; t <= f.tri->NbTriangles(); ++t) {
+                int idx[3];
+                f.tri->Triangle(t).Get(idx[0], idx[1], idx[2]);
+                for (int k = 0; k < 3; ++k) {
+                    const gp_XYZ w = flatten(placed(f, idx[k]));
+                    outPositions.push_back(static_cast<float>(w.X()));
+                    outPositions.push_back(static_cast<float>(w.Y()));
+                    outPositions.push_back(static_cast<float>(w.Z()));
+                }
+            }
+        }
+    } catch (...) {
+        outPositions.resize(cap0);
+        return false;
+    }
+    return outPositions.size() > cap0;
+}
+
+bool computeMeshShadowOutline(const TopoDS_Shape& shape, const gp_Pln& plane,
+                              SectionSlice& out)
+{
+    const size_t lines0 = out.lines.size(), cap0 = out.cap.size(), loops0 = out.loops.size();
+    try {
+        const gp_Ax3 frame = plane.Position();
+        const gp_Pnt o = frame.Location();
+        const gp_Vec ex(frame.XDirection()), ey(frame.YDirection());
+        auto placed = [&](const FaceMesh& f, int idx) {
+            gp_Pnt p = f.tri->Node(idx);
+            if (f.moved) p.Transform(f.trsf);
+            return p;
+        };
+        auto to2d = [&](const gp_Pnt& p) { gp_Vec r(o, p); return gp_Pnt2d(r.Dot(ex), r.Dot(ey)); };
+
+        // Every triangle, flattened onto the plane's own 2D (u,v) - same
+        // projection computeMeshShadow uses for the live overlay. A first
+        // version tried to turn these into real BRep faces and exact-union
+        // them (BOPAlgo_Builder General Fuse); on a real 1300-face/5400-
+        // triangle mesh that took over an hour and still produced 1427
+        // fragmented loops with an internal OCCT triangulation error -
+        // exact arithmetic over that many nearly-coplanar-by-construction
+        // pieces doesn't scale and doesn't stay numerically sound.
+        struct Tri2 { gp_Pnt2d a, b, c; };
+        std::vector<Tri2> tris;
+        double u0 = 1e30, u1 = -1e30, v0 = 1e30, v1 = -1e30;
+        for (const FaceMesh& f : meshedFaces(shape)) {
+            if (f.tri.IsNull()) continue;
+            for (int t = 1; t <= f.tri->NbTriangles(); ++t) {
+                int idx[3];
+                f.tri->Triangle(t).Get(idx[0], idx[1], idx[2]);
+                const gp_Pnt2d a = to2d(placed(f, idx[0]));
+                const gp_Pnt2d b = to2d(placed(f, idx[1]));
+                const gp_Pnt2d c = to2d(placed(f, idx[2]));
+                tris.push_back({a, b, c});
+                u0 = std::min({u0, a.X(), b.X(), c.X()}); u1 = std::max({u1, a.X(), b.X(), c.X()});
+                v0 = std::min({v0, a.Y(), b.Y(), c.Y()}); v1 = std::max({v1, a.Y(), b.Y(), c.Y()});
+            }
+        }
+        if (tris.empty()) return false;
+
+        // Rasterize onto a grid: bounded resolution (fine enough to keep
+        // real detail - the mesh's own facet size is the natural limit
+        // anyway - but capped so a huge part doesn't blow the cell budget).
+        // This is what makes coverage cheap AND robust: marking a cell
+        // "in" is a plain boolean OR over every triangle that touches it,
+        // so - unlike exact union, and unlike a facing-flip classifier -
+        // it doesn't care which triangle is nearer the viewer, how many
+        // there are, or how thin their facing angle is.
+        constexpr int kMaxGridDim = 768;
+        const double spanU = std::max(u1 - u0, 1e-6);
+        const double spanV = std::max(v1 - v0, 1e-6);
+        const double cell = std::max(std::max(spanU, spanV) / kMaxGridDim, 1e-3);
+        const int W = std::max(1, static_cast<int>(std::ceil(spanU / cell)) + 1);
+        const int H = std::max(1, static_cast<int>(std::ceil(spanV / cell)) + 1);
+
+        std::vector<uint8_t> occ(static_cast<size_t>(W) * static_cast<size_t>(H), 0);
+        auto cellAt = [&](int i, int j) -> uint8_t& { return occ[static_cast<size_t>(j) * W + i]; };
+        auto side = [](const gp_Pnt2d& p, const gp_Pnt2d& a, const gp_Pnt2d& b) {
+            return (b.X() - a.X()) * (p.Y() - a.Y()) - (b.Y() - a.Y()) * (p.X() - a.X());
+        };
+        for (const Tri2& tr : tris) {
+            const double area2 = side(tr.c, tr.a, tr.b);
+            if (std::fabs(area2) < 1e-12) continue; // edge-on once flattened - no footprint
+            const double tu0 = std::min({tr.a.X(), tr.b.X(), tr.c.X()});
+            const double tu1 = std::max({tr.a.X(), tr.b.X(), tr.c.X()});
+            const double tv0 = std::min({tr.a.Y(), tr.b.Y(), tr.c.Y()});
+            const double tv1 = std::max({tr.a.Y(), tr.b.Y(), tr.c.Y()});
+            const int i0 = std::max(0, static_cast<int>(std::floor((tu0 - u0) / cell)));
+            const int i1 = std::min(W - 1, static_cast<int>(std::floor((tu1 - u0) / cell)));
+            const int j0 = std::max(0, static_cast<int>(std::floor((tv0 - v0) / cell)));
+            const int j1 = std::min(H - 1, static_cast<int>(std::floor((tv1 - v0) / cell)));
+            for (int j = j0; j <= j1; ++j) {
+                const double cv = v0 + (j + 0.5) * cell;
+                for (int i = i0; i <= i1; ++i) {
+                    uint8_t& c = cellAt(i, j);
+                    if (c) continue;
+                    const gp_Pnt2d p(u0 + (i + 0.5) * cell, cv);
+                    const double d1 = side(p, tr.a, tr.b), d2 = side(p, tr.b, tr.c), d3 = side(p, tr.c, tr.a);
+                    const bool hasNeg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+                    const bool hasPos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+                    if (!(hasNeg && hasPos)) c = 1;
+                }
+            }
+        }
+
+        // Cell-boundary extraction (the 2D analogue of voxel face-culling):
+        // every side of an occupied cell facing an unoccupied or off-grid
+        // neighbour is one boundary segment. Orientation of these segments
+        // doesn't need tracking here - followSegments below only needs
+        // shared endpoints to chain loops, and finishSlice's own nesting/
+        // fill pass (signedArea + contains) already determines outer-vs-
+        // hole winding downstream, same as every other loop source in this
+        // file (sliceSection's triangle-plane crossings aren't direction-
+        // consistent either).
+        Slice sl;
+        auto corner = [&](int i, int j) { return gp_Pnt2d(u0 + i * cell, v0 + j * cell); };
+        auto addSeg = [&](const gp_Pnt2d& a, const gp_Pnt2d& b) {
+            const int ia = sl.vertex(a), ib = sl.vertex(b);
+            if (ia != ib && sl.seen.insert(Slice::key(std::min(ia, ib), std::max(ia, ib))).second)
+                sl.segs.emplace_back(ia, ib);
+        };
+        auto isOcc = [&](int i, int j) { return i >= 0 && i < W && j >= 0 && j < H && cellAt(i, j) != 0; };
+        for (int j = 0; j < H; ++j) {
+            for (int i = 0; i < W; ++i) {
+                if (!isOcc(i, j)) continue;
+                if (!isOcc(i, j - 1)) addSeg(corner(i, j), corner(i + 1, j));
+                if (!isOcc(i + 1, j)) addSeg(corner(i + 1, j), corner(i + 1, j + 1));
+                if (!isOcc(i, j + 1)) addSeg(corner(i + 1, j + 1), corner(i, j + 1));
+                if (!isOcc(i - 1, j)) addSeg(corner(i, j + 1), corner(i, j));
+            }
+        }
+        if (sl.segs.empty()) return false;
+
+        Chains ch = followSegments(sl);
+        std::vector<std::vector<int>> loops = std::move(ch.loops);
+        // The grid's own resolution is the "facet size" here, same role a
+        // mesh's own triangle size plays elsewhere - collapse the staircase
+        // of axis-aligned steps along a straight run into clean polylines,
+        // same as every other loop source in this file.
+        for (auto& loop : loops) mergeCollinear(sl.pts, loop);
+        if (loops.empty()) return false;
+
+        finishSlice(sl, std::move(loops), {}, frame, /*fill=*/true, out);
+    } catch (...) {
+        out.lines.resize(lines0);
+        out.cap.resize(cap0);
+        out.loops.resize(loops0);
         return false;
     }
     return out.lines.size() > lines0 || out.cap.size() > cap0;

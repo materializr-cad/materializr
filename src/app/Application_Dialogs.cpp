@@ -53,6 +53,8 @@
 #include <SDL.h>                      // SDL_GetPrefPath: thumbnail cache dir
 #include <cstring>
 #include "modeling/Sketch.h"
+#include "modeling/MeshTraceSetupOp.h"
+#include "viewport/SectionCap.h"
 #include "modeling/SketchSolver.h"
 #include "modeling/SketchTool.h"
 #include "modeling/TextSketchOp.h"
@@ -2024,6 +2026,337 @@ void Application::beginRefImageImport() {
             // blob lives in the doc, but the sidecar was never rewritten).
             markDirty();
         });
+}
+
+// ─── Mesh trace (sketch on 3 planes through an imported STL) ────────────────
+
+// Sets up tracing planes through a mesh body: three orthogonal construction
+// planes (Top/Front/Right, matching the StartSketchXY/XZ/YZ toolbar
+// conventions) through the body's bounding-box center, each hosting a live
+// cross-section of the mesh (MeshTraceEntry - see Document.h and
+// MeshTracePlugin.cpp) and an empty paired sketch. Nothing is baked into a
+// sketch yet - the overlay is a live PREVIEW while renderMeshTraceSetupDialog
+// is open; the user positions each plane (or switches it to Shadow mode)
+// and explicitly clicks "Place Sketch" per plane before anything becomes
+// real geometry. The source mesh is hidden immediately so it doesn't occlude
+// the planes; nothing here is destructive, the mesh body itself is untouched
+// and can be re-shown from the Items panel regardless of how the session
+// ends.
+void Application::beginMeshTraceSetup(int bodyId) {
+    if (!m_document || !m_history) return;
+    if (m_meshTraceSetupActive) {
+        showToast("Finish the current tracing-plane setup first.");
+        return;
+    }
+    if (!m_document->isBodyMesh(bodyId)) {
+        showToast("Set Up Tracing Planes only works on an imported mesh body.");
+        return;
+    }
+
+    // A real history step (MeshTraceSetupOp) - shows up in the History
+    // panel and is Ctrl+Z-undoable like any other op. "Place Sketch"/mode-
+    // toggle/offset-slider edits that happen WHILE the dialog is open stay
+    // direct document edits (not their own steps), same as reference-image
+    // import - only the create-3-planes action itself is tracked.
+    auto op = std::make_unique<MeshTraceSetupOp>();
+    op->setBodyId(bodyId);
+    MeshTraceSetupOp* opPtr = op.get();
+    if (!m_history->pushOperation(std::move(op), *m_document)) {
+        showToast("Couldn't set up tracing planes for that mesh.");
+        return;
+    }
+
+    for (int i = 0; i < 3; ++i) {
+        m_meshTraceSetupPlaneIds[i] = opPtr->planeId(i);
+        m_meshTraceSetupPlaced[i] = false;
+    }
+    m_meshTraceSetupActive = true;
+    m_meshTraceSetupBodyId = bodyId;
+    m_meshTraceSetupCurrent = 0;
+    if (m_selection) {
+        SelectionEntry se;
+        se.type = SelectionType::Plane;
+        se.planeId = m_meshTraceSetupPlaneIds[0];
+        m_selection->select(se);
+    }
+    m_meshesDirty = true;
+    markDirty();
+}
+
+// The rendered overlay (MeshTraceRenderer) is only ever a picture to look
+// at - it is recomputed every frame (for Shadow, via the cheap
+// computeMeshShadow: every triangle flattened, no loop-chaining at all) and
+// never touches Document geometry. This is the other half: turn the
+// CURRENT capture into real, editable sketch geometry. Cross-section's loop
+// IS the mesh (sliceSection's crossing points are exact plane/triangle-edge
+// intersections), so straight lines per loop edge are exact, not an
+// approximation - no curve-fitting has anything to gain there. Shadow's
+// loop is a raster trace (computeMeshShadowOutline: the flattened triangles
+// rasterized onto a grid, with the occupancy boundary traced into loops),
+// so on its own it comes out as an axis-aligned staircase at grid
+// resolution even where the real part is straight-edged or smoothly
+// curved; recoverSketchLoop (shared with SvgImport, see Sketch.h) turns
+// that staircase back into straight runs and Douglas-Peucker-simplified
+// splines the same way it recovers curves from a densely-sampled SVG path.
+bool Application::insertMeshTraceIntoSketch(int planeId) {
+    if (!m_document) return false;
+    const MeshTraceEntry* trace = m_document->getMeshTrace(planeId);
+    if (!trace) return false;
+    if (trace->sketchId < 0 || !m_document->getSketch(trace->sketchId)) {
+        showToast("This plane has no paired sketch to insert into.");
+        return false;
+    }
+    const PlaneEntry* plane = m_document->getPlane(planeId);
+    TopoDS_Shape shape;
+    try { shape = m_document->getBody(trace->bodyId); } catch (...) {}
+    if (!plane || shape.IsNull()) return false;
+
+    materializr::SectionSlice slice;
+    if (trace->mode == MeshTraceMode::Shadow)
+        materializr::computeMeshShadowOutline(shape, plane->plane, slice);
+    else
+        materializr::sliceSection(materializr::faceMeshes(shape), plane->plane, slice);
+    if (slice.loops.empty()) {
+        showToast(trace->mode == MeshTraceMode::Shadow
+            ? "No closed silhouette here - the mesh may be open/non-manifold "
+              "from this direction."
+            : "No closed cross-section here - move the plane through the "
+              "mesh first.");
+        return false;
+    }
+
+    auto sk = std::make_shared<materializr::Sketch>(*m_document->getSketch(trace->sketchId));
+    for (const auto& loop : slice.loops) {
+        if (loop.size() < 2) continue;
+        if (trace->mode == MeshTraceMode::Shadow) {
+            materializr::recoverSketchLoop(sk.get(), loop, /*closed=*/true);
+            continue;
+        }
+        std::vector<int> ptIds;
+        ptIds.reserve(loop.size());
+        for (const auto& p : loop) ptIds.push_back(sk->addPoint(p));
+        for (size_t i = 0; i < ptIds.size(); ++i)
+            sk->addLine(ptIds[i], ptIds[(i + 1) % ptIds.size()]);
+    }
+    m_document->putSketch(trace->sketchId, sk, m_document->getSketchName(trace->sketchId));
+    m_meshesDirty = true;
+    markDirty();
+    return true;
+}
+
+// Offset slider / opacity / Cross-section-vs-Shadow / Insert Outline /
+// Remove Trace for ONE plane's mesh trace. Shared body: draws into whatever
+// window the caller already opened (renderMeshTracePanel's floating panel,
+// or renderMeshTraceSetupDialog's session dialog), same split as
+// renderRefImageControls from renderRefImagePanel.
+void Application::renderMeshTraceControls(int planeId) {
+    const MeshTraceEntry* trace =
+        planeId >= 0 && m_document ? m_document->getMeshTrace(planeId) : nullptr;
+    if (!trace) return;
+    const PlaneEntry* plane = m_document->getPlane(planeId);
+    if (!plane) return;
+
+    // Offset: slide the plane along its OWN normal only, bounded to the
+    // source body's extent on that axis so the slider always lands
+    // somewhere the mesh actually is. Bound is the projection of all 8 bbox
+    // corners onto the normal (not just the two "aligned" ones) so this
+    // stays correct even if the plane was later rotated off-axis by the
+    // generic gizmo.
+    TopoDS_Shape bodyShape;
+    bool haveBody = false;
+    try { bodyShape = m_document->getBody(trace->bodyId); haveBody = !bodyShape.IsNull(); }
+    catch (...) {}
+    if (haveBody) {
+        Bnd_Box box;
+        BRepBndLib::Add(bodyShape, box);
+        if (!box.IsVoid()) {
+            double x0, y0, z0, x1, y1, z1;
+            box.Get(x0, y0, z0, x1, y1, z1);
+            const gp_Ax3& ax = plane->plane.Position();
+            const gp_Dir& n = ax.Direction();
+            const gp_Pnt corners[8] = {
+                {x0, y0, z0}, {x1, y0, z0}, {x0, y1, z0}, {x0, y0, z1},
+                {x1, y1, z0}, {x1, y0, z1}, {x0, y1, z1}, {x1, y1, z1},
+            };
+            double tMin = 1e30, tMax = -1e30;
+            for (const auto& c : corners) {
+                const double t = gp_Vec(n.X(), n.Y(), n.Z()).Dot(gp_Vec(c.X(), c.Y(), c.Z()));
+                tMin = std::min(tMin, t);
+                tMax = std::max(tMax, t);
+            }
+            const gp_Pnt& o = ax.Location();
+            const double tCur = gp_Vec(n.X(), n.Y(), n.Z()).Dot(gp_Vec(o.X(), o.Y(), o.Z()));
+            float t = static_cast<float>(tCur);
+            if (tMax > tMin &&
+                ImGui::SliderFloat(materializr::tr("Slice position"), &t,
+                                   static_cast<float>(tMin), static_cast<float>(tMax), "%.1f mm")) {
+                const double dt = static_cast<double>(t) - tCur;
+                gp_Pnt newO(o.X() + n.X() * dt, o.Y() + n.Y() * dt, o.Z() + n.Z() * dt);
+                gp_Ax3 newAx = ax;
+                newAx.SetLocation(newO);
+                m_document->setPlane(planeId, gp_Pln(newAx));
+                markDirty();
+            }
+            ImGui::SetItemTooltip("%s", materializr::tr("Slides the plane along its own normal through the mesh - same as dragging its move gizmo, just bounded to where the mesh actually is."));
+        }
+    } else {
+        ImGui::TextDisabled("%s", materializr::tr("Source mesh not found."));
+    }
+
+    float opacity = trace->opacity;
+    if (ImGui::SliderFloat(materializr::tr("Opacity"), &opacity, 0.05f, 1.0f, "%.2f")) {
+        m_document->setMeshTraceOpacity(planeId, opacity);
+        markDirty();
+    }
+
+    int mode = static_cast<int>(trace->mode);
+    ImGui::TextUnformatted(materializr::tr("Capture"));
+    ImGui::SameLine();
+    if (ImGui::RadioButton(materializr::tr("Cross-section"), mode == static_cast<int>(MeshTraceMode::CrossSection))) {
+        MeshTraceEntry e = *trace;
+        e.mode = MeshTraceMode::CrossSection;
+        m_document->setMeshTrace(planeId, e);
+        markDirty();
+    }
+    ImGui::SetItemTooltip("%s", materializr::tr("Exactly what the plane cuts through right now - precise, but only the one slice."));
+    ImGui::SameLine();
+    if (ImGui::RadioButton(materializr::tr("Shadow"), mode == static_cast<int>(MeshTraceMode::Shadow))) {
+        MeshTraceEntry e = *trace;
+        e.mode = MeshTraceMode::Shadow;
+        m_document->setMeshTrace(planeId, e);
+        markDirty();
+    }
+    ImGui::SetItemTooltip("%s", materializr::tr("The whole mesh's silhouette flattened onto the plane, like a shadow - use it to trace an outline whose depth varies, instead of hunting for the one slice that catches it."));
+
+    // The overlay above is only ever a picture - THIS is what turns it into
+    // real, editable sketch geometry. Works in EITHER mode: Shadow's
+    // silhouette is real closed loops too (computeMeshShadowOutline, a
+    // separate one-shot rasterize-and-trace pass - not the fast per-frame
+    // overlay), not the raw overlapping-triangle blob an earlier version of
+    // this used.
+    if (ImGui::Button(materializr::tr("Insert Outline into Sketch"), ImVec2(uiSz(220, 0).x, 0))) {
+        insertMeshTraceIntoSketch(planeId);
+    }
+    ImGui::SetItemTooltip("%s", materializr::tr("Appends the CURRENT capture's closed loops as real lines into this plane's sketch. Additive - move the plane (or reposition/re-orient) and click again to capture another slice into the same sketch."));
+
+    if (ImGui::Button(materializr::tr("Remove Trace"), ImVec2(uiSz(120, 0).x, 0))) {
+        // Detaches the underlay only - the plane (and any sketch already
+        // started on it) stays. Unlike RefImage's Remove, the plane here
+        // isn't scaffolding that only existed for this: it's one of a
+        // coordinated set of 3, may already carry the user's sketch work.
+        m_document->removeMeshTrace(planeId);
+        markDirty();
+    }
+    ImGui::SetItemTooltip("%s", materializr::tr("Removes the tracing underlay. The plane and its sketch are kept - delete those separately if you don't want them either."));
+}
+
+// Floating panel while a trace-hosting plane is selected AND no guided setup
+// session is active (the session has its own dialog - renderMeshTraceSetupDialog -
+// which does NOT depend on selection, so it can't be dismissed by a
+// misclick; this one is for touching up a plane after the fact, e.g. weeks
+// later, where selection-driven is the natural way to reach it).
+void Application::renderMeshTracePanel() {
+    if (!m_selection || !m_document || m_inSketchMode || m_meshTraceSetupActive) return;
+    int planeId = -1;
+    for (const auto& e : m_selection->getSelection()) {
+        if (e.type == SelectionType::Plane && e.planeId >= 0) {
+            planeId = e.planeId;
+            break;
+        }
+    }
+    if (planeId < 0 || !m_document->getMeshTrace(planeId)) return;
+
+    ImGui::SetNextWindowPos(ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - 300,
+                                   ImGui::GetWindowPos().y + 50),
+                            ImGuiCond_Appearing);
+    ImGui::SetNextWindowSize(uiSz(300, 0), ImGuiCond_Appearing);
+    ImGui::Begin("Mesh Trace", nullptr,
+                 ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
+                 ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_AlwaysAutoResize);
+    ImGui::TextColored(materializr::accentText(), "%s",
+                       m_document->getPlaneName(planeId).c_str());
+    renderMeshTraceControls(planeId);
+    ImGui::Separator();
+    ImGui::TextWrapped("%s", materializr::tr("Move with the gizmo like a construction plane, or use the slider above. Sketch on it to trace."));
+    ImGui::End();
+}
+
+// The guided setup session (see beginMeshTraceSetup): Top/Front/Right
+// selector buttons pick which of the 3 planes renderMeshTraceControls below
+// targets, so a viewport misclick (which only changes SELECTION) can't
+// switch plane or dismiss the dialog - only these buttons and Finish can.
+// Each plane shows a check once "Place Sketch" has been used on it, purely
+// informational; Finish works regardless of how many are checked.
+void Application::renderMeshTraceSetupDialog() {
+    if (!m_meshTraceSetupActive || !m_document) return;
+
+    ImGui::SetNextWindowPos(ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - 300,
+                                   ImGui::GetWindowPos().y + 50),
+                            ImGuiCond_Appearing);
+    ImGui::SetNextWindowSize(uiSz(300, 0), ImGuiCond_Appearing);
+    ImGui::Begin("Set Up Tracing Planes", nullptr,
+                 ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
+                 ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_AlwaysAutoResize);
+
+    ImGui::TextWrapped("%s", materializr::tr(
+        "Position each plane (drag its gizmo, or use Slice position below), "
+        "pick Cross-section or Shadow, then Place Sketch. The overlay is a "
+        "live preview - nothing is real geometry until you place it."));
+    ImGui::Separator();
+
+    static const char* kLabels[3] = {"Top", "Front", "Right"};
+    for (int i = 0; i < 3; ++i) {
+        if (i > 0) ImGui::SameLine();
+        std::string label = materializr::tr(kLabels[i]);
+        if (m_meshTraceSetupPlaced[i]) label += " \xE2\x9C\x93"; // check mark
+        bool isCurrent = (m_meshTraceSetupCurrent == i);
+        if (isCurrent) ImGui::PushStyleColor(ImGuiCol_Button, materializr::accentText());
+        if (ImGui::Button(label.c_str(), ImVec2(uiSz(88, 0).x, 0))) {
+            m_meshTraceSetupCurrent = i;
+            if (m_selection && m_meshTraceSetupPlaneIds[i] >= 0) {
+                SelectionEntry se;
+                se.type = SelectionType::Plane;
+                se.planeId = m_meshTraceSetupPlaneIds[i];
+                m_selection->select(se);
+            }
+        }
+        if (isCurrent) ImGui::PopStyleColor();
+    }
+    ImGui::Separator();
+
+    const int planeId = m_meshTraceSetupPlaneIds[m_meshTraceSetupCurrent];
+    ImGui::TextColored(materializr::accentText(), "%s",
+                       m_document->getPlaneName(planeId).c_str());
+    renderMeshTraceControls(planeId);
+    if (ImGui::Button(materializr::tr("Place Sketch"), ImVec2(uiSz(150, 0).x, 0))) {
+        if (insertMeshTraceIntoSketch(planeId))
+            m_meshTraceSetupPlaced[m_meshTraceSetupCurrent] = true;
+    }
+    ImGui::SetItemTooltip("%s", materializr::tr("Bakes the CURRENT preview into this plane's sketch as real, editable lines. Click again after repositioning to add another slice."));
+
+    ImGui::Separator();
+    if (ImGui::Button(materializr::tr("Finish"), ImVec2(uiSz(120, 0).x, 0))) {
+        m_meshTraceSetupActive = false;
+    }
+    ImGui::SetItemTooltip("%s", materializr::tr("Closes this dialog. Every plane keeps whatever you placed (or didn't) - re-select a plane any time to adjust it further."));
+    ImGui::SameLine();
+    if (ImGui::Button(materializr::tr("Cancel"), ImVec2(uiSz(120, 0).x, 0))) {
+        // "Set Up Tracing Planes" is ONE history step (MeshTraceSetupOp) -
+        // undoing it removes all 3 planes/sketches (with whatever "Place
+        // Sketch" content they'd accumulated) and re-shows the mesh, exactly
+        // as if the action never ran. Relies on nothing else having been
+        // pushed to history while this dialog was open - true as long as the
+        // user only used this dialog's own controls, which don't route
+        // through m_history themselves.
+        m_history->undo(*m_document);
+        if (m_selection) m_selection->clear();
+        m_meshTraceSetupActive = false;
+        m_meshesDirty = true;
+        markDirty();
+    }
+    ImGui::SetItemTooltip("%s", materializr::tr("Undoes this whole setup - removes all 3 planes and sketches, re-shows the mesh. Same as Ctrl+Z right after running Set Up Tracing Planes."));
+
+    ImGui::End();
 }
 
 void Application::renderRefImagePanel() {
