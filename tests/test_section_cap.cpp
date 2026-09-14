@@ -377,6 +377,34 @@ TEST(SectionCapShadowOutline, FlippingPlaneNormalGivesTheSameLoops) {
     ASSERT_EQ(up.loops.size(), down.loops.size());
 }
 
+TEST(SectionCapShadowOutline, DiagonalEdgeDoesNotFragmentTheLoop) {
+    // Regression for a real CI failure: FlippingPlaneNormalGivesTheSameLoops
+    // passed on Linux/x86_64 but returned 18 loops instead of 1 on macOS/
+    // arm64 for the SAME box - gp_Ax3's auto-picked in-plane X direction
+    // for a given normal is a coordinate choice OCCT is free to make either
+    // way, and it differed by platform for one of the two normals, rotating
+    // the box just off grid-alignment. Point-sampling the occupancy grid at
+    // each cell's centre left gaps along that now-diagonal edge (a triangle
+    // can miss every nearby cell centre without missing the cell itself),
+    // fragmenting the boundary. Pin the rotation explicitly - deterministic
+    // on every platform - so this failure mode is always exercised, not
+    // only when a platform happens to pick the unlucky axis.
+    TopoDS_Shape box = BRepPrimAPI_MakeBox(20.0, 20.0, 30.0).Shape();
+    meshLikeRenderer(box);
+    const gp_Ax3 frame(gp_Pnt(10, 10, 15), gp_Dir(0, 0, 1), gp_Dir(1, 1, 0));
+    SectionSlice slice;
+    ASSERT_TRUE(computeMeshShadowOutline(box, gp_Pln(frame), slice));
+    ASSERT_EQ(slice.loops.size(), 1u);
+    // Conservative (touches-ANY-part-of-the-cell) rasterization systematically
+    // dilates a boundary that isn't grid-aligned by up to about half a cell,
+    // all the way around the perimeter - real, expected, and not something to
+    // chase away (the alternative is the gaps/fragmentation this test exists
+    // to catch). A cell here is diag/768 for an 80 mm perimeter, so a couple
+    // mm^2 of dilation is normal; only the axis-aligned tests elsewhere hold
+    // to a tight tolerance, since a grid-aligned edge has no partial cells.
+    EXPECT_NEAR(capArea(slice.cap), 20.0 * 20.0, 5.0);
+}
+
 TEST(SectionSlice, LinesFollowEveryLoop) {
     // The outline is every edge of every loop: the square's four sides and
     // the bore's polygon (a 21-gon at Medium, 31.3 mm around).

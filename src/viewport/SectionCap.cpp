@@ -530,6 +530,40 @@ bool computeMeshShadowOutline(const TopoDS_Shape& shape, const gp_Pln& plane,
         auto side = [](const gp_Pnt2d& p, const gp_Pnt2d& a, const gp_Pnt2d& b) {
             return (b.X() - a.X()) * (p.Y() - a.Y()) - (b.Y() - a.Y()) * (p.X() - a.X());
         };
+        // Conservative triangle-vs-cell overlap (2D separating-axis test: the
+        // 2 cell axes + the triangle's 3 edge normals - a complete axis set
+        // for two convex shapes in the plane). A cell is occupied the moment
+        // the triangle touches ANY part of it, not just its centre point.
+        // Point-sampling at cell centres - what this used to do - leaves
+        // gaps along a shallow diagonal edge: a chain of cells whose centre
+        // happens to fall just outside every triangle near that edge
+        // fragments the traced boundary into dozens of tiny loops instead of
+        // one clean outline. Hit on a plain axis-aligned box on macOS/arm64
+        // CI (never on the same box on Linux/x86_64): gp_Ax3's auto-picked
+        // in-plane X direction is a coordinate choice OCCT is free to make
+        // either way, and differed by platform for this particular normal -
+        // enough to rotate the box just off grid-alignment and expose it.
+        auto overlaps = [&](const gp_Pnt2d& a, const gp_Pnt2d& b, const gp_Pnt2d& c,
+                            double cx, double cy, double halfCell) {
+            auto sep = [&](double axx, double axy) {
+                const double ta = axx * a.X() + axy * a.Y();
+                const double tb = axx * b.X() + axy * b.Y();
+                const double tc = axx * c.X() + axy * c.Y();
+                const double tmin = std::min({ta, tb, tc});
+                const double tmax = std::max({ta, tb, tc});
+                const double bc = axx * cx + axy * cy;
+                const double br = halfCell * (std::fabs(axx) + std::fabs(axy));
+                return tmax < bc - br || tmin > bc + br;
+            };
+            if (sep(1.0, 0.0) || sep(0.0, 1.0)) return false;
+            const gp_Pnt2d* v[3] = {&a, &b, &c};
+            for (int k = 0; k < 3; ++k) {
+                const gp_Pnt2d& p = *v[k];
+                const gp_Pnt2d& q = *v[(k + 1) % 3];
+                if (sep(-(q.Y() - p.Y()), q.X() - p.X())) return false;
+            }
+            return true;
+        };
         for (const Tri2& tr : tris) {
             const double area2 = side(tr.c, tr.a, tr.b);
             if (std::fabs(area2) < 1e-12) continue; // edge-on once flattened - no footprint
@@ -546,11 +580,8 @@ bool computeMeshShadowOutline(const TopoDS_Shape& shape, const gp_Pln& plane,
                 for (int i = i0; i <= i1; ++i) {
                     uint8_t& c = cellAt(i, j);
                     if (c) continue;
-                    const gp_Pnt2d p(u0 + (i + 0.5) * cell, cv);
-                    const double d1 = side(p, tr.a, tr.b), d2 = side(p, tr.b, tr.c), d3 = side(p, tr.c, tr.a);
-                    const bool hasNeg = (d1 < 0) || (d2 < 0) || (d3 < 0);
-                    const bool hasPos = (d1 > 0) || (d2 > 0) || (d3 > 0);
-                    if (!(hasNeg && hasPos)) c = 1;
+                    if (overlaps(tr.a, tr.b, tr.c, u0 + (i + 0.5) * cell, cv, cell * 0.5))
+                        c = 1;
                 }
             }
         }
