@@ -403,6 +403,13 @@ TEST(SectionCapShadowOutline, DiagonalEdgeDoesNotFragmentTheLoop) {
     // mm^2 of dilation is normal; only the axis-aligned tests elsewhere hold
     // to a tight tolerance, since a grid-aligned edge has no partial cells.
     EXPECT_NEAR(capArea(slice.cap), 20.0 * 20.0, 5.0);
+    // A box's footprint is 4 real corners - the loop simplifyLoop hands to
+    // recoverSketchLoop should be close to that, not a still-jagged
+    // staircase (the actual bug this test caught: a 45-degree edge is
+    // rasterization's WORST case for dilation, cell*sqrt(2) rather than the
+    // cell*1 an axis-aligned edge sees, and a tolerance sized for the
+    // typical case left a visible residual zigzag on exactly this angle).
+    EXPECT_LE(slice.loops.front().size(), 12u);
 }
 
 TEST(SectionSlice, LinesFollowEveryLoop) {

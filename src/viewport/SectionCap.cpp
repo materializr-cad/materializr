@@ -690,15 +690,26 @@ bool computeMeshShadowOutline(const TopoDS_Shape& shape, const gp_Pln& plane,
         std::vector<std::vector<int>> loops = std::move(ch.loops);
         // The raw trace has a genuine ~90-degree turn at every vertex (each
         // grid step is one horizontal + one vertical edge) - mergeCollinear
-        // (exact collinearity only) does nothing to that. Douglas-Peucker at
-        // the raster's own cell size is what actually turns it back into a
-        // clean polygon approximating the true boundary; recoverSketchLoop
-        // (in Application_Dialogs.cpp's insertMeshTraceIntoSketch) needs
-        // that shape of input to tell real corners from smooth curves - see
-        // simplifyLoop's own comment for why skipping this step, or using
-        // mergeCollinear instead, silently fell back to drawing the raw
-        // staircase.
-        for (auto& loop : loops) simplifyLoop(sl.pts, loop, cell);
+        // (exact collinearity only) does nothing to that. Douglas-Peucker is
+        // what actually turns it back into a clean polygon approximating the
+        // true boundary; recoverSketchLoop (in Application_Dialogs.cpp's
+        // insertMeshTraceIntoSketch) needs that shape of input to tell real
+        // corners from smooth curves - see simplifyLoop's own comment for
+        // why skipping this step, or using mergeCollinear instead, silently
+        // fell back to drawing the raw staircase.
+        //
+        // The tolerance is NOT just `cell`: the conservative (touches-ANY-
+        // part-of-the-cell) overlap test above dilates a boundary that
+        // isn't grid-aligned by up to `cell*(|cos th|+|sin th|)` for an edge
+        // at angle th to the grid - cell at th=0/90 deg, but growing to
+        // cell*sqrt(2) (~1.41*cell) at th=45 deg. A tolerance of exactly
+        // `cell` comfortably flattens a near-axis-aligned edge's staircase
+        // but leaves a residual one on an edge nearer 45 degrees, where the
+        // true deviation exceeds it - a real, visible leftover zigzag on an
+        // otherwise near-straight run. Covering the worst case with margin
+        // fixes every angle, not just the axis-aligned ones that happened to
+        // get tested first.
+        for (auto& loop : loops) simplifyLoop(sl.pts, loop, 2.0 * cell);
         if (loops.empty()) return false;
 
         finishSlice(sl, std::move(loops), {}, frame, /*fill=*/true, out);
