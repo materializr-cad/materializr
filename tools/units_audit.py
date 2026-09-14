@@ -42,6 +42,7 @@ OVERRIDE = [
     ("src/app/Application_Viewport.cpp", "##bubbleDia", "CONVERTED"),   # commits via parseLength below
     ("src/app/Application_Viewport.cpp", "parseFinite(m_sketchDimBuf", "angle"),  # sweep deg / polygon sides
     ("src/plugins/SketchPlugin.cpp", "parseFinite(m_dimBuf", "angle"),            # same non-length branch
+    ("src/app/Application_Dialogs.cpp", "Slice position", "absolute-mm"),   # mesh-trace plane offset along its own normal: a genuine length, deliberately shown in mm
     ("src/app/Application_Dialogs.cpp", "Fillet time limit", "seconds"),
     ("src/app/Application_Dialogs.cpp", "Double-click speed", "seconds"),
     ("src/ui/MaterialPanel.cpp", "Roughness", "ratio"), ("src/ui/MaterialPanel.cpp", "Metallic", "ratio"),
@@ -237,6 +238,7 @@ LITERAL_ALLOW = [
     ("src/app/Application_Dialogs.cpp", "Gap %.4f mm",          "achieved G0 fit residual, same range as the tolerance that drove it"),
     ("src/modeling/PatchOp.cpp",        "Fit: gap %.4f mm",     "achieved G0 fit residual"),
     ("src/modeling/SewOp.cpp",          "Joined at %.4f mm.",   "the sewing tolerance actually used, a solver quantity"),
+    ("src/app/Application_Dialogs.cpp", '"%.1f mm")) {',       "mesh-trace slice-position readout, same absolute-mm choice as the control"),
 ]
 
 def classify_literal(f, code, ln=None):
