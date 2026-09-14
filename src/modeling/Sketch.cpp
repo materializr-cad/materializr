@@ -627,12 +627,32 @@ std::vector<glm::vec2> Sketch::interpolate2D(const std::vector<glm::vec2>& ctrl,
         if (i >= n) return ctrl[n - 1] * 2.0f - ctrl[n - 2];
         return ctrl[i];
     };
+    // `segsPerSpan` is a per-caller MINIMUM, not the actual count: a control
+    // point pair a handful of mm apart (anywhere someone clicks close
+    // together, e.g. SketchTool's freehand spline) wants exactly that many:
+    // fine at any zoom, cheap to redraw every frame. But a span can also be
+    // much longer than that - recoverSketchLoop's Douglas-Peucker thinning
+    // keeps a control point only where the traced boundary actually turns,
+    // so a gently curving stretch of a real part's outline can go many mm
+    // between kept points. A fixed segment count there stops looking like a
+    // curve at all once zoomed in past a few chords - the same shape of bug
+    // as a JPEG's 8x8 blocks: fine from a distance, a grid up close. Scale
+    // the segment count up by the span's own control-to-control distance so
+    // the chord length stays bounded regardless of how sparse the control
+    // points are; the cap keeps one absurdly long or degenerate span from
+    // making a single redraw expensive.
+    constexpr float kTargetSegMm = 0.4f;
+    constexpr int kMaxSegsPerSpan = 200;
     int spans = closed ? n : n - 1;
     std::vector<glm::vec2> out;
     out.reserve(spans * segsPerSpan + 1);
     for (int s = 0; s < spans; ++s) {
-        for (int i = 0; i < segsPerSpan; ++i) {
-            float t = static_cast<float>(i) / segsPerSpan;
+        const float spanLen = glm::length(at(s + 1) - at(s));
+        const int segs = std::clamp(
+            static_cast<int>(std::ceil(spanLen / kTargetSegMm)),
+            segsPerSpan, kMaxSegsPerSpan);
+        for (int i = 0; i < segs; ++i) {
+            float t = static_cast<float>(i) / segs;
             out.push_back(catmullRomPoint(at(s - 1), at(s), at(s + 1),
                                           at(s + 2), t));
         }
