@@ -118,11 +118,11 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | CONVERTED | src/app/EdgeOpController.cpp:895 | `if (materializr::parseLength(m_inputBuf2, p2) &&` |
 | CONVERTED | src/app/EdgeOpController.cpp:905 | `materializr::lengthStepperRow("edgeStep2", &m_value2,` |
 | CONVERTED | src/app/EdgeOpController.cpp:929 | `(void)materializr::parseLength(m_inputBuf, m_value);` |
-| CONVERTED | src/app/ExtrudeController.cpp:414 | `if (materializr::amountLengthField("extAmt", materializr::tr("Distance"), &m_distance, /*allowSign=*/true)) {` |
-| CONVERTED | src/app/ExtrudeController.cpp:430 | `(void)materializr::parseLength(m_inputBuf, m_distance);` |
-| CONVERTED | src/app/ExtrudeController.cpp:437 | `if (materializr::parseLength(m_inputBuf, parsed) &&` |
-| CONVERTED | src/app/ExtrudeController.cpp:450 | `materializr::lengthStepperRow("extrudeStep", &m_distance,` |
-| CONVERTED | src/app/ExtrudeController.cpp:497 | `(void)materializr::parseLength(m_inputBuf, m_distance);` |
+| CONVERTED | src/app/ExtrudeController.cpp:411 | `if (materializr::amountLengthField("extAmt", materializr::tr("Distance"), &m_distance, /*allowSign=*/true)) {` |
+| CONVERTED | src/app/ExtrudeController.cpp:427 | `(void)materializr::parseLength(m_inputBuf, m_distance);` |
+| CONVERTED | src/app/ExtrudeController.cpp:434 | `if (materializr::parseLength(m_inputBuf, parsed) &&` |
+| CONVERTED | src/app/ExtrudeController.cpp:447 | `materializr::lengthStepperRow("extrudeStep", &m_distance,` |
+| CONVERTED | src/app/ExtrudeController.cpp:493 | `(void)materializr::parseLength(m_inputBuf, m_distance);` |
 | CONVERTED | src/app/FaceOpControllers.cpp:128 | `if (materializr::amountLengthField("shellAmt", nullptr, &m_thickness, /*allowSign=*/false, 0.1f, 20.0f)) {` |
 | CONVERTED | src/app/FaceOpControllers.cpp:144 | `(void)materializr::parseLength(m_inputBuf, m_thickness);` |
 | CONVERTED | src/app/FaceOpControllers.cpp:151 | `if (materializr::parseLength(m_inputBuf, parsed) &&` |
