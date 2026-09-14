@@ -301,4 +301,5 @@ src/viewport/RefImageRenderer.cpp:211:
 src/viewport/RefImageRenderer.cpp:214:
 src/viewport/SectionCap.cpp:45:
 src/viewport/SectionCap.cpp:47:
+src/viewport/SectionCap.cpp:210:
 src/viewport/SketchRenderer.cpp:756:

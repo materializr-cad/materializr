@@ -206,6 +206,78 @@ void mergeCollinear(const std::vector<gp_Pnt2d>& pts, std::vector<int>& loop)
     }
 }
 
+// Real Douglas-Peucker simplification of a CLOSED loop at an arbitrary
+// tolerance - unlike mergeCollinear (exact collinearity only, ~1e-4 mm),
+// this collapses a run that stays within `tol` of its own chord, straight
+// OR gently curving. Needed for computeMeshShadowOutline's raster/cell-
+// boundary trace: that staircase has a genuine ~90-degree turn at every
+// single vertex by construction (each step is one horizontal + one
+// vertical edge), so mergeCollinear removes nothing, and feeding it
+// straight to recoverSketchLoop was the actual bug - its corner detector
+// was built for a DENSELY sampled smooth curve (SVG bezier flattening),
+// where per-sample turn stays small even on a tight bend. A true right-
+// angle staircase reads as "corner" at nearly every vertex, so
+// recoverSketchLoop's own "more than half the vertices are corners - too
+// jagged to spline" bailout correctly, but unhelpfully, fires and just
+// draws the raw staircase back out. Running DP first at the raster's own
+// cell size turns the staircase into what recoverSketchLoop actually
+// expects: a sparse point sequence whose density naturally tracks local
+// curvature (DP keeps more points where the boundary turns tighter), so a
+// true corner still reads as one big turn and a smooth stretch reads as
+// several small ones. Splits at the loop's two most distant points (a
+// stable anchor pair for a closed loop - picking an arbitrary start
+// instead can bias which side of a symmetric shape gets thinned first)
+// and simplifies each half as an open chain.
+void simplifyLoop(const std::vector<gp_Pnt2d>& pts, std::vector<int>& loop, double tol)
+{
+    const int n = static_cast<int>(loop.size());
+    if (n < 4) return;
+    auto at = [&](int i) -> const gp_Pnt2d& { return pts[loop[((i % n) + n) % n]]; };
+
+    int ia = 0, ib = 1;
+    double best = -1.0;
+    for (int i = 0; i < n; ++i)
+        for (int j = i + 1; j < n; ++j) {
+            const double d = at(i).Distance(at(j));
+            if (d > best) { best = d; ia = i; ib = j; }
+        }
+
+    std::vector<char> keep(static_cast<size_t>(n), 0);
+    keep[static_cast<size_t>(ia)] = keep[static_cast<size_t>(ib)] = 1;
+    auto dpRange = [&](int a, int b) { // walk forward a->b (may wrap); endpoints already kept
+        std::vector<std::pair<int, int>> stack{{a, b}};
+        while (!stack.empty()) {
+            const auto [lo, hi] = stack.back(); stack.pop_back();
+            int span = hi - lo; if (span < 0) span += n;
+            if (span <= 1) continue;
+            const gp_Pnt2d& A = at(lo);
+            const gp_Pnt2d& B = at(hi);
+            const double abx = B.X() - A.X(), aby = B.Y() - A.Y();
+            const double len = std::hypot(abx, aby);
+            double bestD = -1.0; int bi = -1;
+            for (int s = 1; s < span; ++s) {
+                const int k = ((lo + s) % n + n) % n;
+                const gp_Pnt2d& P = at(k);
+                const double d = (len < 1e-12) ? P.Distance(A)
+                    : std::fabs(abx * (P.Y() - A.Y()) - aby * (P.X() - A.X())) / len;
+                if (d > bestD) { bestD = d; bi = k; }
+            }
+            if (bestD > tol && bi >= 0) {
+                keep[static_cast<size_t>(bi)] = 1;
+                stack.push_back({lo, bi});
+                stack.push_back({bi, hi});
+            }
+        }
+    };
+    dpRange(ia, ib);
+    dpRange(ib, ia);
+
+    std::vector<int> kept;
+    kept.reserve(static_cast<size_t>(n));
+    for (int i = 0; i < n; ++i) if (keep[static_cast<size_t>(i)]) kept.push_back(loop[static_cast<size_t>(i)]);
+    loop.swap(kept);
+}
+
 double signedArea(const std::vector<gp_Pnt2d>& pts, const std::vector<int>& loop)
 {
     double a = 0.0;
@@ -616,11 +688,17 @@ bool computeMeshShadowOutline(const TopoDS_Shape& shape, const gp_Pln& plane,
 
         Chains ch = followSegments(sl);
         std::vector<std::vector<int>> loops = std::move(ch.loops);
-        // The grid's own resolution is the "facet size" here, same role a
-        // mesh's own triangle size plays elsewhere - collapse the staircase
-        // of axis-aligned steps along a straight run into clean polylines,
-        // same as every other loop source in this file.
-        for (auto& loop : loops) mergeCollinear(sl.pts, loop);
+        // The raw trace has a genuine ~90-degree turn at every vertex (each
+        // grid step is one horizontal + one vertical edge) - mergeCollinear
+        // (exact collinearity only) does nothing to that. Douglas-Peucker at
+        // the raster's own cell size is what actually turns it back into a
+        // clean polygon approximating the true boundary; recoverSketchLoop
+        // (in Application_Dialogs.cpp's insertMeshTraceIntoSketch) needs
+        // that shape of input to tell real corners from smooth curves - see
+        // simplifyLoop's own comment for why skipping this step, or using
+        // mergeCollinear instead, silently fell back to drawing the raw
+        // staircase.
+        for (auto& loop : loops) simplifyLoop(sl.pts, loop, cell);
         if (loops.empty()) return false;
 
         finishSlice(sl, std::move(loops), {}, frame, /*fill=*/true, out);

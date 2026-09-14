@@ -260,7 +260,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 
 - CONVERTED: 1
 - allowed-by-hand: 20
-- comment: 264
+- comment: 265
 - diagnostic: 10
 - identifier/other: 9
 
@@ -569,6 +569,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | comment | src/viewport/RefImageRenderer.cpp:214 | `// plane - the common case). 0.05 mm is invisible for tracing and the` |
 | comment | src/viewport/SectionCap.cpp:45 | `// Endpoints closer than this (in mm, in the plane) are one vertex. Crossings` |
 | comment | src/viewport/SectionCap.cpp:47 | `// mesh feature the app produces is the 0.01 mm Ultra deflection.` |
+| comment | src/viewport/SectionCap.cpp:210 | `// tolerance - unlike mergeCollinear (exact collinearity only, ~1e-4 mm),` |
 | comment | src/viewport/SketchRenderer.cpp:756 | `// Same mapping AirfoilImport::place uses: chord-normalised -> mm, rotated` |
 
 ## `Operation::description()` captions
