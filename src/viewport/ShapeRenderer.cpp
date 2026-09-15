@@ -268,6 +268,40 @@ int ShapeRenderer::tessellate(const TopoDS_Shape& shape, float deflection,
 #endif
         BRepMesh_IncrementalMesh meshGen(
             shape, materializr::meshParams(deflection, angularDeflection, true));
+
+        // Delabella (chosen above for speed on many-holed faces) can leave a
+        // face bare - confirmed on a real boolean-result body where two large
+        // faces came back with zero triangles despite the shape being fully
+        // BRepCheck-valid, no free edges, properly closed. The rest of the
+        // pipeline has no idea: the shape is fine, only this one mesher choice
+        // failed on it. Retry just the bare faces with Watson (OCCT's default,
+        // slower but far more robust) instead of leaving a hole in the body -
+        // it only costs the handful of faces that actually need it, not the
+        // whole shape, so Delabella's perf win everywhere else is unaffected.
+        int watsonRetried = 0, watsonRecovered = 0;
+        for (TopExp_Explorer fx(shape, TopAbs_FACE); fx.More(); fx.Next()) {
+            const TopoDS_Face& bareFace = TopoDS::Face(fx.Current());
+            TopLoc_Location loc;
+            if (!BRep_Tool::Triangulation(bareFace, loc).IsNull()) continue;
+            ++watsonRetried;
+            try {
+                IMeshTools_Parameters wp =
+                    materializr::meshParams(deflection, angularDeflection, false);
+                wp.MeshAlgo = IMeshTools_MeshAlgoType_Watson;
+                BRepMesh_IncrementalMesh retry(bareFace, wp);
+                if (!BRep_Tool::Triangulation(bareFace, loc).IsNull()) ++watsonRecovered;
+            } catch (...) {
+                // Leave it bare - genuinely unmeshable geometry (a
+                // self-intersecting wire, degenerate surface). The mesh tag
+                // below still records it so this isn't retried every frame.
+            }
+        }
+        if (watsonRetried > 0) {
+            std::fprintf(stderr,
+                "[ShapeRenderer] Delabella left %d face(s) bare - Watson "
+                "fallback recovered %d\n", watsonRetried, watsonRecovered);
+        }
+
         m_lastMeshMs = std::chrono::duration<double, std::milli>(
                            std::chrono::steady_clock::now() - t0).count();
         m_meshedAt[key] = materializr::makeMeshTag(shape, deflection, angularDeflection);
