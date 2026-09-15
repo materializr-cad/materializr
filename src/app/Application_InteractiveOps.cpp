@@ -284,7 +284,7 @@ void Application::commitThread() {
             TopoDS_Shape r = worker->buildResult(body);
             if (!r.IsNull()) {
                 try {
-                    BRepMesh_IncrementalMesh mesh(r, materializr::meshParams(mdefl, meshAng, true));
+                    materializr::meshWithFallback(r, mdefl, meshAng, true);
                 } catch (...) {}
             }
             return r;
@@ -2506,8 +2506,7 @@ bool Application::launchThreadRecut(ThreadOp& op, int attempts) {
                            TopoDS_Shape r = worker->buildResult(body);
                            if (!r.IsNull()) {
                                try {
-                                   BRepMesh_IncrementalMesh mesh(
-                                       r, materializr::meshParams(rdefl, recutAng, true));
+                                   materializr::meshWithFallback(r, rdefl, recutAng, true);
                                } catch (...) {}
                            }
                            const double secs =

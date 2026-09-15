@@ -5395,7 +5395,7 @@ void Application::enterSketchOnFace(const TopoDS_Face& face, int sourceBodyId) {
         TopLoc_Location loc;
         Handle(Poly_Triangulation) tri = BRep_Tool::Triangulation(face, loc);
         if (tri.IsNull()) {
-            BRepMesh_IncrementalMesh mesher(face, materializr::meshParams(0.1, 0.5, false));
+            materializr::meshWithFallback(face, 0.1, 0.5, false);
             tri = BRep_Tool::Triangulation(face, loc);
         }
         if (!tri.IsNull() && tri->NbTriangles() > 0) {

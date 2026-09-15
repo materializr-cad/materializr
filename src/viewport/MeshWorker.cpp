@@ -175,6 +175,25 @@ void MeshWorker::run()
                 job.copy, materializr::meshParams(job.deflection, job.angularDeflection, true));
             r.millis = std::chrono::duration<double, std::milli>(
                            std::chrono::steady_clock::now() - t0).count();
+            // Delabella (the algorithm meshParams() selects) can leave a face
+            // bare on otherwise-valid geometry - confirmed on real boolean
+            // results (issue #117), same as ShapeRenderer::tessellate(). This
+            // worker is the OTHER path a body's mesh gets computed on (async,
+            // for a live interactive op instead of the main-thread render
+            // loop), and it must carry the same fallback or a body that came
+            // through here - any further boolean/push-pull on an already-
+            // meshed body - renders with the same disappearing faces even
+            // after the render-path fix.
+            for (const auto& jf : job.faces) {
+                TopLoc_Location loc;
+                if (!BRep_Tool::Triangulation(jf.copy, loc).IsNull()) continue;
+                try {
+                    IMeshTools_Parameters wp = materializr::meshParams(
+                        job.deflection, job.angularDeflection, false);
+                    wp.MeshAlgo = IMeshTools_MeshAlgoType_Watson;
+                    BRepMesh_IncrementalMesh retry(jf.copy, wp);
+                } catch (...) {}
+            }
             for (const auto& jf : job.faces) {
                 Result::Face rf;
                 rf.live = jf.live;
