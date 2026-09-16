@@ -141,6 +141,14 @@ public:
 
     // Element removal
     void removeElement(int id);
+    // Batch removal: resolves polygon ownership across the WHOLE `ids` list
+    // against the sketch's pre-mutation state before deleting anything, so a
+    // selection containing more than one piece of the same polygon (two
+    // vertices, an edge plus a vertex, ...) can't have a later id lose its
+    // owning-polygon protection because an earlier id in the same call
+    // already cascaded that polygon away. Prefer this over a loop of
+    // removeElement() calls for any caller processing a multi-id selection.
+    void removeElements(const std::vector<int>& ids);
     // Remove points that no geometry references any more (e.g. a line's two
     // endpoints after the line itself is deleted), plus any constraint left
     // dangling by the removal. Returns the number of orphan points pruned.
