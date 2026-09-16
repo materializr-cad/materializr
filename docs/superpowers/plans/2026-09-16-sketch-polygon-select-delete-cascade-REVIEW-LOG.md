@@ -1,10 +1,10 @@
 # Plan Review Log: Sketch polygon Select+Delete cascade corruption fix
 Started 2026-09-16. MAX_ROUNDS=5. Codex model: gpt-6-astra (config.toml default,
-via `codex exec` not the built-in review subcommand — per tools/codex.md
+via `codex exec` not the built-in review subcommand - per tools/codex.md
 2026-09-08 entry, astra works fine for plain `codex exec`).
 Thread: 01a0aa5a-ac89-7540-a7b0-4bd4eb90a9e6
 
-## Round 1 — Codex
+## Round 1 - Codex
 
 1. **Blocking: plan assumes code absent from this branch.** At `d1b378f`
    (upstream/main), `Sketch::removeElement` does not cascade a polygon's
@@ -38,13 +38,13 @@ VERDICT: REVISE
 All five accepted and fixed in the plan:
 
 1. Verified directly (`gh pr view 119`: OPEN, `mergedAt: null`; grepped the
-   PR #119 artifacts on a fresh `upstream/main` checkout — absent). Branch
+   PR #119 artifacts on a fresh `upstream/main` checkout - absent). Branch
    reset onto `origin/fix/sketch-polygon-trim-pick-priority` @ `4697d77`
-   instead (PR #119's own branch untouched, just used as this branch's base —
+   instead (PR #119's own branch untouched, just used as this branch's base -
    a normal depends-on-an-open-PR relationship). Re-verified the PR #119
    artifacts are present after the reset.
 2. Accepted. Swapped `deleteSelectedSketchElements`'s delete order to
-   points-then-lines (piece 2 in the revised plan) — a one-line reorder that
+   points-then-lines (piece 2 in the revised plan) - a one-line reorder that
    makes a selected polygon-owned point always find its still-live owning
    polygon before any line-triggered cascade could remove the record out from
    under it. Added regression test 6.
@@ -53,14 +53,14 @@ All five accepted and fixed in the plan:
    the existing `removeLastSplinePoint` guard exactly. Added regression test
    7. The same finding's second half (segment lookup can pick the wrong
    duplicate-endpoint line) is a pre-existing, unrelated Line-tool ambiguity
-   this change doesn't introduce — documented as an explicit out-of-scope
+   this change doesn't introduce - documented as an explicit out-of-scope
    follow-up rather than fixed here.
 4. Accepted. Restructured `removeElement`'s redirect: skip the ownership scan
    entirely whenever `id` already names a live polygon. This bounds the
    redirect to exactly one recursion step by construction (every redirect
    target is a real, currently-live polygon id, so it can never re-enter the
    scan branch), independent of whatever a corrupted polygon's own
-   `lineIds`/`vertexPointIds` claims — no visited-set or depth counter needed.
+   `lineIds`/`vertexPointIds` claims - no visited-set or depth counter needed.
    Added regression test 8 (hand-built self-referencing `SketchPolygon` via
    `addRawPolygon`).
 5. Accepted. Changed the scan to collect *every* owning polygon id before
@@ -68,7 +68,7 @@ All five accepted and fixed in the plan:
    range-for/erase aliasing either), and cascade all of them. Matches the
    stated policy exactly instead of being first-in-`m_polygons`-wins.
 
-## Round 2 — Codex
+## Round 2 - Codex
 
 Confirmed: branch dependency correct (HEAD `4697d77`, cascade + Trim tests
 present), collect-before-mutate and the live-polygon-id fast path address the
@@ -123,7 +123,7 @@ Both accepted, plus the missing test added.
 3. Added test 9 (two polygons sharing one center point, plus a standalone
    line also on that point): both polygons deleted, point and line survive.
 
-## Round 3 — Codex
+## Round 3 - Codex
 
 No remaining material blockers. Batch resolution preserves both shared
 vertices regardless of order; segment-id tracking removes the duplicate-edge
