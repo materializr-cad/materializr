@@ -3529,6 +3529,13 @@ void Application::rebuildMeshes() {
     // freeze - say so, with the trigger state.
     const uint32_t rmStart = m_meshesDirty ? SDL_GetTicks() : 0;
     const bool rmWasFull = m_meshesDirty;
+    // A full rebuild (body add/remove/reload) or any partial one (a per-body
+    // edit routed through markBodyDirty, which covers visibility toggles
+    // among other things) can change the scene's bounding extent - see
+    // renderViewport()'s minor-grid-tier check. Read before the partial pass
+    // below clears m_dirtyBodyIds.
+    if (m_meshesDirty || !m_dirtyBodyIds.empty())
+        m_gridExtentStale = true;
 
     if (m_meshesDirty) {
         // Full rebuild - clear everything and re-tessellate every visible

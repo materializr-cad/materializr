@@ -1236,6 +1236,14 @@ private:
     // updates only those bodies' meshes via setBodyMesh / removeBody. Cleared
     // after each rebuild pass.
     std::set<int> m_dirtyBodyIds;
+    // Set whenever a rebuildMeshes() pass could have changed the visible body
+    // set (full rebuild) or any body's geometry/visibility (partial rebuild) -
+    // see rebuildMeshes(). Consumed by renderViewport()'s minor-grid-tier
+    // extent check, which recomputes its cached verdict only when this is
+    // true (and a cooldown has elapsed) and clears it only once it actually
+    // recomputes. Starts true so the first eligible frame still computes the
+    // verdict.
+    bool m_gridExtentStale = true;
     int m_hoveredBodyId = -1;
 
     // Gizmo drag state for history commit

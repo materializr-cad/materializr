@@ -33,6 +33,7 @@
 #include <TopTools_ListOfShape.hxx>
 #include <Bnd_Box.hxx>
 #include <BRepBndLib.hxx>
+#include <Standard_Failure.hxx>
 #include "io/ImageEncode.h"
 #include "viewport/Gizmo.h"
 #include "viewport/SelectionHighlight.h"
@@ -565,33 +566,75 @@ void Application::renderViewport() {
                                m_edgeCtl.active();
             float minorAlpha = 1.0f;
             if (!interactive) {
-                // This used to walk every visible body's bbox on every frame
-                // to decide whether the project is "big enough" to suppress
-                // the 1× minor grid. On a 65-body airplane that's ~65 OCCT
-                // bbox calls per frame; even cheap each, the cumulative
-                // baseline cost is real. We only need this threshold check
-                // to feel responsive - not to update every frame - so cache
-                // the verdict and refresh every ~0.25s. A topology change
-                // can wait that long to flip the grid tier.
+                // Walks every visible body's exact bbox to decide whether the
+                // project is "big enough" to suppress the 1x minor grid -
+                // BRepBndLib::Add is a real geometry pass, not a cached-bounds
+                // read, and on a 423-body dense-import scene one walk costs
+                // ~100ms (measured via GL timer queries + wall-clock spike,
+                // issue #110). A 65-body-project-era version of this comment
+                // used to unconditionally poll every ~0.25s - that aliased
+                // against the idle frame cadence and fired every other
+                // frame, which is what produced the reported ~8fps.
+                // m_gridExtentStale (set by rebuildMeshes() whenever a full or
+                // partial rebuild ran - body add/remove/visibility/edit, but
+                // also a theme or mesh-quality switch that can't change the
+                // bounds) now gates whether there is anything to check at
+                // all, so a truly idle frame costs nothing; the 0.25s
+                // cooldown below still caps the worst case for a rapid
+                // string of non-geometric edits (e.g. a body-colour drag off
+                // a live colour wheel), which dirty m_dirtyBodyIds many
+                // times a second without ever changing the bounds.
+                static bool s_hideMinor = false;
                 static double s_nextCheckTime = 0.0;
-                static bool   s_hideMinor    = false;
-                double now = ImGui::GetTime();
-                if (now >= s_nextCheckTime) {
+                const double now = ImGui::GetTime();
+                if (m_gridExtentStale && now >= s_nextCheckTime) {
+                    m_gridExtentStale = false;
+                    // Fresh each pass, not left at its previous value: an
+                    // empty or fully-hidden scene must clear back to
+                    // "not hidden", not freeze at whatever the last
+                    // nonempty scene decided.
+                    bool hideMinor = false;
                     try {
                         Bnd_Box bb;
-                        bool any = false;
                         for (int id : m_document->getAllBodyIds()) {
                             if (!m_document->isBodyVisible(id)) continue;
-                            BRepBndLib::Add(m_document->getBody(id), bb);
-                            any = true;
+                            // Per-body, not just around the Add call below:
+                            // one body with a stale/invalid shape must not
+                            // blank the bounds of every other body that
+                            // resolved fine. The outer try is the same
+                            // safety net the pre-existing code had around
+                            // the whole scan (getAllBodyIds/isBodyVisible
+                            // aren't expected to throw, but nothing here
+                            // relies on that).
+                            try {
+                                BRepBndLib::Add(m_document->getBody(id), bb);
+                            } catch (const Standard_Failure& e) {
+                                // The realistic failure here - OCCT derives
+                                // its own exceptions from Standard_Transient,
+                                // not std::exception, same as every other
+                                // OCCT try/catch in this codebase (BrepIO,
+                                // StepIO, ProjectIO, MoveHoleOp).
+                                if (materializr::isVerbose())
+                                    std::fprintf(stderr,
+                                        "[GridExtent] body %d bounds failed: %s\n",
+                                        id, e.GetMessageString() ? e.GetMessageString() : "unknown");
+                                continue;
+                            } catch (const std::exception& e) {
+                                if (materializr::isVerbose())
+                                    std::fprintf(stderr,
+                                        "[GridExtent] body %d bounds failed: %s\n",
+                                        id, e.what());
+                                continue;
+                            } catch (...) { continue; }
                         }
-                        if (any && !bb.IsVoid()) {
+                        if (!bb.IsVoid()) {
                             double xmn,ymn,zmn,xmx,ymx,zmx;
                             bb.Get(xmn,ymn,zmn,xmx,ymx,zmx);
                             double ext = std::max({xmx-xmn, ymx-ymn, zmx-zmn});
-                            s_hideMinor = (ext > 100.0);
+                            hideMinor = (ext > 100.0);
                         }
                     } catch (...) {}
+                    s_hideMinor = hideMinor;
                     s_nextCheckTime = now + 0.25;
                 }
                 if (s_hideMinor) minorAlpha = 0.0f;
