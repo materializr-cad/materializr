@@ -464,6 +464,11 @@ add_executable(test_sticky_rim test_sticky_rim.cpp)
 target_link_libraries(test_sticky_rim PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_sticky_rim COMMAND test_sticky_rim)
 
+# Trim on a polygon edge deletes the whole polygon, not a partial line-trim
+add_executable(test_sketch_trim_polygon test_sketch_trim_polygon.cpp)
+target_link_libraries(test_sketch_trim_polygon PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_sketch_trim_polygon COMMAND test_sketch_trim_polygon)
+
 # Face-sketch grid direction: world-aligned edge beats the longest diagonal
 add_executable(test_sketch_plane_axis test_sketch_plane_axis.cpp)
 target_link_libraries(test_sketch_plane_axis PRIVATE materializr_core gtest gtest_main)

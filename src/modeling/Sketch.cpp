@@ -722,6 +722,20 @@ void Sketch::removeElement(int id) {
             [id](const SketchSpline& s) { return s.id == id; }),
         m_splines.end());
 
+    // Deleting a polygon must also remove its own edge lines - the renderer
+    // draws polygon edges purely via drawLines() over m_lines, so a polygon
+    // record erased below with its lines left behind would keep rendering
+    // every edge forever.
+    for (const auto& p : m_polygons) {
+        if (p.id != id) continue;
+        std::unordered_set<int> polyLineIds(p.lineIds.begin(), p.lineIds.end());
+        m_lines.erase(
+            std::remove_if(m_lines.begin(), m_lines.end(),
+                [&polyLineIds](const SketchLine& l) { return polyLineIds.count(l.id) != 0; }),
+            m_lines.end());
+        break;
+    }
+
     m_polygons.erase(
         std::remove_if(m_polygons.begin(), m_polygons.end(),
             [id](const SketchPolygon& p) { return p.id == id; }),

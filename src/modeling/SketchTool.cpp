@@ -6,6 +6,7 @@
 #include <cmath>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -3092,8 +3093,18 @@ static int pickSketchElement(const Sketch& sketch, glm::vec2 pos, float threshol
     int bestId = -1;
     pickType.clear();
 
+    // A polygon's edges are real SketchLine entries (Sketch::addPolygon),
+    // also present in sketch.getLines(). Skip them in the Lines loop below so
+    // a click on a polygon edge is only ever claimed by the Polygons loop -
+    // without this, both loops compute the identical distance for the same
+    // edge and the Lines loop (running first) always wins the tie.
+    std::unordered_set<int> polygonLineIds;
+    for (const auto& po : sketch.getPolygons())
+        for (int lid : po.lineIds) polygonLineIds.insert(lid);
+
     // Lines
     for (const auto& ln : sketch.getLines()) {
+        if (polygonLineIds.count(ln.id)) continue;
         const SketchPoint* a = sketch.getPoint(ln.startPointId);
         const SketchPoint* b = sketch.getPoint(ln.endPointId);
         if (!a || !b) continue;
