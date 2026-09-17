@@ -383,6 +383,7 @@ void SketchTool::onCancel() {
     m_rectDimStage = 0;
     m_rectDimH = 0.0f;
     m_lineChain.clear();
+    m_lineChainSegmentIds.clear();
 }
 
 bool SketchTool::dropLineChainTail() {
@@ -395,21 +396,34 @@ bool SketchTool::dropLineChainTail() {
     if (m_mode != SketchToolMode::Line || m_lineChain.size() < 2 || !m_sketch)
         return false;
     int tail = m_lineChain.back();
-    int prev = m_lineChain[m_lineChain.size() - 2];
 
-    // Delete the segment line joining prev <-> tail.
-    for (const auto& l : m_sketch->getLines()) {
-        if ((l.startPointId == prev && l.endPointId == tail) ||
-            (l.startPointId == tail && l.endPointId == prev)) {
-            m_sketch->removeElement(l.id);
-            break;
-        }
+    // Delete the EXACT segment line this chain step created (tracked in
+    // m_lineChainSegmentIds, pushed in lockstep with m_lineChain in
+    // handleLineTool) - not re-derived from the endpoint pair, which picks
+    // the WRONG line whenever another line (e.g. a pre-existing polygon
+    // edge) already shares those same two endpoints.
+    if (!m_lineChainSegmentIds.empty()) {
+        m_sketch->removeElement(m_lineChainSegmentIds.back());
+        m_lineChainSegmentIds.pop_back();
     }
     // Delete the tail vertex too, but only if nothing else references it - it
     // may have been snapped onto pre-existing geometry we mustn't disturb.
     bool stillUsed = false;
     for (const auto& l : m_sketch->getLines())
         if (l.startPointId == tail || l.endPointId == tail) { stillUsed = true; break; }
+    // A polygon's center is never a line endpoint (only its vertices are), so
+    // the line-only check above can't see it - without this, backtracking a
+    // line chain that happened to weld onto a pre-existing polygon's center
+    // point would delete the *entire* unrelated polygon as a side effect
+    // (same failure shape removeLastSplinePoint already guards against for
+    // splines, SketchTool.cpp:2947-2953). vertexPointIds is checked too for
+    // defense in depth, symmetric with that guard.
+    if (!stillUsed)
+        for (const auto& pg : m_sketch->getPolygons()) {
+            if (pg.centerPointId == tail) { stillUsed = true; break; }
+            if (std::find(pg.vertexPointIds.begin(), pg.vertexPointIds.end(), tail) !=
+                pg.vertexPointIds.end()) { stillUsed = true; break; }
+        }
     if (!stillUsed) m_sketch->removeElement(tail);
 
     m_lineChain.pop_back();
@@ -2417,6 +2431,7 @@ void SketchTool::handleLineTool(glm::vec2 pos) {
         m_chainStartPointId = m_lastPointId;
         m_lineChain.clear();
         m_lineChain.push_back(m_lastPointId);
+        m_lineChainSegmentIds.clear();
     } else {
         // Second click: create line and continue chain.
         // Reject a zero-length segment - a tap/release back onto the anchor (or
@@ -2453,7 +2468,6 @@ void SketchTool::handleLineTool(glm::vec2 pos) {
         // Constraints are entirely opt-in - no autoConstrain on creation. The
         // user applies Horizontal / Vertical / Coincident / etc. explicitly via
         // the toolbar when they want one.
-        (void)newLineId;
 
         // Remember the direction of the segment we just committed - the
         // perpendicular- and parallel-to-previous inferences need it while the
@@ -2481,6 +2495,7 @@ void SketchTool::handleLineTool(glm::vec2 pos) {
             m_hasPrevLineDir = false;
             m_activeInferences.clear();
             m_lineChain.clear();
+            m_lineChainSegmentIds.clear();
             return;
         }
 
@@ -2489,6 +2504,7 @@ void SketchTool::handleLineTool(glm::vec2 pos) {
         m_firstClick = pos;
         m_clickCount++;
         m_lineChain.push_back(endPointId);
+        m_lineChainSegmentIds.push_back(newLineId);
     }
 }
 
@@ -4037,7 +4053,7 @@ void SketchTool::undoLastStamp() {
     if (!m_sketch || m_stampStack.empty()) return;
     // Pop ONE stamp off the top - repeated calls walk back to the original.
     const std::vector<int>& ids = m_stampStack.back();
-    for (int id : ids) m_sketch->removeElement(id);
+    m_sketch->removeElements(ids);
     std::fprintf(stderr, "[Stamp] removed last placement (%zu elements, %zu stamp(s) left)\n",
                  ids.size(), m_stampStack.size() - 1);
     m_stampStack.pop_back();
