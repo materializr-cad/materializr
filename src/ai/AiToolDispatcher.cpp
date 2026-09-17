@@ -416,17 +416,33 @@ ToolResult filletEdge(PluginContext& ctx, const nlohmann::json& args) {
     const TopoDS_Shape& body = ctx.document().getBody(bodyId);
     const TopoDS_Edge edge = nearestEdge(body, userPntToWorld(ux, uy, uz));
     if (edge.IsNull()) return {false, "body " + std::to_string(bodyId) + " has no edges"};
+    // Report back the edge ACTUALLY found, not just the point that was
+    // searched from - nearestEdge always returns SOMETHING (never "no edge
+    // close enough"), so a badly-off point (most often a Y/Z mixup - see the
+    // system prompt) silently fillets the wrong edge instead of failing
+    // where the mistake would be obvious. Comparing the requested point
+    // against this is the fastest way to catch that from the tool result
+    // alone, without a screenshot.
+    double fx, fy, fz;
+    worldPntToUser(edgeMidpoint(edge), fx, fy, fz);
+    char foundAt[96];
+    std::snprintf(foundAt, sizeof(foundAt), "(%.1f, %.1f, %.1f)", fx, fy, fz);
     auto op = std::make_unique<FilletOp>();
     op->setBody(bodyId);
     op->setEdges({edge});
     op->setRadius(radius);
     if (!ctx.history().pushOperation(std::move(op), ctx.document()))
-        return {false, "fillet failed - the radius is likely too large for this edge "
-                       "or its neighbouring faces; try a smaller radius"};
+        return {false, std::string("fillet failed on the edge found nearest (") +
+                       std::to_string(ux) + ", " + std::to_string(uy) + ", " +
+                       std::to_string(uz) + ") - that edge is actually at " + foundAt +
+                       " - the radius is likely too large for it or its neighbouring "
+                       "faces; try a smaller radius, or call list_bodies/capture_view "
+                       "if that location doesn't look like the edge you meant"};
     ctx.markMeshesDirty();
     return {true, "Filleted the edge of body " + std::to_string(bodyId) +
                   " nearest (" + std::to_string(ux) + ", " + std::to_string(uy) + ", " +
-                  std::to_string(uz) + ") at radius " + std::to_string(radius) + "mm"};
+                  std::to_string(uz) + ") - edge found at " + foundAt +
+                  " - at radius " + std::to_string(radius) + "mm"};
 }
 
 ToolResult chamferEdge(PluginContext& ctx, const nlohmann::json& args) {
@@ -442,17 +458,29 @@ ToolResult chamferEdge(PluginContext& ctx, const nlohmann::json& args) {
     const TopoDS_Shape& body = ctx.document().getBody(bodyId);
     const TopoDS_Edge edge = nearestEdge(body, userPntToWorld(ux, uy, uz));
     if (edge.IsNull()) return {false, "body " + std::to_string(bodyId) + " has no edges"};
+    // See filletEdge's identical comment - report the edge ACTUALLY found,
+    // since nearestEdge never fails to find one.
+    double fx, fy, fz;
+    worldPntToUser(edgeMidpoint(edge), fx, fy, fz);
+    char foundAt[96];
+    std::snprintf(foundAt, sizeof(foundAt), "(%.1f, %.1f, %.1f)", fx, fy, fz);
     auto op = std::make_unique<ChamferOp>();
     op->setBody(bodyId);
     op->setEdges({edge});
     op->setDistance(distance);
     if (!ctx.history().pushOperation(std::move(op), ctx.document()))
-        return {false, "chamfer failed - the distance is likely too large for this "
-                       "edge or its neighbouring faces; try a smaller distance"};
+        return {false, std::string("chamfer failed on the edge found nearest (") +
+                       std::to_string(ux) + ", " + std::to_string(uy) + ", " +
+                       std::to_string(uz) + ") - that edge is actually at " + foundAt +
+                       " - the distance is likely too large for it or its "
+                       "neighbouring faces; try a smaller distance, or call "
+                       "list_bodies/capture_view if that location doesn't look like "
+                       "the edge you meant"};
     ctx.markMeshesDirty();
     return {true, "Chamfered the edge of body " + std::to_string(bodyId) +
                   " nearest (" + std::to_string(ux) + ", " + std::to_string(uy) + ", " +
-                  std::to_string(uz) + ") at distance " + std::to_string(distance) + "mm"};
+                  std::to_string(uz) + ") - edge found at " + foundAt +
+                  " - at distance " + std::to_string(distance) + "mm"};
 }
 
 // The face whose centre of mass is closest to `target` - the same

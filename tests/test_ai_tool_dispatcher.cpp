@@ -374,6 +374,27 @@ TEST(AiToolDispatcher, FilletEdgeRoundsOnlyTheNearestEdge) {
         << "exactly one edge rounded should add exactly one blend face";
 }
 
+TEST(AiToolDispatcher, FilletEdgeReportsTheActualEdgeLocationFound) {
+    // Steve reported the model "seeing" a body via list_bodies but failing
+    // to fillet it - nearestEdge never reports "no edge close enough" (it
+    // always returns SOMETHING), so a Y/Z-swapped point silently rounds the
+    // wrong edge instead of failing where the mistake would be obvious. The
+    // message reporting back where the edge ACTUALLY was is the fix: a
+    // point dead-on this edge's midpoint must echo that same point back.
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ASSERT_TRUE(executeTool(ctx, "add_box",
+        {{"width", 20.0}, {"height", 20.0}, {"depth", 20.0}}).ok);
+    int id = doc.getAllBodyIds().front();
+
+    ToolResult r = executeTool(ctx, "fillet_edge",
+        {{"body_id", id}, {"radius", 2.0}, {"x", 20.0}, {"y", 20.0}, {"z", 10.0}});
+    ASSERT_TRUE(r.ok) << r.message;
+    EXPECT_NE(r.message.find("edge found at"), std::string::npos) << r.message;
+    EXPECT_NE(r.message.find("(20.0, 20.0, 10.0)"), std::string::npos) << r.message;
+}
+
 TEST(AiToolDispatcher, FilletEdgeRoundsALessVolumeThanFilletAllEdges) {
     // Same box, same radius: one edge should remove much less material than
     // all twelve - a cheap sanity check that only one edge was actually

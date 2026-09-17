@@ -31,6 +31,7 @@ nlohmann::json AnthropicClient::buildRequestBody(const std::vector<ChatMessage>&
     nlohmann::json out;
     out["model"] = model;
     out["max_tokens"] = 4096;
+    out["system"] = systemPrompt();
     nlohmann::json msgs = nlohmann::json::array();
     nlohmann::json pendingToolResults = nlohmann::json::array();
     auto flushToolResults = [&]() {

@@ -10,10 +10,26 @@ TEST(OpenAiCompatibleClient, BuildRequestBodyIncludesModelMessagesAndTools) {
         messages, allTools(), "gpt-4o");
 
     EXPECT_EQ(body["model"], "gpt-4o");
-    ASSERT_EQ(body["messages"].size(), 1u);
-    EXPECT_EQ(body["messages"][0]["role"], "user");
+    // messages[0] is the leading system prompt (see the dedicated test
+    // below) - the actual conversation starts at index 1.
+    ASSERT_EQ(body["messages"].size(), 2u);
+    EXPECT_EQ(body["messages"][1]["role"], "user");
     ASSERT_TRUE(body["tools"].is_array());
     EXPECT_EQ(body["tools"].size(), allTools().size());
+}
+
+TEST(OpenAiCompatibleClient, BuildRequestBodyLeadsWithTheSystemPromptAndStatesTheAxisConvention) {
+    // No separate top-level "system" field in this wire shape, unlike
+    // Anthropic's - it has to be the first message. Steve reported the
+    // model sometimes treats Y as up (a common convention elsewhere - Unity,
+    // Maya, OpenGL) and misses edges/faces as a result - this is the fix.
+    std::vector<ChatMessage> messages = {{ChatRole::User, "hi", "", {}}};
+    nlohmann::json body = OpenAiCompatibleClient::buildRequestBody(messages, {}, "gpt-4o");
+    ASSERT_FALSE(body["messages"].empty());
+    EXPECT_EQ(body["messages"][0]["role"], "system");
+    std::string prompt = body["messages"][0]["content"].get<std::string>();
+    EXPECT_NE(prompt.find("Z = up"), std::string::npos) << prompt;
+    EXPECT_NE(prompt.find("list_bodies"), std::string::npos) << prompt;
 }
 
 TEST(OpenAiCompatibleClient, BuildRequestBodySetsAMaxTokensCap) {
@@ -47,15 +63,16 @@ TEST(OpenAiCompatibleClient, BuildRequestBodyFollowsAnImageResultWithASyntheticU
         {ChatRole::ToolResult, "Captured the current view", "call_1", {}, png},
     };
     nlohmann::json body = OpenAiCompatibleClient::buildRequestBody(messages, {}, "gpt-4o");
-    ASSERT_EQ(body["messages"].size(), 2u);
+    // +1 for the leading system prompt (see BuildRequestBodyLeadsWith...).
+    ASSERT_EQ(body["messages"].size(), 3u);
 
-    const auto& toolMsg = body["messages"][0];
+    const auto& toolMsg = body["messages"][1];
     EXPECT_EQ(toolMsg["role"], "tool");
     EXPECT_TRUE(toolMsg["content"].is_string())
         << "the tool-role message itself must stay plain text";
     EXPECT_EQ(toolMsg["content"], "Captured the current view");
 
-    const auto& imageMsg = body["messages"][1];
+    const auto& imageMsg = body["messages"][2];
     EXPECT_EQ(imageMsg["role"], "user");
     ASSERT_TRUE(imageMsg["content"].is_array());
     bool sawImage = false;
@@ -74,7 +91,8 @@ TEST(OpenAiCompatibleClient, BuildRequestBodyAddsNoExtraMessageWhenAToolResultHa
         {ChatRole::ToolResult, "Created body 1", "call_abc", {}},
     };
     nlohmann::json body = OpenAiCompatibleClient::buildRequestBody(messages, {}, "gpt-4o");
-    EXPECT_EQ(body["messages"].size(), 1u);
+    // +1 for the leading system prompt (see BuildRequestBodyLeadsWith...).
+    EXPECT_EQ(body["messages"].size(), 2u);
 }
 
 TEST(OpenAiCompatibleClient, BuildRequestBodyEmitsAssistantToolCallsArray) {

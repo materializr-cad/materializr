@@ -17,6 +17,19 @@ TEST(AnthropicClient, BuildRequestBodyIncludesModelMessagesAndTools) {
     EXPECT_EQ(body["tools"].size(), allTools().size());
 }
 
+TEST(AnthropicClient, BuildRequestBodySetsTheSystemPromptStatingTheAxisConvention) {
+    // Anthropic's Messages API has a dedicated top-level "system" field, so
+    // unlike OpenAiCompatibleClient this never touches the messages array -
+    // see the sibling test there for why this prompt exists at all (Steve
+    // reported the model sometimes treats Y as up and misses edges/faces).
+    std::vector<ChatMessage> messages = {{ChatRole::User, "hi", "", {}}};
+    nlohmann::json body = AnthropicClient::buildRequestBody(messages, {}, "claude-sonnet-4-5");
+    ASSERT_TRUE(body.contains("system"));
+    std::string prompt = body["system"].get<std::string>();
+    EXPECT_NE(prompt.find("Z = up"), std::string::npos) << prompt;
+    EXPECT_NE(prompt.find("list_bodies"), std::string::npos) << prompt;
+}
+
 TEST(AnthropicClient, BuildRequestBodyMapsToolResultMessagesToUserToolResultBlocks) {
     // Anthropic has no separate "tool" role - a tool result rides inside a
     // user-role message as a tool_result content block.

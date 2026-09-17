@@ -37,6 +37,10 @@ nlohmann::json OpenAiCompatibleClient::buildRequestBody(
     // layer otherwise defaults to unbounded.
     out["max_tokens"] = 4096;
     nlohmann::json msgs = nlohmann::json::array();
+    // No separate top-level "system" field in this API shape (unlike
+    // Anthropic's Messages API) - a system-role message has to be the first
+    // entry in the array instead.
+    msgs.push_back({{"role", "system"}, {"content", systemPrompt()}});
     for (const auto& m : messages) {
         if (m.role == ChatRole::ToolResult) {
             msgs.push_back({{"role", "tool"}, {"tool_call_id", m.toolCallId},
