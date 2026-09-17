@@ -5,9 +5,27 @@
 #include "../modeling/PrimitiveOp.h"
 #include "../modeling/TransformOp.h"
 #include "../modeling/BooleanOp.h"
+#include "../modeling/FilletOp.h"
+#include "../modeling/ChamferOp.h"
+#include "../modeling/ShellOp.h"
+
+#include <BRepGProp.hxx>
+#include <BRepGProp_Face.hxx>
+#include <GProp_GProps.hxx>
+#include <TopExp_Explorer.hxx>
+#include <TopoDS.hxx>
+#include <TopoDS_Edge.hxx>
+#include <TopoDS_Face.hxx>
+#include <gp_Dir.hxx>
+#include <gp_Pnt.hxx>
+#include <gp_Vec.hxx>
 
 #include <cmath>
 #include <limits>
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 namespace materializr { namespace ai {
 
@@ -238,6 +256,132 @@ ToolResult booleanOp(PluginContext& ctx, const nlohmann::json& args) {
                   std::to_string(toolId) + " (" + modeStr + ")"};
 }
 
+ToolResult filletAllEdges(PluginContext& ctx, const nlohmann::json& args) {
+    std::string err;
+    int bodyId;
+    double radius;
+    if (!requireBodyId(ctx.document(), args, "body_id", bodyId, err) ||
+        !requirePositive(args, "radius", radius, err))
+        return {false, err};
+    const TopoDS_Shape& body = ctx.document().getBody(bodyId);
+    std::vector<TopoDS_Edge> edges;
+    for (TopExp_Explorer ex(body, TopAbs_EDGE); ex.More(); ex.Next())
+        edges.push_back(TopoDS::Edge(ex.Current()));
+    if (edges.empty()) return {false, "body " + std::to_string(bodyId) + " has no edges"};
+    auto op = std::make_unique<FilletOp>();
+    op->setBody(bodyId);
+    op->setEdges(edges);
+    op->setRadius(radius);
+    if (!ctx.history().pushOperation(std::move(op), ctx.document()))
+        return {false, "fillet failed - the radius is likely too large for this body's "
+                       "smallest edge or face; try a smaller radius"};
+    ctx.markMeshesDirty();
+    return {true, "Filleted all edges of body " + std::to_string(bodyId) +
+                  " at radius " + std::to_string(radius) + "mm"};
+}
+
+ToolResult chamferAllEdges(PluginContext& ctx, const nlohmann::json& args) {
+    std::string err;
+    int bodyId;
+    double distance;
+    if (!requireBodyId(ctx.document(), args, "body_id", bodyId, err) ||
+        !requirePositive(args, "distance", distance, err))
+        return {false, err};
+    const TopoDS_Shape& body = ctx.document().getBody(bodyId);
+    std::vector<TopoDS_Edge> edges;
+    for (TopExp_Explorer ex(body, TopAbs_EDGE); ex.More(); ex.Next())
+        edges.push_back(TopoDS::Edge(ex.Current()));
+    if (edges.empty()) return {false, "body " + std::to_string(bodyId) + " has no edges"};
+    auto op = std::make_unique<ChamferOp>();
+    op->setBody(bodyId);
+    op->setEdges(edges);
+    op->setDistance(distance);
+    if (!ctx.history().pushOperation(std::move(op), ctx.document()))
+        return {false, "chamfer failed - the distance is likely too large for this "
+                       "body's smallest edge or face; try a smaller distance"};
+    ctx.markMeshesDirty();
+    return {true, "Chamfered all edges of body " + std::to_string(bodyId) +
+                  " at distance " + std::to_string(distance) + "mm"};
+}
+
+// The face on `body` whose outward normal points most nearly along `dir`
+// (world space), or a null face if none is even roughly aligned. Ties (more
+// than one face facing that way) go to the largest by area - shell_body's
+// schema documents this so the model isn't surprised by which one opens.
+TopoDS_Face largestFaceFacing(const TopoDS_Shape& body, const gp_Dir& dir) {
+    TopoDS_Face best;
+    double bestArea = -1.0;
+    for (TopExp_Explorer ex(body, TopAbs_FACE); ex.More(); ex.Next()) {
+        const TopoDS_Face f = TopoDS::Face(ex.Current());
+        try {
+            BRepGProp_Face gf(f);
+            Standard_Real u0, u1, v0, v1;
+            gf.Bounds(u0, u1, v0, v1);
+            gp_Pnt p;
+            gp_Vec n;
+            gf.Normal(0.5 * (u0 + u1), 0.5 * (v0 + v1), p, n);
+            if (n.Magnitude() < 1e-9) continue;
+            if (gp_Dir(n).Angle(dir) > 20.0 * M_PI / 180.0) continue; // not facing that way
+            GProp_GProps g;
+            BRepGProp::SurfaceProperties(f, g);
+            if (g.Mass() > bestArea) { bestArea = g.Mass(); best = f; }
+        } catch (...) { continue; }
+    }
+    return best;
+}
+
+// User (x,y,z) -> world (x,z,y): Z is up, Y is depth - the same convention
+// add_box/move_body/rotate_body already use (see PrimitiveOp.cpp's worldPnt()
+// and moveBody's comment above). open_face is specified in this same
+// user-facing convention, so it's remapped here before searching the body.
+gp_Dir userDirToWorld(double ux, double uy, double uz) {
+    return gp_Dir(ux, uz, uy);
+}
+
+ToolResult shellBody(PluginContext& ctx, const nlohmann::json& args) {
+    std::string err;
+    int bodyId;
+    double thickness;
+    if (!requireBodyId(ctx.document(), args, "body_id", bodyId, err) ||
+        !requirePositive(args, "thickness", thickness, err))
+        return {false, err};
+    std::string openFace = "none";
+    if (args.contains("open_face")) {
+        if (!args["open_face"].is_string())
+            return {false, "'open_face' must be a string"};
+        openFace = args["open_face"].get<std::string>();
+    }
+    gp_Dir dir(0, 0, 1); // placeholder; only read when openFace != "none"
+    if (openFace != "none") {
+        if (openFace == "+x") dir = userDirToWorld(1, 0, 0);
+        else if (openFace == "-x") dir = userDirToWorld(-1, 0, 0);
+        else if (openFace == "+y") dir = userDirToWorld(0, 1, 0);
+        else if (openFace == "-y") dir = userDirToWorld(0, -1, 0);
+        else if (openFace == "+z") dir = userDirToWorld(0, 0, 1);
+        else if (openFace == "-z") dir = userDirToWorld(0, 0, -1);
+        else return {false, "'open_face' must be one of: +x,-x,+y,-y,+z,-z,none"};
+    }
+    auto op = std::make_unique<ShellOp>();
+    op->setBody(bodyId);
+    op->setThickness(thickness);
+    if (openFace != "none") {
+        const TopoDS_Shape& body = ctx.document().getBody(bodyId);
+        const TopoDS_Face face = largestFaceFacing(body, dir);
+        if (face.IsNull())
+            return {false, "no face on body " + std::to_string(bodyId) +
+                          " faces direction '" + openFace + "'"};
+        op->addFaceToRemove(face);
+    }
+    if (!ctx.history().pushOperation(std::move(op), ctx.document()))
+        return {false, "shell failed - the thickness is likely too large (it must be "
+                       "smaller than the body's smallest wall/radius); try a smaller "
+                       "thickness"};
+    ctx.markMeshesDirty();
+    return {true, "Shelled body " + std::to_string(bodyId) + " to " +
+                  std::to_string(thickness) + "mm walls" +
+                  (openFace == "none" ? " (fully closed)" : (", open on " + openFace))};
+}
+
 } // namespace
 
 ToolResult executeTool(PluginContext& ctx, const std::string& toolName,
@@ -251,6 +395,9 @@ ToolResult executeTool(PluginContext& ctx, const std::string& toolName,
     if (toolName == "rotate_body") return rotateBody(ctx, args);
     if (toolName == "scale_body") return scaleBody(ctx, args);
     if (toolName == "boolean_op") return booleanOp(ctx, args);
+    if (toolName == "fillet_all_edges") return filletAllEdges(ctx, args);
+    if (toolName == "chamfer_all_edges") return chamferAllEdges(ctx, args);
+    if (toolName == "shell_body") return shellBody(ctx, args);
     return {false, "unknown tool '" + toolName + "'"};
 }
 

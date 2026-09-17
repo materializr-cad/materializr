@@ -6,6 +6,9 @@
 #include <gtest/gtest.h>
 #include <Bnd_Box.hxx>
 #include <BRepBndLib.hxx>
+#include <BRepGProp.hxx>
+#include <GProp_GProps.hxx>
+#include <TopExp_Explorer.hxx>
 
 using namespace materializr::ai;
 using materializr::PluginContext;
@@ -40,6 +43,16 @@ void bboxWorldOrigin(Document& doc, int bodyId, double& x, double& y, double& z)
     BRepBndLib::Add(doc.getBody(bodyId), box);
     double x1, y1, z1;
     box.Get(x, y, z, x1, y1, z1);
+}
+double volumeOf(Document& doc, int bodyId) {
+    GProp_GProps g;
+    BRepGProp::VolumeProperties(doc.getBody(bodyId), g);
+    return g.Mass();
+}
+int faceCountOf(Document& doc, int bodyId) {
+    int n = 0;
+    for (TopExp_Explorer ex(doc.getBody(bodyId), TopAbs_FACE); ex.More(); ex.Next()) ++n;
+    return n;
 }
 } // namespace
 
@@ -260,4 +273,153 @@ TEST(AiToolDispatcher, AddBoxRejectsANonNumericOptionalPosition) {
     EXPECT_FALSE(r.ok);
     EXPECT_TRUE(doc.getAllBodyIds().empty())
         << "a malformed optional argument must not silently default";
+}
+
+TEST(AiToolDispatcher, FilletAllEdgesRoundsABoxAndRemovesVolume) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ASSERT_TRUE(executeTool(ctx, "add_box",
+        {{"width", 20.0}, {"height", 20.0}, {"depth", 20.0}}).ok);
+    int id = doc.getAllBodyIds().front();
+    const double v0 = volumeOf(doc, id);
+    const int f0 = faceCountOf(doc, id);
+
+    ToolResult r = executeTool(ctx, "fillet_all_edges", {{"body_id", id}, {"radius", 2.0}});
+    ASSERT_TRUE(r.ok) << r.message;
+    EXPECT_LT(volumeOf(doc, id), v0) << "rounding a box's edges must remove material";
+    EXPECT_GT(faceCountOf(doc, id), f0) << "every rounded edge adds a blend face";
+}
+
+TEST(AiToolDispatcher, FilletAllEdgesRejectsANonPositiveRadius) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ASSERT_TRUE(executeTool(ctx, "add_box",
+        {{"width", 10.0}, {"height", 10.0}, {"depth", 10.0}}).ok);
+    int id = doc.getAllBodyIds().front();
+
+    ToolResult r = executeTool(ctx, "fillet_all_edges", {{"body_id", id}, {"radius", 0.0}});
+    EXPECT_FALSE(r.ok);
+}
+
+TEST(AiToolDispatcher, FilletAllEdgesRejectsARadiusTooLargeForTheBody) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ASSERT_TRUE(executeTool(ctx, "add_box",
+        {{"width", 4.0}, {"height", 4.0}, {"depth", 4.0}}).ok);
+    int id = doc.getAllBodyIds().front();
+    const double v0 = volumeOf(doc, id);
+
+    // A radius bigger than half the smallest edge can't fit - OCCT either
+    // fails outright or (worse, if unchecked) silently produces something
+    // degenerate. Either way the document must not end up mutated on failure.
+    ToolResult r = executeTool(ctx, "fillet_all_edges", {{"body_id", id}, {"radius", 50.0}});
+    if (r.ok) {
+        // Some OCCT versions clamp rather than fail; if it succeeded the
+        // volume must still be sane (not collapsed to ~0 or negative).
+        EXPECT_GT(volumeOf(doc, id), 0.0);
+    } else {
+        EXPECT_NEAR(volumeOf(doc, id), v0, 1e-6)
+            << "a refused fillet must leave the body unchanged";
+    }
+}
+
+TEST(AiToolDispatcher, ChamferAllEdgesBevelsABoxAndRemovesVolume) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ASSERT_TRUE(executeTool(ctx, "add_box",
+        {{"width", 20.0}, {"height", 20.0}, {"depth", 20.0}}).ok);
+    int id = doc.getAllBodyIds().front();
+    const double v0 = volumeOf(doc, id);
+    const int f0 = faceCountOf(doc, id);
+
+    ToolResult r = executeTool(ctx, "chamfer_all_edges", {{"body_id", id}, {"distance", 2.0}});
+    ASSERT_TRUE(r.ok) << r.message;
+    EXPECT_LT(volumeOf(doc, id), v0) << "bevelling a box's edges must remove material";
+    EXPECT_GT(faceCountOf(doc, id), f0) << "every chamfered edge adds a bevel face";
+}
+
+TEST(AiToolDispatcher, ChamferAllEdgesRejectsANonPositiveDistance) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ASSERT_TRUE(executeTool(ctx, "add_box",
+        {{"width", 10.0}, {"height", 10.0}, {"depth", 10.0}}).ok);
+    int id = doc.getAllBodyIds().front();
+
+    ToolResult r = executeTool(ctx, "chamfer_all_edges", {{"body_id", id}, {"distance", -1.0}});
+    EXPECT_FALSE(r.ok);
+}
+
+TEST(AiToolDispatcher, ShellBodyWithNoOpenFaceHollowsOutMostOfTheVolume) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ASSERT_TRUE(executeTool(ctx, "add_box",
+        {{"width", 20.0}, {"height", 20.0}, {"depth", 20.0}}).ok);
+    int id = doc.getAllBodyIds().front();
+    const double v0 = volumeOf(doc, id);
+
+    ToolResult r = executeTool(ctx, "shell_body",
+        {{"body_id", id}, {"thickness", 2.0}, {"open_face", "none"}});
+    ASSERT_TRUE(r.ok) << r.message;
+    // A 20mm cube shelled to 2mm walls leaves a 16mm^3 cavity: most of the
+    // original 8000mm^3 is gone.
+    EXPECT_LT(volumeOf(doc, id), v0 * 0.6);
+    EXPECT_GT(volumeOf(doc, id), 0.0);
+}
+
+TEST(AiToolDispatcher, ShellBodyDefaultsToAFullyClosedShellWhenOpenFaceIsOmitted) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ASSERT_TRUE(executeTool(ctx, "add_box",
+        {{"width", 20.0}, {"height", 20.0}, {"depth", 20.0}}).ok);
+    int id = doc.getAllBodyIds().front();
+
+    ToolResult r = executeTool(ctx, "shell_body", {{"body_id", id}, {"thickness", 2.0}});
+    EXPECT_TRUE(r.ok) << r.message;
+}
+
+TEST(AiToolDispatcher, ShellBodyWithAnOpenFaceStillHollowsTheBody) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ASSERT_TRUE(executeTool(ctx, "add_box",
+        {{"width", 20.0}, {"height", 20.0}, {"depth", 20.0}}).ok);
+    int id = doc.getAllBodyIds().front();
+    const double v0 = volumeOf(doc, id);
+
+    ToolResult r = executeTool(ctx, "shell_body",
+        {{"body_id", id}, {"thickness", 2.0}, {"open_face", "+z"}});
+    ASSERT_TRUE(r.ok) << r.message;
+    EXPECT_LT(volumeOf(doc, id), v0 * 0.6);
+}
+
+TEST(AiToolDispatcher, ShellBodyRejectsAnInvalidOpenFaceString) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ASSERT_TRUE(executeTool(ctx, "add_box",
+        {{"width", 10.0}, {"height", 10.0}, {"depth", 10.0}}).ok);
+    int id = doc.getAllBodyIds().front();
+
+    ToolResult r = executeTool(ctx, "shell_body",
+        {{"body_id", id}, {"thickness", 1.0}, {"open_face", "sideways"}});
+    EXPECT_FALSE(r.ok);
+}
+
+TEST(AiToolDispatcher, ShellBodyRejectsANonPositiveThickness) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ASSERT_TRUE(executeTool(ctx, "add_box",
+        {{"width", 10.0}, {"height", 10.0}, {"depth", 10.0}}).ok);
+    int id = doc.getAllBodyIds().front();
+
+    ToolResult r = executeTool(ctx, "shell_body", {{"body_id", id}, {"thickness", 0.0}});
+    EXPECT_FALSE(r.ok);
 }

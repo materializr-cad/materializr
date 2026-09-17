@@ -4,13 +4,14 @@
 
 using namespace materializr::ai;
 
-TEST(AiToolSchema, AllToolsContainsExactlyTheNineV1Tools) {
+TEST(AiToolSchema, AllToolsContainsExactlyTheExpectedTools) {
     const auto& tools = allTools();
     std::vector<std::string> names;
     for (const auto& t : tools) names.push_back(t.name);
     std::vector<std::string> expected = {
         "add_box", "add_cylinder", "add_sphere", "add_cone", "add_torus",
-        "move_body", "rotate_body", "scale_body", "boolean_op"};
+        "move_body", "rotate_body", "scale_body", "boolean_op",
+        "fillet_all_edges", "chamfer_all_edges", "shell_body"};
     EXPECT_EQ(names, expected);
 }
 
@@ -52,4 +53,16 @@ TEST(AiToolSchema, BooleanOpModeParamIsRequired) {
         return;
     }
     FAIL() << "boolean_op tool not found";
+}
+
+TEST(AiToolSchema, ShellBodyOpenFaceParamIsOptional) {
+    for (const auto& t : allTools()) {
+        if (t.name != "shell_body") continue;
+        bool found = false;
+        for (const auto& p : t.params)
+            if (p.name == "open_face") { found = true; EXPECT_FALSE(p.required); }
+        EXPECT_TRUE(found);
+        return;
+    }
+    FAIL() << "shell_body tool not found";
 }

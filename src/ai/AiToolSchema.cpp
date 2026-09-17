@@ -55,6 +55,23 @@ const std::vector<ToolDef>& allTools() {
          {num("target_body_id", "The body kept after the operation."),
           num("tool_body_id", "The body combined into the target."),
           str("mode", "One of: union, subtract, intersect.")}},
+        {"fillet_all_edges", "Round every edge of a body with a constant radius.",
+         {num("body_id", "The id of the body to fillet."),
+          num("radius", "Fillet radius in mm. Must be small enough to fit the body's "
+                        "smallest edge/face - if it fails, try a smaller radius.")}},
+        {"chamfer_all_edges", "Bevel every edge of a body by a constant distance.",
+         {num("body_id", "The id of the body to chamfer."),
+          num("distance", "Chamfer distance in mm, measured along each adjoining face.")}},
+        {"shell_body", "Hollow out a body to a constant wall thickness, optionally "
+                       "leaving one face open so the inside is reachable.",
+         {num("body_id", "The id of the body to shell."),
+          num("thickness", "Wall thickness in mm."),
+          str("open_face", "Which face to remove, by the direction its outward normal "
+                           "points, in the same X/Y/Z convention as add_box (Z is up, Y "
+                           "is depth): '+x','-x','+y','-y','+z' (top, most common for an "
+                           "open-top container),'-z', or 'none' for a fully closed hollow "
+                           "shell. If more than one face on the body points that way, the "
+                           "largest one is removed.", false)}},
     };
     return kTools;
 }
