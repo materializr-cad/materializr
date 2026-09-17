@@ -567,6 +567,13 @@ private:
     // back = current tail). Mirrors the committed segments so the touch "Back"
     // button can drop the tail and re-anchor after the host undoes a segment.
     std::vector<int> m_lineChain;
+    // Line id of each committed segment, in lockstep with m_lineChain (one
+    // shorter - segment i connects m_lineChain[i] to m_lineChain[i+1]).
+    // dropLineChainTail pops the exact id here instead of re-deriving "the"
+    // segment by matching endpoints, which picks the WRONG line whenever
+    // another line (e.g. a pre-existing polygon edge) already shares those
+    // same two endpoints. Cleared everywhere m_lineChain is.
+    std::vector<int> m_lineChainSegmentIds;
 
     // Snap to grid/points
     glm::vec2 snap(glm::vec2 pos) const;

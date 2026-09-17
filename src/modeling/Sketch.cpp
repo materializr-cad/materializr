@@ -702,6 +702,48 @@ const std::vector<SketchPolygon>& Sketch::getPolygons() const {
 // Element removal
 
 void Sketch::removeElement(int id) {
+    // If `id` already names a live polygon, skip straight to the existing
+    // whole-polygon cascade below and skip the ownership scan entirely. This
+    // is what makes the redirect below provably terminate in one recursion
+    // step: every redirect target is a real m_polygons[i].id, and a call
+    // with that id can never re-enter this branch, regardless of what a
+    // polygon's centerPointId/vertexPointIds/lineIds claims (self-reference
+    // or a cycle between two polygons is normally impossible - ids are
+    // unique and machine-generated - but ProjectIO/addRaw*/CombineSketchesOp
+    // never validate ids on load or merge, so corrupted/merged data can
+    // contain one; without this guard that would stack-overflow instead of
+    // just misbehaving).
+    bool isPolygonId = std::any_of(m_polygons.begin(), m_polygons.end(),
+        [id](const SketchPolygon& p) { return p.id == id; });
+
+    if (!isPolygonId) {
+        // A polygon's vertices and edge lines are generated together
+        // (addPolygon) and its center point can additionally be an existing,
+        // pre-shared point (handlePolygonTool welds onto one via
+        // findCoincidentPoint) - either way SketchPolygon (centerPointId +
+        // radius + sides) has no valid state for "missing one edge/vertex".
+        // Deleting any owned piece by its own id (reachable via ordinary
+        // point/line picking - handleSelectTool has no polygon awareness)
+        // must delete the whole polygon instead, same as clicking any edge
+        // in the Trim tool already does (pickSketchElement's FullDelete
+        // case). A point can be the shared center of MORE THAN ONE polygon -
+        // collect every owner before touching any of them, so a shared point
+        // takes out every polygon that owns it, not just the first found.
+        std::vector<int> owningPolygonIds;
+        for (const auto& p : m_polygons) {
+            bool owned = p.centerPointId == id ||
+                std::find(p.vertexPointIds.begin(), p.vertexPointIds.end(), id) !=
+                    p.vertexPointIds.end() ||
+                std::find(p.lineIds.begin(), p.lineIds.end(), id) !=
+                    p.lineIds.end();
+            if (owned) owningPolygonIds.push_back(p.id);
+        }
+        if (!owningPolygonIds.empty()) {
+            for (int polyId : owningPolygonIds) removeElement(polyId);
+            return;
+        }
+    }
+
     m_lines.erase(
         std::remove_if(m_lines.begin(), m_lines.end(),
             [id](const SketchLine& l) { return l.id == id; }),
@@ -722,6 +764,20 @@ void Sketch::removeElement(int id) {
             [id](const SketchSpline& s) { return s.id == id; }),
         m_splines.end());
 
+    // Deleting a polygon must also remove its own edge lines - the renderer
+    // draws polygon edges purely via drawLines() over m_lines, so a polygon
+    // record erased below with its lines left behind would keep rendering
+    // every edge forever.
+    for (const auto& p : m_polygons) {
+        if (p.id != id) continue;
+        std::unordered_set<int> polyLineIds(p.lineIds.begin(), p.lineIds.end());
+        m_lines.erase(
+            std::remove_if(m_lines.begin(), m_lines.end(),
+                [&polyLineIds](const SketchLine& l) { return polyLineIds.count(l.id) != 0; }),
+            m_lines.end());
+        break;
+    }
+
     m_polygons.erase(
         std::remove_if(m_polygons.begin(), m_polygons.end(),
             [id](const SketchPolygon& p) { return p.id == id; }),
@@ -731,6 +787,40 @@ void Sketch::removeElement(int id) {
         std::remove_if(m_points.begin(), m_points.end(),
             [id](const SketchPoint& p) { return p.id == id; }),
         m_points.end());
+}
+
+void Sketch::removeElements(const std::vector<int>& ids) {
+    // Resolve every polygon touched by ANY id in this batch against the
+    // sketch's state BEFORE deleting anything. A batch selection can contain
+    // more than one piece of the same polygon (two vertices, an edge plus a
+    // vertex, ...) - deleting the first piece's owning polygon (see
+    // removeElement) would make a later piece from the SAME polygon
+    // undetectable as polygon-owned by the time its turn comes, and it would
+    // fall through to plain, unconditional erasure - corrupting any OTHER,
+    // unselected geometry still sharing that point. Resolving the whole
+    // batch up front and skipping ids already covered by a polygon's own
+    // cascade closes that window for any size/order of batch.
+    std::unordered_set<int> polygonOwnedIds;
+    std::vector<int> polygonsToDelete;
+    for (int id : ids) {
+        for (const auto& p : m_polygons) {
+            bool owned = p.centerPointId == id ||
+                std::find(p.vertexPointIds.begin(), p.vertexPointIds.end(), id) !=
+                    p.vertexPointIds.end() ||
+                std::find(p.lineIds.begin(), p.lineIds.end(), id) !=
+                    p.lineIds.end();
+            if (!owned) continue;
+            polygonOwnedIds.insert(id);
+            if (std::find(polygonsToDelete.begin(), polygonsToDelete.end(), p.id) ==
+                polygonsToDelete.end())
+                polygonsToDelete.push_back(p.id);
+        }
+    }
+    for (int polyId : polygonsToDelete) removeElement(polyId);
+    for (int id : ids) {
+        if (polygonOwnedIds.count(id)) continue; // handled via its polygon above
+        removeElement(id);
+    }
 }
 
 int Sketch::pruneOrphanPoints() {

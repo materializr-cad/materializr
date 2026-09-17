@@ -6659,8 +6659,16 @@ void Application::deleteSelectedSketchElements() {
     const auto lns = m_sketchTool->getSelectedLines();
     if (pts.empty() && lns.empty()) return;
     recordSketchMutation([&]{
-        for (int lid : lns) m_activeSketch->removeElement(lid);
-        for (int pid : pts) m_activeSketch->removeElement(pid);
+        // One combined-batch call, not separate per-category loops:
+        // removeElements resolves polygon ownership across the WHOLE
+        // selection against pre-mutation state, so a selection spanning more
+        // than one piece of the same polygon (an edge plus a shared vertex,
+        // two shared vertices, ...) can't have a later id lose its
+        // owning-polygon protection because an earlier id already cascaded
+        // that polygon away.
+        std::vector<int> ids(pts.begin(), pts.end());
+        ids.insert(ids.end(), lns.begin(), lns.end());
+        m_activeSketch->removeElements(ids);
         // Deleting a line leaves its two endpoints behind (they weren't in
         // the selection) - sweep up the now-unreferenced points so no orphan
         // vertices linger.
