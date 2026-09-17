@@ -264,6 +264,7 @@ add_executable(materializr
     src/plugins/ShellPlugin.cpp
     src/plugins/ConstructionPlanePlugin.cpp
     src/plugins/RefImagePlugin.cpp
+    src/plugins/RefMeshPlugin.cpp
     src/plugins/BoundaryFillPlugin.cpp
     src/plugins/PatchPlugin.cpp
     src/plugins/SewPlugin.cpp
@@ -287,6 +288,7 @@ add_executable(materializr
     src/ai/OpenAiCompatibleClient.cpp
     src/ai/AiSessionController.cpp
     src/ai/AiConnectionTest.cpp
+    src/core/Base64.cpp
     src/core/Document.cpp
     src/core/History.cpp
     src/core/SelectionManager.cpp
@@ -369,6 +371,7 @@ add_executable(materializr
     src/viewport/EdgeRenderer.cpp
     src/viewport/PlaneRenderer.cpp
     src/viewport/RefImageRenderer.cpp
+    src/viewport/RefMeshRenderer.cpp
     src/viewport/AxisRenderer.cpp
     src/viewport/BackgroundRenderer.cpp
     src/viewport/Gizmo.cpp
@@ -407,6 +410,7 @@ add_executable(materializr
     src/io/Settings.cpp
     src/io/StepIO.cpp
     src/io/StlIO.cpp
+    src/io/RefMeshImport.cpp
     src/io/MeshDecimate.cpp
     src/io/StlExport.cpp
     src/io/SvgExport.cpp

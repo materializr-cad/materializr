@@ -481,7 +481,10 @@ void Application::wireDocumentConsumers() {
                                m_eventBus.get(), &m_viewport->getCamera(),
                                &m_meshesDirty, &m_inSketchMode,
                                &m_aiSettings,
-                               [this]{ markDirty(); });
+                               [this]{ markDirty(); },
+                               [this](std::vector<uint8_t>& out) {
+                                   return captureViewportPng(out);
+                               });
     // Tell everything that caches DOCUMENT-DERIVED state to rebuild. The
     // setters above only reach consumers Application knows by name; plugins
     // own their render caches in file-local statics this function cannot

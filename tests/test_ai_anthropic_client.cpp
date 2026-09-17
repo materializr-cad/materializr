@@ -68,6 +68,41 @@ TEST(AnthropicClient, BuildRequestBodyGroupsConsecutiveToolResultsIntoOneUserMes
     EXPECT_EQ(toolResultsMsg["content"][1]["tool_use_id"], "call_2");
 }
 
+TEST(AnthropicClient, BuildRequestBodyEmitsImageBlockForAToolResultCarryingAScreenshot) {
+    std::vector<uint8_t> png = {0x89, 'P', 'N', 'G', 0x0d, 0x0a};
+    std::vector<ChatMessage> messages = {
+        {ChatRole::User, "make a box", "", {}},
+        {ChatRole::Assistant, "", "", {{"call_1", "capture_view", {}}}},
+        {ChatRole::ToolResult, "Captured the current view", "call_1", {}, png},
+    };
+    nlohmann::json body = AnthropicClient::buildRequestBody(messages, {}, "claude-sonnet-4-5");
+    const auto& last = body["messages"].back();
+    EXPECT_EQ(last["role"], "user");
+    ASSERT_EQ(last["content"].size(), 1u);
+    const auto& toolResult = last["content"][0];
+    EXPECT_EQ(toolResult["type"], "tool_result");
+    ASSERT_TRUE(toolResult["content"].is_array())
+        << "an image-bearing result must switch content from a plain string to a block array";
+    ASSERT_EQ(toolResult["content"].size(), 2u);
+    EXPECT_EQ(toolResult["content"][0]["type"], "text");
+    EXPECT_EQ(toolResult["content"][0]["text"], "Captured the current view");
+    EXPECT_EQ(toolResult["content"][1]["type"], "image");
+    EXPECT_EQ(toolResult["content"][1]["source"]["type"], "base64");
+    EXPECT_EQ(toolResult["content"][1]["source"]["media_type"], "image/png");
+    EXPECT_FALSE(toolResult["content"][1]["source"]["data"].get<std::string>().empty());
+}
+
+TEST(AnthropicClient, BuildRequestBodyOmitsTheTextBlockWhenAnImageResultHasNoMessage) {
+    std::vector<uint8_t> png = {0x89, 'P', 'N', 'G'};
+    std::vector<ChatMessage> messages = {
+        {ChatRole::ToolResult, "", "call_1", {}, png},
+    };
+    nlohmann::json body = AnthropicClient::buildRequestBody(messages, {}, "claude-sonnet-4-5");
+    const auto& content = body["messages"][0]["content"][0]["content"];
+    ASSERT_EQ(content.size(), 1u);
+    EXPECT_EQ(content[0]["type"], "image");
+}
+
 TEST(AnthropicClient, ParseResponseExtractsFinalTextWhenNoToolUse) {
     nlohmann::json response = {
         {"content", {{{"type", "text"}, {"text", "Done!"}}}},

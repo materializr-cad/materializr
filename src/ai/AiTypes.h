@@ -1,5 +1,6 @@
 #pragma once
 #include <nlohmann/json.hpp>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -21,6 +22,11 @@ struct ChatMessage {
     std::vector<ToolCall> toolCalls; // only meaningful when role == Assistant; empty
                                       // for a plain text reply, non-empty for a
                                       // tool-calling turn
+    // PNG bytes attached to a ToolResult message (e.g. a future screenshot
+    // tool). Empty for every other role and for text-only tool results.
+    // AnthropicClient/OpenAiCompatibleClient each decide how to shape this
+    // into their own wire format - see buildRequestBody in both.
+    std::vector<uint8_t> imagePng;
 };
 
 struct LlmTurnResult {

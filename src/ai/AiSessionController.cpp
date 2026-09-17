@@ -93,7 +93,8 @@ void AiSessionController::poll(materializr::PluginContext& ctx) {
         m_scrollback.push_back({toolResult.ok ? ScrollbackLine::Kind::ToolSummary
                                               : ScrollbackLine::Kind::Error,
                                 "-> " + toolResult.message});
-        m_messages.push_back({ChatRole::ToolResult, toolResult.message, call.id, {}});
+        m_messages.push_back({ChatRole::ToolResult, toolResult.message, call.id, {},
+                              toolResult.imagePng});
         ++m_stepCount;
     }
     if (m_stepCount >= kMaxStepsPerPrompt) {

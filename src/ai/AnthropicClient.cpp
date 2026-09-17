@@ -1,4 +1,5 @@
 #include "AnthropicClient.h"
+#include "../core/Base64.h"
 
 #include <curl/curl.h>
 
@@ -30,9 +31,24 @@ nlohmann::json AnthropicClient::buildRequestBody(const std::vector<ChatMessage>&
     };
     for (const auto& m : messages) {
         if (m.role == ChatRole::ToolResult) {
+            nlohmann::json content;
+            if (m.imagePng.empty()) {
+                // The common case: keep the plain-string shape the API also
+                // accepts, unchanged from before images existed.
+                content = m.text;
+            } else {
+                content = nlohmann::json::array();
+                if (!m.text.empty())
+                    content.push_back({{"type", "text"}, {"text", m.text}});
+                content.push_back({{"type", "image"},
+                                   {"source", {{"type", "base64"},
+                                              {"media_type", "image/png"},
+                                              {"data", base64Encode(m.imagePng.data(),
+                                                                    m.imagePng.size())}}}});
+            }
             pendingToolResults.push_back({{"type", "tool_result"},
                                           {"tool_use_id", m.toolCallId},
-                                          {"content", m.text}});
+                                          {"content", content}});
             continue;
         }
         flushToolResults();

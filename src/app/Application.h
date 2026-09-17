@@ -309,6 +309,16 @@ private:
     // to show (no visible bodies) - the save then simply carries no thumbnail.
     // Main thread only (needs the GL context).
     bool captureProjectThumbnailPNG(std::vector<uint8_t>& pngOut);
+    // Render exactly what the LIVE viewport currently shows - the user's own
+    // camera angle, bodies, edges, and any plugin overlay drawn after bodies
+    // (reference images/planes/axes, the AI Assistant's reference-mesh
+    // overlay) - into an offscreen PNG. Unlike captureProjectThumbnailPNG,
+    // the camera is never touched (no reset/zoom-fit) and there is no
+    // "nothing visible" failure case (an empty scene is still a meaningful
+    // screenshot). Used by the AI Assistant's capture_view tool so the model
+    // can compare its own progress against a loaded reference. Main thread
+    // only (needs the GL context).
+    bool captureViewportPng(std::vector<uint8_t>& pngOut);
     // Landing page: rebuild the tile list from m_recentProjects (peeking each
     // file's embedded thumbnail into a GL texture) and show it. Rendered by
     // renderLandingPage() each frame; actions (new/open/dismiss) are handled

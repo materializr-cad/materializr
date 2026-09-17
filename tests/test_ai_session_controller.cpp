@@ -262,3 +262,34 @@ TEST(AiSessionController, ACappedTurnKeepsHistoryBalancedForTheNextPrompt) {
     EXPECT_EQ(toolResultCount, assistantToolCallCount)
         << "every tool_use id from the capped turn must have a matching ToolResult";
 }
+
+TEST(AiSessionController, ACaptureViewResultCarriesItsImageIntoTheNextTurnsHistory) {
+    // capture_view is the one tool whose ToolResult carries image bytes (see
+    // AiToolDispatcher::captureView) - this is the one path that actually
+    // exercises ToolResult::imagePng -> ChatMessage::imagePng end to end.
+    Document doc;
+    History hist;
+    PluginContext ctx;
+    ctx._bind(&doc, &hist, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, {},
+             [](std::vector<uint8_t>& out) {
+                 out = {0x89, 'P', 'N', 'G'};
+                 return true;
+             });
+
+    auto scripted = std::make_unique<ScriptedClient>(
+        std::vector<LlmTurnResult>{
+            toolCall("call_1", "capture_view", {}),
+            finalText("Looks good so far."),
+        });
+    ScriptedClient* rawClient = scripted.get();
+    AiSessionController sess(std::move(scripted));
+
+    sess.submitPrompt("check your progress");
+    pumpUntilIdle(sess, ctx);
+
+    ASSERT_EQ(rawClient->capturedCalls().size(), 2u);
+    const std::vector<ChatMessage>& secondCall = rawClient->capturedCalls()[1];
+    ASSERT_EQ(secondCall.size(), 3u);
+    EXPECT_EQ(secondCall[2].role, ChatRole::ToolResult);
+    EXPECT_EQ(secondCall[2].imagePng, (std::vector<uint8_t>{0x89, 'P', 'N', 'G'}));
+}

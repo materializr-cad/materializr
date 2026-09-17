@@ -22,6 +22,7 @@ find_package(ZLIB REQUIRED)
 find_package(CURL REQUIRED)
 
 add_library(materializr_core STATIC
+    ${CMAKE_SOURCE_DIR}/src/core/Base64.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Document.cpp
     ${CMAKE_SOURCE_DIR}/src/core/History.cpp
     ${CMAKE_SOURCE_DIR}/src/core/SelectionManager.cpp
@@ -104,6 +105,7 @@ add_library(materializr_core STATIC
     ${CMAKE_SOURCE_DIR}/src/io/DxfImport.cpp
     ${CMAKE_SOURCE_DIR}/src/io/ThreeMfExport.cpp
     ${CMAKE_SOURCE_DIR}/src/io/StlIO.cpp
+    ${CMAKE_SOURCE_DIR}/src/io/RefMeshImport.cpp
     ${CMAKE_SOURCE_DIR}/src/io/MeshDecimate.cpp
     ${CMAKE_SOURCE_DIR}/src/io/ProjectRecovery.cpp
     ${CMAKE_SOURCE_DIR}/src/io/SketchRecovery.cpp
@@ -819,6 +821,14 @@ add_test(NAME test_sketch_dimension COMMAND test_sketch_dimension)
 add_executable(test_project_thumbnail test_project_thumbnail.cpp)
 target_link_libraries(test_project_thumbnail PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_project_thumbnail COMMAND test_project_thumbnail)
+
+add_executable(test_base64 test_base64.cpp)
+target_link_libraries(test_base64 PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_base64 COMMAND test_base64)
+
+add_executable(test_ref_mesh_import test_ref_mesh_import.cpp)
+target_link_libraries(test_ref_mesh_import PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_ref_mesh_import COMMAND test_ref_mesh_import)
 
 # test_settings_sessions - tab-list persistence + the indexed-list SHRINK trap
 # (the writer preserves keys it didn't emit, which resurrected closed tabs).

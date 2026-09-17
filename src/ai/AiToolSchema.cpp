@@ -144,6 +144,12 @@ const std::vector<ToolDef>& allTools() {
                            "open-top container),'-z', or 'none' for a fully closed hollow "
                            "shell. If more than one face on the body points that way, the "
                            "largest one is removed.", false)}},
+        {"capture_view", "Take a screenshot of the current 3D view (whatever camera angle "
+                         "is currently on screen - this does not move the camera) and see "
+                         "it as an image. Use this to check your own progress, e.g. after a "
+                         "few modeling steps, or to compare against a loaded reference mesh "
+                         "before deciding what to do next. Takes no arguments.",
+         {}},
     };
     return kTools;
 }

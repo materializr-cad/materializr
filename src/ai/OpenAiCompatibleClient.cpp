@@ -1,4 +1,5 @@
 #include "OpenAiCompatibleClient.h"
+#include "../core/Base64.h"
 
 #include <curl/curl.h>
 
@@ -25,6 +26,23 @@ nlohmann::json OpenAiCompatibleClient::buildRequestBody(
         if (m.role == ChatRole::ToolResult) {
             msgs.push_back({{"role", "tool"}, {"tool_call_id", m.toolCallId},
                             {"content", m.text}});
+            if (!m.imagePng.empty()) {
+                // OpenAI's "tool" role only accepts string content - a
+                // vision-capable image_url part has to ride in a "user"
+                // message instead. Emitted right after the tool result so it
+                // reads, in order, as "here's what that tool produced."
+                // Synthesized fresh from ChatMessage::imagePng every call
+                // (nothing is stored back into m_messages), so this stays in
+                // sync automatically if history is replayed or truncated.
+                msgs.push_back({{"role", "user"},
+                                {"content", {{{"type", "text"},
+                                              {"text", "[Screenshot from the tool call above]"}},
+                                             {{"type", "image_url"},
+                                              {"image_url",
+                                               {{"url", "data:image/png;base64," +
+                                                        base64Encode(m.imagePng.data(),
+                                                                     m.imagePng.size())}}}}}}});
+            }
         } else if (m.role == ChatRole::Assistant && !m.toolCalls.empty()) {
             nlohmann::json toolCalls = nlohmann::json::array();
             for (const auto& c : m.toolCalls)

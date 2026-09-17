@@ -28,6 +28,45 @@ TEST(OpenAiCompatibleClient, BuildRequestBodyMapsToolResultToARealToolRole) {
     EXPECT_EQ(last["content"], "Created body 1");
 }
 
+TEST(OpenAiCompatibleClient, BuildRequestBodyFollowsAnImageResultWithASyntheticUserImageMessage) {
+    // OpenAI's "tool" role only accepts string content - no vision provider
+    // in this family accepts an image_url part there - so a screenshot rides
+    // in a synthetic "user" message appended right after the tool result.
+    std::vector<uint8_t> png = {0x89, 'P', 'N', 'G', 0x0d, 0x0a};
+    std::vector<ChatMessage> messages = {
+        {ChatRole::ToolResult, "Captured the current view", "call_1", {}, png},
+    };
+    nlohmann::json body = OpenAiCompatibleClient::buildRequestBody(messages, {}, "gpt-4o");
+    ASSERT_EQ(body["messages"].size(), 2u);
+
+    const auto& toolMsg = body["messages"][0];
+    EXPECT_EQ(toolMsg["role"], "tool");
+    EXPECT_TRUE(toolMsg["content"].is_string())
+        << "the tool-role message itself must stay plain text";
+    EXPECT_EQ(toolMsg["content"], "Captured the current view");
+
+    const auto& imageMsg = body["messages"][1];
+    EXPECT_EQ(imageMsg["role"], "user");
+    ASSERT_TRUE(imageMsg["content"].is_array());
+    bool sawImage = false;
+    for (const auto& part : imageMsg["content"]) {
+        if (part["type"] == "image_url") {
+            sawImage = true;
+            std::string url = part["image_url"]["url"].get<std::string>();
+            EXPECT_EQ(url.rfind("data:image/png;base64,", 0), 0u);
+        }
+    }
+    EXPECT_TRUE(sawImage);
+}
+
+TEST(OpenAiCompatibleClient, BuildRequestBodyAddsNoExtraMessageWhenAToolResultHasNoImage) {
+    std::vector<ChatMessage> messages = {
+        {ChatRole::ToolResult, "Created body 1", "call_abc", {}},
+    };
+    nlohmann::json body = OpenAiCompatibleClient::buildRequestBody(messages, {}, "gpt-4o");
+    EXPECT_EQ(body["messages"].size(), 1u);
+}
+
 TEST(OpenAiCompatibleClient, BuildRequestBodyEmitsAssistantToolCallsArray) {
     std::vector<ChatMessage> messages = {
         {ChatRole::Assistant, "", "",

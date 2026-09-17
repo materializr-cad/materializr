@@ -658,6 +658,21 @@ ToolResult shellBody(PluginContext& ctx, const nlohmann::json& args) {
                   (openFace == "none" ? " (fully closed)" : (", open on " + openFace))};
 }
 
+// The only read-only tool: no arguments, no Document/History mutation. The
+// image rides in ToolResult::imagePng - AiSessionController carries it into
+// a ChatMessage, and each LLM client shapes it into its own wire format (see
+// AnthropicClient/OpenAiCompatibleClient buildRequestBody).
+ToolResult captureView(PluginContext& ctx) {
+    std::vector<uint8_t> png;
+    if (!ctx.captureViewportPng(png) || png.empty())
+        return {false, "failed to capture the viewport"};
+    ToolResult result;
+    result.ok = true;
+    result.message = "Captured the current view";
+    result.imagePng = std::move(png);
+    return result;
+}
+
 } // namespace
 
 ToolResult executeTool(PluginContext& ctx, const std::string& toolName,
@@ -679,6 +694,7 @@ ToolResult executeTool(PluginContext& ctx, const std::string& toolName,
     if (toolName == "push_pull_face") return pushPullFace(ctx, args);
     if (toolName == "extrude_rect") return extrudeRect(ctx, args);
     if (toolName == "extrude_circle") return extrudeCircle(ctx, args);
+    if (toolName == "capture_view") return captureView(ctx);
     return {false, "unknown tool '" + toolName + "'"};
 }
 

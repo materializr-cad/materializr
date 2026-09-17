@@ -629,3 +629,31 @@ TEST(AiToolDispatcher, ShellBodyRejectsANonPositiveThickness) {
     ToolResult r = executeTool(ctx, "shell_body", {{"body_id", id}, {"thickness", 0.0}});
     EXPECT_FALSE(r.ok);
 }
+
+TEST(AiToolDispatcher, CaptureViewFailsCleanlyWithNoCaptureCallbackBound) {
+    // makeCtx() leaves the capture callback unset - the shape a real
+    // Application always binds one, but a dispatcher call before that (or a
+    // future headless caller) must fail cleanly, not crash.
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+
+    ToolResult r = executeTool(ctx, "capture_view", {});
+    EXPECT_FALSE(r.ok);
+    EXPECT_TRUE(r.imagePng.empty());
+}
+
+TEST(AiToolDispatcher, CaptureViewReturnsTheImageBytesFromTheBoundCallback) {
+    Document doc;
+    History hist;
+    PluginContext ctx;
+    ctx._bind(&doc, &hist, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, {},
+             [](std::vector<uint8_t>& out) {
+                 out = {0x89, 'P', 'N', 'G'};
+                 return true;
+             });
+
+    ToolResult r = executeTool(ctx, "capture_view", {});
+    ASSERT_TRUE(r.ok) << r.message;
+    EXPECT_EQ(r.imagePng, (std::vector<uint8_t>{0x89, 'P', 'N', 'G'}));
+}
