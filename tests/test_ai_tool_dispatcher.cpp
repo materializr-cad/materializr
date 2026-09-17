@@ -354,6 +354,95 @@ TEST(AiToolDispatcher, ChamferAllEdgesRejectsANonPositiveDistance) {
     EXPECT_FALSE(r.ok);
 }
 
+TEST(AiToolDispatcher, FilletEdgeRoundsOnlyTheNearestEdge) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ASSERT_TRUE(executeTool(ctx, "add_box",
+        {{"width", 20.0}, {"height", 20.0}, {"depth", 20.0}}).ok);
+    int id = doc.getAllBodyIds().front();
+    const double v0 = volumeOf(doc, id);
+    const int f0 = faceCountOf(doc, id);
+
+    // A point near one corner - the top-front-right vertical edge, in the
+    // same user X/Y/Z convention add_box uses.
+    ToolResult r = executeTool(ctx, "fillet_edge",
+        {{"body_id", id}, {"radius", 2.0}, {"x", 20.0}, {"y", 20.0}, {"z", 10.0}});
+    ASSERT_TRUE(r.ok) << r.message;
+    EXPECT_LT(volumeOf(doc, id), v0) << "rounding an edge must remove some material";
+    EXPECT_EQ(faceCountOf(doc, id), f0 + 1)
+        << "exactly one edge rounded should add exactly one blend face";
+}
+
+TEST(AiToolDispatcher, FilletEdgeRoundsALessVolumeThanFilletAllEdges) {
+    // Same box, same radius: one edge should remove much less material than
+    // all twelve - a cheap sanity check that only one edge was actually
+    // touched, not silently all of them.
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ASSERT_TRUE(executeTool(ctx, "add_box",
+        {{"width", 20.0}, {"height", 20.0}, {"depth", 20.0}}).ok);
+    int oneEdgeId = doc.getAllBodyIds().front();
+    const double v0 = volumeOf(doc, oneEdgeId);
+    ASSERT_TRUE(executeTool(ctx, "fillet_edge",
+        {{"body_id", oneEdgeId}, {"radius", 2.0}, {"x", 20.0}, {"y", 20.0}, {"z", 10.0}}).ok);
+    const double removedByOne = v0 - volumeOf(doc, oneEdgeId);
+
+    ASSERT_TRUE(executeTool(ctx, "add_box",
+        {{"width", 20.0}, {"height", 20.0}, {"depth", 20.0}, {"x", 50.0}}).ok);
+    int allEdgesId = doc.getAllBodyIds().back();
+    ASSERT_TRUE(executeTool(ctx, "fillet_all_edges",
+        {{"body_id", allEdgesId}, {"radius", 2.0}}).ok);
+    const double removedByAll = v0 - volumeOf(doc, allEdgesId);
+
+    EXPECT_LT(removedByOne, removedByAll * 0.5);
+}
+
+TEST(AiToolDispatcher, FilletEdgeRejectsANonPositiveRadius) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ASSERT_TRUE(executeTool(ctx, "add_box",
+        {{"width", 10.0}, {"height", 10.0}, {"depth", 10.0}}).ok);
+    int id = doc.getAllBodyIds().front();
+
+    ToolResult r = executeTool(ctx, "fillet_edge",
+        {{"body_id", id}, {"radius", 0.0}, {"x", 0.0}, {"y", 0.0}, {"z", 0.0}});
+    EXPECT_FALSE(r.ok);
+}
+
+TEST(AiToolDispatcher, ChamferEdgeBevelsOnlyTheNearestEdge) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ASSERT_TRUE(executeTool(ctx, "add_box",
+        {{"width", 20.0}, {"height", 20.0}, {"depth", 20.0}}).ok);
+    int id = doc.getAllBodyIds().front();
+    const double v0 = volumeOf(doc, id);
+    const int f0 = faceCountOf(doc, id);
+
+    ToolResult r = executeTool(ctx, "chamfer_edge",
+        {{"body_id", id}, {"distance", 2.0}, {"x", 20.0}, {"y", 20.0}, {"z", 10.0}});
+    ASSERT_TRUE(r.ok) << r.message;
+    EXPECT_LT(volumeOf(doc, id), v0) << "bevelling an edge must remove some material";
+    EXPECT_EQ(faceCountOf(doc, id), f0 + 1)
+        << "exactly one edge chamfered should add exactly one bevel face";
+}
+
+TEST(AiToolDispatcher, ChamferEdgeRejectsANonPositiveDistance) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ASSERT_TRUE(executeTool(ctx, "add_box",
+        {{"width", 10.0}, {"height", 10.0}, {"depth", 10.0}}).ok);
+    int id = doc.getAllBodyIds().front();
+
+    ToolResult r = executeTool(ctx, "chamfer_edge",
+        {{"body_id", id}, {"distance", -1.0}, {"x", 0.0}, {"y", 0.0}, {"z", 0.0}});
+    EXPECT_FALSE(r.ok);
+}
+
 TEST(AiToolDispatcher, ShellBodyWithNoOpenFaceHollowsOutMostOfTheVolume) {
     Document doc;
     History hist;

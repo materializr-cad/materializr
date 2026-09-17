@@ -11,7 +11,8 @@ TEST(AiToolSchema, AllToolsContainsExactlyTheExpectedTools) {
     std::vector<std::string> expected = {
         "add_box", "add_cylinder", "add_sphere", "add_cone", "add_torus",
         "move_body", "rotate_body", "scale_body", "boolean_op",
-        "fillet_all_edges", "chamfer_all_edges", "shell_body"};
+        "fillet_all_edges", "chamfer_all_edges", "fillet_edge", "chamfer_edge",
+        "shell_body"};
     EXPECT_EQ(names, expected);
 }
 
@@ -65,4 +66,18 @@ TEST(AiToolSchema, ShellBodyOpenFaceParamIsOptional) {
         return;
     }
     FAIL() << "shell_body tool not found";
+}
+
+TEST(AiToolSchema, FilletEdgePositionParamsAreRequired) {
+    for (const auto& t : allTools()) {
+        if (t.name != "fillet_edge") continue;
+        for (const char* key : {"x", "y", "z"}) {
+            bool found = false;
+            for (const auto& p : t.params)
+                if (p.name == key) { found = true; EXPECT_TRUE(p.required) << key; }
+            EXPECT_TRUE(found) << key;
+        }
+        return;
+    }
+    FAIL() << "fillet_edge tool not found";
 }

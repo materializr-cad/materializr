@@ -11,11 +11,15 @@
 
 #include <BRepGProp.hxx>
 #include <BRepGProp_Face.hxx>
+#include <BRep_Tool.hxx>
 #include <GProp_GProps.hxx>
+#include <Geom_Curve.hxx>
+#include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Edge.hxx>
 #include <TopoDS_Face.hxx>
+#include <TopoDS_Vertex.hxx>
 #include <gp_Dir.hxx>
 #include <gp_Pnt.hxx>
 #include <gp_Vec.hxx>
@@ -338,6 +342,97 @@ gp_Dir userDirToWorld(double ux, double uy, double uz) {
     return gp_Dir(ux, uz, uy);
 }
 
+// Same remap as userDirToWorld, for a POSITION rather than a direction -
+// used by fillet_edge/chamfer_edge to turn the model's "approximately here"
+// point into world space before searching for the nearest edge.
+gp_Pnt userPntToWorld(double ux, double uy, double uz) {
+    return gp_Pnt(ux, uz, uy);
+}
+
+// The curve's own parametric midpoint - not the endpoint average, which
+// collapses a closed/periodic edge (a full circular rim, one vertex used at
+// both ends) down to that single vertex instead of a point representative of
+// the whole edge. Falls back to the endpoint average only for the rare edge
+// with no 3D curve at all.
+gp_Pnt edgeMidpoint(const TopoDS_Edge& e) {
+    double f, l;
+    Handle(Geom_Curve) c = BRep_Tool::Curve(e, f, l);
+    if (!c.IsNull()) return c->Value(0.5 * (f + l));
+    TopoDS_Vertex v1, v2;
+    TopExp::Vertices(e, v1, v2);
+    if (v1.IsNull() || v2.IsNull()) return gp_Pnt();
+    return gp_Pnt(0.5 * (BRep_Tool::Pnt(v1).XYZ() + BRep_Tool::Pnt(v2).XYZ()));
+}
+
+// The edge whose midpoint is closest to `target` - how fillet_edge/
+// chamfer_edge pick ONE edge out of a body without needing a "list edges"
+// companion tool: the model gives an approximate world position (which it
+// usually already knows, having just specified the body's own dimensions),
+// the same way a person would click near the edge they mean.
+TopoDS_Edge nearestEdge(const TopoDS_Shape& body, const gp_Pnt& target) {
+    TopoDS_Edge best;
+    double bestD2 = std::numeric_limits<double>::max();
+    for (TopExp_Explorer ex(body, TopAbs_EDGE); ex.More(); ex.Next()) {
+        const TopoDS_Edge e = TopoDS::Edge(ex.Current());
+        if (BRep_Tool::Degenerated(e)) continue;
+        const double d2 = target.SquareDistance(edgeMidpoint(e));
+        if (d2 < bestD2) { bestD2 = d2; best = e; }
+    }
+    return best;
+}
+
+ToolResult filletEdge(PluginContext& ctx, const nlohmann::json& args) {
+    std::string err;
+    int bodyId;
+    double radius, ux, uy, uz;
+    if (!requireBodyId(ctx.document(), args, "body_id", bodyId, err) ||
+        !requirePositive(args, "radius", radius, err) ||
+        !requireNumber(args, "x", ux, err) ||
+        !requireNumber(args, "y", uy, err) ||
+        !requireNumber(args, "z", uz, err))
+        return {false, err};
+    const TopoDS_Shape& body = ctx.document().getBody(bodyId);
+    const TopoDS_Edge edge = nearestEdge(body, userPntToWorld(ux, uy, uz));
+    if (edge.IsNull()) return {false, "body " + std::to_string(bodyId) + " has no edges"};
+    auto op = std::make_unique<FilletOp>();
+    op->setBody(bodyId);
+    op->setEdges({edge});
+    op->setRadius(radius);
+    if (!ctx.history().pushOperation(std::move(op), ctx.document()))
+        return {false, "fillet failed - the radius is likely too large for this edge "
+                       "or its neighbouring faces; try a smaller radius"};
+    ctx.markMeshesDirty();
+    return {true, "Filleted the edge of body " + std::to_string(bodyId) +
+                  " nearest (" + std::to_string(ux) + ", " + std::to_string(uy) + ", " +
+                  std::to_string(uz) + ") at radius " + std::to_string(radius) + "mm"};
+}
+
+ToolResult chamferEdge(PluginContext& ctx, const nlohmann::json& args) {
+    std::string err;
+    int bodyId;
+    double distance, ux, uy, uz;
+    if (!requireBodyId(ctx.document(), args, "body_id", bodyId, err) ||
+        !requirePositive(args, "distance", distance, err) ||
+        !requireNumber(args, "x", ux, err) ||
+        !requireNumber(args, "y", uy, err) ||
+        !requireNumber(args, "z", uz, err))
+        return {false, err};
+    const TopoDS_Shape& body = ctx.document().getBody(bodyId);
+    const TopoDS_Edge edge = nearestEdge(body, userPntToWorld(ux, uy, uz));
+    if (edge.IsNull()) return {false, "body " + std::to_string(bodyId) + " has no edges"};
+    auto op = std::make_unique<ChamferOp>();
+    op->setBody(bodyId);
+    op->setEdges({edge});
+    op->setDistance(distance);
+    if (!ctx.history().pushOperation(std::move(op), ctx.document()))
+        return {false, "chamfer failed - the distance is likely too large for this "
+                       "edge or its neighbouring faces; try a smaller distance"};
+    ctx.markMeshesDirty();
+    return {true, "Chamfered the edge of body " + std::to_string(bodyId) +
+                  " nearest (" + std::to_string(ux) + ", " + std::to_string(uy) + ", " +
+                  std::to_string(uz) + ") at distance " + std::to_string(distance) + "mm"};
+}
+
 ToolResult shellBody(PluginContext& ctx, const nlohmann::json& args) {
     std::string err;
     int bodyId;
@@ -397,6 +492,8 @@ ToolResult executeTool(PluginContext& ctx, const std::string& toolName,
     if (toolName == "boolean_op") return booleanOp(ctx, args);
     if (toolName == "fillet_all_edges") return filletAllEdges(ctx, args);
     if (toolName == "chamfer_all_edges") return chamferAllEdges(ctx, args);
+    if (toolName == "fillet_edge") return filletEdge(ctx, args);
+    if (toolName == "chamfer_edge") return chamferEdge(ctx, args);
     if (toolName == "shell_body") return shellBody(ctx, args);
     return {false, "unknown tool '" + toolName + "'"};
 }

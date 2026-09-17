@@ -62,6 +62,26 @@ const std::vector<ToolDef>& allTools() {
         {"chamfer_all_edges", "Bevel every edge of a body by a constant distance.",
          {num("body_id", "The id of the body to chamfer."),
           num("distance", "Chamfer distance in mm, measured along each adjoining face.")}},
+        {"fillet_edge", "Round a SINGLE edge of a body - whichever one is nearest the "
+                        "given point - with a constant radius. For a whole-body round, "
+                        "use fillet_all_edges instead.",
+         {num("body_id", "The id of the body to fillet."),
+          num("radius", "Fillet radius in mm."),
+          num("x", "Approximate X position near the edge to fillet, in mm - same "
+                   "X/Y/Z convention as add_box (Z is up, Y is depth). Doesn't need to "
+                   "be exact, just closer to the intended edge than to any other."),
+          num("y", "Approximate Y position near the edge, in mm."),
+          num("z", "Approximate Z position near the edge, in mm.")}},
+        {"chamfer_edge", "Bevel a SINGLE edge of a body - whichever one is nearest the "
+                         "given point - by a constant distance. For a whole-body bevel, "
+                         "use chamfer_all_edges instead.",
+         {num("body_id", "The id of the body to chamfer."),
+          num("distance", "Chamfer distance in mm, measured along each adjoining face."),
+          num("x", "Approximate X position near the edge to chamfer, in mm - same "
+                   "X/Y/Z convention as add_box (Z is up, Y is depth). Doesn't need to "
+                   "be exact, just closer to the intended edge than to any other."),
+          num("y", "Approximate Y position near the edge, in mm."),
+          num("z", "Approximate Z position near the edge, in mm.")}},
         {"shell_body", "Hollow out a body to a constant wall thickness, optionally "
                        "leaving one face open so the inside is reachable.",
          {num("body_id", "The id of the body to shell."),
