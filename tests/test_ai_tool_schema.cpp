@@ -13,7 +13,7 @@ TEST(AiToolSchema, AllToolsContainsExactlyTheExpectedTools) {
         "move_body", "rotate_body", "scale_body", "boolean_op",
         "fillet_all_edges", "chamfer_all_edges", "fillet_edge", "chamfer_edge",
         "push_pull_face", "extrude_rect", "extrude_circle", "shell_body",
-        "capture_view"};
+        "capture_view", "list_bodies"};
     EXPECT_EQ(names, expected);
 }
 

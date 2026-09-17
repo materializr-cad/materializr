@@ -657,3 +657,48 @@ TEST(AiToolDispatcher, CaptureViewReturnsTheImageBytesFromTheBoundCallback) {
     ASSERT_TRUE(r.ok) << r.message;
     EXPECT_EQ(r.imagePng, (std::vector<uint8_t>{0x89, 'P', 'N', 'G'}));
 }
+
+TEST(AiToolDispatcher, ListBodiesReportsAnEmptyDocumentCleanly) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+
+    ToolResult r = executeTool(ctx, "list_bodies", {});
+    ASSERT_TRUE(r.ok);
+    EXPECT_NE(r.message.find("No bodies"), std::string::npos);
+}
+
+TEST(AiToolDispatcher, ListBodiesReportsIdNameAndPositionForEachBody) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ASSERT_TRUE(executeTool(ctx, "add_box",
+        {{"width", 10.0}, {"height", 20.0}, {"depth", 30.0},
+         {"x", 5.0}, {"y", 6.0}, {"z", 7.0}}).ok);
+    int id = doc.getAllBodyIds().front();
+    doc.setBodyName(id, "fuselage");
+
+    ToolResult r = executeTool(ctx, "list_bodies", {});
+    ASSERT_TRUE(r.ok);
+    EXPECT_NE(r.message.find("id " + std::to_string(id)), std::string::npos);
+    EXPECT_NE(r.message.find("\"fuselage\""), std::string::npos);
+    // add_box's x/y/z is the corner, not the center - the reported centre
+    // must reflect that (corner + half the extent along the matching axis),
+    // not just echo the box's own creation args back unchanged.
+    EXPECT_NE(r.message.find("x=10.0"), std::string::npos)
+        << r.message; // 5 (corner) + 10/2 (half width)
+}
+
+TEST(AiToolDispatcher, ListBodiesReportsMultipleBodies) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ASSERT_TRUE(executeTool(ctx, "add_box",
+        {{"width", 10.0}, {"height", 10.0}, {"depth", 10.0}}).ok);
+    ASSERT_TRUE(executeTool(ctx, "add_sphere", {{"radius", 5.0}}).ok);
+
+    ToolResult r = executeTool(ctx, "list_bodies", {});
+    ASSERT_TRUE(r.ok);
+    for (int id : doc.getAllBodyIds())
+        EXPECT_NE(r.message.find("id " + std::to_string(id)), std::string::npos);
+}

@@ -150,6 +150,14 @@ const std::vector<ToolDef>& allTools() {
                          "few modeling steps, or to compare against a loaded reference mesh "
                          "before deciding what to do next. Takes no arguments.",
          {}},
+        {"list_bodies", "List every body already in the document, with its id, name, "
+                        "position, and size. ALWAYS call this before editing, moving, "
+                        "combining with, or otherwise targeting something that isn't a "
+                        "body you just created yourself in this conversation - body_id/"
+                        "target_body_id arguments elsewhere only work with a real id from "
+                        "here (or from a body you created earlier in this chat). Takes no "
+                        "arguments.",
+         {}},
     };
     return kTools;
 }

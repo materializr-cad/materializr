@@ -14,9 +14,11 @@
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakeWire.hxx>
+#include <BRepBndLib.hxx>
 #include <BRepGProp.hxx>
 #include <BRepGProp_Face.hxx>
 #include <BRep_Tool.hxx>
+#include <Bnd_Box.hxx>
 #include <GProp_GProps.hxx>
 #include <Geom_Circle.hxx>
 #include <Geom_Curve.hxx>
@@ -35,6 +37,7 @@
 #include <gp_Vec.hxx>
 
 #include <cmath>
+#include <cstdio>
 #include <limits>
 
 #ifndef M_PI
@@ -359,6 +362,15 @@ gp_Pnt userPntToWorld(double ux, double uy, double uz) {
     return gp_Pnt(ux, uz, uy);
 }
 
+// Inverse of userPntToWorld (the remap is its own inverse: swap Y/Z back).
+// Used by list_bodies to report existing geometry's position back to the
+// model in the same convention every tool's x/y/z arguments already use.
+void worldPntToUser(const gp_Pnt& w, double& ux, double& uy, double& uz) {
+    ux = w.X();
+    uy = w.Z();
+    uz = w.Y();
+}
+
 // The curve's own parametric midpoint - not the endpoint average, which
 // collapses a closed/periodic edge (a full circular rim, one vertex used at
 // both ends) down to that single vertex instead of a point representative of
@@ -658,6 +670,48 @@ ToolResult shellBody(PluginContext& ctx, const nlohmann::json& args) {
                   (openFace == "none" ? " (fully closed)" : (", open on " + openFace))};
 }
 
+// Read-only, no arguments. Without this the model has no way to discover
+// what already exists in the document - every other tool that targets a
+// body (move_body, boolean_op, push_pull_face, fillet_edge, shell_body, ...)
+// needs a numeric body_id/target_body_id, and the model can otherwise only
+// know one by having created it itself earlier in THIS conversation. Asked
+// to edit something that predates the chat (or that another tool call made
+// without the model noticing the id), it had no way to find it - the
+// reported real-world symptom this tool exists to fix.
+ToolResult listBodies(PluginContext& ctx) {
+    Document& doc = ctx.document();
+    std::vector<int> ids = doc.getAllBodyIds();
+    if (ids.empty()) return {true, "No bodies in the document yet."};
+
+    std::string msg = "Bodies in the document (x/y/z in the usual "
+                      "X=width/Y=depth/Z=up convention):\n";
+    for (int id : ids) {
+        const TopoDS_Shape& shape = doc.getBody(id);
+        Bnd_Box box;
+        try {
+            if (!shape.IsNull()) BRepBndLib::Add(shape, box);
+        } catch (...) { continue; }
+        if (box.IsVoid()) continue;
+        double x0, y0, z0, x1, y1, z1;
+        box.Get(x0, y0, z0, x1, y1, z1);
+        double cx, cy, cz;
+        worldPntToUser(gp_Pnt((x0 + x1) / 2.0, (y0 + y1) / 2.0, (z0 + z1) / 2.0), cx, cy, cz);
+        // Extent doesn't need the axis remap - it's a size, not a position -
+        // but the LABELS still have to follow the same user convention so
+        // "width" really means the X extent, not whichever axis OCCT's X
+        // happened to land on.
+        char line[320];
+        std::snprintf(line, sizeof(line),
+            "  id %d \"%s\": centered at (x=%.1f, y=%.1f, z=%.1f)mm, "
+            "size (width=%.1f, depth=%.1f, height=%.1f)mm%s\n",
+            id, doc.getBodyName(id).c_str(), cx, cy, cz,
+            x1 - x0, z1 - z0, y1 - y0,
+            doc.isBodyVisible(id) ? "" : " [hidden]");
+        msg += line;
+    }
+    return {true, msg};
+}
+
 // The only read-only tool: no arguments, no Document/History mutation. The
 // image rides in ToolResult::imagePng - AiSessionController carries it into
 // a ChatMessage, and each LLM client shapes it into its own wire format (see
@@ -695,6 +749,7 @@ ToolResult executeTool(PluginContext& ctx, const std::string& toolName,
     if (toolName == "extrude_rect") return extrudeRect(ctx, args);
     if (toolName == "extrude_circle") return extrudeCircle(ctx, args);
     if (toolName == "capture_view") return captureView(ctx);
+    if (toolName == "list_bodies") return listBodies(ctx);
     return {false, "unknown tool '" + toolName + "'"};
 }
 
