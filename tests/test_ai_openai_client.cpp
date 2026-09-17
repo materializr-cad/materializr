@@ -16,6 +16,16 @@ TEST(OpenAiCompatibleClient, BuildRequestBodyIncludesModelMessagesAndTools) {
     EXPECT_EQ(body["tools"].size(), allTools().size());
 }
 
+TEST(OpenAiCompatibleClient, BuildRequestBodySetsAMaxTokensCap) {
+    // A local model with no stop condition can otherwise ramble toward its
+    // full context window instead of failing fast - see the 2026-09-17
+    // comment in buildRequestBody.
+    std::vector<ChatMessage> messages = {{ChatRole::User, "make a box", "", {}}};
+    nlohmann::json body = OpenAiCompatibleClient::buildRequestBody(messages, {}, "gpt-4o");
+    ASSERT_TRUE(body.contains("max_tokens"));
+    EXPECT_GT(body["max_tokens"].get<int>(), 0);
+}
+
 TEST(OpenAiCompatibleClient, BuildRequestBodyMapsToolResultToARealToolRole) {
     // Unlike Anthropic, OpenAI's shape HAS a dedicated "tool" role.
     std::vector<ChatMessage> messages = {

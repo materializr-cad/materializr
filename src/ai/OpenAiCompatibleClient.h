@@ -11,7 +11,8 @@ public:
           m_model(std::move(model)) {}
 
     LlmTurnResult sendTurn(const std::vector<ChatMessage>& messages,
-                          const std::vector<ToolDef>& tools) override;
+                          const std::vector<ToolDef>& tools,
+                          const std::atomic<bool>* cancelFlag) override;
 
     static nlohmann::json buildRequestBody(const std::vector<ChatMessage>& messages,
                                            const std::vector<ToolDef>& tools,

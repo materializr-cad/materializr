@@ -17,15 +17,37 @@ void AiSessionController::submitPrompt(const std::string& userText) {
 }
 
 void AiSessionController::startTurn() {
-    // Captured by value: m_client is a pointer the lambda doesn't own the
-    // lifetime of, but AiSessionController outlives every turn it starts
-    // (poll() always completes a turn before the next submitPrompt can
-    // start another - see the isBusy() guard above).
+    // Captured by value/raw pointer: m_client and &m_cancelRequested outlive
+    // every turn they're used in - AiSessionController never rebuilds/
+    // destroys itself while a turn is in flight (poll() always completes one
+    // before the next submitPrompt can start another - see the isBusy()
+    // guard above; the chat overlay's sessionFor() has the matching
+    // "never rebuild while busy" rule on its side).
+    m_cancelRequested = false;
+    m_turnStartedAt = std::chrono::steady_clock::now();
     LlmClient* client = m_client.get();
+    const std::atomic<bool>* cancelFlag = &m_cancelRequested;
     std::vector<ChatMessage> messagesCopy = m_messages;
-    m_future = std::async(std::launch::async, [client, messagesCopy]() {
-        return client->sendTurn(messagesCopy, allTools());
+    m_future = std::async(std::launch::async, [client, messagesCopy, cancelFlag]() {
+        return client->sendTurn(messagesCopy, allTools(), cancelFlag);
     });
+}
+
+void AiSessionController::cancel() {
+    if (isBusy()) m_cancelRequested = true;
+}
+
+double AiSessionController::elapsedSeconds() const {
+    if (!isBusy()) return 0.0;
+    return std::chrono::duration<double>(
+        std::chrono::steady_clock::now() - m_turnStartedAt).count();
+}
+
+void AiSessionController::clear() {
+    if (isBusy()) return;
+    m_messages.clear();
+    m_scrollback.clear();
+    m_stepCount = 0;
 }
 
 void AiSessionController::poll(materializr::PluginContext& ctx) {
@@ -42,7 +64,11 @@ void AiSessionController::poll(materializr::PluginContext& ctx) {
     }
 
     if (!result.ok) {
-        m_scrollback.push_back({ScrollbackLine::Kind::Error,
+        // A deliberate cancel() isn't a failure - don't red-flag it as one.
+        m_scrollback.push_back(
+            result.error == "Cancelled"
+                ? ScrollbackLine{ScrollbackLine::Kind::ToolSummary, "Cancelled."}
+                : ScrollbackLine{ScrollbackLine::Kind::Error,
                                 "AI request failed: " + result.error});
         return;
     }

@@ -14,6 +14,15 @@ size_t writeToString(void* contents, size_t size, size_t nmemb, void* userp) {
     out->append(static_cast<char*>(contents), total);
     return total;
 }
+// curl calls this roughly once a second throughout the request (connect,
+// send, and the whole time it's waiting on the response) - returning
+// non-zero aborts the transfer immediately with CURLE_ABORTED_BY_CALLBACK,
+// which is how AiSessionController::cancel() actually stops an in-flight
+// request instead of just abandoning it to finish in the background.
+int xferAbortIfCancelled(void* clientp, curl_off_t, curl_off_t, curl_off_t, curl_off_t) {
+    const auto* cancelFlag = static_cast<const std::atomic<bool>*>(clientp);
+    return (cancelFlag && cancelFlag->load()) ? 1 : 0;
+}
 } // namespace
 
 nlohmann::json AnthropicClient::buildRequestBody(const std::vector<ChatMessage>& messages,
@@ -119,7 +128,8 @@ LlmTurnResult AnthropicClient::parseResponseFromRawBody(const std::string& rawBo
 }
 
 LlmTurnResult AnthropicClient::sendTurn(const std::vector<ChatMessage>& messages,
-                                       const std::vector<ToolDef>& tools) {
+                                       const std::vector<ToolDef>& tools,
+                                       const std::atomic<bool>* cancelFlag) {
     nlohmann::json requestBody = buildRequestBody(messages, tools, m_model);
     std::string requestStr = requestBody.dump();
 
@@ -148,10 +158,17 @@ LlmTurnResult AnthropicClient::sendTurn(const std::vector<ChatMessage>& messages
     curl_easy_setopt(curl, CURLOPT_PROTOCOLS, CURLPROTO_HTTPS);
     curl_easy_setopt(curl, CURLOPT_REDIR_PROTOCOLS, CURLPROTO_HTTPS);
 #endif
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 20L);
+    // A generous outer safety net, not the primary control anymore - now
+    // that cancelFlag/xferAbortIfCancelled exists, the user's Cancel button
+    // is how a slow-but-alive request actually gets stopped. This only
+    // guards against curl itself wedging.
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 600L);
     curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeToString);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &responseBody);
+    curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+    curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, xferAbortIfCancelled);
+    curl_easy_setopt(curl, CURLOPT_XFERINFODATA, cancelFlag);
 
     CURLcode code = curl_easy_perform(curl);
     long httpStatus = 0;
@@ -162,7 +179,8 @@ LlmTurnResult AnthropicClient::sendTurn(const std::vector<ChatMessage>& messages
     if (code != CURLE_OK) {
         LlmTurnResult r;
         r.ok = false;
-        r.error = curl_easy_strerror(code);
+        r.error = (code == CURLE_ABORTED_BY_CALLBACK) ? "Cancelled"
+                                                       : curl_easy_strerror(code);
         return r;
     }
     try {

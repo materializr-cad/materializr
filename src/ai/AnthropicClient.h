@@ -10,7 +10,8 @@ public:
         : m_apiKey(std::move(apiKey)), m_model(std::move(model)) {}
 
     LlmTurnResult sendTurn(const std::vector<ChatMessage>& messages,
-                          const std::vector<ToolDef>& tools) override;
+                          const std::vector<ToolDef>& tools,
+                          const std::atomic<bool>* cancelFlag) override;
 
     // Pure, network-free - directly unit-testable.
     static nlohmann::json buildRequestBody(const std::vector<ChatMessage>& messages,

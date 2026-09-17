@@ -14,6 +14,14 @@ size_t writeToString(void* contents, size_t size, size_t nmemb, void* userp) {
     out->append(static_cast<char*>(contents), total);
     return total;
 }
+// See AnthropicClient's identical callback - curl polls this roughly once a
+// second for the whole request (including a local server's cold model
+// load), and a non-zero return aborts it right away with
+// CURLE_ABORTED_BY_CALLBACK.
+int xferAbortIfCancelled(void* clientp, curl_off_t, curl_off_t, curl_off_t, curl_off_t) {
+    const auto* cancelFlag = static_cast<const std::atomic<bool>*>(clientp);
+    return (cancelFlag && cancelFlag->load()) ? 1 : 0;
+}
 } // namespace
 
 nlohmann::json OpenAiCompatibleClient::buildRequestBody(
@@ -21,6 +29,13 @@ nlohmann::json OpenAiCompatibleClient::buildRequestBody(
         const std::string& model) {
     nlohmann::json out;
     out["model"] = model;
+    // Unlike AnthropicClient (which has always hardcoded 4096), this path
+    // had NO cap - discovered 2026-09-17 when a local model rambled with no
+    // stop condition and ran toward its full context window (tens of
+    // minutes at normal token-generation speed) instead of failing fast.
+    // Real OpenAI and most compatible servers accept this; Ollama's compat
+    // layer otherwise defaults to unbounded.
+    out["max_tokens"] = 4096;
     nlohmann::json msgs = nlohmann::json::array();
     for (const auto& m : messages) {
         if (m.role == ChatRole::ToolResult) {
@@ -136,7 +151,8 @@ LlmTurnResult OpenAiCompatibleClient::parseResponseFromRawBody(const std::string
 }
 
 LlmTurnResult OpenAiCompatibleClient::sendTurn(const std::vector<ChatMessage>& messages,
-                                              const std::vector<ToolDef>& tools) {
+                                              const std::vector<ToolDef>& tools,
+                                              const std::atomic<bool>* cancelFlag) {
     nlohmann::json requestBody = buildRequestBody(messages, tools, m_model);
     std::string requestStr = requestBody.dump();
 
@@ -171,10 +187,20 @@ LlmTurnResult OpenAiCompatibleClient::sendTurn(const std::vector<ChatMessage>& m
     curl_easy_setopt(curl, CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
     curl_easy_setopt(curl, CURLOPT_REDIR_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
 #endif
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 20L);
+    // A generous outer safety net, not the primary control anymore - now
+    // that cancelFlag/xferAbortIfCancelled exists, the user's Cancel button
+    // is how a slow-but-alive request (a local server cold-loading a
+    // multi-GB model, or just a big/slow generation) actually gets stopped.
+    // This only guards against curl itself wedging. Connect timeout stays
+    // short - that fails fast on a wrong host/port, a different failure
+    // than "slow to answer".
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 600L);
     curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeToString);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &responseBody);
+    curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+    curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, xferAbortIfCancelled);
+    curl_easy_setopt(curl, CURLOPT_XFERINFODATA, cancelFlag);
 
     CURLcode code = curl_easy_perform(curl);
     long httpStatus = 0;
@@ -185,7 +211,8 @@ LlmTurnResult OpenAiCompatibleClient::sendTurn(const std::vector<ChatMessage>& m
     if (code != CURLE_OK) {
         LlmTurnResult r;
         r.ok = false;
-        r.error = curl_easy_strerror(code);
+        r.error = (code == CURLE_ABORTED_BY_CALLBACK) ? "Cancelled"
+                                                       : curl_easy_strerror(code);
         return r;
     }
     try {

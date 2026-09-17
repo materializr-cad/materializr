@@ -19,7 +19,8 @@ public:
     explicit ScriptedClient(std::vector<LlmTurnResult> turns)
         : m_turns(std::move(turns)) {}
     LlmTurnResult sendTurn(const std::vector<ChatMessage>& messages,
-                          const std::vector<ToolDef>&) override {
+                          const std::vector<ToolDef>&,
+                          const std::atomic<bool>*) override {
         m_capturedCalls.push_back(messages);
         if (m_next >= m_turns.size()) {
             LlmTurnResult r;
@@ -36,6 +37,32 @@ private:
     std::vector<LlmTurnResult> m_turns;
     size_t m_next = 0;
     std::vector<std::vector<ChatMessage>> m_capturedCalls;
+};
+
+// Simulates a slow request the same way curl actually behaves: it doesn't
+// return until either cancelFlag flips true (mimicking
+// xferAbortIfCancelled aborting the transfer) or a generous safety timeout
+// elapses (so a bug that never sets the flag fails the test instead of
+// hanging it forever).
+class SlowCancellableClient : public LlmClient {
+public:
+    LlmTurnResult sendTurn(const std::vector<ChatMessage>&, const std::vector<ToolDef>&,
+                          const std::atomic<bool>* cancelFlag) override {
+        auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+        while (!(cancelFlag && cancelFlag->load())) {
+            if (std::chrono::steady_clock::now() > deadline) {
+                LlmTurnResult r;
+                r.ok = false;
+                r.error = "SlowCancellableClient: never got cancelled";
+                return r;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+        LlmTurnResult r;
+        r.ok = false;
+        r.error = "Cancelled";
+        return r;
+    }
 };
 
 PluginContext makeCtx(Document& doc, History& hist) {
@@ -292,4 +319,91 @@ TEST(AiSessionController, ACaptureViewResultCarriesItsImageIntoTheNextTurnsHisto
     ASSERT_EQ(secondCall.size(), 3u);
     EXPECT_EQ(secondCall[2].role, ChatRole::ToolResult);
     EXPECT_EQ(secondCall[2].imagePng, (std::vector<uint8_t>{0x89, 'P', 'N', 'G'}));
+}
+
+TEST(AiSessionController, CancelStopsAnInFlightTurnAndSurfacesItAsNotAnError) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    AiSessionController sess(std::make_unique<SlowCancellableClient>());
+
+    sess.submitPrompt("do something slow");
+    ASSERT_TRUE(sess.isBusy());
+    // Give the background thread a moment to actually start (and enter its
+    // wait loop) before cancelling, so this exercises stopping something
+    // genuinely in flight rather than racing submitPrompt itself.
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    sess.cancel();
+    pumpUntilIdle(sess, ctx);
+
+    EXPECT_FALSE(sess.isBusy());
+    ASSERT_FALSE(sess.scrollback().empty());
+    const auto& last = sess.scrollback().back();
+    EXPECT_EQ(last.kind, AiSessionController::ScrollbackLine::Kind::ToolSummary)
+        << "a deliberate cancel must not read as a failure";
+    EXPECT_EQ(last.text, "Cancelled.");
+}
+
+TEST(AiSessionController, CancelWithNothingInFlightIsANoOp) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    AiSessionController sess(std::make_unique<ScriptedClient>(
+        std::vector<LlmTurnResult>{finalText("Hi.")}));
+
+    sess.cancel(); // nothing submitted yet - must not crash or misbehave
+    EXPECT_FALSE(sess.isBusy());
+
+    sess.submitPrompt("hello");
+    pumpUntilIdle(sess, ctx);
+    EXPECT_EQ(sess.scrollback().back().text, "Hi.");
+}
+
+TEST(AiSessionController, ElapsedSecondsIsZeroWhenIdleAndPositiveWhileBusy) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    AiSessionController sess(std::make_unique<SlowCancellableClient>());
+
+    EXPECT_EQ(sess.elapsedSeconds(), 0.0);
+
+    sess.submitPrompt("do something slow");
+    std::this_thread::sleep_for(std::chrono::milliseconds(30));
+    EXPECT_GT(sess.elapsedSeconds(), 0.0);
+
+    sess.cancel();
+    pumpUntilIdle(sess, ctx);
+    EXPECT_EQ(sess.elapsedSeconds(), 0.0)
+        << "resets back to 0 once the turn is no longer in flight";
+}
+
+TEST(AiSessionController, ClearEmptiesTheScrollbackAndHistory) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    AiSessionController sess(std::make_unique<ScriptedClient>(
+        std::vector<LlmTurnResult>{finalText("Made it.")}));
+
+    sess.submitPrompt("hello");
+    pumpUntilIdle(sess, ctx);
+    ASSERT_FALSE(sess.scrollback().empty());
+
+    sess.clear();
+    EXPECT_TRUE(sess.scrollback().empty());
+}
+
+TEST(AiSessionController, ClearIsANoOpWhileATurnIsInFlight) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    AiSessionController sess(std::make_unique<SlowCancellableClient>());
+
+    sess.submitPrompt("do something slow");
+    ASSERT_TRUE(sess.isBusy());
+    sess.clear(); // must not disturb the in-flight turn
+    EXPECT_FALSE(sess.scrollback().empty())
+        << "the User line from submitPrompt must survive a clear() while busy";
+
+    sess.cancel();
+    pumpUntilIdle(sess, ctx);
 }
