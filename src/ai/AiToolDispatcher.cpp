@@ -8,18 +8,28 @@
 #include "../modeling/FilletOp.h"
 #include "../modeling/ChamferOp.h"
 #include "../modeling/ShellOp.h"
+#include "../modeling/ExtrudeOp.h"
+#include "../modeling/PushPullOp.h"
 
+#include <BRepBuilderAPI_MakeEdge.hxx>
+#include <BRepBuilderAPI_MakeFace.hxx>
+#include <BRepBuilderAPI_MakeWire.hxx>
 #include <BRepGProp.hxx>
 #include <BRepGProp_Face.hxx>
 #include <BRep_Tool.hxx>
 #include <GProp_GProps.hxx>
+#include <Geom_Circle.hxx>
 #include <Geom_Curve.hxx>
+#include <Geom_Plane.hxx>
 #include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Edge.hxx>
 #include <TopoDS_Face.hxx>
 #include <TopoDS_Vertex.hxx>
+#include <gp_Ax2.hxx>
+#include <gp_Ax3.hxx>
+#include <gp_Circ.hxx>
 #include <gp_Dir.hxx>
 #include <gp_Pnt.hxx>
 #include <gp_Vec.hxx>
@@ -433,6 +443,177 @@ ToolResult chamferEdge(PluginContext& ctx, const nlohmann::json& args) {
                   std::to_string(uz) + ") at distance " + std::to_string(distance) + "mm"};
 }
 
+// The face whose centre of mass is closest to `target` - the same
+// nearest-point selection trick as nearestEdge, one level up. Works for
+// planar or curved faces alike since GProp's centre of mass is a property of
+// the whole face, not a parametric sample.
+TopoDS_Face nearestFace(const TopoDS_Shape& body, const gp_Pnt& target) {
+    TopoDS_Face best;
+    double bestD2 = std::numeric_limits<double>::max();
+    for (TopExp_Explorer ex(body, TopAbs_FACE); ex.More(); ex.Next()) {
+        const TopoDS_Face f = TopoDS::Face(ex.Current());
+        GProp_GProps g;
+        try { BRepGProp::SurfaceProperties(f, g); } catch (...) { continue; }
+        const double d2 = target.SquareDistance(g.CentreOfMass());
+        if (d2 < bestD2) { bestD2 = d2; best = f; }
+    }
+    return best;
+}
+
+ToolResult pushPullFace(PluginContext& ctx, const nlohmann::json& args) {
+    std::string err;
+    int bodyId;
+    double distance, ux, uy, uz;
+    if (!requireBodyId(ctx.document(), args, "body_id", bodyId, err) ||
+        !requireNumber(args, "distance", distance, err) ||
+        !requireNumber(args, "x", ux, err) ||
+        !requireNumber(args, "y", uy, err) ||
+        !requireNumber(args, "z", uz, err))
+        return {false, err};
+    if (distance == 0.0) return {false, "'distance' must not be zero"};
+    const TopoDS_Shape& body = ctx.document().getBody(bodyId);
+    const TopoDS_Face face = nearestFace(body, userPntToWorld(ux, uy, uz));
+    if (face.IsNull()) return {false, "body " + std::to_string(bodyId) + " has no faces"};
+    auto op = std::make_unique<PushPullOp>();
+    op->setTargets({{face, bodyId}});
+    op->setDistance(distance);
+    if (!ctx.history().pushOperation(std::move(op), ctx.document()))
+        return {false, "push/pull failed - a negative distance larger than the body's "
+                       "own depth there will do this; try a smaller magnitude"};
+    ctx.markMeshesDirty();
+    return {true, "Pushed/pulled the face of body " + std::to_string(bodyId) +
+                  " nearest (" + std::to_string(ux) + ", " + std::to_string(uy) + ", " +
+                  std::to_string(uz) + ") by " + std::to_string(distance) +
+                  "mm (positive = outward, negative = cut inward)"};
+}
+
+// u,v basis for the plane perpendicular to `dir`, and the resulting Geom_Ax3
+// - shared by buildRectFace/buildCircleFace so both profile builders agree on
+// where "in-plane X/Y" point for a given extrude direction.
+gp_Ax3 profileFrame(const gp_Pnt& center, const gp_Dir& dir) {
+    return gp_Ax3(center, dir);
+}
+
+// A rectangular face of the given width (along the frame's local X) and
+// depth (local Y), centred at `center`, with outward normal exactly `dir` -
+// so ExtrudeOp (which always extrudes along the profile FACE's own normal,
+// regardless of its ExtrudeDirection setting - see its execute()) extrudes
+// this along `dir` with no further coordination needed.
+TopoDS_Face buildRectFace(const gp_Pnt& center, const gp_Dir& dir, double width, double depth) {
+    const gp_Ax3 ax = profileFrame(center, dir);
+    const gp_XYZ hw = ax.XDirection().XYZ() * (width / 2.0);
+    const gp_XYZ hd = ax.YDirection().XYZ() * (depth / 2.0);
+    const gp_Pnt p1(center.XYZ() - hw - hd), p2(center.XYZ() + hw - hd),
+                p3(center.XYZ() + hw + hd), p4(center.XYZ() - hw + hd);
+    BRepBuilderAPI_MakeWire mw;
+    mw.Add(BRepBuilderAPI_MakeEdge(p1, p2));
+    mw.Add(BRepBuilderAPI_MakeEdge(p2, p3));
+    mw.Add(BRepBuilderAPI_MakeEdge(p3, p4));
+    mw.Add(BRepBuilderAPI_MakeEdge(p4, p1));
+    if (!mw.IsDone()) return {};
+    Handle(Geom_Plane) plane = new Geom_Plane(ax);
+    BRepBuilderAPI_MakeFace mf(plane, mw.Wire(), Standard_True);
+    if (!mf.IsDone()) return {};
+    return mf.Face();
+}
+
+// Same idea as buildRectFace but circular - outward normal exactly `dir`.
+TopoDS_Face buildCircleFace(const gp_Pnt& center, const gp_Dir& dir, double radius) {
+    const gp_Ax3 ax = profileFrame(center, dir);
+    const gp_Circ circ(gp_Ax2(center, dir, ax.XDirection()), radius);
+    const TopoDS_Edge circEdge = BRepBuilderAPI_MakeEdge(circ);
+    BRepBuilderAPI_MakeWire mw(circEdge);
+    if (!mw.IsDone()) return {};
+    Handle(Geom_Plane) plane = new Geom_Plane(ax);
+    BRepBuilderAPI_MakeFace mf(plane, mw.Wire(), Standard_True);
+    if (!mf.IsDone()) return {};
+    return mf.Face();
+}
+
+bool parseExtrudeMode(const std::string& s, ExtrudeMode& out, std::string& err) {
+    if (s == "new_body") { out = ExtrudeMode::NewBody; return true; }
+    if (s == "union") { out = ExtrudeMode::Union; return true; }
+    if (s == "subtract") { out = ExtrudeMode::Subtract; return true; }
+    if (s == "intersect") { out = ExtrudeMode::Intersect; return true; }
+    err = "'mode' must be one of: new_body, union, subtract, intersect";
+    return false;
+}
+
+// Shared by extrude_rect/extrude_circle: everything except the profile shape
+// itself (built by the caller).
+ToolResult extrudeProfile(PluginContext& ctx, const nlohmann::json& args,
+                          const TopoDS_Face& profile, double distance) {
+    std::string err;
+    std::string modeStr = args.value("mode", std::string("new_body"));
+    ExtrudeMode mode;
+    if (!parseExtrudeMode(modeStr, mode, err)) return {false, err};
+    int targetId = -1;
+    if (mode != ExtrudeMode::NewBody) {
+        if (!requireBodyId(ctx.document(), args, "target_body_id", targetId, err))
+            return {false, "mode '" + modeStr + "' needs a valid 'target_body_id': " + err};
+    }
+    if (profile.IsNull()) return {false, "failed to build the extrude profile"};
+
+    auto op = std::make_unique<ExtrudeOp>();
+    op->setProfile(profile);
+    op->setDistance(distance);
+    op->setMode(mode);
+    if (mode != ExtrudeMode::NewBody) op->setTargetBody(targetId);
+    if (!ctx.history().pushOperation(std::move(op), ctx.document()))
+        return {false, "extrude failed"};
+    ctx.markMeshesDirty();
+    if (mode == ExtrudeMode::NewBody) {
+        int newId = ctx.document().getAllBodyIds().back();
+        return {true, "Created body " + std::to_string(newId) + " by extrusion"};
+    }
+    return {true, "Extruded (" + modeStr + ") into body " + std::to_string(targetId)};
+}
+
+ToolResult extrudeRect(PluginContext& ctx, const nlohmann::json& args) {
+    std::string err;
+    double width, depth, distance;
+    if (!requirePositive(args, "width", width, err) ||
+        !requirePositive(args, "depth", depth, err) ||
+        !requireNumber(args, "distance", distance, err))
+        return {false, err};
+    if (distance == 0.0) return {false, "'distance' must not be zero"};
+    double ux, uy, uz, ddx, ddy, ddz;
+    if (!optionalNumber(args, "x", ux, 0.0, err) ||
+        !optionalNumber(args, "y", uy, 0.0, err) ||
+        !optionalNumber(args, "z", uz, 0.0, err) ||
+        !optionalNumber(args, "dir_x", ddx, 0.0, err) ||
+        !optionalNumber(args, "dir_y", ddy, 0.0, err) ||
+        !optionalNumber(args, "dir_z", ddz, 1.0, err))
+        return {false, err};
+    gp_Dir dir;
+    try { dir = userDirToWorld(ddx, ddy, ddz); }
+    catch (...) { return {false, "'dir_x,dir_y,dir_z' must not all be zero"}; }
+    const TopoDS_Face profile = buildRectFace(userPntToWorld(ux, uy, uz), dir, width, depth);
+    return extrudeProfile(ctx, args, profile, distance);
+}
+
+ToolResult extrudeCircle(PluginContext& ctx, const nlohmann::json& args) {
+    std::string err;
+    double radius, distance;
+    if (!requirePositive(args, "radius", radius, err) ||
+        !requireNumber(args, "distance", distance, err))
+        return {false, err};
+    if (distance == 0.0) return {false, "'distance' must not be zero"};
+    double ux, uy, uz, ddx, ddy, ddz;
+    if (!optionalNumber(args, "x", ux, 0.0, err) ||
+        !optionalNumber(args, "y", uy, 0.0, err) ||
+        !optionalNumber(args, "z", uz, 0.0, err) ||
+        !optionalNumber(args, "dir_x", ddx, 0.0, err) ||
+        !optionalNumber(args, "dir_y", ddy, 0.0, err) ||
+        !optionalNumber(args, "dir_z", ddz, 1.0, err))
+        return {false, err};
+    gp_Dir dir;
+    try { dir = userDirToWorld(ddx, ddy, ddz); }
+    catch (...) { return {false, "'dir_x,dir_y,dir_z' must not all be zero"}; }
+    const TopoDS_Face profile = buildCircleFace(userPntToWorld(ux, uy, uz), dir, radius);
+    return extrudeProfile(ctx, args, profile, distance);
+}
+
 ToolResult shellBody(PluginContext& ctx, const nlohmann::json& args) {
     std::string err;
     int bodyId;
@@ -495,6 +676,9 @@ ToolResult executeTool(PluginContext& ctx, const std::string& toolName,
     if (toolName == "fillet_edge") return filletEdge(ctx, args);
     if (toolName == "chamfer_edge") return chamferEdge(ctx, args);
     if (toolName == "shell_body") return shellBody(ctx, args);
+    if (toolName == "push_pull_face") return pushPullFace(ctx, args);
+    if (toolName == "extrude_rect") return extrudeRect(ctx, args);
+    if (toolName == "extrude_circle") return extrudeCircle(ctx, args);
     return {false, "unknown tool '" + toolName + "'"};
 }
 

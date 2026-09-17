@@ -12,7 +12,7 @@ TEST(AiToolSchema, AllToolsContainsExactlyTheExpectedTools) {
         "add_box", "add_cylinder", "add_sphere", "add_cone", "add_torus",
         "move_body", "rotate_body", "scale_body", "boolean_op",
         "fillet_all_edges", "chamfer_all_edges", "fillet_edge", "chamfer_edge",
-        "shell_body"};
+        "push_pull_face", "extrude_rect", "extrude_circle", "shell_body"};
     EXPECT_EQ(names, expected);
 }
 
@@ -80,4 +80,32 @@ TEST(AiToolSchema, FilletEdgePositionParamsAreRequired) {
         return;
     }
     FAIL() << "fillet_edge tool not found";
+}
+
+TEST(AiToolSchema, ExtrudeRectModeAndTargetBodyIdAreOptional) {
+    for (const auto& t : allTools()) {
+        if (t.name != "extrude_rect") continue;
+        for (const char* key : {"mode", "target_body_id"}) {
+            bool found = false;
+            for (const auto& p : t.params)
+                if (p.name == key) { found = true; EXPECT_FALSE(p.required) << key; }
+            EXPECT_TRUE(found) << key;
+        }
+        return;
+    }
+    FAIL() << "extrude_rect tool not found";
+}
+
+TEST(AiToolSchema, ExtrudeCircleRadiusAndDistanceAreRequired) {
+    for (const auto& t : allTools()) {
+        if (t.name != "extrude_circle") continue;
+        for (const char* key : {"radius", "distance"}) {
+            bool found = false;
+            for (const auto& p : t.params)
+                if (p.name == key) { found = true; EXPECT_TRUE(p.required) << key; }
+            EXPECT_TRUE(found) << key;
+        }
+        return;
+    }
+    FAIL() << "extrude_circle tool not found";
 }

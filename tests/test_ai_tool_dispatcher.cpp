@@ -443,6 +443,123 @@ TEST(AiToolDispatcher, ChamferEdgeRejectsANonPositiveDistance) {
     EXPECT_FALSE(r.ok);
 }
 
+TEST(AiToolDispatcher, ExtrudeRectCreatesANewBodyWithTheGivenVolume) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+
+    ToolResult r = executeTool(ctx, "extrude_rect",
+        {{"width", 10.0}, {"depth", 5.0}, {"distance", 20.0}});
+    ASSERT_TRUE(r.ok) << r.message;
+    ASSERT_EQ(doc.getAllBodyIds().size(), 1u);
+    EXPECT_NEAR(volumeOf(doc, doc.getAllBodyIds().front()), 10.0 * 5.0 * 20.0, 1e-3);
+}
+
+TEST(AiToolDispatcher, ExtrudeRectSubtractModeCutsAPocketIntoAnExistingBody) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ASSERT_TRUE(executeTool(ctx, "add_box",
+        {{"width", 20.0}, {"height", 20.0}, {"depth", 20.0}}).ok);
+    int id = doc.getAllBodyIds().front();
+    const double v0 = volumeOf(doc, id);
+
+    // A 4x4x10 pocket straight down from above the box's centre.
+    ToolResult r = executeTool(ctx, "extrude_rect",
+        {{"width", 4.0}, {"depth", 4.0}, {"distance", -10.0},
+         {"x", 10.0}, {"y", 10.0}, {"z", 25.0},
+         {"mode", "subtract"}, {"target_body_id", id}});
+    ASSERT_TRUE(r.ok) << r.message;
+    EXPECT_EQ(doc.getAllBodyIds().size(), 1u) << "subtract must not create a new body";
+    EXPECT_LT(volumeOf(doc, id), v0) << "a subtract-mode extrude must remove material";
+}
+
+TEST(AiToolDispatcher, ExtrudeRectRejectsAModeWithoutATargetBodyId) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ASSERT_TRUE(executeTool(ctx, "add_box",
+        {{"width", 10.0}, {"height", 10.0}, {"depth", 10.0}}).ok);
+
+    ToolResult r = executeTool(ctx, "extrude_rect",
+        {{"width", 2.0}, {"depth", 2.0}, {"distance", 5.0}, {"mode", "subtract"}});
+    EXPECT_FALSE(r.ok);
+}
+
+TEST(AiToolDispatcher, ExtrudeCircleAlongACustomDirectionExtendsAlongThatAxis) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+
+    // dir_x=1 (all else default 0) -> world X, not the default up axis.
+    ToolResult r = executeTool(ctx, "extrude_circle",
+        {{"radius", 2.0}, {"distance", 30.0}, {"dir_x", 1.0}, {"dir_y", 0.0}, {"dir_z", 0.0}});
+    ASSERT_TRUE(r.ok) << r.message;
+    int id = doc.getAllBodyIds().front();
+
+    Bnd_Box box;
+    BRepBndLib::Add(doc.getBody(id), box);
+    double x0, y0, z0, x1, y1, z1;
+    box.Get(x0, y0, z0, x1, y1, z1);
+    EXPECT_NEAR(x1 - x0, 30.0, 1e-3) << "world X extent must match the extrude distance";
+    EXPECT_NEAR(y1 - y0, 4.0, 1e-3) << "world Y/Z extents must match the circle's diameter";
+    EXPECT_NEAR(z1 - z0, 4.0, 1e-3);
+}
+
+TEST(AiToolDispatcher, ExtrudeRectRejectsAZeroDistance) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ToolResult r = executeTool(ctx, "extrude_rect",
+        {{"width", 5.0}, {"depth", 5.0}, {"distance", 0.0}});
+    EXPECT_FALSE(r.ok);
+}
+
+TEST(AiToolDispatcher, PushPullFacePositiveDistanceAddsMaterial) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ASSERT_TRUE(executeTool(ctx, "add_box",
+        {{"width", 20.0}, {"height", 20.0}, {"depth", 20.0}}).ok);
+    int id = doc.getAllBodyIds().front();
+    const double v0 = volumeOf(doc, id);
+
+    // (10, 20, 10) in user space -> world (10, 10, 20): the centre of the
+    // face at world Z=20, one of the cube's six faces, unambiguously.
+    ToolResult r = executeTool(ctx, "push_pull_face",
+        {{"body_id", id}, {"distance", 5.0}, {"x", 10.0}, {"y", 20.0}, {"z", 10.0}});
+    ASSERT_TRUE(r.ok) << r.message;
+    EXPECT_GT(volumeOf(doc, id), v0);
+}
+
+TEST(AiToolDispatcher, PushPullFaceNegativeDistanceRemovesMaterial) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ASSERT_TRUE(executeTool(ctx, "add_box",
+        {{"width", 20.0}, {"height", 20.0}, {"depth", 20.0}}).ok);
+    int id = doc.getAllBodyIds().front();
+    const double v0 = volumeOf(doc, id);
+
+    ToolResult r = executeTool(ctx, "push_pull_face",
+        {{"body_id", id}, {"distance", -5.0}, {"x", 10.0}, {"y", 20.0}, {"z", 10.0}});
+    ASSERT_TRUE(r.ok) << r.message;
+    EXPECT_LT(volumeOf(doc, id), v0);
+}
+
+TEST(AiToolDispatcher, PushPullFaceRejectsAZeroDistance) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ASSERT_TRUE(executeTool(ctx, "add_box",
+        {{"width", 10.0}, {"height", 10.0}, {"depth", 10.0}}).ok);
+    int id = doc.getAllBodyIds().front();
+
+    ToolResult r = executeTool(ctx, "push_pull_face",
+        {{"body_id", id}, {"distance", 0.0}, {"x", 5.0}, {"y", 10.0}, {"z", 5.0}});
+    EXPECT_FALSE(r.ok);
+}
+
 TEST(AiToolDispatcher, ShellBodyWithNoOpenFaceHollowsOutMostOfTheVolume) {
     Document doc;
     History hist;

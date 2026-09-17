@@ -17,6 +17,28 @@ std::vector<ToolParam> withOrigin(std::vector<ToolParam> params) {
     params.push_back(num("z", "World Z position in mm (default 0).", false));
     return params;
 }
+// Position (profile centre) plus an extrude direction, both optional - a
+// plain vertical extrude (dir 0,0,1, matching add_box's own up axis) is the
+// common case; a custom direction is what makes extrude_rect/extrude_circle
+// more than just add_box/add_cylinder with extra steps, letting a cut or
+// addition go in at ANY orientation, not just the three principal axes.
+std::vector<ToolParam> withOriginAndDirection(std::vector<ToolParam> params) {
+    params = withOrigin(std::move(params));
+    params.push_back(num("dir_x", "Extrude direction X component (default 0).", false));
+    params.push_back(num("dir_y", "Extrude direction Y component (default 0).", false));
+    params.push_back(num("dir_z", "Extrude direction Z component (default 1, i.e. "
+                                  "straight up, same convention as add_box).", false));
+    return params;
+}
+// mode + target_body_id, shared by extrude_rect/extrude_circle: create a new
+// body, or combine into an existing one the same way boolean_op does.
+std::vector<ToolParam> withExtrudeMode(std::vector<ToolParam> params) {
+    params.push_back(str("mode", "One of: new_body (default), union, subtract, intersect. "
+                                 "union/subtract/intersect need target_body_id.", false));
+    params.push_back(num("target_body_id", "The body to combine into, for union/subtract/"
+                                           "intersect. Ignored for new_body.", false));
+    return params;
+}
 } // namespace
 
 const std::vector<ToolDef>& allTools() {
@@ -82,6 +104,36 @@ const std::vector<ToolDef>& allTools() {
                    "be exact, just closer to the intended edge than to any other."),
           num("y", "Approximate Y position near the edge, in mm."),
           num("z", "Approximate Z position near the edge, in mm.")}},
+        {"push_pull_face", "Push or pull a single face of an existing body - whichever "
+                          "face is nearest the given point - along its own normal, "
+                          "adding or removing material. This is how to nudge one wall, "
+                          "widen a pocket, or extend one side of a body you already have.",
+         {num("body_id", "The id of the body to edit."),
+          num("distance", "Distance in mm. Positive extends the face outward (adds "
+                          "material); negative pushes it inward (removes material)."),
+          num("x", "Approximate X position near the face to push/pull, in mm - same "
+                   "X/Y/Z convention as add_box. Doesn't need to be exact, just closer "
+                   "to the intended face than to any other."),
+          num("y", "Approximate Y position near the face, in mm."),
+          num("z", "Approximate Z position near the face, in mm.")}},
+        {"extrude_rect", "Create a rectangular profile and extrude it along a chosen "
+                         "direction - a box at any orientation, or (with mode=subtract) "
+                         "a rectangular pocket/slot cut into an existing body at any "
+                         "orientation, e.g. through the SIDE of a part.",
+         withExtrudeMode(withOriginAndDirection(
+             {num("width", "Profile width in mm, along the extrude direction's local X."),
+              num("depth", "Profile depth in mm, along the extrude direction's local Y."),
+              num("distance", "Extrude distance in mm along the direction (can be "
+                              "negative to extrude the other way).")}))},
+        {"extrude_circle", "Create a circular profile and extrude it along a chosen "
+                           "direction - a cylinder at any orientation, or (with "
+                           "mode=subtract) a round hole drilled into an existing body at "
+                           "any orientation, e.g. through the SIDE of a part, which "
+                           "add_cylinder + boolean_op cannot do without a separate rotate.",
+         withExtrudeMode(withOriginAndDirection(
+             {num("radius", "Profile radius in mm."),
+              num("distance", "Extrude distance in mm along the direction (can be "
+                              "negative to extrude the other way).")}))},
         {"shell_body", "Hollow out a body to a constant wall thickness, optionally "
                        "leaving one face open so the inside is reachable.",
          {num("body_id", "The id of the body to shell."),
