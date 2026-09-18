@@ -149,6 +149,134 @@ TEST(AiToolDispatcher, BooleanOpUnionMergesTwoBodiesIntoOne) {
         << "the tool body must be consumed by a union";
 }
 
+TEST(AiToolDispatcher, DeleteBodyRemovesItFromTheDocument) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ASSERT_TRUE(executeTool(ctx, "add_box", {{"width", 10.0}, {"height", 10.0}, {"depth", 10.0}}).ok);
+    int id = doc.getAllBodyIds().front();
+
+    ToolResult r = executeTool(ctx, "delete_body", {{"body_id", id}});
+    EXPECT_TRUE(r.ok) << r.message;
+    EXPECT_TRUE(doc.getAllBodyIds().empty());
+}
+
+TEST(AiToolDispatcher, DuplicateBodyCreatesASecondBodyOffsetFromTheOriginal) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ASSERT_TRUE(executeTool(ctx, "add_box", {{"width", 10.0}, {"height", 10.0}, {"depth", 10.0}}).ok);
+    int original = doc.getAllBodyIds().front();
+
+    ToolResult r = executeTool(ctx, "duplicate_body", {{"body_id", original}});
+    ASSERT_TRUE(r.ok) << r.message;
+    ASSERT_EQ(doc.getAllBodyIds().size(), 2u);
+    int copy = doc.getAllBodyIds().back();
+
+    Bnd_Box box;
+    BRepBndLib::Add(doc.getBody(copy), box);
+    double x0, y0, z0, x1, y1, z1;
+    box.Get(x0, y0, z0, x1, y1, z1);
+    // Default offset is dx=20 (user X, unaffected by the Y/Z swap) - the
+    // original sat at world x0=0, so the copy should land at world x0=20.
+    EXPECT_NEAR(x0, 20.0, 1e-6);
+    EXPECT_NE(copy, original);
+}
+
+TEST(AiToolDispatcher, MirrorBodyCreatesANewMirroredCopyByDefault) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ASSERT_TRUE(executeTool(ctx, "add_box",
+        {{"width", 10.0}, {"height", 10.0}, {"depth", 10.0}, {"x", 10.0}}).ok);
+    int original = doc.getAllBodyIds().front();
+
+    ToolResult r = executeTool(ctx, "mirror_body", {{"body_id", original}, {"axis", "+x"}});
+    ASSERT_TRUE(r.ok) << r.message;
+    ASSERT_EQ(doc.getAllBodyIds().size(), 2u) << "keep_original defaults to true";
+    int mirrored = doc.getAllBodyIds().back();
+
+    Bnd_Box box;
+    BRepBndLib::Add(doc.getBody(mirrored), box);
+    double x0, y0, z0, x1, y1, z1;
+    box.Get(x0, y0, z0, x1, y1, z1);
+    // Original spans world x [10,20]; mirrored across the YZ plane (x=0)
+    // should span [-20,-10].
+    EXPECT_NEAR(x0, -20.0, 1e-6);
+    EXPECT_NEAR(x1, -10.0, 1e-6);
+}
+
+TEST(AiToolDispatcher, MirrorBodyCanReplaceTheOriginalInPlace) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ASSERT_TRUE(executeTool(ctx, "add_box",
+        {{"width", 10.0}, {"height", 10.0}, {"depth", 10.0}, {"x", 10.0}}).ok);
+    int original = doc.getAllBodyIds().front();
+
+    ToolResult r = executeTool(ctx, "mirror_body",
+        {{"body_id", original}, {"axis", "+x"}, {"keep_original", false}});
+    ASSERT_TRUE(r.ok) << r.message;
+    ASSERT_EQ(doc.getAllBodyIds().size(), 1u) << "no new body when keep_original is false";
+
+    Bnd_Box box;
+    BRepBndLib::Add(doc.getBody(original), box);
+    double x0, y0, z0, x1, y1, z1;
+    box.Get(x0, y0, z0, x1, y1, z1);
+    EXPECT_NEAR(x0, -20.0, 1e-6);
+}
+
+TEST(AiToolDispatcher, MirrorBodyRejectsAnUnknownAxis) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ASSERT_TRUE(executeTool(ctx, "add_box", {{"width", 10.0}, {"height", 10.0}, {"depth", 10.0}}).ok);
+    int id = doc.getAllBodyIds().front();
+
+    ToolResult r = executeTool(ctx, "mirror_body", {{"body_id", id}, {"axis", "diagonal"}});
+    EXPECT_FALSE(r.ok);
+}
+
+TEST(AiToolDispatcher, PatternBodyLinearCreatesTheRequestedNumberOfCopiesIncludingTheOriginal) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ASSERT_TRUE(executeTool(ctx, "add_box", {{"width", 10.0}, {"height", 10.0}, {"depth", 10.0}}).ok);
+    int id = doc.getAllBodyIds().front();
+
+    ToolResult r = executeTool(ctx, "pattern_body",
+        {{"body_id", id}, {"type", "linear"}, {"count", 3},
+         {"spacing_x", 15.0}, {"spacing_y", 0.0}, {"spacing_z", 0.0}});
+    EXPECT_TRUE(r.ok) << r.message;
+    EXPECT_EQ(doc.getAllBodyIds().size(), 3u);
+}
+
+TEST(AiToolDispatcher, PatternBodyRadialCreatesTheRequestedNumberOfCopiesIncludingTheOriginal) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ASSERT_TRUE(executeTool(ctx, "add_box", {{"width", 10.0}, {"height", 10.0}, {"depth", 10.0}}).ok);
+    int id = doc.getAllBodyIds().front();
+
+    ToolResult r = executeTool(ctx, "pattern_body",
+        {{"body_id", id}, {"type", "radial"}, {"count", 4},
+         {"axis_x", 0.0}, {"axis_y", 0.0}, {"axis_z", 1.0}});
+    EXPECT_TRUE(r.ok) << r.message;
+    EXPECT_EQ(doc.getAllBodyIds().size(), 4u);
+}
+
+TEST(AiToolDispatcher, PatternBodyRejectsAnUnknownType) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ASSERT_TRUE(executeTool(ctx, "add_box", {{"width", 10.0}, {"height", 10.0}, {"depth", 10.0}}).ok);
+    int id = doc.getAllBodyIds().front();
+
+    ToolResult r = executeTool(ctx, "pattern_body",
+        {{"body_id", id}, {"type", "zigzag"}, {"count", 3}});
+    EXPECT_FALSE(r.ok);
+}
+
 TEST(AiToolDispatcher, UnknownToolNameIsRejected) {
     Document doc;
     History hist;

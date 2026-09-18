@@ -10,6 +10,10 @@
 #include "../modeling/ShellOp.h"
 #include "../modeling/ExtrudeOp.h"
 #include "../modeling/PushPullOp.h"
+#include "../modeling/DeleteOp.h"
+#include "../modeling/CopyOp.h"
+#include "../modeling/MirrorOp.h"
+#include "../modeling/PatternOp.h"
 
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
@@ -324,6 +328,146 @@ ToolResult booleanOp(PluginContext& ctx, const nlohmann::json& args) {
     ctx.markMeshesDirty();
     return {true, "Combined bodies " + std::to_string(targetId) + " and " +
                   std::to_string(toolId) + " (" + modeStr + ")"};
+}
+
+ToolResult deleteBody(PluginContext& ctx, const nlohmann::json& args) {
+    std::string err;
+    int bodyId;
+    if (!requireBodyId(ctx.document(), args, "body_id", bodyId, err))
+        return {false, err};
+    auto op = std::make_unique<DeleteOp>();
+    op->setBodyId(bodyId);
+    if (!ctx.history().pushOperation(std::move(op), ctx.document()))
+        return {false, "the operation failed to execute"};
+    ctx.markMeshesDirty();
+    return {true, "Deleted body " + std::to_string(bodyId)};
+}
+
+ToolResult duplicateBody(PluginContext& ctx, const nlohmann::json& args) {
+    std::string err;
+    int bodyId;
+    double dx, dy, dz;
+    if (!requireBodyId(ctx.document(), args, "body_id", bodyId, err) ||
+        !optionalNumber(args, "dx", dx, 20.0, err) ||
+        !optionalNumber(args, "dy", dy, 0.0, err) ||
+        !optionalNumber(args, "dz", dz, 0.0, err))
+        return {false, err};
+    auto op = std::make_unique<CopyOp>();
+    op->setSourceBodyId(bodyId);
+    // Same raw-world-coordinate remap as move_body's dx/dy/dz - see its
+    // comment above (CopyOp::setOffset passes straight through, like
+    // TransformOp::setTranslation, unlike PrimitiveOp's origin remap).
+    op->setOffset(dx, dz, dy);
+    if (!ctx.history().pushOperation(std::move(op), ctx.document()))
+        return {false, "the operation failed to execute"};
+    ctx.markMeshesDirty();
+    int newId = ctx.document().getAllBodyIds().back();
+    std::string msg = "Created body " + std::to_string(newId) + " by duplicating body " +
+                      std::to_string(bodyId);
+    std::string geom;
+    if (describeBodyBox(ctx.document().getBody(newId), geom)) msg += ": " + geom;
+    return {true, msg};
+}
+
+ToolResult mirrorBody(PluginContext& ctx, const nlohmann::json& args) {
+    std::string err;
+    int bodyId;
+    if (!requireBodyId(ctx.document(), args, "body_id", bodyId, err))
+        return {false, err};
+    if (!args.contains("axis") || !args["axis"].is_string())
+        return {false, "missing required argument 'axis'"};
+    std::string axisStr = args["axis"].get<std::string>();
+    // The mirror plane always passes through the world origin, with its
+    // normal along the given axis - +x and -x mirror the SAME plane (a
+    // reflection through the origin doesn't care about sign), so only the
+    // letter matters. MirrorOp's own XY/XZ/YZ plane names are OCCT-native
+    // (WORLD) axes, not this app's user-facing ones - see PrimitiveOp.cpp's
+    // worldPnt() comment for why those differ (user Z=up is world Y, user
+    // Y=depth is world Z). Translating through the same +x/-x/+y/-y/+z/-z
+    // vocabulary every other face/direction argument here already uses
+    // keeps this tool from reintroducing that exact axis-swap mistake.
+    MirrorPlane plane;
+    if (axisStr == "+x" || axisStr == "-x") plane = MirrorPlane::YZ;       // normal world X
+    else if (axisStr == "+y" || axisStr == "-y") plane = MirrorPlane::XY;  // normal world Z (user depth)
+    else if (axisStr == "+z" || axisStr == "-z") plane = MirrorPlane::XZ; // normal world Y (user up)
+    else return {false, "'axis' must be one of: +x,-x,+y,-y,+z,-z"};
+    bool keepOriginal = true;
+    if (args.contains("keep_original")) {
+        if (!args["keep_original"].is_boolean())
+            return {false, "'keep_original' must be a boolean"};
+        keepOriginal = args["keep_original"].get<bool>();
+    }
+    auto op = std::make_unique<MirrorOp>();
+    op->setBody(bodyId);
+    op->setPlane(plane);
+    op->setKeepOriginal(keepOriginal);
+    if (!ctx.history().pushOperation(std::move(op), ctx.document()))
+        return {false, "mirror failed"};
+    ctx.markMeshesDirty();
+    if (!keepOriginal)
+        return {true, "Mirrored body " + std::to_string(bodyId) + " across the '" +
+                      axisStr + "' axis (replaced in place)"};
+    int newId = ctx.document().getAllBodyIds().back();
+    std::string msg = "Created body " + std::to_string(newId) + " by mirroring body " +
+                      std::to_string(bodyId) + " across the '" + axisStr + "' axis";
+    std::string geom;
+    if (describeBodyBox(ctx.document().getBody(newId), geom)) msg += ": " + geom;
+    return {true, msg};
+}
+
+ToolResult patternBody(PluginContext& ctx, const nlohmann::json& args) {
+    std::string err;
+    int bodyId, count;
+    if (!requireBodyId(ctx.document(), args, "body_id", bodyId, err)) return {false, err};
+    double countD;
+    if (!requirePositive(args, "count", countD, err)) return {false, err};
+    count = static_cast<int>(countD);
+    if (countD != std::floor(countD) || count < 1)
+        return {false, "'count' must be a positive whole number"};
+    if (!args.contains("type") || !args["type"].is_string())
+        return {false, "missing required argument 'type' ('linear' or 'radial')"};
+    std::string typeStr = args["type"].get<std::string>();
+
+    auto op = std::make_unique<PatternOp>();
+    op->setBody(bodyId);
+    op->setCount(count);
+    if (typeStr == "linear") {
+        op->setType(PatternType::Linear);
+        double sx, sy, sz;
+        if (!requireNumber(args, "spacing_x", sx, err) ||
+            !requireNumber(args, "spacing_y", sy, err) ||
+            !requireNumber(args, "spacing_z", sz, err))
+            return {false, err};
+        // Same raw-world-coordinate remap as move_body/duplicate_body's
+        // dx/dy/dz - PatternOp::setLinearSpacing passes straight through.
+        op->setLinearSpacing(sx, sz, sy);
+    } else if (typeStr == "radial") {
+        op->setType(PatternType::Radial);
+        double ax, ay, az, ox, oy, oz, totalAngle;
+        if (!requireNumber(args, "axis_x", ax, err) ||
+            !requireNumber(args, "axis_y", ay, err) ||
+            !requireNumber(args, "axis_z", az, err) ||
+            !optionalNumber(args, "origin_x", ox, 0.0, err) ||
+            !optionalNumber(args, "origin_y", oy, 0.0, err) ||
+            !optionalNumber(args, "origin_z", oz, 0.0, err) ||
+            !optionalNumber(args, "total_angle_degrees", totalAngle, 360.0, err))
+            return {false, err};
+        if (ax == 0.0 && ay == 0.0 && az == 0.0)
+            return {false, "'axis_x,axis_y,axis_z' must not all be zero"};
+        // Same remap again - PatternOp::setRadialAxis/setRadialOrigin also
+        // pass straight through to world space.
+        op->setRadialAxis(ax, az, ay);
+        op->setRadialOrigin(ox, oz, oy);
+        op->setTotalAngle(totalAngle);
+    } else {
+        return {false, "'type' must be one of: linear, radial"};
+    }
+    if (!ctx.history().pushOperation(std::move(op), ctx.document()))
+        return {false, "pattern failed"};
+    ctx.markMeshesDirty();
+    return {true, "Created " + std::to_string(count) + "-copy " + typeStr +
+                  " pattern of body " + std::to_string(bodyId) +
+                  " (list_bodies to see the new ids)"};
 }
 
 ToolResult filletAllEdges(PluginContext& ctx, const nlohmann::json& args) {
@@ -870,6 +1014,10 @@ ToolResult executeTool(PluginContext& ctx, const std::string& toolName,
     if (toolName == "rotate_body") return rotateBody(ctx, args);
     if (toolName == "scale_body") return scaleBody(ctx, args);
     if (toolName == "boolean_op") return booleanOp(ctx, args);
+    if (toolName == "delete_body") return deleteBody(ctx, args);
+    if (toolName == "duplicate_body") return duplicateBody(ctx, args);
+    if (toolName == "mirror_body") return mirrorBody(ctx, args);
+    if (toolName == "pattern_body") return patternBody(ctx, args);
     if (toolName == "fillet_all_edges") return filletAllEdges(ctx, args);
     if (toolName == "chamfer_all_edges") return chamferAllEdges(ctx, args);
     if (toolName == "fillet_face_edges") return filletFaceEdges(ctx, args);

@@ -246,6 +246,7 @@ LITERAL_ALLOW = [
     ("src/ai/AiToolSchema.cpp",         "in mm,",              "AI tool parameter description for LLM"),
     ("src/ai/AiToolSchema.cpp",         "in mm -",             "AI tool parameter description for LLM"),
     ("src/ai/AiToolSchema.cpp",         "in mm along",         "AI tool parameter description for LLM"),
+    ("src/ai/AiToolSchema.cpp",         "in mm (default",      "AI tool parameter description for LLM"),
     # AI tool RESULT messages: text handed back to the LLM as the outcome of a
     # tool call (e.g. "Filleted all edges of body 3 at radius 2mm"), not a UI
     # readout - same reasoning as the schema descriptions above, just on the

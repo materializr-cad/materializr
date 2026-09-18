@@ -36,7 +36,7 @@ struct LlmTurnResult {
     std::vector<ToolCall> toolCalls;
 };
 
-enum class ToolParamType { Number, String };
+enum class ToolParamType { Number, String, Boolean };
 
 struct ToolParam {
     std::string name;

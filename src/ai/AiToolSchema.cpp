@@ -9,6 +9,9 @@ ToolParam num(const char* name, const char* desc, bool required = true) {
 ToolParam str(const char* name, const char* desc, bool required = true) {
     return {name, ToolParamType::String, required, desc};
 }
+ToolParam boolean(const char* name, const char* desc, bool required = true) {
+    return {name, ToolParamType::Boolean, required, desc};
+}
 // x, y, z default to the world origin - see AiToolDispatcher (Task 5) for
 // where the default is actually applied when the model omits them.
 //
@@ -87,10 +90,57 @@ const std::vector<ToolDef>& allTools() {
         {"scale_body", "Uniformly scale an existing body.",
          {num("body_id", "The id of the body to scale."),
           num("factor", "Scale factor, e.g. 2.0 doubles the size.")}},
-        {"boolean_op", "Combine two bodies with a boolean operation.",
+        {"boolean_op", "Combine two bodies with a boolean operation. Also how to "
+                      "SUBTRACT one body from another: mode='subtract' removes "
+                      "tool_body_id's volume from target_body_id.",
          {num("target_body_id", "The body kept after the operation."),
           num("tool_body_id", "The body combined into the target."),
           str("mode", "One of: union, subtract, intersect.")}},
+        {"delete_body", "Permanently remove a body from the document. Always call "
+                        "list_bodies first if the body wasn't created earlier in "
+                        "THIS conversation.",
+         {num("body_id", "The id of the body to delete.")}},
+        {"duplicate_body", "Make a copy of an existing body, offset from the "
+                           "original.",
+         {num("body_id", "The id of the body to duplicate."),
+          num("dx", "Offset of the copy along X in mm (default 20).", false),
+          num("dy", "Offset of the copy along Y in mm (default 0).", false),
+          num("dz", "Offset of the copy along Z in mm (default 0).", false)}},
+        {"mirror_body", "Reflect a body across a plane through the world origin, "
+                        "either as a new mirrored copy (default) or by flipping "
+                        "the body itself in place.",
+         {num("body_id", "The id of the body to mirror."),
+          str("axis", "The mirror plane's normal direction, in the same X/Y/Z "
+                      "convention as add_box (Z is up, Y is depth): one of "
+                      "+x,-x,+y,-y,+z,-z. Sign doesn't matter - '+x' and '-x' "
+                      "mirror the same plane."),
+          boolean("keep_original", "If true (default), the mirror is a NEW body "
+                                   "and the original is untouched. If false, the "
+                                   "original body itself is replaced by its "
+                                   "mirror image.", false)}},
+        {"pattern_body", "Create multiple evenly-spaced or evenly-rotated copies "
+                         "of a body. Afterwards call list_bodies to get the new "
+                         "copies' ids - this tool doesn't return them directly.",
+         {num("body_id", "The id of the body to pattern."),
+          str("type", "One of: linear (evenly spaced along a straight line), "
+                      "radial (evenly rotated around an axis)."),
+          num("count", "Total number of copies, INCLUDING the original - 3 "
+                       "means the original plus 2 new copies."),
+          num("spacing_x", "LINEAR ONLY (required if type=linear): spacing "
+                           "between copies along X in mm.", false),
+          num("spacing_y", "LINEAR ONLY: spacing along Y in mm.", false),
+          num("spacing_z", "LINEAR ONLY: spacing along Z in mm.", false),
+          num("axis_x", "RADIAL ONLY (required if type=radial): rotation axis "
+                        "X component.", false),
+          num("axis_y", "RADIAL ONLY: rotation axis Y component.", false),
+          num("axis_z", "RADIAL ONLY: rotation axis Z component.", false),
+          num("origin_x", "RADIAL ONLY: a point the rotation axis passes "
+                          "through, X in mm (default 0 - the world origin).", false),
+          num("origin_y", "RADIAL ONLY: rotation axis point, Y in mm (default 0).", false),
+          num("origin_z", "RADIAL ONLY: rotation axis point, Z in mm (default 0).", false),
+          num("total_angle_degrees", "RADIAL ONLY: total angle the copies span, "
+                                     "in degrees (default 360, i.e. a full ring).",
+                                     false)}},
         {"fillet_all_edges", "Round every edge of a body with a constant radius.",
          {num("body_id", "The id of the body to fillet."),
           num("radius", "Fillet radius in mm. Must be small enough to fit the body's "
@@ -233,7 +283,12 @@ const std::string& systemPrompt() {
 
 namespace {
 const char* typeName(ToolParamType t) {
-    return t == ToolParamType::String ? "string" : "number";
+    switch (t) {
+        case ToolParamType::String: return "string";
+        case ToolParamType::Boolean: return "boolean";
+        case ToolParamType::Number: return "number";
+    }
+    return "number";
 }
 // Shared by both formatters: the JSON Schema "object" body every provider
 // wraps identically (properties + required list), only the outer envelope
