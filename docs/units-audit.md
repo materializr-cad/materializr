@@ -258,63 +258,91 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 ## `mm` literals by class
 
 - CONVERTED: 1
-- allowed-by-hand: 36
+- allowed-by-hand: 64
 - comment: 261
 - diagnostic: 10
 - identifier/other: 9
 
 | class | file:line | code |
 |---|---|---|
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:297 | `" at radius " + std::to_string(radius) + "mm"};` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:321 | `" at distance " + std::to_string(distance) + "mm"};` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:445 | `" - at radius " + std::to_string(radius) + "mm"};` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:483 | `" - at distance " + std::to_string(distance) + "mm"};` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:527 | `"mm (positive = outward, negative = cut inward)"};` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:697 | `std::to_string(thickness) + "mm walls" +` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:733 | `"  id %d \"%s\": centered at (x=%.1f, y=%.1f, z=%.1f)mm, "` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:734 | `"size (width=%.1f, depth=%.1f, height=%.1f)mm%s\n",` |
 | allowed-by-hand | src/ai/AiToolSchema.cpp:15 | `params.push_back(num("x", "World X position in mm (default 0).", false));` |
 | allowed-by-hand | src/ai/AiToolSchema.cpp:16 | `params.push_back(num("y", "World Y position in mm (default 0).", false));` |
 | allowed-by-hand | src/ai/AiToolSchema.cpp:17 | `params.push_back(num("z", "World Z position in mm (default 0).", false));` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:25 | `withOrigin({num("width", "Size along X in mm."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:26 | `num("height", "Size along the up axis (Z) in mm."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:27 | `num("depth", "Size along the horizontal depth axis (Y) in mm.")})},` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:29 | `withOrigin({num("radius", "Radius in mm."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:30 | `num("height", "Height in mm.")})},` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:32 | `withOrigin({num("radius", "Radius in mm.")})},` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:34 | `withOrigin({num("bottom_radius", "Base radius in mm."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:35 | `num("top_radius", "Top radius in mm; 0 for a point."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:36 | `num("height", "Height in mm.")})},` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:38 | `withOrigin({num("major_radius", "Distance from centre to tube centre, in mm."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:39 | `num("minor_radius", "Tube radius in mm.")})},` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:42 | `num("dx", "Move along X in mm."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:43 | `num("dy", "Move along Y in mm."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:44 | `num("dz", "Move along Z in mm.")}},` |
-| comment | src/app/Application.cpp:909 | `// ios_platform.mm).` |
-| comment | src/app/Application.cpp:1167 | `// Create a demo box so there's something to see (a 20 mm cube) - but only` |
-| comment | src/app/Application.cpp:1952 | `// Absolute linear deflection (mm) and angular deflection (radians). Lower` |
-| comment | src/app/Application.cpp:2027 | `// or, from before the presets converted, wrote 1 and reloaded as a 1 mm` |
-| comment | src/app/Application.cpp:4380 | `// Sketch origin should lie on the face's plane within 0.05 mm.` |
-| comment | src/app/Application.cpp:4406 | `// origin on the face plane within 0.05 mm). Used to re-adopt a sketch whose` |
-| comment | src/app/Application.cpp:4851 | `// step is the snap lattice and the visible grid, so leaving it at 1 mm` |
-| comment | src/app/Application.cpp:4859 | `// 152 mm - see 0733a59, which reverted exactly that.` |
-| comment | src/app/Application.cpp:5447 | `// the surface's parametric origin ~0.3 mm off-axis - the fitted anchor` |
-| comment | src/app/Application.cpp:5509 | `// 0.64 mm off-axis). Fit a circle to the OUTER wire instead, then` |
-| comment | src/app/Application.cpp:5574 | `// then keeps the wrong band, landing 0.6 mm off with a` |
-| comment | src/app/Application.cpp:5623 | `// 0.64 mm off-axis at the surface origin) that WON` |
-| comment | src/app/Application.cpp:5717 | `// sides at a generous offset (1 mm) so tessellation slack near the` |
-| comment | src/app/Application.cpp:5732 | `const double eps = 1.0; // mm` |
-| comment | src/app/Application.cpp:6360 | `// lines wrote raw millimetres: placing a dimension under any non-mm unit` |
-| comment | src/app/Application.cpp:6395 | `// Hash point positions and circle/arc radii too (quantised to 1e-4 mm)` |
-| comment | src/app/Application.cpp:6734 | `// millimetres. 40 mm is a reasonable first view in millimetres and an` |
-| comment | src/app/Application.cpp:6794 | `// Measured offsets were 10–50% of a cell. At a 1 mm grid that reads as` |
-| comment | src/app/Application.cpp:6795 | `// slightly-fat lines; at 0.1 mm it is most of a cell, i.e. "I can't draw a` |
-| comment | src/app/Application.h:657 | `// buttons are an explicit fine override (a 0.1 nudge under a 1 mm grid must` |
-| comment | src/app/Application.h:936 | `// Ceiling on the opening view of an EMPTY sketch, in mm of half-span.` |
-| comment | src/app/Application.h:938 | `// 300 mm because it reads as a round number in the units that needed` |
-| comment | src/app/Application.h:940 | `// the unit-aware 40-unit span is 12192 mm - a twelve-metre view, which put` |
-| comment | src/app/Application.h:943 | `// 40 mm and this never engages, so the common case does not move.` |
-| comment | src/app/Application.h:945 | `// Metres are the unit this serves least well: a 300 mm view makes every` |
-| comment | src/app/Application.h:951 | `// Sketch grid step in mm. This is the BASE the user chose (a display` |
-| comment | src/app/Application.h:1149 | `// sketch mm, so the tag keeps its grab point instead of snapping its centre` |
-| comment | src/app/Application.h:1352 | `// Scale popup unit mode. Percent is the multi-body-safe default; mm only` |
-| comment | src/app/Application.h:1358 | `// mm-mode text buffer + focus state per user axis (X, Y, Z in Z-up` |
-| comment | src/app/Application.h:1438 | `float  m_threadClearance = 0.0f; // radial fit gap for printed threads (mm)` |
-| comment | src/app/Application.h:1440 | `float  m_threadGrooveWidth = 0.0f; // explicit cut width (mm); 0 = from pitch` |
-| comment | src/app/Application.h:1656 | `float m_patternDistance = 5.0f; // linear: spacing in mm along chosen axis` |
-| comment | src/app/Application.h:2111 | `// (0.1 / 1 / 10 mm) and gets a solid-blue border when snap is on. Click` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:47 | `withOrigin({num("width", "Size along X in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:48 | `num("height", "Size along the up axis (Z) in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:49 | `num("depth", "Size along the horizontal depth axis (Y) in mm.")})},` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:51 | `withOrigin({num("radius", "Radius in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:52 | `num("height", "Height in mm.")})},` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:54 | `withOrigin({num("radius", "Radius in mm.")})},` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:56 | `withOrigin({num("bottom_radius", "Base radius in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:57 | `num("top_radius", "Top radius in mm; 0 for a point."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:58 | `num("height", "Height in mm.")})},` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:60 | `withOrigin({num("major_radius", "Distance from centre to tube centre, in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:61 | `num("minor_radius", "Tube radius in mm.")})},` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:64 | `num("dx", "Move along X in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:65 | `num("dy", "Move along Y in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:66 | `num("dz", "Move along Z in mm.")}},` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:82 | `num("radius", "Fillet radius in mm. Must be small enough to fit the body's "` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:86 | `num("distance", "Chamfer distance in mm, measured along each adjoining face.")}},` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:91 | `num("radius", "Fillet radius in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:92 | `num("x", "Approximate X position near the edge to fillet, in mm - same "` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:95 | `num("y", "Approximate Y position near the edge, in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:96 | `num("z", "Approximate Z position near the edge, in mm.")}},` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:101 | `num("distance", "Chamfer distance in mm, measured along each adjoining face."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:102 | `num("x", "Approximate X position near the edge to chamfer, in mm - same "` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:105 | `num("y", "Approximate Y position near the edge, in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:106 | `num("z", "Approximate Z position near the edge, in mm.")}},` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:112 | `num("distance", "Distance in mm. Positive extends the face outward (adds "` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:114 | `num("x", "Approximate X position near the face to push/pull, in mm - same "` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:117 | `num("y", "Approximate Y position near the face, in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:118 | `num("z", "Approximate Z position near the face, in mm.")}},` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:124 | `{num("width", "Profile width in mm, along the extrude direction's local X."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:125 | `num("depth", "Profile depth in mm, along the extrude direction's local Y."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:126 | `num("distance", "Extrude distance in mm along the direction (can be "` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:134 | `{num("radius", "Profile radius in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:135 | `num("distance", "Extrude distance in mm along the direction (can be "` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:140 | `num("thickness", "Wall thickness in mm."),` |
+| comment | src/app/Application.cpp:912 | `// ios_platform.mm).` |
+| comment | src/app/Application.cpp:1170 | `// Create a demo box so there's something to see (a 20 mm cube) - but only` |
+| comment | src/app/Application.cpp:1955 | `// Absolute linear deflection (mm) and angular deflection (radians). Lower` |
+| comment | src/app/Application.cpp:2030 | `// or, from before the presets converted, wrote 1 and reloaded as a 1 mm` |
+| comment | src/app/Application.cpp:4383 | `// Sketch origin should lie on the face's plane within 0.05 mm.` |
+| comment | src/app/Application.cpp:4409 | `// origin on the face plane within 0.05 mm). Used to re-adopt a sketch whose` |
+| comment | src/app/Application.cpp:4854 | `// step is the snap lattice and the visible grid, so leaving it at 1 mm` |
+| comment | src/app/Application.cpp:4862 | `// 152 mm - see 0733a59, which reverted exactly that.` |
+| comment | src/app/Application.cpp:5450 | `// the surface's parametric origin ~0.3 mm off-axis - the fitted anchor` |
+| comment | src/app/Application.cpp:5512 | `// 0.64 mm off-axis). Fit a circle to the OUTER wire instead, then` |
+| comment | src/app/Application.cpp:5577 | `// then keeps the wrong band, landing 0.6 mm off with a` |
+| comment | src/app/Application.cpp:5626 | `// 0.64 mm off-axis at the surface origin) that WON` |
+| comment | src/app/Application.cpp:5720 | `// sides at a generous offset (1 mm) so tessellation slack near the` |
+| comment | src/app/Application.cpp:5735 | `const double eps = 1.0; // mm` |
+| comment | src/app/Application.cpp:6363 | `// lines wrote raw millimetres: placing a dimension under any non-mm unit` |
+| comment | src/app/Application.cpp:6398 | `// Hash point positions and circle/arc radii too (quantised to 1e-4 mm)` |
+| comment | src/app/Application.cpp:6737 | `// millimetres. 40 mm is a reasonable first view in millimetres and an` |
+| comment | src/app/Application.cpp:6797 | `// Measured offsets were 10–50% of a cell. At a 1 mm grid that reads as` |
+| comment | src/app/Application.cpp:6798 | `// slightly-fat lines; at 0.1 mm it is most of a cell, i.e. "I can't draw a` |
+| comment | src/app/Application.h:667 | `// buttons are an explicit fine override (a 0.1 nudge under a 1 mm grid must` |
+| comment | src/app/Application.h:946 | `// Ceiling on the opening view of an EMPTY sketch, in mm of half-span.` |
+| comment | src/app/Application.h:948 | `// 300 mm because it reads as a round number in the units that needed` |
+| comment | src/app/Application.h:950 | `// the unit-aware 40-unit span is 12192 mm - a twelve-metre view, which put` |
+| comment | src/app/Application.h:953 | `// 40 mm and this never engages, so the common case does not move.` |
+| comment | src/app/Application.h:955 | `// Metres are the unit this serves least well: a 300 mm view makes every` |
+| comment | src/app/Application.h:961 | `// Sketch grid step in mm. This is the BASE the user chose (a display` |
+| comment | src/app/Application.h:1159 | `// sketch mm, so the tag keeps its grab point instead of snapping its centre` |
+| comment | src/app/Application.h:1362 | `// Scale popup unit mode. Percent is the multi-body-safe default; mm only` |
+| comment | src/app/Application.h:1368 | `// mm-mode text buffer + focus state per user axis (X, Y, Z in Z-up` |
+| comment | src/app/Application.h:1448 | `float  m_threadClearance = 0.0f; // radial fit gap for printed threads (mm)` |
+| comment | src/app/Application.h:1450 | `float  m_threadGrooveWidth = 0.0f; // explicit cut width (mm); 0 = from pitch` |
+| comment | src/app/Application.h:1666 | `float m_patternDistance = 5.0f; // linear: spacing in mm along chosen axis` |
+| comment | src/app/Application.h:2121 | `// (0.1 / 1 / 10 mm) and gets a solid-blue border when snap is on. Click` |
 | comment | src/app/Application_Dialogs.cpp:1032 | `// mm mode only makes sense for a single body - multi-body scale needs a` |
 | comment | src/app/Application_Dialogs.cpp:1038 | `// Resolve the (single-body) bbox now so mm-mode fields can pre-fill from` |
 | identifier/other | src/app/Application_Dialogs.cpp:1077 | `const bool mm = (m_scaleUnitMode == ScaleUnitMode::Millimeter);` |
