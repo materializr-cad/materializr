@@ -14,6 +14,9 @@
 #include "../modeling/CopyOp.h"
 #include "../modeling/MirrorOp.h"
 #include "../modeling/PatternOp.h"
+#include "../modeling/LoftOp.h"
+
+#include <BRepTools.hxx>
 
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
@@ -544,6 +547,21 @@ TopoDS_Face largestFaceFacing(const TopoDS_Shape& body, const gp_Dir& dir) {
     return best;
 }
 
+// The face's own outward normal at its parametric midpoint - same
+// computation largestFaceFacing already does internally, but that helper
+// doesn't hand the normal back out, so loft_bodies (which needs it to
+// decide whether a profile wire's winding needs reversing - see its call
+// site) recomputes it here.
+gp_Vec faceMidpointNormal(const TopoDS_Face& f) {
+    BRepGProp_Face gf(f);
+    Standard_Real u0, u1, v0, v1;
+    gf.Bounds(u0, u1, v0, v1);
+    gp_Pnt p;
+    gp_Vec n;
+    gf.Normal(0.5 * (u0 + u1), 0.5 * (v0 + v1), p, n);
+    return n;
+}
+
 // Parses the same +x/-x/+y/-y/+z/-z vocabulary shell_body's open_face uses,
 // into a world-space direction. Shared by fillet_face_edges/chamfer_face_edges.
 bool parseFaceDirection(const std::string& s, gp_Dir& out, std::string& err) {
@@ -831,6 +849,30 @@ TopoDS_Face buildCircleFace(const gp_Pnt& center, const gp_Dir& dir, double radi
     return mf.Face();
 }
 
+// Same idea as buildRectFace/buildCircleFace but an arbitrary polygon: `pts`
+// are LOCAL 2D coordinates in the profile's own frame (same local-X/local-Y
+// axes buildRectFace's width/depth already use), one edge per consecutive
+// pair, closed from the last point back to the first. extrude_polygon's
+// answer to "I need a custom cross-section, not just a rect or circle."
+TopoDS_Face buildPolygonFace(const gp_Pnt& origin, const gp_Dir& dir,
+                             const std::vector<std::pair<double, double>>& pts) {
+    const gp_Ax3 ax = profileFrame(origin, dir);
+    std::vector<gp_Pnt> worldPts;
+    worldPts.reserve(pts.size());
+    for (const auto& p : pts) {
+        const gp_XYZ off = ax.XDirection().XYZ() * p.first + ax.YDirection().XYZ() * p.second;
+        worldPts.push_back(gp_Pnt(origin.XYZ() + off));
+    }
+    BRepBuilderAPI_MakeWire mw;
+    for (size_t i = 0; i < worldPts.size(); ++i)
+        mw.Add(BRepBuilderAPI_MakeEdge(worldPts[i], worldPts[(i + 1) % worldPts.size()]));
+    if (!mw.IsDone()) return {};
+    Handle(Geom_Plane) plane = new Geom_Plane(ax);
+    BRepBuilderAPI_MakeFace mf(plane, mw.Wire(), Standard_True);
+    if (!mf.IsDone()) return {};
+    return mf.Face();
+}
+
 bool parseExtrudeMode(const std::string& s, ExtrudeMode& out, std::string& err) {
     if (s == "new_body") { out = ExtrudeMode::NewBody; return true; }
     if (s == "union") { out = ExtrudeMode::Union; return true; }
@@ -916,6 +958,128 @@ ToolResult extrudeCircle(PluginContext& ctx, const nlohmann::json& args) {
     catch (...) { return {false, "'dir_x,dir_y,dir_z' must not all be zero"}; }
     const TopoDS_Face profile = buildCircleFace(userPntToWorld(ux, uy, uz), dir, radius);
     return extrudeProfile(ctx, args, profile, distance);
+}
+
+// 'points' rides as a JSON-array-shaped STRING (not a native array/object
+// argument - the tool schema here only has number/string/boolean params, the
+// same constraint tool_calls.arguments itself is under), e.g.
+// "[[0,0],[10,0],[10,5],[0,5]]". Parsed once here; every caller gets the
+// same validation and the same error message shape.
+bool parsePointsArg(const nlohmann::json& args, std::vector<std::pair<double, double>>& out,
+                    std::string& err) {
+    if (!args.contains("points") || !args["points"].is_string()) {
+        err = "missing required argument 'points' (a JSON array string of [x,y] pairs, "
+              "e.g. \"[[0,0],[10,0],[10,5],[0,5]]\")";
+        return false;
+    }
+    nlohmann::json parsed;
+    try {
+        parsed = nlohmann::json::parse(args["points"].get<std::string>());
+    } catch (const nlohmann::json::parse_error&) {
+        err = "'points' must be valid JSON, e.g. \"[[0,0],[10,0],[10,5],[0,5]]\"";
+        return false;
+    }
+    if (!parsed.is_array() || parsed.size() < 3) {
+        err = "'points' must be a JSON array of at least 3 [x,y] pairs";
+        return false;
+    }
+    out.clear();
+    for (const auto& p : parsed) {
+        if (!p.is_array() || p.size() != 2 || !p[0].is_number() || !p[1].is_number()) {
+            err = "each entry in 'points' must be a [x,y] pair of numbers";
+            return false;
+        }
+        out.emplace_back(p[0].get<double>(), p[1].get<double>());
+    }
+    return true;
+}
+
+ToolResult extrudePolygon(PluginContext& ctx, const nlohmann::json& args) {
+    std::string err;
+    double distance;
+    if (!requireNumber(args, "distance", distance, err)) return {false, err};
+    if (distance == 0.0) return {false, "'distance' must not be zero"};
+    std::vector<std::pair<double, double>> pts;
+    if (!parsePointsArg(args, pts, err)) return {false, err};
+    double ux, uy, uz, ddx, ddy, ddz;
+    if (!optionalNumber(args, "x", ux, 0.0, err) ||
+        !optionalNumber(args, "y", uy, 0.0, err) ||
+        !optionalNumber(args, "z", uz, 0.0, err) ||
+        !optionalNumber(args, "dir_x", ddx, 0.0, err) ||
+        !optionalNumber(args, "dir_y", ddy, 0.0, err) ||
+        !optionalNumber(args, "dir_z", ddz, 1.0, err))
+        return {false, err};
+    gp_Dir dir;
+    try { dir = userDirToWorld(ddx, ddy, ddz); }
+    catch (...) { return {false, "'dir_x,dir_y,dir_z' must not all be zero"}; }
+    const TopoDS_Face profile = buildPolygonFace(userPntToWorld(ux, uy, uz), dir, pts);
+    if (profile.IsNull())
+        return {false, "failed to build a face from 'points' - check they form a simple "
+                       "(non-self-intersecting) closed polygon"};
+    return extrudeProfile(ctx, args, profile, distance);
+}
+
+ToolResult loftBodies(PluginContext& ctx, const nlohmann::json& args) {
+    std::string err;
+    int fromId, toId;
+    if (!requireBodyId(ctx.document(), args, "from_body_id", fromId, err) ||
+        !requireBodyId(ctx.document(), args, "to_body_id", toId, err))
+        return {false, err};
+    if (fromId == toId)
+        return {false, "'from_body_id' and 'to_body_id' must be different bodies"};
+    if (!args.contains("from_face") || !args["from_face"].is_string())
+        return {false, "missing required argument 'from_face'"};
+    if (!args.contains("to_face") || !args["to_face"].is_string())
+        return {false, "missing required argument 'to_face'"};
+    std::string fromFaceStr = args["from_face"].get<std::string>();
+    std::string toFaceStr = args["to_face"].get<std::string>();
+    gp_Dir fromDir(0, 0, 1), toDir(0, 0, 1);
+    if (!parseFaceDirection(fromFaceStr, fromDir, err)) return {false, err};
+    if (!parseFaceDirection(toFaceStr, toDir, err)) return {false, err};
+
+    const TopoDS_Face fromFace = largestFaceFacing(ctx.document().getBody(fromId), fromDir);
+    if (fromFace.IsNull())
+        return {false, "no face on body " + std::to_string(fromId) + " faces direction '" +
+                       fromFaceStr + "'"};
+    const TopoDS_Face toFace = largestFaceFacing(ctx.document().getBody(toId), toDir);
+    if (toFace.IsNull())
+        return {false, "no face on body " + std::to_string(toId) + " faces direction '" +
+                       toFaceStr + "'"};
+
+    bool solid = true;
+    if (args.contains("solid")) {
+        if (!args["solid"].is_boolean()) return {false, "'solid' must be a boolean"};
+        solid = args["solid"].get<bool>();
+    }
+
+    TopoDS_Wire fromWire = BRepTools::OuterWire(fromFace);
+    TopoDS_Wire toWire = BRepTools::OuterWire(toFace);
+    // The two faces almost always face TOWARD each other (a "top" paired
+    // with a "bottom", mating sides, ...), so their outward normals are
+    // close to ANTI-parallel - and OuterWire()'s natural winding on each
+    // face (which follows that face's own normal via the right-hand rule)
+    // then winds the two wires OPPOSITE ways as seen along the loft
+    // direction, twisting the result into a self-intersecting bowtie.
+    // Reverse one wire whenever the normals are more anti-parallel than
+    // perpendicular, so ThruSections gets consistent winding instead.
+    if (faceMidpointNormal(fromFace).Dot(faceMidpointNormal(toFace)) < 0.0)
+        toWire.Reverse();
+    auto op = std::make_unique<LoftOp>();
+    op->addProfile(fromWire);
+    op->addProfile(toWire);
+    op->setSolid(solid);
+    if (!ctx.history().pushOperation(std::move(op), ctx.document()))
+        return {false, "loft failed - the two faces may be too different in shape or "
+                       "position for a clean loft (badly twisted or self-intersecting "
+                       "result); try different faces or bodies"};
+    ctx.markMeshesDirty();
+    int newId = ctx.document().getAllBodyIds().back();
+    std::string msg = "Created body " + std::to_string(newId) + " by lofting from body " +
+                      std::to_string(fromId) + "'s '" + fromFaceStr + "' face to body " +
+                      std::to_string(toId) + "'s '" + toFaceStr + "' face";
+    std::string geom;
+    if (describeBodyBox(ctx.document().getBody(newId), geom)) msg += ": " + geom;
+    return {true, msg};
 }
 
 ToolResult shellBody(PluginContext& ctx, const nlohmann::json& args) {
@@ -1028,6 +1192,8 @@ ToolResult executeTool(PluginContext& ctx, const std::string& toolName,
     if (toolName == "push_pull_face") return pushPullFace(ctx, args);
     if (toolName == "extrude_rect") return extrudeRect(ctx, args);
     if (toolName == "extrude_circle") return extrudeCircle(ctx, args);
+    if (toolName == "extrude_polygon") return extrudePolygon(ctx, args);
+    if (toolName == "loft_bodies") return loftBodies(ctx, args);
     if (toolName == "capture_view") return captureView(ctx);
     if (toolName == "list_bodies") return listBodies(ctx);
     return {false, "unknown tool '" + toolName + "'"};

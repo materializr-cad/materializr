@@ -14,8 +14,8 @@ TEST(AiToolSchema, AllToolsContainsExactlyTheExpectedTools) {
         "delete_body", "duplicate_body", "mirror_body", "pattern_body",
         "fillet_all_edges", "chamfer_all_edges", "fillet_face_edges",
         "chamfer_face_edges", "fillet_edge", "chamfer_edge",
-        "push_pull_face", "extrude_rect", "extrude_circle", "shell_body",
-        "capture_view", "list_bodies"};
+        "push_pull_face", "extrude_rect", "extrude_circle", "extrude_polygon",
+        "loft_bodies", "shell_body", "capture_view", "list_bodies"};
     EXPECT_EQ(names, expected);
 }
 

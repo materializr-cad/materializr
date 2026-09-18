@@ -230,6 +230,42 @@ const std::vector<ToolDef>& allTools() {
              {num("radius", "Profile radius in mm."),
               num("distance", "Extrude distance in mm along the direction (can be "
                               "negative to extrude the other way).")}))},
+        {"extrude_polygon", "Create a custom polygon profile and extrude it along a "
+                            "chosen direction - for any cross-section that isn't a "
+                            "plain rectangle or circle (use extrude_rect/extrude_circle "
+                            "for those, they're simpler). Also how to build a custom "
+                            "profile to loft between with loft_bodies.",
+         withExtrudeMode(withOriginAndDirection(
+             {str("points", "The profile's corners, as a JSON array of [x,y] pairs "
+                            "ENCODED AS A STRING (this is the one tool argument here "
+                            "that isn't a plain number/string/bool - it's a JSON array "
+                            "written out as text), e.g. "
+                            "\"[[0,0],[10,0],[10,5],[0,5]]\". At least 3 points, "
+                            "listed in order around the polygon (clockwise or "
+                            "counterclockwise, either works - don't jump between "
+                            "opposite corners). Coordinates are LOCAL to the profile: "
+                            "local x/y are the same axes extrude_rect's width/depth "
+                            "use, relative to this tool's own x/y/z + dir_x/y/z."),
+              num("distance", "Extrude distance in mm along the direction (can be "
+                              "negative to extrude the other way).")}))},
+        {"loft_bodies", "Create a new smooth solid connecting one face of an existing "
+                        "body to a face of a DIFFERENT existing body - e.g. lofting "
+                        "from a round body to a square one. Both source bodies are "
+                        "left untouched; the loft is a separate new body (use "
+                        "boolean_op afterward to fuse everything into one part if "
+                        "that's wanted). Call list_bodies first if either body wasn't "
+                        "created earlier in THIS conversation.",
+         {num("from_body_id", "The id of the first body."),
+          str("from_face", "Which face of from_body_id to start the loft from, by the "
+                           "direction its outward normal points, in the same X/Y/Z "
+                           "convention as add_box (Z is up, Y is depth): one of "
+                           "+x,-x,+y,-y,+z,-z. If more than one face points that way, "
+                           "the largest one is used."),
+          num("to_body_id", "The id of the second body."),
+          str("to_face", "Which face of to_body_id to end the loft at - same "
+                        "direction convention as from_face."),
+          boolean("solid", "true (default) for a solid loft; false for a thin loft "
+                           "shell with no wall thickness.", false)}},
         {"shell_body", "Hollow out a body to a constant wall thickness, optionally "
                        "leaving one face open so the inside is reachable.",
          {num("body_id", "The id of the body to shell."),

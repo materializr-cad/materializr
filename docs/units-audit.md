@@ -258,22 +258,22 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 ## `mm` literals by class
 
 - CONVERTED: 1
-- allowed-by-hand: 77
+- allowed-by-hand: 78
 - comment: 261
 - diagnostic: 10
 - identifier/other: 9
 
 | class | file:line | code |
 |---|---|---|
-| allowed-by-hand | src/ai/AiToolDispatcher.cpp:154 | `"centered at (x=%.1f, y=%.1f, z=%.1f)mm, size (width=%.1f, depth=%.1f, height=%.1f)mm",` |
-| allowed-by-hand | src/ai/AiToolDispatcher.cpp:494 | `" at radius " + std::to_string(radius) + "mm"};` |
-| allowed-by-hand | src/ai/AiToolDispatcher.cpp:518 | `" at distance " + std::to_string(distance) + "mm"};` |
-| allowed-by-hand | src/ai/AiToolDispatcher.cpp:600 | `std::to_string(radius) + "mm"};` |
-| allowed-by-hand | src/ai/AiToolDispatcher.cpp:632 | `std::to_string(distance) + "mm"};` |
-| allowed-by-hand | src/ai/AiToolDispatcher.cpp:706 | `" - at radius " + std::to_string(radius) + "mm"};` |
-| allowed-by-hand | src/ai/AiToolDispatcher.cpp:744 | `" - at distance " + std::to_string(distance) + "mm"};` |
-| allowed-by-hand | src/ai/AiToolDispatcher.cpp:788 | `"mm (positive = outward, negative = cut inward)"};` |
-| allowed-by-hand | src/ai/AiToolDispatcher.cpp:961 | `std::to_string(thickness) + "mm walls" +` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:157 | `"centered at (x=%.1f, y=%.1f, z=%.1f)mm, size (width=%.1f, depth=%.1f, height=%.1f)mm",` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:497 | `" at radius " + std::to_string(radius) + "mm"};` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:521 | `" at distance " + std::to_string(distance) + "mm"};` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:618 | `std::to_string(radius) + "mm"};` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:650 | `std::to_string(distance) + "mm"};` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:724 | `" - at radius " + std::to_string(radius) + "mm"};` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:762 | `" - at distance " + std::to_string(distance) + "mm"};` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:806 | `"mm (positive = outward, negative = cut inward)"};` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:1125 | `std::to_string(thickness) + "mm walls" +` |
 | allowed-by-hand | src/ai/AiToolSchema.cpp:26 | `std::string xDesc = "World X position in mm (default 0).";` |
 | allowed-by-hand | src/ai/AiToolSchema.cpp:27 | `if (anchor) xDesc = "World X position in mm (default 0) - " + std::string(anchor);` |
 | allowed-by-hand | src/ai/AiToolSchema.cpp:29 | `params.push_back(num("y", "World Y position in mm (default 0).", false));` |
@@ -322,7 +322,8 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | allowed-by-hand | src/ai/AiToolSchema.cpp:222 | `num("distance", "Extrude distance in mm along the direction (can be "` |
 | allowed-by-hand | src/ai/AiToolSchema.cpp:230 | `{num("radius", "Profile radius in mm."),` |
 | allowed-by-hand | src/ai/AiToolSchema.cpp:231 | `num("distance", "Extrude distance in mm along the direction (can be "` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:236 | `num("thickness", "Wall thickness in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:249 | `num("distance", "Extrude distance in mm along the direction (can be "` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:272 | `num("thickness", "Wall thickness in mm."),` |
 | comment | src/app/Application.cpp:912 | `// ios_platform.mm).` |
 | comment | src/app/Application.cpp:1170 | `// Create a demo box so there's something to see (a 20 mm cube) - but only` |
 | comment | src/app/Application.cpp:1955 | `// Absolute linear deflection (mm) and angular deflection (radians). Lower` |

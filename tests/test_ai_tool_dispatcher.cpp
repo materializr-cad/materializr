@@ -664,6 +664,71 @@ TEST(AiToolDispatcher, ExtrudeRectRejectsAZeroDistance) {
     EXPECT_FALSE(r.ok);
 }
 
+TEST(AiToolDispatcher, ExtrudePolygonCreatesANewBodyWithTheGivenCrossSectionArea) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+
+    // Right triangle (0,0)-(10,0)-(0,10): area 50, extruded 4mm -> volume 200.
+    ToolResult r = executeTool(ctx, "extrude_polygon",
+        {{"points", "[[0,0],[10,0],[0,10]]"}, {"distance", 4.0}});
+    ASSERT_TRUE(r.ok) << r.message;
+    ASSERT_EQ(doc.getAllBodyIds().size(), 1u);
+    EXPECT_NEAR(volumeOf(doc, doc.getAllBodyIds().front()), 50.0 * 4.0, 1e-3);
+}
+
+TEST(AiToolDispatcher, ExtrudePolygonRejectsFewerThanThreePoints) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ToolResult r = executeTool(ctx, "extrude_polygon",
+        {{"points", "[[0,0],[10,0]]"}, {"distance", 4.0}});
+    EXPECT_FALSE(r.ok);
+}
+
+TEST(AiToolDispatcher, ExtrudePolygonRejectsMalformedJson) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ToolResult r = executeTool(ctx, "extrude_polygon",
+        {{"points", "not json"}, {"distance", 4.0}});
+    EXPECT_FALSE(r.ok);
+}
+
+TEST(AiToolDispatcher, LoftBodiesCreatesANewBodyConnectingTwoOtherBodies) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    // A 10x10x10 box at the origin, and a smaller 4x4x4 box floating above it.
+    ASSERT_TRUE(executeTool(ctx, "add_box",
+        {{"width", 10.0}, {"height", 10.0}, {"depth", 10.0}}).ok);
+    ASSERT_TRUE(executeTool(ctx, "add_box",
+        {{"width", 4.0}, {"height", 4.0}, {"depth", 4.0},
+         {"x", 3.0}, {"y", 3.0}, {"z", 20.0}}).ok);
+    auto ids = doc.getAllBodyIds();
+    ASSERT_EQ(ids.size(), 2u);
+
+    ToolResult r = executeTool(ctx, "loft_bodies",
+        {{"from_body_id", ids[0]}, {"from_face", "+z"},
+         {"to_body_id", ids[1]}, {"to_face", "-z"}});
+    ASSERT_TRUE(r.ok) << r.message;
+    ASSERT_EQ(doc.getAllBodyIds().size(), 3u) << "loft must add a new body, not consume either source";
+    int loftId = doc.getAllBodyIds().back();
+    EXPECT_GT(volumeOf(doc, loftId), 0.0);
+}
+
+TEST(AiToolDispatcher, LoftBodiesRejectsTheSameBodyForBothEnds) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    ASSERT_TRUE(executeTool(ctx, "add_box", {{"width", 10.0}, {"height", 10.0}, {"depth", 10.0}}).ok);
+    int id = doc.getAllBodyIds().front();
+
+    ToolResult r = executeTool(ctx, "loft_bodies",
+        {{"from_body_id", id}, {"from_face", "+z"}, {"to_body_id", id}, {"to_face", "-z"}});
+    EXPECT_FALSE(r.ok);
+}
+
 TEST(AiToolDispatcher, PushPullFacePositiveDistanceAddsMaterial) {
     Document doc;
     History hist;
