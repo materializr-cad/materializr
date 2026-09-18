@@ -103,6 +103,56 @@ bool optionalNumber(const nlohmann::json& args, const char* key, double& out,
     return true;
 }
 
+// User (x,y,z) -> world (x,z,y): Z is up, Y is depth - the same convention
+// add_box/move_body/rotate_body already use (see PrimitiveOp.cpp's worldPnt()
+// and moveBody's comment above). open_face is specified in this same
+// user-facing convention, so it's remapped here before searching the body.
+gp_Dir userDirToWorld(double ux, double uy, double uz) {
+    return gp_Dir(ux, uz, uy);
+}
+
+// Same remap as userDirToWorld, for a POSITION rather than a direction -
+// used by fillet_edge/chamfer_edge to turn the model's "approximately here"
+// point into world space before searching for the nearest edge.
+gp_Pnt userPntToWorld(double ux, double uy, double uz) {
+    return gp_Pnt(ux, uz, uy);
+}
+
+// Inverse of userPntToWorld (the remap is its own inverse: swap Y/Z back).
+// Used by list_bodies (and add_* below) to report existing/just-created
+// geometry's position back to the model in the same convention every tool's
+// x/y/z arguments already use.
+void worldPntToUser(const gp_Pnt& w, double& ux, double& uy, double& uz) {
+    ux = w.X();
+    uy = w.Z();
+    uz = w.Y();
+}
+
+// World bbox of `shape`, reported in the user-facing convention: centre
+// position and size. Shared by list_bodies and add_* (Reported live: a
+// model that just created a body has no way to know where it actually
+// landed - add_box's origin argument is a CORNER, not a centre, and even
+// for the centre-anchored primitives the model still has to do the mental
+// math itself unless told the result directly - so every add_* tool below
+// hands this back immediately instead of making the model spend a
+// follow-up list_bodies call just to find out what it built).
+bool describeBodyBox(const TopoDS_Shape& shape, std::string& out) {
+    if (shape.IsNull()) return false;
+    Bnd_Box box;
+    try { BRepBndLib::Add(shape, box); } catch (...) { return false; }
+    if (box.IsVoid()) return false;
+    double x0, y0, z0, x1, y1, z1;
+    box.Get(x0, y0, z0, x1, y1, z1);
+    double cx, cy, cz;
+    worldPntToUser(gp_Pnt((x0 + x1) / 2.0, (y0 + y1) / 2.0, (z0 + z1) / 2.0), cx, cy, cz);
+    char line[192];
+    std::snprintf(line, sizeof(line),
+        "centered at (x=%.1f, y=%.1f, z=%.1f)mm, size (width=%.1f, depth=%.1f, height=%.1f)mm",
+        cx, cy, cz, x1 - x0, z1 - z0, y1 - y0);
+    out = line;
+    return true;
+}
+
 ToolResult addPrimitive(PluginContext& ctx, PrimitiveOp::Kind kind,
                         const nlohmann::json& args) {
     std::string err;
@@ -173,7 +223,10 @@ ToolResult addPrimitive(PluginContext& ctx, PrimitiveOp::Kind kind,
     ctx.markMeshesDirty();
     // PrimitiveOp appends the new body, so its id is the last one - see Document::addBody.
     int newId = ctx.document().getAllBodyIds().back();
-    return {true, "Created body " + std::to_string(newId)};
+    std::string msg = "Created body " + std::to_string(newId);
+    std::string geom;
+    if (describeBodyBox(ctx.document().getBody(newId), geom)) msg += ": " + geom;
+    return {true, msg};
 }
 
 ToolResult moveBody(PluginContext& ctx, const nlohmann::json& args) {
@@ -347,28 +400,92 @@ TopoDS_Face largestFaceFacing(const TopoDS_Shape& body, const gp_Dir& dir) {
     return best;
 }
 
-// User (x,y,z) -> world (x,z,y): Z is up, Y is depth - the same convention
-// add_box/move_body/rotate_body already use (see PrimitiveOp.cpp's worldPnt()
-// and moveBody's comment above). open_face is specified in this same
-// user-facing convention, so it's remapped here before searching the body.
-gp_Dir userDirToWorld(double ux, double uy, double uz) {
-    return gp_Dir(ux, uz, uy);
+// Parses the same +x/-x/+y/-y/+z/-z vocabulary shell_body's open_face uses,
+// into a world-space direction. Shared by fillet_face_edges/chamfer_face_edges.
+bool parseFaceDirection(const std::string& s, gp_Dir& out, std::string& err) {
+    if (s == "+x") out = userDirToWorld(1, 0, 0);
+    else if (s == "-x") out = userDirToWorld(-1, 0, 0);
+    else if (s == "+y") out = userDirToWorld(0, 1, 0);
+    else if (s == "-y") out = userDirToWorld(0, -1, 0);
+    else if (s == "+z") out = userDirToWorld(0, 0, 1);
+    else if (s == "-z") out = userDirToWorld(0, 0, -1);
+    else { err = "'face' must be one of: +x,-x,+y,-y,+z,-z"; return false; }
+    return true;
 }
 
-// Same remap as userDirToWorld, for a POSITION rather than a direction -
-// used by fillet_edge/chamfer_edge to turn the model's "approximately here"
-// point into world space before searching for the nearest edge.
-gp_Pnt userPntToWorld(double ux, double uy, double uz) {
-    return gp_Pnt(ux, uz, uy);
+// The edges bounding `face`, exactly as they appear on it - fillet_face_edges/
+// chamfer_face_edges' whole reason to exist: round/bevel a named side of a
+// body (e.g. "the top edges") without the model having to guess a point near
+// each individual edge the way fillet_edge/chamfer_edge require.
+std::vector<TopoDS_Edge> edgesOfFace(const TopoDS_Face& face) {
+    std::vector<TopoDS_Edge> edges;
+    for (TopExp_Explorer ex(face, TopAbs_EDGE); ex.More(); ex.Next())
+        edges.push_back(TopoDS::Edge(ex.Current()));
+    return edges;
 }
 
-// Inverse of userPntToWorld (the remap is its own inverse: swap Y/Z back).
-// Used by list_bodies to report existing geometry's position back to the
-// model in the same convention every tool's x/y/z arguments already use.
-void worldPntToUser(const gp_Pnt& w, double& ux, double& uy, double& uz) {
-    ux = w.X();
-    uy = w.Z();
-    uz = w.Y();
+ToolResult filletFaceEdges(PluginContext& ctx, const nlohmann::json& args) {
+    std::string err;
+    int bodyId;
+    double radius;
+    if (!requireBodyId(ctx.document(), args, "body_id", bodyId, err) ||
+        !requirePositive(args, "radius", radius, err))
+        return {false, err};
+    if (!args.contains("face") || !args["face"].is_string())
+        return {false, "missing required argument 'face'"};
+    std::string faceStr = args["face"].get<std::string>();
+    gp_Dir dir(0, 0, 1);
+    if (!parseFaceDirection(faceStr, dir, err)) return {false, err};
+    const TopoDS_Shape& body = ctx.document().getBody(bodyId);
+    const TopoDS_Face face = largestFaceFacing(body, dir);
+    if (face.IsNull())
+        return {false, "no face on body " + std::to_string(bodyId) + " faces direction '" +
+                       faceStr + "'"};
+    std::vector<TopoDS_Edge> edges = edgesOfFace(face);
+    if (edges.empty()) return {false, "that face has no edges"};
+    auto op = std::make_unique<FilletOp>();
+    op->setBody(bodyId);
+    op->setEdges(edges);
+    op->setRadius(radius);
+    if (!ctx.history().pushOperation(std::move(op), ctx.document()))
+        return {false, "fillet failed - the radius is likely too large for this face's "
+                       "smallest edge; try a smaller radius"};
+    ctx.markMeshesDirty();
+    return {true, "Filleted " + std::to_string(edges.size()) + " edge(s) of the '" +
+                  faceStr + "' face of body " + std::to_string(bodyId) + " at radius " +
+                  std::to_string(radius) + "mm"};
+}
+
+ToolResult chamferFaceEdges(PluginContext& ctx, const nlohmann::json& args) {
+    std::string err;
+    int bodyId;
+    double distance;
+    if (!requireBodyId(ctx.document(), args, "body_id", bodyId, err) ||
+        !requirePositive(args, "distance", distance, err))
+        return {false, err};
+    if (!args.contains("face") || !args["face"].is_string())
+        return {false, "missing required argument 'face'"};
+    std::string faceStr = args["face"].get<std::string>();
+    gp_Dir dir(0, 0, 1);
+    if (!parseFaceDirection(faceStr, dir, err)) return {false, err};
+    const TopoDS_Shape& body = ctx.document().getBody(bodyId);
+    const TopoDS_Face face = largestFaceFacing(body, dir);
+    if (face.IsNull())
+        return {false, "no face on body " + std::to_string(bodyId) + " faces direction '" +
+                       faceStr + "'"};
+    std::vector<TopoDS_Edge> edges = edgesOfFace(face);
+    if (edges.empty()) return {false, "that face has no edges"};
+    auto op = std::make_unique<ChamferOp>();
+    op->setBody(bodyId);
+    op->setEdges(edges);
+    op->setDistance(distance);
+    if (!ctx.history().pushOperation(std::move(op), ctx.document()))
+        return {false, "chamfer failed - the distance is likely too large for this "
+                       "face's smallest edge; try a smaller distance"};
+    ctx.markMeshesDirty();
+    return {true, "Chamfered " + std::to_string(edges.size()) + " edge(s) of the '" +
+                  faceStr + "' face of body " + std::to_string(bodyId) + " at distance " +
+                  std::to_string(distance) + "mm"};
 }
 
 // The curve's own parametric midpoint - not the endpoint average, which
@@ -604,7 +721,10 @@ ToolResult extrudeProfile(PluginContext& ctx, const nlohmann::json& args,
     ctx.markMeshesDirty();
     if (mode == ExtrudeMode::NewBody) {
         int newId = ctx.document().getAllBodyIds().back();
-        return {true, "Created body " + std::to_string(newId) + " by extrusion"};
+        std::string msg = "Created body " + std::to_string(newId) + " by extrusion";
+        std::string geom;
+        if (describeBodyBox(ctx.document().getBody(newId), geom)) msg += ": " + geom;
+        return {true, msg};
     }
     return {true, "Extruded (" + modeStr + ") into body " + std::to_string(targetId)};
 }
@@ -714,28 +834,10 @@ ToolResult listBodies(PluginContext& ctx) {
     std::string msg = "Bodies in the document (x/y/z in the usual "
                       "X=width/Y=depth/Z=up convention):\n";
     for (int id : ids) {
-        const TopoDS_Shape& shape = doc.getBody(id);
-        Bnd_Box box;
-        try {
-            if (!shape.IsNull()) BRepBndLib::Add(shape, box);
-        } catch (...) { continue; }
-        if (box.IsVoid()) continue;
-        double x0, y0, z0, x1, y1, z1;
-        box.Get(x0, y0, z0, x1, y1, z1);
-        double cx, cy, cz;
-        worldPntToUser(gp_Pnt((x0 + x1) / 2.0, (y0 + y1) / 2.0, (z0 + z1) / 2.0), cx, cy, cz);
-        // Extent doesn't need the axis remap - it's a size, not a position -
-        // but the LABELS still have to follow the same user convention so
-        // "width" really means the X extent, not whichever axis OCCT's X
-        // happened to land on.
-        char line[320];
-        std::snprintf(line, sizeof(line),
-            "  id %d \"%s\": centered at (x=%.1f, y=%.1f, z=%.1f)mm, "
-            "size (width=%.1f, depth=%.1f, height=%.1f)mm%s\n",
-            id, doc.getBodyName(id).c_str(), cx, cy, cz,
-            x1 - x0, z1 - z0, y1 - y0,
-            doc.isBodyVisible(id) ? "" : " [hidden]");
-        msg += line;
+        std::string geom;
+        if (!describeBodyBox(doc.getBody(id), geom)) continue;
+        msg += "  id " + std::to_string(id) + " \"" + doc.getBodyName(id) + "\": " + geom +
+               (doc.isBodyVisible(id) ? "" : " [hidden]") + "\n";
     }
     return {true, msg};
 }
@@ -770,6 +872,8 @@ ToolResult executeTool(PluginContext& ctx, const std::string& toolName,
     if (toolName == "boolean_op") return booleanOp(ctx, args);
     if (toolName == "fillet_all_edges") return filletAllEdges(ctx, args);
     if (toolName == "chamfer_all_edges") return chamferAllEdges(ctx, args);
+    if (toolName == "fillet_face_edges") return filletFaceEdges(ctx, args);
+    if (toolName == "chamfer_face_edges") return chamferFaceEdges(ctx, args);
     if (toolName == "fillet_edge") return filletEdge(ctx, args);
     if (toolName == "chamfer_edge") return chamferEdge(ctx, args);
     if (toolName == "shell_body") return shellBody(ctx, args);

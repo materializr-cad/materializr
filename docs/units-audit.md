@@ -258,58 +258,62 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 ## `mm` literals by class
 
 - CONVERTED: 1
-- allowed-by-hand: 64
+- allowed-by-hand: 68
 - comment: 261
 - diagnostic: 10
 - identifier/other: 9
 
 | class | file:line | code |
 |---|---|---|
-| allowed-by-hand | src/ai/AiToolDispatcher.cpp:297 | `" at radius " + std::to_string(radius) + "mm"};` |
-| allowed-by-hand | src/ai/AiToolDispatcher.cpp:321 | `" at distance " + std::to_string(distance) + "mm"};` |
-| allowed-by-hand | src/ai/AiToolDispatcher.cpp:445 | `" - at radius " + std::to_string(radius) + "mm"};` |
-| allowed-by-hand | src/ai/AiToolDispatcher.cpp:483 | `" - at distance " + std::to_string(distance) + "mm"};` |
-| allowed-by-hand | src/ai/AiToolDispatcher.cpp:527 | `"mm (positive = outward, negative = cut inward)"};` |
-| allowed-by-hand | src/ai/AiToolDispatcher.cpp:697 | `std::to_string(thickness) + "mm walls" +` |
-| allowed-by-hand | src/ai/AiToolDispatcher.cpp:733 | `"  id %d \"%s\": centered at (x=%.1f, y=%.1f, z=%.1f)mm, "` |
-| allowed-by-hand | src/ai/AiToolDispatcher.cpp:734 | `"size (width=%.1f, depth=%.1f, height=%.1f)mm%s\n",` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:15 | `params.push_back(num("x", "World X position in mm (default 0).", false));` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:16 | `params.push_back(num("y", "World Y position in mm (default 0).", false));` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:17 | `params.push_back(num("z", "World Z position in mm (default 0).", false));` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:47 | `withOrigin({num("width", "Size along X in mm."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:48 | `num("height", "Size along the up axis (Z) in mm."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:49 | `num("depth", "Size along the horizontal depth axis (Y) in mm.")})},` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:51 | `withOrigin({num("radius", "Radius in mm."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:52 | `num("height", "Height in mm.")})},` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:54 | `withOrigin({num("radius", "Radius in mm.")})},` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:56 | `withOrigin({num("bottom_radius", "Base radius in mm."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:57 | `num("top_radius", "Top radius in mm; 0 for a point."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:58 | `num("height", "Height in mm.")})},` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:60 | `withOrigin({num("major_radius", "Distance from centre to tube centre, in mm."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:61 | `num("minor_radius", "Tube radius in mm.")})},` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:64 | `num("dx", "Move along X in mm."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:65 | `num("dy", "Move along Y in mm."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:66 | `num("dz", "Move along Z in mm.")}},` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:82 | `num("radius", "Fillet radius in mm. Must be small enough to fit the body's "` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:86 | `num("distance", "Chamfer distance in mm, measured along each adjoining face.")}},` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:91 | `num("radius", "Fillet radius in mm."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:92 | `num("x", "Approximate X position near the edge to fillet, in mm - same "` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:95 | `num("y", "Approximate Y position near the edge, in mm."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:96 | `num("z", "Approximate Z position near the edge, in mm.")}},` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:101 | `num("distance", "Chamfer distance in mm, measured along each adjoining face."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:102 | `num("x", "Approximate X position near the edge to chamfer, in mm - same "` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:105 | `num("y", "Approximate Y position near the edge, in mm."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:106 | `num("z", "Approximate Z position near the edge, in mm.")}},` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:112 | `num("distance", "Distance in mm. Positive extends the face outward (adds "` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:114 | `num("x", "Approximate X position near the face to push/pull, in mm - same "` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:117 | `num("y", "Approximate Y position near the face, in mm."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:118 | `num("z", "Approximate Z position near the face, in mm.")}},` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:124 | `{num("width", "Profile width in mm, along the extrude direction's local X."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:125 | `num("depth", "Profile depth in mm, along the extrude direction's local Y."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:126 | `num("distance", "Extrude distance in mm along the direction (can be "` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:134 | `{num("radius", "Profile radius in mm."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:135 | `num("distance", "Extrude distance in mm along the direction (can be "` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:140 | `num("thickness", "Wall thickness in mm."),` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:150 | `"centered at (x=%.1f, y=%.1f, z=%.1f)mm, size (width=%.1f, depth=%.1f, height=%.1f)mm",` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:350 | `" at radius " + std::to_string(radius) + "mm"};` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:374 | `" at distance " + std::to_string(distance) + "mm"};` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:456 | `std::to_string(radius) + "mm"};` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:488 | `std::to_string(distance) + "mm"};` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:562 | `" - at radius " + std::to_string(radius) + "mm"};` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:600 | `" - at distance " + std::to_string(distance) + "mm"};` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:644 | `"mm (positive = outward, negative = cut inward)"};` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:817 | `std::to_string(thickness) + "mm walls" +` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:23 | `std::string xDesc = "World X position in mm (default 0).";` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:24 | `if (anchor) xDesc = "World X position in mm (default 0) - " + std::string(anchor);` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:26 | `params.push_back(num("y", "World Y position in mm (default 0).", false));` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:27 | `params.push_back(num("z", "World Z position in mm (default 0).", false));` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:57 | `withOrigin({num("width", "Size along X in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:58 | `num("height", "Size along the up axis (Z) in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:59 | `num("depth", "Size along the horizontal depth axis (Y) in mm.")},` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:65 | `withOrigin({num("radius", "Radius in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:66 | `num("height", "Height in mm.")})},` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:68 | `withOrigin({num("radius", "Radius in mm.")})},` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:70 | `withOrigin({num("bottom_radius", "Base radius in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:71 | `num("top_radius", "Top radius in mm; 0 for a point."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:72 | `num("height", "Height in mm.")})},` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:74 | `withOrigin({num("major_radius", "Distance from centre to tube centre, in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:75 | `num("minor_radius", "Tube radius in mm.")})},` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:78 | `num("dx", "Move along X in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:79 | `num("dy", "Move along Y in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:80 | `num("dz", "Move along Z in mm.")}},` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:96 | `num("radius", "Fillet radius in mm. Must be small enough to fit the body's "` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:100 | `num("distance", "Chamfer distance in mm, measured along each adjoining face.")}},` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:108 | `num("radius", "Fillet radius in mm. Must be small enough to fit the face's "` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:123 | `num("distance", "Chamfer distance in mm, measured along each adjoining face."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:135 | `num("radius", "Fillet radius in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:136 | `num("x", "Approximate X position near the edge to fillet, in mm - same "` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:139 | `num("y", "Approximate Y position near the edge, in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:140 | `num("z", "Approximate Z position near the edge, in mm.")}},` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:147 | `num("distance", "Chamfer distance in mm, measured along each adjoining face."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:148 | `num("x", "Approximate X position near the edge to chamfer, in mm - same "` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:151 | `num("y", "Approximate Y position near the edge, in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:152 | `num("z", "Approximate Z position near the edge, in mm.")}},` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:158 | `num("distance", "Distance in mm. Positive extends the face outward (adds "` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:160 | `num("x", "Approximate X position near the face to push/pull, in mm - same "` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:163 | `num("y", "Approximate Y position near the face, in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:164 | `num("z", "Approximate Z position near the face, in mm.")}},` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:170 | `{num("width", "Profile width in mm, along the extrude direction's local X."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:171 | `num("depth", "Profile depth in mm, along the extrude direction's local Y."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:172 | `num("distance", "Extrude distance in mm along the direction (can be "` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:180 | `{num("radius", "Profile radius in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:181 | `num("distance", "Extrude distance in mm along the direction (can be "` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:186 | `num("thickness", "Wall thickness in mm."),` |
 | comment | src/app/Application.cpp:912 | `// ios_platform.mm).` |
 | comment | src/app/Application.cpp:1170 | `// Create a demo box so there's something to see (a 20 mm cube) - but only` |
 | comment | src/app/Application.cpp:1955 | `// Absolute linear deflection (mm) and angular deflection (radians). Lower` |

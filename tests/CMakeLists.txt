@@ -869,6 +869,14 @@ add_executable(test_ai_session_controller test_ai_session_controller.cpp
 target_link_libraries(test_ai_session_controller PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_ai_session_controller COMMAND test_ai_session_controller)
 
+# ai_harness - manual tool, NOT a gtest and NOT registered with add_test. Drives
+# the real AiSessionController/AiToolDispatcher/OpenAiCompatibleClient path
+# over real HTTP against a mock OpenAI-compatible server, so the tool schema
+# and system prompt can be exercised by hand against a "dumb model" without
+# burning real API usage. See ai_harness_main.cpp for usage.
+add_executable(ai_harness ai_harness_main.cpp)
+target_link_libraries(ai_harness PRIVATE materializr_core)
+
 # test_multibody_export - several disjoint solids export as ONE file with
 # their spacing intact (print-in-place), and visibility selects the subset.
 # StlExport.cpp is not in materializr_core - compiled in directly.

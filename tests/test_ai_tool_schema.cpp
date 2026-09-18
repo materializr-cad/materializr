@@ -11,7 +11,8 @@ TEST(AiToolSchema, AllToolsContainsExactlyTheExpectedTools) {
     std::vector<std::string> expected = {
         "add_box", "add_cylinder", "add_sphere", "add_cone", "add_torus",
         "move_body", "rotate_body", "scale_body", "boolean_op",
-        "fillet_all_edges", "chamfer_all_edges", "fillet_edge", "chamfer_edge",
+        "fillet_all_edges", "chamfer_all_edges", "fillet_face_edges",
+        "chamfer_face_edges", "fillet_edge", "chamfer_edge",
         "push_pull_face", "extrude_rect", "extrude_circle", "shell_body",
         "capture_view", "list_bodies"};
     EXPECT_EQ(names, expected);

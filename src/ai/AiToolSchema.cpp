@@ -11,8 +11,18 @@ ToolParam str(const char* name, const char* desc, bool required = true) {
 }
 // x, y, z default to the world origin - see AiToolDispatcher (Task 5) for
 // where the default is actually applied when the model omits them.
-std::vector<ToolParam> withOrigin(std::vector<ToolParam> params) {
-    params.push_back(num("x", "World X position in mm (default 0).", false));
+//
+// `anchor`, when given, says what point on the shape (x,y,z) actually is -
+// most of these primitives anchor at their centre (sphere, torus) or the
+// centre of their base face (cylinder, cone), which is the assumption a
+// model defaults to anyway and so doesn't need calling out. add_box is the
+// one exception (its origin is a CORNER, not a centre) - see its own call
+// below. Left null for every other caller, which keeps their wording
+// unchanged.
+std::vector<ToolParam> withOrigin(std::vector<ToolParam> params, const char* anchor = nullptr) {
+    std::string xDesc = "World X position in mm (default 0).";
+    if (anchor) xDesc = "World X position in mm (default 0) - " + std::string(anchor);
+    params.push_back(num("x", xDesc.c_str(), false));
     params.push_back(num("y", "World Y position in mm (default 0).", false));
     params.push_back(num("z", "World Z position in mm (default 0).", false));
     return params;
@@ -46,7 +56,11 @@ const std::vector<ToolDef>& allTools() {
         {"add_box", "Create a rectangular box body.",
          withOrigin({num("width", "Size along X in mm."),
                      num("height", "Size along the up axis (Z) in mm."),
-                     num("depth", "Size along the horizontal depth axis (Y) in mm.")})},
+                     num("depth", "Size along the horizontal depth axis (Y) in mm.")},
+                    "this is the box's MINIMUM CORNER, not its centre - the box "
+                    "extends from here by width/depth/height in the +X/+Y/+Z "
+                    "direction. To centre a box at a point, subtract half of "
+                    "width/height/depth from that point's x/y/z first.")},
         {"add_cylinder", "Create a cylindrical body.",
          withOrigin({num("radius", "Radius in mm."),
                      num("height", "Height in mm.")})},
@@ -84,9 +98,39 @@ const std::vector<ToolDef>& allTools() {
         {"chamfer_all_edges", "Bevel every edge of a body by a constant distance.",
          {num("body_id", "The id of the body to chamfer."),
           num("distance", "Chamfer distance in mm, measured along each adjoining face.")}},
+        {"fillet_face_edges", "Round every edge bounding ONE face of a body - e.g. "
+                              "'round the top edges' of a box means this, not "
+                              "fillet_all_edges (which would round the bottom and side "
+                              "edges too) and not fillet_edge (which only takes one edge "
+                              "at a time and needs a guessed point). Prefer this whenever "
+                              "the request names a face/side rather than a specific edge.",
+         {num("body_id", "The id of the body to fillet."),
+          num("radius", "Fillet radius in mm. Must be small enough to fit the face's "
+                        "smallest edge - if it fails, try a smaller radius."),
+          str("face", "Which face's bounding edges to round, by the direction its "
+                      "outward normal points, in the same X/Y/Z convention as add_box "
+                      "(Z is up, Y is depth): '+x','-x','+y','-y','+z' (top),'-z' "
+                      "(bottom). If more than one face points that way, the largest one "
+                      "is used.")}},
+        {"chamfer_face_edges", "Bevel every edge bounding ONE face of a body - e.g. "
+                               "'chamfer the top edges' of a box means this, not "
+                               "chamfer_all_edges (which would bevel the bottom and side "
+                               "edges too) and not chamfer_edge (which only takes one "
+                               "edge at a time and needs a guessed point). Prefer this "
+                               "whenever the request names a face/side rather than a "
+                               "specific edge.",
+         {num("body_id", "The id of the body to chamfer."),
+          num("distance", "Chamfer distance in mm, measured along each adjoining face."),
+          str("face", "Which face's bounding edges to bevel, by the direction its "
+                      "outward normal points, in the same X/Y/Z convention as add_box "
+                      "(Z is up, Y is depth): '+x','-x','+y','-y','+z' (top),'-z' "
+                      "(bottom). If more than one face points that way, the largest one "
+                      "is used.")}},
         {"fillet_edge", "Round a SINGLE edge of a body - whichever one is nearest the "
                         "given point - with a constant radius. For a whole-body round, "
-                        "use fillet_all_edges instead.",
+                        "use fillet_all_edges instead; for every edge of one face (e.g. "
+                        "'the top edges'), use fillet_face_edges instead - it needs no "
+                        "guessed point.",
          {num("body_id", "The id of the body to fillet."),
           num("radius", "Fillet radius in mm."),
           num("x", "Approximate X position near the edge to fillet, in mm - same "
@@ -96,7 +140,9 @@ const std::vector<ToolDef>& allTools() {
           num("z", "Approximate Z position near the edge, in mm.")}},
         {"chamfer_edge", "Bevel a SINGLE edge of a body - whichever one is nearest the "
                          "given point - by a constant distance. For a whole-body bevel, "
-                         "use chamfer_all_edges instead.",
+                         "use chamfer_all_edges instead; for every edge of one face (e.g. "
+                         "'the top edges'), use chamfer_face_edges instead - it needs no "
+                         "guessed point.",
          {num("body_id", "The id of the body to chamfer."),
           num("distance", "Chamfer distance in mm, measured along each adjoining face."),
           num("x", "Approximate X position near the edge to chamfer, in mm - same "
