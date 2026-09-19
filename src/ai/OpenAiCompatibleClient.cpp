@@ -2,27 +2,9 @@
 #include "../core/Base64.h"
 
 #include <curl/curl.h>
+#include <optional>
 
 namespace materializr { namespace ai {
-
-namespace {
-size_t writeToString(void* contents, size_t size, size_t nmemb, void* userp) {
-    size_t total = size * nmemb;
-    std::string* out = static_cast<std::string*>(userp);
-    const size_t kMaxResponse = 4u * 1024 * 1024;
-    if (out->size() + total > kMaxResponse) return 0;
-    out->append(static_cast<char*>(contents), total);
-    return total;
-}
-// See AnthropicClient's identical callback - curl polls this roughly once a
-// second for the whole request (including a local server's cold model
-// load), and a non-zero return aborts it right away with
-// CURLE_ABORTED_BY_CALLBACK.
-int xferAbortIfCancelled(void* clientp, curl_off_t, curl_off_t, curl_off_t, curl_off_t) {
-    const auto* cancelFlag = static_cast<const std::atomic<bool>*>(clientp);
-    return (cancelFlag && cancelFlag->load()) ? 1 : 0;
-}
-} // namespace
 
 nlohmann::json OpenAiCompatibleClient::buildRequestBody(
         const std::vector<ChatMessage>& messages, const std::vector<ToolDef>& tools,
@@ -59,6 +41,13 @@ nlohmann::json OpenAiCompatibleClient::buildRequestBody(
     // safe to send unconditionally to every OpenAI-compatible endpoint, not
     // just OpenRouter.
     out["reasoning"] = {{"max_tokens", 1500}};
+    // Server-Sent-Events streaming - lets sendTurn forward reasoning/content
+    // deltas to the UI as they arrive instead of only after the whole
+    // response lands. See applySseChunk/accumulatorToResponseJson: the FINAL
+    // LlmTurnResult is reconstructed from the accumulated deltas and goes
+    // through the exact same parseResponse as a non-streamed reply, so
+    // nothing downstream needs to know streaming happened at all.
+    out["stream"] = true;
     nlohmann::json msgs = nlohmann::json::array();
     // No separate top-level "system" field in this API shape (unlike
     // Anthropic's Messages API) - a system-role message has to be the first
@@ -178,9 +167,169 @@ LlmTurnResult OpenAiCompatibleClient::parseResponseFromRawBody(const std::string
     return parseResponse(parsed, httpStatus);
 }
 
+void OpenAiCompatibleClient::applySseChunk(const nlohmann::json& chunk, StreamAccumulator& acc,
+                                           const StreamDeltaCallback& onDelta) {
+    if (!chunk.contains("choices") || chunk["choices"].empty() ||
+        !chunk["choices"][0].is_object())
+        return;
+    const auto& choice = chunk["choices"][0];
+    if (choice.contains("finish_reason") && choice["finish_reason"].is_string())
+        acc.finishReason = choice["finish_reason"].get<std::string>();
+    if (!choice.contains("delta") || !choice["delta"].is_object()) return;
+    const auto& delta = choice["delta"];
+    // Some servers stream reasoning under "reasoning", others "reasoning_content" -
+    // forward either straight to the UI; neither is part of the final
+    // LlmTurnResult (see StreamAccumulator's doc comment).
+    for (const char* key : {"reasoning", "reasoning_content"}) {
+        if (delta.contains(key) && delta[key].is_string()) {
+            const std::string piece = delta[key].get<std::string>();
+            if (!piece.empty() && onDelta) onDelta(piece);
+        }
+    }
+    if (delta.contains("content") && delta["content"].is_string()) {
+        const std::string piece = delta["content"].get<std::string>();
+        acc.content += piece;
+        if (!piece.empty() && onDelta) onDelta(piece);
+    }
+    if (delta.contains("tool_calls") && delta["tool_calls"].is_array()) {
+        for (const auto& tc : delta["tool_calls"]) {
+            if (!tc.is_object() || !tc.contains("index") || !tc["index"].is_number())
+                continue;
+            auto& call = acc.toolCallsByIndex[tc["index"].get<int>()];
+            if (tc.contains("id") && tc["id"].is_string())
+                call.id = tc["id"].get<std::string>();
+            if (tc.contains("function") && tc["function"].is_object()) {
+                const auto& fn = tc["function"];
+                if (fn.contains("name") && fn["name"].is_string())
+                    call.name += fn["name"].get<std::string>();
+                // "arguments" arrives as successive string FRAGMENTS to
+                // concatenate, not a replacement each time - a compat server
+                // streams e.g. `{"wid`, `th":10,`, `"height":10}` across
+                // several deltas for one tool call.
+                if (fn.contains("arguments") && fn["arguments"].is_string())
+                    call.arguments += fn["arguments"].get<std::string>();
+            }
+        }
+    }
+}
+
+nlohmann::json OpenAiCompatibleClient::accumulatorToResponseJson(const StreamAccumulator& acc) {
+    nlohmann::json message;
+    message["role"] = "assistant";
+    message["content"] = acc.content.empty() ? nlohmann::json(nullptr) : nlohmann::json(acc.content);
+    if (!acc.toolCallsByIndex.empty()) {
+        nlohmann::json toolCalls = nlohmann::json::array();
+        for (const auto& [index, call] : acc.toolCallsByIndex)
+            toolCalls.push_back({{"id", call.id}, {"type", "function"},
+                                 {"function", {{"name", call.name},
+                                               {"arguments", call.arguments}}}});
+        message["tool_calls"] = toolCalls;
+    }
+    return {{"choices", {{{"message", message}, {"finish_reason", acc.finishReason}}}}};
+}
+
+namespace {
+// One line of an SSE stream, already stripped of its trailing "\r\n" - "" for
+// a blank keep-alive line, the JSON payload for a "data: ..." line (with
+// "[DONE]" reported as std::nullopt, the sentinel that ends the stream), and
+// std::nullopt with no payload processing needed for anything else (SSE
+// comment lines, "event:" lines this API never sends, etc).
+std::optional<std::string> sseDataPayload(const std::string& line) {
+    if (line.rfind("data:", 0) != 0) return std::nullopt;
+    size_t start = line.find_first_not_of(' ', 5);
+    std::string payload = (start == std::string::npos) ? "" : line.substr(start);
+    if (payload == "[DONE]") return std::nullopt;
+    return payload;
+}
+} // namespace
+
+LlmTurnResult OpenAiCompatibleClient::parseSseStream(const std::string& sseBody, long httpStatus,
+                                                     const StreamDeltaCallback& onDelta) {
+    if (httpStatus < 200 || httpStatus >= 300)
+        return parseResponseFromRawBody(sseBody, httpStatus);
+    StreamAccumulator acc;
+    size_t pos = 0;
+    while (pos <= sseBody.size()) {
+        size_t nl = sseBody.find('\n', pos);
+        std::string line = sseBody.substr(pos, (nl == std::string::npos ? sseBody.size() : nl) - pos);
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (auto payload = sseDataPayload(line)) {
+            try {
+                applySseChunk(nlohmann::json::parse(*payload), acc, onDelta);
+            } catch (const nlohmann::json::parse_error&) {
+                // A malformed/truncated chunk line - skip it, matches the
+                // tolerance parseResponse already has for malformed entries.
+            }
+        }
+        if (nl == std::string::npos) break;
+        pos = nl + 1;
+    }
+    return parseResponse(accumulatorToResponseJson(acc), httpStatus);
+}
+
+namespace {
+// CURLOPT_WRITEDATA payload for the real streaming request: everything
+// applySseChunk needs, plus the raw byte buffer curl keeps appending to (used
+// unparsed for a non-2xx error body - see the httpStatus check below, same
+// fallback parseResponseFromRawBody already handled before streaming existed)
+// and how far into it complete lines have already been consumed.
+struct StreamWriteContext {
+    CURL* curl = nullptr;
+    std::string rawBody;
+    size_t consumedUpTo = 0;
+    StreamAccumulator acc;
+    const StreamDeltaCallback* onDelta = nullptr;
+};
+
+size_t streamWriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
+    size_t total = size * nmemb;
+    auto* ctx = static_cast<StreamWriteContext*>(userp);
+    const size_t kMaxResponse = 4u * 1024 * 1024;
+    if (ctx->rawBody.size() + total > kMaxResponse) return 0;
+    ctx->rawBody.append(static_cast<char*>(contents), total);
+
+    // An error response (bad model, bad key, ...) is a plain JSON body, not
+    // an SSE stream, even though "stream": true was requested - leave it in
+    // rawBody untouched for sendTurn to hand to parseResponseFromRawBody
+    // once the transfer finishes, exactly as it did before streaming existed.
+    long httpStatus = 0;
+    curl_easy_getinfo(ctx->curl, CURLINFO_RESPONSE_CODE, &httpStatus);
+    if (httpStatus < 200 || httpStatus >= 300) return total;
+
+    for (;;) {
+        size_t nl = ctx->rawBody.find('\n', ctx->consumedUpTo);
+        if (nl == std::string::npos) break;
+        std::string line = ctx->rawBody.substr(ctx->consumedUpTo, nl - ctx->consumedUpTo);
+        ctx->consumedUpTo = nl + 1;
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (auto payload = sseDataPayload(line)) {
+            try {
+                OpenAiCompatibleClient::applySseChunk(
+                    nlohmann::json::parse(*payload), ctx->acc,
+                    ctx->onDelta ? *ctx->onDelta : StreamDeltaCallback{});
+            } catch (const nlohmann::json::parse_error&) {
+                // Same tolerance as parseSseStream - a stray malformed chunk
+                // must not abort an otherwise-live stream.
+            }
+        }
+    }
+    return total;
+}
+
+// See AnthropicClient's identical callback - curl polls this roughly once a
+// second for the whole request (including a local server's cold model
+// load), and a non-zero return aborts it right away with
+// CURLE_ABORTED_BY_CALLBACK.
+int xferAbortIfCancelled(void* clientp, curl_off_t, curl_off_t, curl_off_t, curl_off_t) {
+    const auto* cancelFlag = static_cast<const std::atomic<bool>*>(clientp);
+    return (cancelFlag && cancelFlag->load()) ? 1 : 0;
+}
+} // namespace
+
 LlmTurnResult OpenAiCompatibleClient::sendTurn(const std::vector<ChatMessage>& messages,
                                               const std::vector<ToolDef>& tools,
-                                              const std::atomic<bool>* cancelFlag) {
+                                              const std::atomic<bool>* cancelFlag,
+                                              const StreamDeltaCallback& onDelta) {
     nlohmann::json requestBody = buildRequestBody(messages, tools, m_model);
     std::string requestStr = requestBody.dump();
 
@@ -192,7 +341,9 @@ LlmTurnResult OpenAiCompatibleClient::sendTurn(const std::vector<ChatMessage>& m
         return r;
     }
 
-    std::string responseBody;
+    StreamWriteContext ctx;
+    ctx.curl = curl;
+    ctx.onDelta = &onDelta;
     struct curl_slist* headers = nullptr;
     headers = curl_slist_append(headers, "Content-Type: application/json");
     // A dummy/empty key is fine for a local server (Ollama/LM Studio) that
@@ -224,8 +375,8 @@ LlmTurnResult OpenAiCompatibleClient::sendTurn(const std::vector<ChatMessage>& m
     // than "slow to answer".
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 600L);
     curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeToString);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &responseBody);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, streamWriteCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &ctx);
     curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
     curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, xferAbortIfCancelled);
     curl_easy_setopt(curl, CURLOPT_XFERINFODATA, cancelFlag);
@@ -244,7 +395,9 @@ LlmTurnResult OpenAiCompatibleClient::sendTurn(const std::vector<ChatMessage>& m
         return r;
     }
     try {
-        return parseResponseFromRawBody(responseBody, httpStatus);
+        if (httpStatus >= 200 && httpStatus < 300)
+            return parseResponse(accumulatorToResponseJson(ctx.acc), httpStatus);
+        return parseResponseFromRawBody(ctx.rawBody, httpStatus);
     } catch (const std::exception& e) {
         LlmTurnResult r;
         r.ok = false;

@@ -25,12 +25,28 @@ void AiSessionController::startTurn() {
     // "never rebuild while busy" rule on its side).
     m_cancelRequested = false;
     m_turnStartedAt = std::chrono::steady_clock::now();
+    {
+        std::lock_guard<std::mutex> lock(m_streamMutex);
+        m_streamingText.clear();
+    }
     LlmClient* client = m_client.get();
     const std::atomic<bool>* cancelFlag = &m_cancelRequested;
     std::vector<ChatMessage> messagesCopy = m_messages;
-    m_future = std::async(std::launch::async, [client, messagesCopy, cancelFlag]() {
-        return client->sendTurn(messagesCopy, allTools(), cancelFlag);
+    // Runs on the SAME background thread as sendTurn itself (see
+    // StreamDeltaCallback's doc comment) - must only touch the mutex-guarded
+    // buffer, never m_scrollback/m_messages or anything ImGui-related.
+    StreamDeltaCallback onDelta = [this](const std::string& deltaText) {
+        std::lock_guard<std::mutex> lock(m_streamMutex);
+        m_streamingText += deltaText;
+    };
+    m_future = std::async(std::launch::async, [client, messagesCopy, cancelFlag, onDelta]() {
+        return client->sendTurn(messagesCopy, allTools(), cancelFlag, onDelta);
     });
+}
+
+std::string AiSessionController::streamingText() const {
+    std::lock_guard<std::mutex> lock(m_streamMutex);
+    return m_streamingText;
 }
 
 void AiSessionController::cancel() {

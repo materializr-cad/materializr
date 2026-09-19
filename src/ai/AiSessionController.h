@@ -6,6 +6,7 @@
 #include <chrono>
 #include <future>
 #include <memory>
+#include <mutex>
 
 namespace materializr { class PluginContext; }
 
@@ -51,6 +52,15 @@ public:
     // alive local model is visibly distinct from a genuinely frozen UI. 0
     // when not busy.
     double elapsedSeconds() const;
+    // Whatever the model has streamed so far for the CURRENT network
+    // round-trip (reasoning text, then its reply) - "" once idle, reset at
+    // the start of every startTurn(). Backed by a mutex, not an atomic
+    // string: onDelta fires from the background LlmClient thread while this
+    // is read from the main thread every frame, and std::string has no
+    // lock-free way to do that safely. Only ever grows during a turn, so a
+    // frame that reads it mid-append just sees last frame's text, not a
+    // torn one.
+    std::string streamingText() const;
 
     // Resets the conversation to empty - history, scrollback, and step
     // count. A no-op while busy (isBusy()): clearing out from under an
@@ -74,6 +84,8 @@ private:
     // address stays valid for the whole call.
     std::atomic<bool> m_cancelRequested{false};
     std::chrono::steady_clock::time_point m_turnStartedAt;
+    mutable std::mutex m_streamMutex;
+    std::string m_streamingText;
 };
 
 } } // namespace materializr::ai

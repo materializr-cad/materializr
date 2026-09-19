@@ -15,6 +15,10 @@
 // Env:
 //   AI_HARNESS_URL   base URL, default http://127.0.0.1:8899/v1
 //   AI_HARNESS_MODEL model name sent in the request body, default "dumb-test-model"
+//   AI_HARNESS_KEY   API key/Bearer token, default "harness-dummy-key" (fine for
+//                    a local mock server) - set this to point the harness at a
+//                    real provider (e.g. OpenRouter) instead of a mock, to watch
+//                    the real streamed reasoning/tool-call text live.
 
 #include "ai/AiSessionController.h"
 #include "ai/OpenAiCompatibleClient.h"
@@ -75,6 +79,7 @@ int main(int argc, char** argv) {
 
     const char* urlEnv = std::getenv("AI_HARNESS_URL");
     const char* modelEnv = std::getenv("AI_HARNESS_MODEL");
+    const char* keyEnv = std::getenv("AI_HARNESS_KEY");
     std::string baseUrl = urlEnv ? urlEnv : "http://127.0.0.1:8899/v1";
     std::string model = modelEnv ? modelEnv : "dumb-test-model";
     std::printf("=== ai_harness: baseUrl=%s model=%s ===\n\n", baseUrl.c_str(), model.c_str());
@@ -91,7 +96,8 @@ int main(int argc, char** argv) {
                  return true;
              });
 
-    auto client = std::make_unique<OpenAiCompatibleClient>("harness-dummy-key", baseUrl, model);
+    std::string apiKey = keyEnv ? keyEnv : "harness-dummy-key";
+    auto client = std::make_unique<OpenAiCompatibleClient>(apiKey, baseUrl, model);
     AiSessionController session(std::move(client));
 
     size_t printedUpTo = 0;
@@ -105,8 +111,19 @@ int main(int argc, char** argv) {
         std::printf("\n----- submitPrompt(%d/%d): %s -----\n", i, argc - 1, argv[i]);
         session.submitPrompt(argv[i]);
         auto deadline = std::chrono::steady_clock::now() + std::chrono::minutes(10);
+        // Print streamed reasoning/content live, as it arrives, the same way
+        // the real chat overlay would show it - only OpenAiCompatibleClient
+        // actually streams (see LlmClient::sendTurn), so against a mock
+        // server or AnthropicClient this just never grows and prints nothing.
+        size_t streamedUpTo = 0;
         while (session.isBusy()) {
             session.poll(ctx);
+            std::string live = session.streamingText();
+            if (live.size() > streamedUpTo) {
+                std::fwrite(live.data() + streamedUpTo, 1, live.size() - streamedUpTo, stdout);
+                std::fflush(stdout);
+                streamedUpTo = live.size();
+            }
             drainScrollback();
             if (std::chrono::steady_clock::now() > deadline) {
                 std::fprintf(stderr, "harness: turn %d timed out after 10 minutes\n", i);

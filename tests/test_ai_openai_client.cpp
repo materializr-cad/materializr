@@ -57,6 +57,107 @@ TEST(OpenAiCompatibleClient, BuildRequestBodyCapsHiddenReasoningTokensSeparately
         << "the reasoning cap must leave real room in max_tokens for the actual reply/tool call";
 }
 
+TEST(OpenAiCompatibleClient, BuildRequestBodyRequestsStreaming) {
+    std::vector<ChatMessage> messages = {{ChatRole::User, "make a box", "", {}}};
+    nlohmann::json body = OpenAiCompatibleClient::buildRequestBody(messages, {}, "gpt-4o");
+    ASSERT_TRUE(body.contains("stream"));
+    EXPECT_TRUE(body["stream"].get<bool>());
+}
+
+TEST(OpenAiCompatibleClient, ParseSseStreamAccumulatesContentAcrossChunksAndFiresOnDelta) {
+    std::string sse =
+        "data: {\"choices\":[{\"delta\":{\"role\":\"assistant\"}}]}\n"
+        "\n"
+        "data: {\"choices\":[{\"delta\":{\"content\":\"Hello\"}}]}\n"
+        "\n"
+        "data: {\"choices\":[{\"delta\":{\"content\":\", world!\"}}]}\n"
+        "\n"
+        "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n"
+        "\n"
+        "data: [DONE]\n";
+    std::vector<std::string> deltas;
+    LlmTurnResult r = OpenAiCompatibleClient::parseSseStream(
+        sse, 200, [&](const std::string& d) { deltas.push_back(d); });
+    ASSERT_TRUE(r.ok);
+    EXPECT_EQ(r.finalText, "Hello, world!");
+    EXPECT_TRUE(r.toolCalls.empty());
+    EXPECT_FALSE(r.truncated);
+    ASSERT_EQ(deltas.size(), 2u);
+    EXPECT_EQ(deltas[0], "Hello");
+    EXPECT_EQ(deltas[1], ", world!");
+}
+
+TEST(OpenAiCompatibleClient, ParseSseStreamReassemblesAToolCallSplitAcrossManyChunks) {
+    // A real compat server fragments a single tool call's id/name in the
+    // FIRST delta for its index, then streams "arguments" as successive
+    // string pieces to concatenate across further deltas at the same index.
+    std::string sse =
+        "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_1\","
+        "\"function\":{\"name\":\"add_box\",\"arguments\":\"\"}}]}}]}\n"
+        "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,"
+        "\"function\":{\"arguments\":\"{\\\"width\\\":\"}}]}}]}\n"
+        "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,"
+        "\"function\":{\"arguments\":\"10}\"}}]}}]}\n"
+        "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"tool_calls\"}]}\n"
+        "data: [DONE]\n";
+    LlmTurnResult r = OpenAiCompatibleClient::parseSseStream(sse, 200);
+    ASSERT_TRUE(r.ok);
+    ASSERT_EQ(r.toolCalls.size(), 1u);
+    EXPECT_EQ(r.toolCalls[0].id, "call_1");
+    EXPECT_EQ(r.toolCalls[0].name, "add_box");
+    EXPECT_EQ(r.toolCalls[0].args["width"], 10);
+}
+
+TEST(OpenAiCompatibleClient, ParseSseStreamFlagsTruncationFromTheFinalChunksFinishReason) {
+    std::string sse =
+        "data: {\"choices\":[{\"delta\":{\"content\":\"partial\"}}]}\n"
+        "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"length\"}]}\n"
+        "data: [DONE]\n";
+    LlmTurnResult r = OpenAiCompatibleClient::parseSseStream(sse, 200);
+    ASSERT_TRUE(r.ok);
+    EXPECT_TRUE(r.truncated);
+}
+
+TEST(OpenAiCompatibleClient, ParseSseStreamFiresOnDeltaForReasoningWithoutKeepingItInFinalText) {
+    // Hidden reasoning is only ever useful live (see StreamAccumulator's doc
+    // comment) - it must reach onDelta for the UI but never end up in the
+    // structured result, same as before streaming existed.
+    std::string sse =
+        "data: {\"choices\":[{\"delta\":{\"reasoning\":\"let me think... \"}}]}\n"
+        "data: {\"choices\":[{\"delta\":{\"reasoning\":\"ok.\"}}]}\n"
+        "data: {\"choices\":[{\"delta\":{\"content\":\"Done.\"}}]}\n"
+        "data: [DONE]\n";
+    std::vector<std::string> deltas;
+    LlmTurnResult r = OpenAiCompatibleClient::parseSseStream(
+        sse, 200, [&](const std::string& d) { deltas.push_back(d); });
+    ASSERT_TRUE(r.ok);
+    EXPECT_EQ(r.finalText, "Done.");
+    ASSERT_EQ(deltas.size(), 3u);
+    EXPECT_EQ(deltas[0], "let me think... ");
+    EXPECT_EQ(deltas[1], "ok.");
+    EXPECT_EQ(deltas[2], "Done.");
+}
+
+TEST(OpenAiCompatibleClient, ParseSseStreamToleratesAMalformedChunkLineWithoutAborting) {
+    std::string sse =
+        "data: {\"choices\":[{\"delta\":{\"content\":\"before \"}}]}\n"
+        "data: not valid json at all\n"
+        "data: {\"choices\":[{\"delta\":{\"content\":\"after\"}}]}\n"
+        "data: [DONE]\n";
+    LlmTurnResult r = OpenAiCompatibleClient::parseSseStream(sse, 200);
+    ASSERT_TRUE(r.ok);
+    EXPECT_EQ(r.finalText, "before after");
+}
+
+TEST(OpenAiCompatibleClient, ParseSseStreamFallsBackToPlainJsonForAnErrorStatus) {
+    // An error response is a plain JSON body, not an SSE stream, even though
+    // "stream": true was in the request - must not try to parse it as one.
+    std::string errorBody = R"({"error":{"message":"model not found"}})";
+    LlmTurnResult r = OpenAiCompatibleClient::parseSseStream(errorBody, 404);
+    EXPECT_FALSE(r.ok);
+    EXPECT_NE(r.error.find("model not found"), std::string::npos);
+}
+
 TEST(OpenAiCompatibleClient, BuildRequestBodyMapsToolResultToARealToolRole) {
     // Unlike Anthropic, OpenAI's shape HAS a dedicated "tool" role.
     std::vector<ChatMessage> messages = {

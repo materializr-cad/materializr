@@ -18,10 +18,19 @@ class ScriptedClient : public LlmClient {
 public:
     explicit ScriptedClient(std::vector<LlmTurnResult> turns)
         : m_turns(std::move(turns)) {}
+    // Optionally fires onDelta with these fake pieces before returning the
+    // scripted result, for tests that exercise the streaming wiring itself
+    // rather than any particular provider's real SSE parsing.
+    explicit ScriptedClient(std::vector<LlmTurnResult> turns,
+                           std::vector<std::string> streamedDeltas)
+        : m_turns(std::move(turns)), m_streamedDeltas(std::move(streamedDeltas)) {}
     LlmTurnResult sendTurn(const std::vector<ChatMessage>& messages,
                           const std::vector<ToolDef>&,
-                          const std::atomic<bool>*) override {
+                          const std::atomic<bool>*,
+                          const StreamDeltaCallback& onDelta) override {
         m_capturedCalls.push_back(messages);
+        if (onDelta)
+            for (const auto& piece : m_streamedDeltas) onDelta(piece);
         if (m_next >= m_turns.size()) {
             LlmTurnResult r;
             r.ok = false;
@@ -37,6 +46,7 @@ private:
     std::vector<LlmTurnResult> m_turns;
     size_t m_next = 0;
     std::vector<std::vector<ChatMessage>> m_capturedCalls;
+    std::vector<std::string> m_streamedDeltas;
 };
 
 // Simulates a slow request the same way curl actually behaves: it doesn't
@@ -47,7 +57,8 @@ private:
 class SlowCancellableClient : public LlmClient {
 public:
     LlmTurnResult sendTurn(const std::vector<ChatMessage>&, const std::vector<ToolDef>&,
-                          const std::atomic<bool>* cancelFlag) override {
+                          const std::atomic<bool>* cancelFlag,
+                          const StreamDeltaCallback&) override {
         auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
         while (!(cancelFlag && cancelFlag->load())) {
             if (std::chrono::steady_clock::now() > deadline) {
@@ -197,6 +208,48 @@ TEST(AiSessionController, TheSecondTurnReplaysTheAssistantsToolUseAndItsResult) 
     EXPECT_EQ(secondCall[1].toolCalls[0].id, "call_1");
     EXPECT_EQ(secondCall[2].role, ChatRole::ToolResult);
     EXPECT_EQ(secondCall[2].toolCallId, "call_1");
+}
+
+TEST(AiSessionController, StreamedDeltasAccumulateIntoStreamingText) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    AiSessionController sess(std::make_unique<ScriptedClient>(
+        std::vector<LlmTurnResult>{finalText("Done.")},
+        std::vector<std::string>{"Thinking about ", "the request...", " ok, done."}));
+
+    sess.submitPrompt("do something");
+    pumpUntilIdle(sess, ctx);
+
+    EXPECT_EQ(sess.streamingText(), "Thinking about the request... ok, done.");
+}
+
+TEST(AiSessionController, StreamingTextResetsAtTheStartOfEachTurnRatherThanAccumulatingForever) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    auto scripted = std::make_unique<ScriptedClient>(
+        std::vector<LlmTurnResult>{finalText("First."), finalText("Second.")},
+        std::vector<std::string>{"same fake delta each turn"});
+    AiSessionController sess(std::move(scripted));
+
+    sess.submitPrompt("first");
+    pumpUntilIdle(sess, ctx);
+    sess.submitPrompt("second");
+    pumpUntilIdle(sess, ctx);
+
+    EXPECT_EQ(sess.streamingText(), "same fake delta each turn")
+        << "startTurn() must clear the buffer, not append across turns";
+}
+
+TEST(AiSessionController, StreamingTextIsEmptyBeforeAnythingIsSubmitted) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    AiSessionController sess(std::make_unique<ScriptedClient>(
+        std::vector<LlmTurnResult>{finalText("Hi.")}));
+    (void)ctx;
+    EXPECT_TRUE(sess.streamingText().empty());
 }
 
 TEST(AiSessionController, ATruncatedEmptyTurnSurfacesAsAnErrorInsteadOfGoingSilent) {

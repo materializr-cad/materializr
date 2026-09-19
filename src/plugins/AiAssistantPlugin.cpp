@@ -121,6 +121,22 @@ void renderOverlay(materializr::PluginContext& ctx) {
         ImGui::TextDisabled("Thinking... %.0fs", session.elapsedSeconds());
         ImGui::SameLine();
         if (ImGui::SmallButton("Cancel")) session.cancel();
+        // The actual point of streaming: show WHY it's taking a while (or
+        // whether it's spiralling) instead of leaving the elapsed counter as
+        // the only signal. Only OpenAiCompatibleClient streams today (see
+        // LlmClient::sendTurn) - against Anthropic this is just always empty
+        // and the section renders nothing, same as before streaming existed.
+        std::string live = session.streamingText();
+        if (!live.empty()) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.7f, 0.7f, 1.0f));
+            ImGui::TextWrapped("%s", live.c_str());
+            ImGui::PopStyleColor();
+            // Pin scroll to the bottom while it's still growing, the same way
+            // a terminal follows fresh output - otherwise the user has to
+            // keep manually re-scrolling down every time more text arrives.
+            if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY())
+                ImGui::SetScrollHereY(1.0f);
+        }
     }
     ImGui::EndChild();
 

@@ -131,7 +131,8 @@ LlmTurnResult AnthropicClient::parseResponseFromRawBody(const std::string& rawBo
 
 LlmTurnResult AnthropicClient::sendTurn(const std::vector<ChatMessage>& messages,
                                        const std::vector<ToolDef>& tools,
-                                       const std::atomic<bool>* cancelFlag) {
+                                       const std::atomic<bool>* cancelFlag,
+                                       const StreamDeltaCallback& /*onDelta*/) {
     nlohmann::json requestBody = buildRequestBody(messages, tools, m_model);
     std::string requestStr = requestBody.dump();
 
