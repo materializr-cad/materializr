@@ -41,10 +41,24 @@ nlohmann::json OpenAiCompatibleClient::buildRequestBody(
     // model of an a10 warthog") spends its ENTIRE 4096-token budget on
     // hidden reasoning before ever emitting a tool call, coming back with
     // finish_reason "length" and a totally empty response (see
-    // AiSessionController::poll()'s `truncated` handling). 16000 gives a
-    // reasoning-heavy model real room to think AND still call a tool
-    // afterward, while still failing fast instead of running unbounded.
+    // AiSessionController::poll()'s `truncated` handling). 16000 is a
+    // generous backstop for the actual reply/tool-call content, which stays
+    // small even for the most verbose tool - the real fix for reasoning
+    // itself is the "reasoning" field below.
     out["max_tokens"] = 16000;
+    // OpenRouter's unified reasoning-control extension: caps HIDDEN thinking
+    // tokens specifically, separate from max_tokens above, so a reasoning
+    // model can't spend its entire budget deliberating and never reach a
+    // tool call - raising max_tokens alone doesn't fix this, a sufficiently
+    // open-ended prompt just reasons for longer (measured 2026-09-18: the
+    // same warthog prompt with no cap here took 255s/~8000 reasoning tokens
+    // and counting on a bigger budget; with this cap, 32s/~700). Real OpenAI
+    // uses a different field ("reasoning_effort") for its own reasoning
+    // models and ignores this one; Ollama's compat layer also silently
+    // ignores unrecognised fields (confirmed, does not error) - so this is
+    // safe to send unconditionally to every OpenAI-compatible endpoint, not
+    // just OpenRouter.
+    out["reasoning"] = {{"max_tokens", 1500}};
     nlohmann::json msgs = nlohmann::json::array();
     // No separate top-level "system" field in this API shape (unlike
     // Anthropic's Messages API) - a system-role message has to be the first

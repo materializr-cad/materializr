@@ -42,6 +42,21 @@ TEST(OpenAiCompatibleClient, BuildRequestBodySetsAMaxTokensCap) {
     EXPECT_GT(body["max_tokens"].get<int>(), 0);
 }
 
+TEST(OpenAiCompatibleClient, BuildRequestBodyCapsHiddenReasoningTokensSeparatelyFromMaxTokens) {
+    // A reasoning model can spend the WHOLE max_tokens budget on hidden
+    // thinking and never reach a tool call (see the 2026-09-18 comment in
+    // buildRequestBody) - OpenRouter's "reasoning.max_tokens" bounds that
+    // specifically. Confirmed real Ollama servers ignore this field rather
+    // than rejecting the request, so it is safe to send unconditionally.
+    std::vector<ChatMessage> messages = {{ChatRole::User, "make a box", "", {}}};
+    nlohmann::json body = OpenAiCompatibleClient::buildRequestBody(messages, {}, "gpt-4o");
+    ASSERT_TRUE(body.contains("reasoning"));
+    ASSERT_TRUE(body["reasoning"].contains("max_tokens"));
+    EXPECT_GT(body["reasoning"]["max_tokens"].get<int>(), 0);
+    EXPECT_LT(body["reasoning"]["max_tokens"].get<int>(), body["max_tokens"].get<int>())
+        << "the reasoning cap must leave real room in max_tokens for the actual reply/tool call";
+}
+
 TEST(OpenAiCompatibleClient, BuildRequestBodyMapsToolResultToARealToolRole) {
     // Unlike Anthropic, OpenAI's shape HAS a dedicated "tool" role.
     std::vector<ChatMessage> messages = {
