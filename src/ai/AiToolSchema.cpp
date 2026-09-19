@@ -56,6 +56,7 @@ std::vector<ToolParam> withExtrudeMode(std::vector<ToolParam> params) {
 
 const std::vector<ToolDef>& allTools() {
     static const std::vector<ToolDef> kTools = {
+        // --- Create a primitive ---
         {"add_box", "Create a rectangular box body.",
          withOrigin({num("width", "Size along X in mm."),
                      num("height", "Size along the up axis (Z) in mm."),
@@ -76,6 +77,7 @@ const std::vector<ToolDef>& allTools() {
         {"add_torus", "Create a torus (ring) body.",
          withOrigin({num("major_radius", "Distance from centre to tube centre, in mm."),
                      num("minor_radius", "Tube radius in mm.")})},
+        // --- Transform an existing body ---
         {"move_body", "Translate an existing body.",
          {num("body_id", "The id of the body to move."),
           num("dx", "Move along X in mm."),
@@ -90,6 +92,7 @@ const std::vector<ToolDef>& allTools() {
         {"scale_body", "Uniformly scale an existing body.",
          {num("body_id", "The id of the body to scale."),
           num("factor", "Scale factor, e.g. 2.0 doubles the size.")}},
+        // --- Combine, remove, or duplicate bodies ---
         {"boolean_op", "Combine two bodies with a boolean operation. Also how to "
                       "SUBTRACT one body from another: mode='subtract' removes "
                       "tool_body_id's volume from target_body_id.",
@@ -141,6 +144,7 @@ const std::vector<ToolDef>& allTools() {
           num("total_angle_degrees", "RADIAL ONLY: total angle the copies span, "
                                      "in degrees (default 360, i.e. a full ring).",
                                      false)}},
+        // --- Round/bevel a whole body or one face ---
         {"fillet_all_edges", "Round every edge of a body with a constant radius.",
          {num("body_id", "The id of the body to fillet."),
           num("radius", "Fillet radius in mm. Must be small enough to fit the body's "
@@ -176,6 +180,7 @@ const std::vector<ToolDef>& allTools() {
                       "(Z is up, Y is depth): '+x','-x','+y','-y','+z' (top),'-z' "
                       "(bottom). If more than one face points that way, the largest one "
                       "is used.")}},
+        // --- Round/bevel a single edge you point at ---
         {"fillet_edge", "Round a SINGLE edge of a body - whichever one is nearest the "
                         "given point - with a constant radius. For a whole-body round, "
                         "use fillet_all_edges instead; for every edge of one face (e.g. "
@@ -200,6 +205,7 @@ const std::vector<ToolDef>& allTools() {
                    "be exact, just closer to the intended edge than to any other."),
           num("y", "Approximate Y position near the edge, in mm."),
           num("z", "Approximate Z position near the edge, in mm.")}},
+        // --- Edit a body's shape directly ---
         {"push_pull_face", "Push or pull a single face of an existing body - whichever "
                           "face is nearest the given point - along its own normal, "
                           "adding or removing material. This is how to nudge one wall, "
@@ -212,6 +218,7 @@ const std::vector<ToolDef>& allTools() {
                    "to the intended face than to any other."),
           num("y", "Approximate Y position near the face, in mm."),
           num("z", "Approximate Z position near the face, in mm.")}},
+        // --- Create a new body from a profile ---
         {"extrude_rect", "Create a rectangular profile and extrude it along a chosen "
                          "direction - a box at any orientation, or (with mode=subtract) "
                          "a rectangular pocket/slot cut into an existing body at any "
@@ -266,6 +273,7 @@ const std::vector<ToolDef>& allTools() {
                         "direction convention as from_face."),
           boolean("solid", "true (default) for a solid loft; false for a thin loft "
                            "shell with no wall thickness.", false)}},
+        // --- Hollow out a body ---
         {"shell_body", "Hollow out a body to a constant wall thickness, optionally "
                        "leaving one face open so the inside is reachable.",
          {num("body_id", "The id of the body to shell."),
@@ -276,6 +284,7 @@ const std::vector<ToolDef>& allTools() {
                            "open-top container),'-z', or 'none' for a fully closed hollow "
                            "shell. If more than one face on the body points that way, the "
                            "largest one is removed.", false)}},
+        // --- Look and inspect (read-only, no Document mutation) ---
         {"capture_view", "Take a screenshot of the current 3D view (whatever camera angle "
                          "is currently on screen - this does not move the camera) and see "
                          "it as an image. Use this to check your own progress, e.g. after a "
@@ -289,6 +298,15 @@ const std::vector<ToolDef>& allTools() {
                         "target_body_id arguments elsewhere only work with a real id from "
                         "here (or from a body you created earlier in this chat). Takes no "
                         "arguments.",
+         {}},
+        {"get_selection", "See what the human currently has selected in the viewport - "
+                          "bodies, faces, edges, vertices, sketches, planes, or axes. Call "
+                          "this when the user refers to something they've clicked on ('this "
+                          "edge', 'the selected face') without giving coordinates. Faces/"
+                          "edges/vertices are reported as a single point you can pass "
+                          "directly to fillet_edge, chamfer_edge, push_pull_face, "
+                          "fillet_face_edges, or chamfer_face_edges as the target. Takes no "
+                          "arguments.",
          {}},
     };
     return kTools;
@@ -312,8 +330,28 @@ const std::string& systemPrompt() {
         "Before editing, moving, or combining anything that isn't a body you just "
         "created earlier in THIS conversation, call list_bodies first - its "
         "reported positions/sizes already use the X/Y/Z convention above, so you "
-        "can use them directly. Use capture_view to look at your own progress "
-        "after a few steps, especially before deciding a multi-step edit is done.";
+        "can use them directly. If the user refers to something they've clicked "
+        "on in the viewport ('this edge', 'the selected face') without giving "
+        "coordinates, call get_selection instead - it reports exactly that, "
+        "already in a form you can pass straight into the matching tool. Use "
+        "capture_view to look at your own progress after a few steps, especially "
+        "before deciding a multi-step edit is done.\n"
+        "\n"
+        "TOOLS BY GROUP (so you don't have to scan the full list at once):\n"
+        "- Create a primitive: add_box, add_cylinder, add_sphere, add_cone, "
+        "add_torus\n"
+        "- Create from a profile: extrude_rect, extrude_circle, extrude_polygon, "
+        "loft_bodies\n"
+        "- Transform: move_body, rotate_body, scale_body\n"
+        "- Combine, remove, or duplicate: boolean_op, delete_body, "
+        "duplicate_body, mirror_body, pattern_body\n"
+        "- Round/bevel a whole body or one face: fillet_all_edges, "
+        "chamfer_all_edges, fillet_face_edges, chamfer_face_edges\n"
+        "- Round/bevel one edge you point at: fillet_edge, chamfer_edge\n"
+        "- Edit a body's shape directly: push_pull_face\n"
+        "- Hollow out: shell_body\n"
+        "- Look and inspect (read-only): list_bodies, get_selection, "
+        "capture_view";
     return kPrompt;
 }
 

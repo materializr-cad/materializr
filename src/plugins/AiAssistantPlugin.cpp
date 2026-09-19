@@ -116,11 +116,10 @@ void renderOverlay(materializr::PluginContext& ctx) {
         // Elapsed time is the whole point: a static "Thinking..." label looks
         // identical whether the model is genuinely working (a slow local
         // model can legitimately take minutes) or the request silently
-        // wedged - a ticking counter is visibly alive either way, and a
-        // Cancel button means never having to wait out a timeout to find out.
+        // wedged - a ticking counter is visibly alive either way, and the
+        // Stop button next to Send below means never having to wait out a
+        // timeout to find out.
         ImGui::TextDisabled("Thinking... %.0fs", session.elapsedSeconds());
-        ImGui::SameLine();
-        if (ImGui::SmallButton("Cancel")) session.cancel();
         // The actual point of streaming: show WHY it's taking a while (or
         // whether it's spiralling) instead of leaving the elapsed counter as
         // the only signal. Only OpenAiCompatibleClient streams today (see
@@ -153,13 +152,20 @@ void renderOverlay(materializr::PluginContext& ctx) {
         // without re-clicking.
         const bool enterPressed = ImGui::InputText("##AiPrompt", inputBuf, sizeof(inputBuf),
                                                     ImGuiInputTextFlags_EnterReturnsTrue);
-        ImGui::SameLine();
-        const bool sendClicked = ImGui::Button("Send");
-        if ((enterPressed || sendClicked) && inputBuf[0] != '\0') {
-            session.submitPrompt(inputBuf);
-            inputBuf[0] = '\0';
-        }
         ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (busy) {
+            // Stop takes over Send's own spot while a turn is in flight -
+            // the standard chat-UI swap, so cancelling a stuck/slow turn
+            // doesn't mean hunting for a button buried in the scrollback.
+            if (ImGui::Button("Stop")) session.cancel();
+        } else {
+            const bool sendClicked = ImGui::Button("Send");
+            if ((enterPressed || sendClicked) && inputBuf[0] != '\0') {
+                session.submitPrompt(inputBuf);
+                inputBuf[0] = '\0';
+            }
+        }
     }
     ImGui::End();
 }

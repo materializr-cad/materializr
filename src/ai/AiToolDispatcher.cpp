@@ -2,6 +2,7 @@
 #include "../plugin/PluginContext.h"
 #include "../core/Document.h"
 #include "../core/History.h"
+#include "../core/SelectionManager.h"
 #include "../modeling/PrimitiveOp.h"
 #include "../modeling/TransformOp.h"
 #include "../modeling/BooleanOp.h"
@@ -1150,6 +1151,91 @@ ToolResult listBodies(PluginContext& ctx) {
     return {true, msg};
 }
 
+// What the human currently has selected in the viewport - the AI's other
+// blind spot besides "what bodies already exist" (see list_bodies above).
+// Without this, a user saying "fillet this edge" while pointing at one in
+// the viewport gives the model nothing to act on; it can only work from
+// coordinates it's told directly. Reports Face/Edge selections as a single
+// representative point in the same user (x=width, y=depth, z=up) convention
+// every other tool's x/y/z already uses, so the model can hand it straight
+// to fillet_edge/chamfer_edge/push_pull_face exactly like a hand-picked
+// approximate point - no new targeting convention to learn.
+ToolResult getSelection(PluginContext& ctx) {
+    const std::vector<SelectionEntry>& entries = ctx.selection().getSelection();
+    if (entries.empty()) return {true, "Nothing is currently selected in the viewport."};
+
+    Document& doc = ctx.document();
+    std::string msg = "Currently selected in the viewport (x/y/z in the usual "
+                      "X=width/Y=depth/Z=up convention):\n";
+    for (const auto& e : entries) {
+        switch (e.type) {
+            case SelectionType::Body: {
+                std::string line = "  a BODY: id " + std::to_string(e.bodyId);
+                std::string geom;
+                if (describeBodyBox(doc.getBody(e.bodyId), geom)) line += " \"" +
+                    doc.getBodyName(e.bodyId) + "\": " + geom;
+                msg += line + "\n";
+                break;
+            }
+            case SelectionType::Face: {
+                if (e.shape.IsNull()) break;
+                GProp_GProps g;
+                try { BRepGProp::SurfaceProperties(TopoDS::Face(e.shape), g); }
+                catch (...) { break; }
+                double fx, fy, fz;
+                worldPntToUser(g.CentreOfMass(), fx, fy, fz);
+                char pt[64];
+                std::snprintf(pt, sizeof(pt), "(%.1f, %.1f, %.1f)", fx, fy, fz);
+                msg += "  a FACE on body id " + std::to_string(e.bodyId) + " at " + pt +
+                       " - pass this point to push_pull_face, fillet_face_edges, or "
+                       "chamfer_face_edges to target it\n";
+                break;
+            }
+            case SelectionType::Edge: {
+                if (e.shape.IsNull()) break;
+                double fx, fy, fz;
+                worldPntToUser(edgeMidpoint(TopoDS::Edge(e.shape)), fx, fy, fz);
+                char pt[64];
+                std::snprintf(pt, sizeof(pt), "(%.1f, %.1f, %.1f)", fx, fy, fz);
+                msg += "  an EDGE on body id " + std::to_string(e.bodyId) + " at " + pt +
+                       " - pass this point to fillet_edge or chamfer_edge to target it\n";
+                break;
+            }
+            case SelectionType::Vertex: {
+                if (e.shape.IsNull()) break;
+                double fx, fy, fz;
+                worldPntToUser(BRep_Tool::Pnt(TopoDS::Vertex(e.shape)), fx, fy, fz);
+                char pt[64];
+                std::snprintf(pt, sizeof(pt), "(%.1f, %.1f, %.1f)", fx, fy, fz);
+                msg += "  a VERTEX on body id " + std::to_string(e.bodyId) + " at " + pt +
+                       " - no tool targets a single vertex; use this point with "
+                       "fillet_edge, chamfer_edge, or push_pull_face instead\n";
+                break;
+            }
+            case SelectionType::Sketch:
+                msg += "  a SKETCH (id " + std::to_string(e.sketchId) +
+                       ") - no AI tool edits sketches yet\n";
+                break;
+            case SelectionType::SketchRegion:
+                msg += "  a SKETCH REGION (sketch id " + std::to_string(e.sketchId) +
+                       ", region " + std::to_string(e.subShapeIndex) +
+                       ") - no AI tool edits sketches yet\n";
+                break;
+            case SelectionType::Plane:
+                msg += "  a construction PLANE (id " + std::to_string(e.planeId) +
+                       ") - no AI tool targets planes yet\n";
+                break;
+            case SelectionType::Axis:
+                msg += "  a construction AXIS (id " + std::to_string(e.axisId) +
+                       ") - no AI tool targets axes yet\n";
+                break;
+            case SelectionType::None:
+                break;
+        }
+    }
+    return {true, msg};
+}
+
 // The only read-only tool: no arguments, no Document/History mutation. The
 // image rides in ToolResult::imagePng - AiSessionController carries it into
 // a ChatMessage, and each LLM client shapes it into its own wire format (see
@@ -1196,6 +1282,7 @@ ToolResult executeTool(PluginContext& ctx, const std::string& toolName,
     if (toolName == "loft_bodies") return loftBodies(ctx, args);
     if (toolName == "capture_view") return captureView(ctx);
     if (toolName == "list_bodies") return listBodies(ctx);
+    if (toolName == "get_selection") return getSelection(ctx);
     return {false, "unknown tool '" + toolName + "'"};
 }
 

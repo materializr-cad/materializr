@@ -1,6 +1,7 @@
 #include "ai/AiToolDispatcher.h"
 #include "core/Document.h"
 #include "core/History.h"
+#include "core/SelectionManager.h"
 #include "plugin/PluginContext.h"
 
 #include <gtest/gtest.h>
@@ -8,17 +9,22 @@
 #include <BRepBndLib.hxx>
 #include <BRepGProp.hxx>
 #include <GProp_GProps.hxx>
+#include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
+#include <TopoDS.hxx>
+#include <TopoDS_Edge.hxx>
+#include <TopoDS_Face.hxx>
 
 using namespace materializr::ai;
 using materializr::PluginContext;
 
 namespace {
 // A PluginContext with just enough bound to run executeTool: Document +
-// History. The other _bind() parameters aren't touched by any tool.
-PluginContext makeCtx(Document& doc, History& hist) {
+// History, plus an optional SelectionManager for the get_selection tests -
+// every other test leaves it null, matching the old behaviour exactly.
+PluginContext makeCtx(Document& doc, History& hist, SelectionManager* sel = nullptr) {
     PluginContext ctx;
-    ctx._bind(&doc, &hist, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+    ctx._bind(&doc, &hist, sel, nullptr, nullptr, nullptr, nullptr, nullptr);
     return ctx;
 }
 double bboxSizeX(Document& doc, int bodyId) {
@@ -915,4 +921,94 @@ TEST(AiToolDispatcher, ListBodiesReportsMultipleBodies) {
     ASSERT_TRUE(r.ok);
     for (int id : doc.getAllBodyIds())
         EXPECT_NE(r.message.find("id " + std::to_string(id)), std::string::npos);
+}
+
+TEST(AiToolDispatcher, GetSelectionReportsNothingSelectedWhenEmpty) {
+    Document doc;
+    History hist;
+    SelectionManager sel;
+    PluginContext ctx = makeCtx(doc, hist, &sel);
+
+    ToolResult r = executeTool(ctx, "get_selection", {});
+    ASSERT_TRUE(r.ok);
+    EXPECT_NE(r.message.find("Nothing is currently selected"), std::string::npos);
+}
+
+TEST(AiToolDispatcher, GetSelectionReportsASelectedBody) {
+    Document doc;
+    History hist;
+    SelectionManager sel;
+    PluginContext ctx = makeCtx(doc, hist, &sel);
+    ASSERT_TRUE(executeTool(ctx, "add_box",
+        {{"width", 10.0}, {"height", 10.0}, {"depth", 10.0}}).ok);
+    int id = doc.getAllBodyIds().front();
+    doc.setBodyName(id, "fuselage");
+
+    SelectionEntry entry;
+    entry.type = SelectionType::Body;
+    entry.bodyId = id;
+    sel.select(entry);
+
+    ToolResult r = executeTool(ctx, "get_selection", {});
+    ASSERT_TRUE(r.ok);
+    EXPECT_NE(r.message.find("BODY"), std::string::npos);
+    EXPECT_NE(r.message.find("id " + std::to_string(id)), std::string::npos);
+    EXPECT_NE(r.message.find("\"fuselage\""), std::string::npos);
+}
+
+TEST(AiToolDispatcher, GetSelectionReportsASelectedFaceAsATargetablePoint) {
+    Document doc;
+    History hist;
+    SelectionManager sel;
+    PluginContext ctx = makeCtx(doc, hist, &sel);
+    ASSERT_TRUE(executeTool(ctx, "add_box",
+        {{"width", 10.0}, {"height", 10.0}, {"depth", 10.0}}).ok);
+    int id = doc.getAllBodyIds().front();
+
+    TopExp_Explorer ex(doc.getBody(id), TopAbs_FACE);
+    ASSERT_TRUE(ex.More());
+    SelectionEntry entry;
+    entry.type = SelectionType::Face;
+    entry.bodyId = id;
+    // TopoDS::Face returns a reference; assigning the call expression
+    // directly into TopoDS_Shape hits an OCCT operator= overload-resolution
+    // trap (SFINAE picks the templated overload's deduced reference type,
+    // then fails the base-class conversion) - going through a named local
+    // of the concrete type first, same as the app's own selection code
+    // (Application_Viewport.cpp), sidesteps it.
+    TopoDS_Face face = TopoDS::Face(ex.Current());
+    entry.shape = face;
+    sel.select(entry);
+
+    ToolResult r = executeTool(ctx, "get_selection", {});
+    ASSERT_TRUE(r.ok);
+    EXPECT_NE(r.message.find("FACE"), std::string::npos);
+    EXPECT_NE(r.message.find("id " + std::to_string(id)), std::string::npos);
+    EXPECT_NE(r.message.find("push_pull_face"), std::string::npos) << r.message;
+}
+
+TEST(AiToolDispatcher, GetSelectionReportsASelectedEdgeAsATargetablePoint) {
+    Document doc;
+    History hist;
+    SelectionManager sel;
+    PluginContext ctx = makeCtx(doc, hist, &sel);
+    ASSERT_TRUE(executeTool(ctx, "add_box",
+        {{"width", 10.0}, {"height", 10.0}, {"depth", 10.0}}).ok);
+    int id = doc.getAllBodyIds().front();
+
+    TopExp_Explorer ex(doc.getBody(id), TopAbs_EDGE);
+    ASSERT_TRUE(ex.More());
+    SelectionEntry entry;
+    entry.type = SelectionType::Edge;
+    entry.bodyId = id;
+    // See the identical comment on the face test above.
+    TopoDS_Edge edge = TopoDS::Edge(ex.Current());
+    entry.shape = edge;
+    sel.select(entry);
+
+    ToolResult r = executeTool(ctx, "get_selection", {});
+    ASSERT_TRUE(r.ok);
+    EXPECT_NE(r.message.find("EDGE"), std::string::npos);
+    EXPECT_NE(r.message.find("id " + std::to_string(id)), std::string::npos);
+    EXPECT_NE(r.message.find("fillet_edge"), std::string::npos) << r.message;
 }
