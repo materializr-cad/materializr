@@ -34,6 +34,14 @@ struct LlmTurnResult {
     std::string error;           // set iff !ok
     std::string finalText;       // set iff ok and toolCalls is empty
     std::vector<ToolCall> toolCalls;
+    // True iff the provider stopped the turn for hitting its output-token cap
+    // (OpenAI-compatible finish_reason "length" / Anthropic stop_reason
+    // "max_tokens") rather than finishing normally. A reasoning model can
+    // spend its ENTIRE budget on hidden "thinking" before ever emitting a
+    // tool call or reply text, landing here with an empty finalText and no
+    // toolCalls - lets the caller tell that apart from a legitimate empty
+    // turn and say so instead of going silent.
+    bool truncated = false;
 };
 
 enum class ToolParamType { Number, String, Boolean };

@@ -193,6 +193,32 @@ TEST(OpenAiCompatibleClient, ParseResponseRejectsAChoiceWithNoMessage) {
     EXPECT_FALSE(r.error.empty());
 }
 
+TEST(OpenAiCompatibleClient, ParseResponseFlagsTruncationOnFinishReasonLength) {
+    // A reasoning model can burn its whole max_tokens budget on hidden
+    // "thinking" before ever emitting content or a tool call - confirmed
+    // 2026-09-18 against a real OpenRouter model. That must be distinguishable
+    // from a legitimate empty turn so AiSessionController can say so.
+    nlohmann::json response = {{"choices", {{
+        {"finish_reason", "length"},
+        {"message", {{"role", "assistant"}, {"content", nullptr}}},
+    }}}};
+    LlmTurnResult r = OpenAiCompatibleClient::parseResponse(response, 200);
+    ASSERT_TRUE(r.ok);
+    EXPECT_TRUE(r.truncated);
+    EXPECT_TRUE(r.toolCalls.empty());
+    EXPECT_TRUE(r.finalText.empty());
+}
+
+TEST(OpenAiCompatibleClient, ParseResponseDoesNotFlagTruncationOnNormalFinish) {
+    nlohmann::json response = {{"choices", {{
+        {"finish_reason", "tool_calls"},
+        {"message", {{"role", "assistant"}, {"content", nullptr}}},
+    }}}};
+    LlmTurnResult r = OpenAiCompatibleClient::parseResponse(response, 200);
+    ASSERT_TRUE(r.ok);
+    EXPECT_FALSE(r.truncated);
+}
+
 TEST(OpenAiCompatibleClient, ParseResponseSkipsAToolCallMissingFunction) {
     // A malformed tool_calls entry lacking "function" must be skipped, not
     // indexed blindly (operator[] on a missing key is UB on a const json).

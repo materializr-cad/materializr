@@ -81,6 +81,21 @@ void AiSessionController::poll(materializr::PluginContext& ctx) {
         if (!result.finalText.empty()) {
             m_scrollback.push_back({ScrollbackLine::Kind::Assistant, result.finalText});
             m_messages.push_back({ChatRole::Assistant, result.finalText, "", {}});
+        } else {
+            // An empty reply with no tool calls used to go here silently -
+            // looked identical to the UI just doing nothing. A reasoning
+            // model spending its whole token budget on hidden "thinking"
+            // before ever producing a tool call or reply text lands here
+            // with result.truncated set - tell the user that specifically
+            // rather than leaving them staring at a chat box that went
+            // quiet with zero explanation.
+            m_scrollback.push_back({ScrollbackLine::Kind::Error,
+                result.truncated
+                    ? "The model ran out of its response budget while "
+                      "thinking, before it replied or used a tool. Try a "
+                      "simpler request, or break it into smaller steps."
+                    : "The model gave an empty reply and made no tool "
+                      "calls for this turn."});
         }
         return;
     }

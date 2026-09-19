@@ -199,6 +199,48 @@ TEST(AiSessionController, TheSecondTurnReplaysTheAssistantsToolUseAndItsResult) 
     EXPECT_EQ(secondCall[2].toolCallId, "call_1");
 }
 
+TEST(AiSessionController, ATruncatedEmptyTurnSurfacesAsAnErrorInsteadOfGoingSilent) {
+    // Used to be a silent no-op (see the removed comment in poll()) - a
+    // reasoning model that spends its whole token budget "thinking" before
+    // ever replying or calling a tool must not look identical to nothing
+    // having happened at all.
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    LlmTurnResult truncated;
+    truncated.ok = true;
+    truncated.truncated = true;
+    AiSessionController sess(std::make_unique<ScriptedClient>(
+        std::vector<LlmTurnResult>{truncated}));
+
+    sess.submitPrompt("make a model of an a10 warthog");
+    pumpUntilIdle(sess, ctx);
+
+    EXPECT_FALSE(sess.isBusy());
+    ASSERT_FALSE(sess.scrollback().empty());
+    const auto& last = sess.scrollback().back();
+    EXPECT_EQ(last.kind, AiSessionController::ScrollbackLine::Kind::Error);
+    EXPECT_NE(last.text.find("budget"), std::string::npos) << last.text;
+}
+
+TEST(AiSessionController, AnEmptyNonTruncatedTurnStillSurfacesAsAnError) {
+    Document doc;
+    History hist;
+    PluginContext ctx = makeCtx(doc, hist);
+    LlmTurnResult empty;
+    empty.ok = true; // no finalText, no toolCalls, not truncated either
+    AiSessionController sess(std::make_unique<ScriptedClient>(
+        std::vector<LlmTurnResult>{empty}));
+
+    sess.submitPrompt("hello");
+    pumpUntilIdle(sess, ctx);
+
+    EXPECT_FALSE(sess.isBusy());
+    ASSERT_FALSE(sess.scrollback().empty());
+    EXPECT_EQ(sess.scrollback().back().kind,
+             AiSessionController::ScrollbackLine::Kind::Error);
+}
+
 TEST(AiSessionController, ANetworkFailureEndsTheSessionWithAnErrorLine) {
     Document doc;
     History hist;

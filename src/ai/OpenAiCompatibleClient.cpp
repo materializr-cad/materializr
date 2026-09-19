@@ -35,7 +35,16 @@ nlohmann::json OpenAiCompatibleClient::buildRequestBody(
     // minutes at normal token-generation speed) instead of failing fast.
     // Real OpenAI and most compatible servers accept this; Ollama's compat
     // layer otherwise defaults to unbounded.
-    out["max_tokens"] = 4096;
+    //
+    // 4096 turned out too tight once reasoning models entered the picture -
+    // confirmed 2026-09-18 that a moderately open-ended prompt ("make a
+    // model of an a10 warthog") spends its ENTIRE 4096-token budget on
+    // hidden reasoning before ever emitting a tool call, coming back with
+    // finish_reason "length" and a totally empty response (see
+    // AiSessionController::poll()'s `truncated` handling). 16000 gives a
+    // reasoning-heavy model real room to think AND still call a tool
+    // afterward, while still failing fast instead of running unbounded.
+    out["max_tokens"] = 16000;
     nlohmann::json msgs = nlohmann::json::array();
     // No separate top-level "system" field in this API shape (unlike
     // Anthropic's Messages API) - a system-role message has to be the first
@@ -102,6 +111,7 @@ LlmTurnResult OpenAiCompatibleClient::parseResponse(const nlohmann::json& body,
     }
     const auto& message = body["choices"][0]["message"];
     r.ok = true;
+    r.truncated = body["choices"][0].value("finish_reason", "") == "length";
     std::string text;
     if (message.contains("content") && message["content"].is_string())
         text = message["content"].get<std::string>();

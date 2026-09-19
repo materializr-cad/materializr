@@ -155,6 +155,28 @@ TEST(AnthropicClient, ParseResponseHandlesUnparseableJsonGracefully) {
     EXPECT_FALSE(r.error.empty());
 }
 
+TEST(AnthropicClient, ParseResponseFlagsTruncationOnMaxTokensStopReason) {
+    nlohmann::json response = {
+        {"stop_reason", "max_tokens"},
+        {"content", nlohmann::json::array()},
+    };
+    LlmTurnResult r = AnthropicClient::parseResponse(response, 200);
+    ASSERT_TRUE(r.ok);
+    EXPECT_TRUE(r.truncated);
+    EXPECT_TRUE(r.toolCalls.empty());
+    EXPECT_TRUE(r.finalText.empty());
+}
+
+TEST(AnthropicClient, ParseResponseDoesNotFlagTruncationOnNormalStop) {
+    nlohmann::json response = {
+        {"stop_reason", "end_turn"},
+        {"content", {{{"type", "text"}, {"text", "Done!"}}}},
+    };
+    LlmTurnResult r = AnthropicClient::parseResponse(response, 200);
+    ASSERT_TRUE(r.ok);
+    EXPECT_FALSE(r.truncated);
+}
+
 TEST(AnthropicClient, ParseResponseCapturesTextAlongsideToolCalls) {
     // A turn can legitimately carry both commentary text and a tool_use block -
     // finalText must not be dropped just because toolCalls is non-empty.
