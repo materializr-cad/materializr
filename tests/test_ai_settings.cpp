@@ -61,6 +61,7 @@ TEST(AiSettings, ExcludedFromJsonExportAndImport) {
     std::ifstream f(exportPath);
     std::string body((std::istreambuf_iterator<char>(f)),
                      std::istreambuf_iterator<char>());
+    f.close();
     EXPECT_EQ(body.find("sk-ant-should-not-leak"), std::string::npos)
         << "an API key must never appear in an exported settings file";
 
