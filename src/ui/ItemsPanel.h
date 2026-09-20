@@ -87,6 +87,9 @@ public:
     // plane's right-click menu. Routes to Application, which opens the
     // rotate-plane-about-axis popup targeting the given plane id.
     void setRotatePlaneCallback(std::function<void(int)> cb) { m_rotatePlane = std::move(cb); }
+    // Called when the user picks "Set Up Tracing Planes" from a mesh body's
+    // right-click menu. Routes to Application::beginMeshTraceSetup.
+    void setMeshTraceCallback(std::function<void(int)> cb) { m_meshTrace = std::move(cb); }
 
     // Returns true if a body was deleted (caller must clear stale hover)
     bool render();
@@ -109,6 +112,7 @@ private:
     std::function<void(int)> m_exportSketchDxf;
     std::function<void(int)> m_duplicateSketch;
     std::function<void(const std::vector<int>&)> m_combineSketches;
+    std::function<void(int)> m_meshTrace;
     std::function<void(int)> m_rotatePlane;
     bool m_sketchModeActive = false;
     int m_activeSketchId = -1;

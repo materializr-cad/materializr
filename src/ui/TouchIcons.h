@@ -104,5 +104,9 @@
 // drawIconCentered. Iconoir has no glyph that reads as "a parallel copy at a
 // fixed distance"; expand/frame glyphs all read as resize.
 #define MZ_ICON_OFFSET     "\xee\x80\x86"  // U+E006
+// Point - sentinel (PUA U+E007): a solid filled square, drawn in
+// drawIconCentered. Matches how a sketch point itself renders (SketchRenderer
+// drawPoints) - Iconoir's outline-only glyphs have no filled dot.
+#define MZ_ICON_POINT      "\xee\x80\x87"  // U+E007
 #define MZ_ICON_FINISH     ICON_IC_CHECK
 #define MZ_ICON_DISCARD    ICON_IC_XMARK

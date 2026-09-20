@@ -20,8 +20,11 @@
 #include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
+#include <TopLoc_Location.hxx>
 #include <TopoDS.hxx>
 #include <gp_Pnt.hxx>
+#include <gp_Trsf.hxx>
+#include <gp_Vec.hxx>
 
 #include <cmath>
 #include <vector>
@@ -158,6 +161,28 @@ TEST(Sew, ASingleClosedShellBecomesASolid) {
     ASSERT_TRUE(op.execute(doc));
     EXPECT_TRUE(op.madeSolid());
     EXPECT_NEAR(vol(doc.getBody(id)), 1000.0, 1e-6);
+}
+
+TEST(Sew, DisjointClosedBodiesAreNotSilentlyDropped) {
+    // Two boxes far apart - each is already its own closed solid, so the
+    // sewn result has zero free edges everywhere even though the boxes
+    // never actually joined into one shape. Before the #115 fix, SewOp
+    // solidified only the first shell and deleted the second body via the
+    // m_consumed removal loop, reporting success while discarding it.
+    Document doc;
+    const int idA = doc.addBody(BRepPrimAPI_MakeBox(10.0, 10.0, 10.0).Shape(), "A");
+    gp_Trsf t;
+    t.SetTranslation(gp_Vec(1000.0, 0.0, 0.0));
+    const TopoDS_Shape boxB =
+        BRepPrimAPI_MakeBox(10.0, 10.0, 10.0).Shape().Moved(TopLoc_Location(t));
+    const int idB = doc.addBody(boxB, "B");
+
+    SewOp op;
+    op.setBodies({idA, idB});
+    EXPECT_FALSE(op.execute(doc));
+    ASSERT_EQ(doc.getAllBodyIds().size(), 2u) << "neither body should be removed";
+    EXPECT_NEAR(vol(doc.getBody(idA)), 1000.0, 1e-6);
+    EXPECT_NEAR(vol(doc.getBody(idB)), 1000.0, 1e-6);
 }
 
 TEST(Sew, RefusesWhenThereIsNothingToDo) {

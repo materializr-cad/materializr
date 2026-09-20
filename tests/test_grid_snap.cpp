@@ -52,6 +52,7 @@
 #include <glm/glm.hpp>
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <set>
 #include <string>
 
@@ -65,6 +66,8 @@ int TextSketch::generate(Sketch*, const std::string&, const std::string&,
 
 using materializr::InferenceGuide;
 using materializr::Sketch;
+using materializr::SketchPoint;
+using materializr::SketchSpline;
 using materializr::SketchTool;
 using materializr::SketchToolMode;
 
@@ -626,4 +629,87 @@ TEST(GridSnap, AClickNearTheAnchorDoesNotBuildADegenerateSegment) {
                 << "mmPerPx=" << mmPerPx
                 << ": a segment must not start and end on the same vertex";
     }
+}
+
+// Regression: an on-spline contact must land ON THE CURVE even with grid
+// snap on. gridAlongLine walks a contact's result along `dir` to hit the
+// lattice - exact for a real straight line (dir IS the line), but an
+// on-spline candidate's `dir` is only the local secant of one sampled
+// polyline segment, so the same walk drags the point off the true curve by
+// an amount that grows with local curvature (Steve: placed a spline
+// endpoint visibly on an existing curve, and the saved coordinate was
+// measurably off it - not floating-point noise, a real few-hundredths-of-a-
+// mm miss that kept the loop it was meant to close from closing).
+TEST(GridSnap, OnSplineContactStaysOnTheCurveWithGridOn) {
+    Sketch sk;
+    // A visibly curved spline (not collinear) so a secant-direction walk
+    // diverges from the true curve.
+    int p0 = sk.addPoint(glm::vec2(0.0f, 0.0f));
+    int p1 = sk.addPoint(glm::vec2(10.0f, 8.0f));
+    int p2 = sk.addPoint(glm::vec2(20.0f, 0.0f));
+    int splineId = sk.addSpline({p0, p1, p2});
+    const SketchSpline* sp = nullptr;
+    for (const auto& s : sk.getSplines())
+        if (s.id == splineId) { sp = &s; break; }
+    ASSERT_NE(sp, nullptr);
+
+    // A fine reference sampling of the TRUE curve (independent of whatever
+    // coarser sampling the interactive tool uses for candidate detection).
+    std::vector<glm::vec2> fine = sk.sampleSpline2D(*sp, 200);
+    auto distToCurve = [&](glm::vec2 p) {
+        float best = std::numeric_limits<float>::max();
+        for (size_t i = 0; i + 1 < fine.size(); ++i) {
+            glm::vec2 a = fine[i], b = fine[i + 1], ab = b - a;
+            float len = glm::length(ab);
+            if (len < 1e-6f) continue;
+            glm::vec2 dir = ab / len;
+            float t = glm::clamp(glm::dot(p - a, dir), 0.0f, len);
+            best = std::min(best, glm::distance(p, a + dir * t));
+        }
+        return best;
+    };
+
+    // A point roughly a quarter of the way along the curve - far enough
+    // from every control point that a vertex snap can't grab it - offset
+    // slightly off the true curve to stand in for ordinary cursor
+    // imprecision, same as the reported case ("clearly close enough and
+    // looked visually right").
+    glm::vec2 curvePt = fine[fine.size() / 4];
+    ASSERT_GT(glm::distance(curvePt, glm::vec2(0.0f, 0.0f)), 2.0f);
+    ASSERT_GT(glm::distance(curvePt, glm::vec2(10.0f, 8.0f)), 2.0f);
+    glm::vec2 clickPos = curvePt + glm::vec2(0.02f, -0.02f);
+
+    SketchTool t;
+    t.setSketch(&sk);
+    t.setPixelScale(0.05f);
+    t.setGridStep(1.0f);
+    t.setSnapToGridEnabled(true);
+    t.setMode(SketchToolMode::Line);
+
+    // Start close by (a directional guide's capture radius scales with
+    // segment length, so a long anchor-to-click segment can let an
+    // unrelated tangent-line guide out-compete the on-spline candidate for
+    // "best" - keep the segment short so on-spline wins on its own merits),
+    // then end near the middle of the spline, away from any of its own
+    // control points, so the click must land via the on-spline projection,
+    // not a vertex snap.
+    t.onMouseDown(clickPos + glm::vec2(-2.0f, -2.0f), false);
+    t.onMouseDown(clickPos, false);
+
+    // The line's end point must be a fresh point ON the curve, not one of
+    // the spline's own control points (which would mean on-spline detection
+    // never fired at all).
+    int newPtId = -1;
+    for (const auto& l : sk.getLines())
+        if (l.startPointId != l.endPointId &&
+            l.endPointId != p0 && l.endPointId != p1 && l.endPointId != p2) {
+            newPtId = l.endPointId;
+            break;
+        }
+    ASSERT_GE(newPtId, 0) << "on-spline contact never fired";
+    const SketchPoint* placed = sk.getPoint(newPtId);
+    ASSERT_NE(placed, nullptr);
+    EXPECT_LT(distToCurve(placed->pos), 1e-3f)
+        << "grid-on landed the contact off the true curve at ("
+        << placed->pos.x << ", " << placed->pos.y << ")";
 }

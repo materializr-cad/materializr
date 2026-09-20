@@ -565,6 +565,20 @@ int Sketch::addRectangle(glm::vec2 corner1, glm::vec2 corner2) {
     addC(ConstraintType::Vertical, l2);
     addC(ConstraintType::Vertical, l4);
 
+    // Width/height as Distance constraints between the corner points, added
+    // unconditionally - not only when a size was typed - so a click-and-drag
+    // rectangle is just as editable from the History panel as a typed one
+    // (the Radius equivalent for circles is handleCircleTool; rectangles had
+    // no such counterpart before, only the read-only H/V rows above).
+    auto addDistance = [&](int a, int b) {
+        Constraint c; c.id = 0; c.type = ConstraintType::Distance;
+        c.entityA = a; c.entityB = b;
+        c.value = glm::length(getPoint(b)->pos - getPoint(a)->pos);
+        c.isSatisfied = true; addConstraint(c);
+    };
+    addDistance(p1, p2); // width
+    addDistance(p2, p3); // height
+
     return firstLineId;
 }
 
@@ -627,12 +641,32 @@ std::vector<glm::vec2> Sketch::interpolate2D(const std::vector<glm::vec2>& ctrl,
         if (i >= n) return ctrl[n - 1] * 2.0f - ctrl[n - 2];
         return ctrl[i];
     };
+    // `segsPerSpan` is a per-caller MINIMUM, not the actual count: a control
+    // point pair a handful of mm apart (anywhere someone clicks close
+    // together, e.g. SketchTool's freehand spline) wants exactly that many:
+    // fine at any zoom, cheap to redraw every frame. But a span can also be
+    // much longer than that - recoverSketchLoop's Douglas-Peucker thinning
+    // keeps a control point only where the traced boundary actually turns,
+    // so a gently curving stretch of a real part's outline can go many mm
+    // between kept points. A fixed segment count there stops looking like a
+    // curve at all once zoomed in past a few chords - the same shape of bug
+    // as a JPEG's 8x8 blocks: fine from a distance, a grid up close. Scale
+    // the segment count up by the span's own control-to-control distance so
+    // the chord length stays bounded regardless of how sparse the control
+    // points are; the cap keeps one absurdly long or degenerate span from
+    // making a single redraw expensive.
+    constexpr float kTargetSegMm = 0.4f;
+    constexpr int kMaxSegsPerSpan = 200;
     int spans = closed ? n : n - 1;
     std::vector<glm::vec2> out;
     out.reserve(spans * segsPerSpan + 1);
     for (int s = 0; s < spans; ++s) {
-        for (int i = 0; i < segsPerSpan; ++i) {
-            float t = static_cast<float>(i) / segsPerSpan;
+        const float spanLen = glm::length(at(s + 1) - at(s));
+        const int segs = std::clamp(
+            static_cast<int>(std::ceil(spanLen / kTargetSegMm)),
+            segsPerSpan, kMaxSegsPerSpan);
+        for (int i = 0; i < segs; ++i) {
+            float t = static_cast<float>(i) / segs;
             out.push_back(catmullRomPoint(at(s - 1), at(s), at(s + 1),
                                           at(s + 2), t));
         }
@@ -668,6 +702,48 @@ const std::vector<SketchPolygon>& Sketch::getPolygons() const {
 // Element removal
 
 void Sketch::removeElement(int id) {
+    // If `id` already names a live polygon, skip straight to the existing
+    // whole-polygon cascade below and skip the ownership scan entirely. This
+    // is what makes the redirect below provably terminate in one recursion
+    // step: every redirect target is a real m_polygons[i].id, and a call
+    // with that id can never re-enter this branch, regardless of what a
+    // polygon's centerPointId/vertexPointIds/lineIds claims (self-reference
+    // or a cycle between two polygons is normally impossible - ids are
+    // unique and machine-generated - but ProjectIO/addRaw*/CombineSketchesOp
+    // never validate ids on load or merge, so corrupted/merged data can
+    // contain one; without this guard that would stack-overflow instead of
+    // just misbehaving).
+    bool isPolygonId = std::any_of(m_polygons.begin(), m_polygons.end(),
+        [id](const SketchPolygon& p) { return p.id == id; });
+
+    if (!isPolygonId) {
+        // A polygon's vertices and edge lines are generated together
+        // (addPolygon) and its center point can additionally be an existing,
+        // pre-shared point (handlePolygonTool welds onto one via
+        // findCoincidentPoint) - either way SketchPolygon (centerPointId +
+        // radius + sides) has no valid state for "missing one edge/vertex".
+        // Deleting any owned piece by its own id (reachable via ordinary
+        // point/line picking - handleSelectTool has no polygon awareness)
+        // must delete the whole polygon instead, same as clicking any edge
+        // in the Trim tool already does (pickSketchElement's FullDelete
+        // case). A point can be the shared center of MORE THAN ONE polygon -
+        // collect every owner before touching any of them, so a shared point
+        // takes out every polygon that owns it, not just the first found.
+        std::vector<int> owningPolygonIds;
+        for (const auto& p : m_polygons) {
+            bool owned = p.centerPointId == id ||
+                std::find(p.vertexPointIds.begin(), p.vertexPointIds.end(), id) !=
+                    p.vertexPointIds.end() ||
+                std::find(p.lineIds.begin(), p.lineIds.end(), id) !=
+                    p.lineIds.end();
+            if (owned) owningPolygonIds.push_back(p.id);
+        }
+        if (!owningPolygonIds.empty()) {
+            for (int polyId : owningPolygonIds) removeElement(polyId);
+            return;
+        }
+    }
+
     m_lines.erase(
         std::remove_if(m_lines.begin(), m_lines.end(),
             [id](const SketchLine& l) { return l.id == id; }),
@@ -688,6 +764,20 @@ void Sketch::removeElement(int id) {
             [id](const SketchSpline& s) { return s.id == id; }),
         m_splines.end());
 
+    // Deleting a polygon must also remove its own edge lines - the renderer
+    // draws polygon edges purely via drawLines() over m_lines, so a polygon
+    // record erased below with its lines left behind would keep rendering
+    // every edge forever.
+    for (const auto& p : m_polygons) {
+        if (p.id != id) continue;
+        std::unordered_set<int> polyLineIds(p.lineIds.begin(), p.lineIds.end());
+        m_lines.erase(
+            std::remove_if(m_lines.begin(), m_lines.end(),
+                [&polyLineIds](const SketchLine& l) { return polyLineIds.count(l.id) != 0; }),
+            m_lines.end());
+        break;
+    }
+
     m_polygons.erase(
         std::remove_if(m_polygons.begin(), m_polygons.end(),
             [id](const SketchPolygon& p) { return p.id == id; }),
@@ -697,6 +787,40 @@ void Sketch::removeElement(int id) {
         std::remove_if(m_points.begin(), m_points.end(),
             [id](const SketchPoint& p) { return p.id == id; }),
         m_points.end());
+}
+
+void Sketch::removeElements(const std::vector<int>& ids) {
+    // Resolve every polygon touched by ANY id in this batch against the
+    // sketch's state BEFORE deleting anything. A batch selection can contain
+    // more than one piece of the same polygon (two vertices, an edge plus a
+    // vertex, ...) - deleting the first piece's owning polygon (see
+    // removeElement) would make a later piece from the SAME polygon
+    // undetectable as polygon-owned by the time its turn comes, and it would
+    // fall through to plain, unconditional erasure - corrupting any OTHER,
+    // unselected geometry still sharing that point. Resolving the whole
+    // batch up front and skipping ids already covered by a polygon's own
+    // cascade closes that window for any size/order of batch.
+    std::unordered_set<int> polygonOwnedIds;
+    std::vector<int> polygonsToDelete;
+    for (int id : ids) {
+        for (const auto& p : m_polygons) {
+            bool owned = p.centerPointId == id ||
+                std::find(p.vertexPointIds.begin(), p.vertexPointIds.end(), id) !=
+                    p.vertexPointIds.end() ||
+                std::find(p.lineIds.begin(), p.lineIds.end(), id) !=
+                    p.lineIds.end();
+            if (!owned) continue;
+            polygonOwnedIds.insert(id);
+            if (std::find(polygonsToDelete.begin(), polygonsToDelete.end(), p.id) ==
+                polygonsToDelete.end())
+                polygonsToDelete.push_back(p.id);
+        }
+    }
+    for (int polyId : polygonsToDelete) removeElement(polyId);
+    for (int id : ids) {
+        if (polygonOwnedIds.count(id)) continue; // handled via its polygon above
+        removeElement(id);
+    }
 }
 
 int Sketch::pruneOrphanPoints() {
@@ -2071,6 +2195,156 @@ int Sketch::elementCount() const {
 
 int Sketch::pointCount() const {
     return static_cast<int>(m_points.size());
+}
+
+bool recoverSketchLoop(Sketch* sk, const std::vector<glm::vec2>& P, bool closed) {
+    const int n = static_cast<int>(P.size());
+    if (n < 2) return false;
+
+    auto emitPolyline = [&]() {
+        std::vector<int> ids; ids.reserve(P.size());
+        for (const auto& q : P) ids.push_back(sk->addPoint(q, /*fromText=*/true));
+        for (size_t i = 0; i + 1 < ids.size(); ++i)
+            sk->addLine(ids[i], ids[i + 1], /*fromText=*/true);
+        if (closed && ids.size() >= 3)
+            sk->addLine(ids.back(), ids.front(), /*fromText=*/true);
+    };
+    if (n < 4 || n > 8000) { emitPolyline(); return true; }
+
+    glm::vec2 mn = P[0], mx = P[0];
+    for (const auto& q : P) { mn = glm::min(mn, q); mx = glm::max(mx, q); }
+    const double diag = glm::length(mx - mn);
+    if (diag < 1e-9) { emitPolyline(); return true; }
+
+    const double circTol = 0.004 * diag;    // whole-loop circle acceptance
+    const double dpTol   = 0.0016 * diag;   // Douglas-Peucker fidelity (spline / line)
+    const double CORNER  = 0.52;   // ~30 deg: a sharper turn splits a segment (curves stay smooth)
+
+    // Cyclic accessor: wraps for closed loops; also handles negative indices.
+    auto at = [&](int k) -> glm::vec2 { return P[((k % n) + n) % n]; };
+
+    // Whole closed loop that is one circle -> SketchCircle (Kasa fit).
+    if (closed && n >= 8) {
+        double Sx=0,Sy=0,Sxx=0,Syy=0,Sxy=0,Sz=0,Sxz=0,Syz=0;
+        for (int k = 0; k < n; ++k) { glm::vec2 p = at(k); double x=p.x,y=p.y,z=x*x+y*y;
+            Sx+=x;Sy+=y;Sxx+=x*x;Syy+=y*y;Sxy+=x*y;Sz+=z;Sxz+=x*z;Syz+=y*z; }
+        const double md = n;
+        double det = Sxx*(Syy*md-Sy*Sy) - Sxy*(Sxy*md-Sy*Sx) + Sx*(Sxy*Sy-Syy*Sx);
+        if (std::abs(det) > 1e-12) {
+            double b1=-Sxz,b2=-Syz,b3=-Sz;
+            double D=( b1*(Syy*md-Sy*Sy) - Sxy*(b2*md-Sy*b3) + Sx*(b2*Sy-Syy*b3))/det;
+            double E=( Sxx*(b2*md-Sy*b3) - b1*(Sxy*md-Sy*Sx) + Sx*(Sxy*b3-b2*Sx))/det;
+            double F=( Sxx*(Syy*b3-b2*Sy) - Sxy*(Sxy*b3-b2*Sx) + b1*(Sxy*Sy-Syy*Sx))/det;
+            glm::vec2 C(static_cast<float>(-D*0.5), static_cast<float>(-E*0.5));
+            double r2 = (D*D+E*E)*0.25 - F;
+            if (r2 > 0) {
+                double R = std::sqrt(r2);
+                if (std::isfinite(R) && R > 1e-6 && R < 60.0*diag) {
+                    double maxErr = 0;
+                    for (int k = 0; k < n; ++k)
+                        maxErr = std::max(maxErr,
+                                          std::abs(static_cast<double>(glm::length(at(k)-C)) - R));
+                    if (maxErr < circTol) { sk->addCircle(sk->addPoint(C, false), R); return true; }
+                }
+            }
+        }
+    }
+
+    // Otherwise: split at sharp corners (so straight edges stay straight),
+    // then each run becomes a single line or a spline that passes THROUGH the
+    // samples. Centripetal Catmull-Rom interpolates its control points, so a
+    // spline joins its neighbours exactly - no gaps, and truer to the curve
+    // than an arc fit would be.
+    auto turnAt = [&](int i) -> double {
+        glm::vec2 v1 = at(i) - at(i-1), v2 = at(i+1) - at(i);
+        if (glm::length(v1) < 1e-9f || glm::length(v2) < 1e-9f) return 0.0;
+        double cr = static_cast<double>(v1.x)*v2.y - static_cast<double>(v1.y)*v2.x;
+        double dt = static_cast<double>(v1.x)*v2.x + static_cast<double>(v1.y)*v2.y;
+        return std::atan2(cr, dt);
+    };
+    // A corner is simply a sample whose turn exceeds the threshold. (An earlier
+    // "concentration" test - turn must beat its neighbours combined - was meant
+    // to keep tight rounded tips smooth, but small text has corners spaced only
+    // a sample or two apart, so a corner's neighbour is another corner and the
+    // test wrongly rejected it, rounding whole letters into comic-sans. The tip
+    // stays smooth without it: a smooth curve's per-sample turn is below the
+    // threshold, a sharp vertex's is above.)
+    auto isCorner = [&](int i) -> bool {
+        return std::abs(turnAt(i)) > CORNER;
+    };
+    std::vector<int> corners;
+    if (closed) { for (int i = 0; i < n; ++i)     if (isCorner(i)) corners.push_back(i); }
+    else        { for (int i = 1; i < n - 1; ++i) if (isCorner(i)) corners.push_back(i); }
+    if (static_cast<int>(corners.size()) > n / 2) { emitPolyline(); return true; } // jagged
+
+    // Douglas-Peucker over global indices [a..b] inclusive; appends kept indices.
+    auto dp = [&](int a, int b, std::vector<int>& kept) {
+        const int m = b - a;
+        std::vector<glm::vec2> rp(m + 1);
+        for (int k = 0; k <= m; ++k) rp[k] = at(a + k);
+        std::vector<char> keep(m + 1, 0); keep[0] = keep[m] = 1;
+        std::vector<std::pair<int,int>> stk; stk.push_back({0, m});
+        while (!stk.empty()) {
+            int lo = stk.back().first, hiK = stk.back().second; stk.pop_back();
+            if (hiK <= lo + 1) continue;
+            glm::vec2 A = rp[lo], B = rp[hiK], AB = B - A;
+            double L = glm::length(AB);
+            double best = -1.0; int bi = -1;
+            for (int k = lo + 1; k < hiK; ++k) {
+                glm::vec2 w = rp[k] - A;
+                double d = (L < 1e-12) ? static_cast<double>(glm::length(w))
+                    : std::abs(static_cast<double>(w.x)*AB.y - static_cast<double>(w.y)*AB.x) / L;
+                if (d > best) { best = d; bi = k; }
+            }
+            if (best > dpTol && bi > lo) { keep[bi] = 1;
+                stk.push_back({lo, bi}); stk.push_back({bi, hiK}); }
+        }
+        for (int k = 0; k <= m; ++k) if (keep[k]) kept.push_back(a + k);
+    };
+
+    // Shared corner/boundary points snap; spline-internal points stay fromText.
+    std::vector<int> cornerPid(n, -1);
+    auto cornerId = [&](int gi) -> int { int kk = ((gi % n) + n) % n;
+        if (cornerPid[kk] < 0) cornerPid[kk] = sk->addPoint(at(kk), /*fromText=*/false);
+        return cornerPid[kk]; };
+    auto internalId = [&](int gi) -> int { return sk->addPoint(at(gi), /*fromText=*/true); };
+
+    auto emitRun = [&](int a, int b) {
+        std::vector<int> kept; dp(a, b, kept);
+        if (kept.size() <= 2) {                     // straight run -> single line
+            sk->addLine(cornerId(a), cornerId(b), /*fromText=*/true);
+            return;
+        }
+        std::vector<int> ctrl; ctrl.reserve(kept.size());
+        for (size_t k = 0; k < kept.size(); ++k)
+            ctrl.push_back((k == 0 || k + 1 == kept.size()) ? cornerId(kept[k])
+                                                            : internalId(kept[k]));
+        sk->addSpline(ctrl);
+    };
+
+    if (closed && corners.empty()) {
+        // Smooth closed loop that isn't a circle -> one closed spline.
+        std::vector<int> kept; dp(0, n, kept);          // at(n) == at(0)
+        if (kept.size() >= 4) {
+            int firstId = cornerId(0);
+            std::vector<int> ctrl; ctrl.push_back(firstId);
+            for (size_t k = 1; k + 1 < kept.size(); ++k) ctrl.push_back(internalId(kept[k]));
+            ctrl.push_back(firstId);                    // first == last -> closed spline
+            sk->addSpline(ctrl);
+        } else {
+            emitPolyline();
+        }
+    } else if (closed) {
+        const int m = static_cast<int>(corners.size());
+        for (int k = 0; k < m; ++k)
+            emitRun(corners[k], (k + 1 < m) ? corners[k + 1] : corners[0] + n);
+    } else {
+        std::vector<int> bnd; bnd.push_back(0);
+        for (int c : corners) bnd.push_back(c);
+        bnd.push_back(n - 1);
+        for (size_t k = 0; k + 1 < bnd.size(); ++k) emitRun(bnd[k], bnd[k + 1]);
+    }
+    return true;
 }
 
 } // namespace materializr

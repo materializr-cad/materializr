@@ -284,7 +284,7 @@ void Application::commitThread() {
             TopoDS_Shape r = worker->buildResult(body);
             if (!r.IsNull()) {
                 try {
-                    BRepMesh_IncrementalMesh mesh(r, materializr::meshParams(mdefl, meshAng, true));
+                    materializr::meshWithFallback(r, mdefl, meshAng, true);
                 } catch (...) {}
             }
             return r;
@@ -2254,6 +2254,8 @@ void Application::beginSketchPattern(PatternKind kind) {
     // reference (now-vanished) preview copies.
     m_sketchPatternPts.clear();
     m_sketchPatternLines.clear();
+    m_sketchPatternCircles.clear();
+    m_sketchPatternArcs.clear();
     m_sketchPatternSelectAll = !m_sketchTool->hasElementSelection();
     if (!m_sketchPatternSelectAll) {
         m_sketchPatternPts.insert(m_sketchTool->getSelectedPoints().begin(),
@@ -2268,17 +2270,38 @@ void Application::beginSketchPattern(PatternKind kind) {
                 }
             }
         }
+        m_sketchPatternCircles = m_sketchTool->getSelectedCircles();
+        for (int cid : m_sketchPatternCircles) {
+            for (const auto& c : m_activeSketch->getCircles()) {
+                if (c.id == cid) {
+                    m_sketchPatternPts.insert(c.centerPointId);
+                    break;
+                }
+            }
+        }
+        m_sketchPatternArcs = m_sketchTool->getSelectedArcs();
+        for (int aid : m_sketchPatternArcs) {
+            for (const auto& a : m_activeSketch->getArcs()) {
+                if (a.id == aid) {
+                    m_sketchPatternPts.insert(a.centerPointId);
+                    m_sketchPatternPts.insert(a.startPointId);
+                    m_sketchPatternPts.insert(a.endPointId);
+                    break;
+                }
+            }
+        }
     } else {
         for (const auto& p : m_activeSketch->getPoints()) m_sketchPatternPts.insert(p.id);
         for (const auto& l : m_activeSketch->getLines())  m_sketchPatternLines.insert(l.id);
-        // Circles + arcs only included via the "selectAll" path (they have no
-        // first-class selection state in SketchTool).
-        for (const auto& c : m_activeSketch->getCircles())
+        for (const auto& c : m_activeSketch->getCircles()) {
             m_sketchPatternPts.insert(c.centerPointId);
+            m_sketchPatternCircles.insert(c.id);
+        }
         for (const auto& a : m_activeSketch->getArcs()) {
             m_sketchPatternPts.insert(a.centerPointId);
             m_sketchPatternPts.insert(a.startPointId);
             m_sketchPatternPts.insert(a.endPointId);
+            m_sketchPatternArcs.insert(a.id);
         }
     }
 
@@ -2295,24 +2318,67 @@ void Application::updateSketchPattern() {
     *m_activeSketch = *m_sketchPatternBefore;
     if (m_sketchPatternCount < 2 || m_sketchPatternPts.empty()) return;
 
+    // Resolve a circle-or-arc id (SketchPoint::onCurveId's namespace covers
+    // both) to its centre + radius, so a patterned copy of a point riding a
+    // rim can be re-projected exactly onto it below.
+    auto curveCenterRadius = [&](int curveId, glm::vec2& center, double& radius) -> bool {
+        for (const auto& c : m_activeSketch->getCircles()) {
+            if (c.id != curveId) continue;
+            const auto* cp = m_activeSketch->getPoint(c.centerPointId);
+            if (!cp) return false;
+            center = cp->pos; radius = c.radius; return true;
+        }
+        for (const auto& a : m_activeSketch->getArcs()) {
+            if (a.id != curveId) continue;
+            const auto* cp = m_activeSketch->getPoint(a.centerPointId);
+            if (!cp) return false;
+            center = cp->pos; radius = a.radius; return true;
+        }
+        return false;
+    };
+
     for (int step = 1; step < m_sketchPatternCount; ++step) {
         std::unordered_map<int,int> remap;
         auto xform = [&](glm::vec2 p) -> glm::vec2 {
             if (m_sketchPatternKind == PatternKind::Linear) {
                 return p + glm::vec2(m_sketchPatternDistance * step, 0.0f);
             }
-            float stepDeg = m_sketchPatternAngle / m_sketchPatternCount;
-            float angRad = (stepDeg * step) * static_cast<float>(M_PI) / 180.0f;
-            float dx = p.x - m_sketchPatternOriginX;
-            float dy = p.y - m_sketchPatternOriginY;
-            float ca = std::cos(angRad), sa = std::sin(angRad);
-            return glm::vec2(m_sketchPatternOriginX + dx * ca - dy * sa,
-                             m_sketchPatternOriginY + dx * sa + dy * ca);
+            // Double precision throughout: a spoke/rib pattern often has its
+            // endpoints anchored to a shared concentric ring (onCurveId), and
+            // every copy needs to land at EXACTLY that ring's radius - not
+            // just "close" - or the rotated copy leaves a hairline gap off
+            // the ring that BRepMesh reads as real, disconnected geometry
+            // once extruded (turns one pixel-invisible sketch mismatch into
+            // dozens of non-manifold edges after a boolean or two).
+            const double stepDeg = double(m_sketchPatternAngle) / m_sketchPatternCount;
+            const double angRad = (stepDeg * step) * M_PI / 180.0;
+            const double dx = double(p.x) - m_sketchPatternOriginX;
+            const double dy = double(p.y) - m_sketchPatternOriginY;
+            const double ca = std::cos(angRad), sa = std::sin(angRad);
+            return glm::vec2(float(m_sketchPatternOriginX + dx * ca - dy * sa),
+                             float(m_sketchPatternOriginY + dx * sa + dy * ca));
         };
         for (int oldId : m_sketchPatternPts) {
             auto* p = m_activeSketch->getPoint(oldId);
             if (!p) continue;
-            remap[oldId] = m_activeSketch->addPoint(xform(p->pos));
+            glm::vec2 newPos = xform(p->pos);
+            // p rides a circle/arc rim: rotation alone can't be trusted to
+            // land exactly back on it (the original point may itself only
+            // be approximately on-curve), so re-derive the copy's position
+            // from the curve's own centre + radius at the rotated angle -
+            // same idea the live sticky-rim drag already uses, just applied
+            // to a freshly patterned point instead of a dragged one.
+            if (p->onCurveId >= 0) {
+                glm::vec2 center; double radius;
+                if (curveCenterRadius(p->onCurveId, center, radius)) {
+                    glm::vec2 v = newPos - center;
+                    double d = glm::length(v);
+                    if (d > 1e-9) newPos = center + glm::vec2(v / float(d)) * float(radius);
+                }
+            }
+            const int newId = m_activeSketch->addPoint(newPos);
+            if (p->onCurveId >= 0) m_activeSketch->setPointOnCurve(newId, p->onCurveId);
+            remap[oldId] = newId;
         }
         for (int lid : m_sketchPatternLines) {
             for (const auto& l : m_activeSketch->getLines()) {
@@ -2324,20 +2390,20 @@ void Application::updateSketchPattern() {
                 break;
             }
         }
-        if (m_sketchPatternSelectAll) {
-            auto circles = m_activeSketch->getCircles();
-            for (const auto& c : circles) {
-                auto it = remap.find(c.centerPointId);
-                if (it != remap.end()) m_activeSketch->addCircle(it->second, c.radius);
-            }
-            auto arcs = m_activeSketch->getArcs();
-            for (const auto& a : arcs) {
-                auto ic = remap.find(a.centerPointId);
-                auto is = remap.find(a.startPointId);
-                auto ie = remap.find(a.endPointId);
-                if (ic != remap.end() && is != remap.end() && ie != remap.end())
-                    m_activeSketch->addArc(ic->second, is->second, ie->second, a.radius);
-            }
+        auto circles = m_activeSketch->getCircles();
+        for (const auto& c : circles) {
+            if (!m_sketchPatternCircles.count(c.id)) continue;
+            auto it = remap.find(c.centerPointId);
+            if (it != remap.end()) m_activeSketch->addCircle(it->second, c.radius);
+        }
+        auto arcs = m_activeSketch->getArcs();
+        for (const auto& a : arcs) {
+            if (!m_sketchPatternArcs.count(a.id)) continue;
+            auto ic = remap.find(a.centerPointId);
+            auto is = remap.find(a.startPointId);
+            auto ie = remap.find(a.endPointId);
+            if (ic != remap.end() && is != remap.end() && ie != remap.end())
+                m_activeSketch->addArc(ic->second, is->second, ie->second, a.radius);
         }
     }
 }
@@ -2360,6 +2426,8 @@ void Application::commitSketchPattern() {
     m_sketchPatternBefore.reset();
     m_sketchPatternPts.clear();
     m_sketchPatternLines.clear();
+    m_sketchPatternCircles.clear();
+    m_sketchPatternArcs.clear();
 }
 
 void Application::cancelSketchPattern() {
@@ -2371,6 +2439,8 @@ void Application::cancelSketchPattern() {
     m_sketchPatternBefore.reset();
     m_sketchPatternPts.clear();
     m_sketchPatternLines.clear();
+    m_sketchPatternCircles.clear();
+    m_sketchPatternArcs.clear();
 }
 
 // ── Rotate Plane About Axis ─────────────────────────────────────────────
@@ -2506,8 +2576,7 @@ bool Application::launchThreadRecut(ThreadOp& op, int attempts) {
                            TopoDS_Shape r = worker->buildResult(body);
                            if (!r.IsNull()) {
                                try {
-                                   BRepMesh_IncrementalMesh mesh(
-                                       r, materializr::meshParams(rdefl, recutAng, true));
+                                   materializr::meshWithFallback(r, rdefl, recutAng, true);
                                } catch (...) {}
                            }
                            const double secs =

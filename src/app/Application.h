@@ -270,6 +270,23 @@ private:
 
     void importStepFile();
     void exportStepFile();
+    // Shared deferred+pumped+pooled import path; see PluginContext::queueHeavyImport.
+    void queueHeavyImport(std::string message, std::function<bool()> importFn);
+    // Mesh getCandidateIds()'s bodies through the parallel-mesh pool (falls
+    // back to a no-op when MZR_PARALLEL_MESH_SUPPORTED isn't defined for this
+    // build), pumping progressLabel between jobs and logging as "[diagTag]
+    // ...". Shared by loadProjectAt and queueHeavyImport so both get the same
+    // test seams and diagnostics instead of hand-copied logic drifting
+    // between the two. getCandidateIds is a callback, not a precomputed list,
+    // because it must run AFTER the MZR_PARALLEL_MESH_TESTING setup hook -
+    // that hook can mutate the document (add a body), and the test fixture
+    // built around loadProjectAt relies on the enumeration seeing it.
+    // Returns true if the user clicked Cancel during the pool's progress
+    // pump. Dispatched jobs still run to completion either way (the pool
+    // has no mid-flight abort) - the return value is for the caller to
+    // decide whether to keep or discard the result.
+    bool prewarmMeshPool(std::function<std::vector<int>()> getCandidateIds,
+                          const char* progressLabel, const char* diagTag);
     // Per-body STL export: opens a save dialog with the body's current name
     // (from the Items panel) as the default filename and writes JUST that
     // body's mesh. Triggered from the viewport right-click menu and the
@@ -1135,10 +1152,10 @@ private:
     bool m_railTabDragged = false, m_rightTabDragged = false;
 
     // Autosave: once the project has been saved at least once (has a path on
-    // disk), periodically re-save dirty changes. Toggled in File > Settings.
+    // disk), save it again automatically on close (Application::closeProject)
+    // so quitting/closing a dirty tab doesn't need the save prompt. Toggled in
+    // File > Settings. No longer a periodic timer - see closeProject().
     bool m_autosaveEnabled = false;
-    float m_autosaveIntervalSec = 120.0f;
-    double m_lastAutosaveTime = 0.0;
 
     // Invert the cube-drag → orbit direction (Settings).
     bool m_invertCubeDrag = false;
@@ -1229,6 +1246,14 @@ private:
     // updates only those bodies' meshes via setBodyMesh / removeBody. Cleared
     // after each rebuild pass.
     std::set<int> m_dirtyBodyIds;
+    // Set whenever a rebuildMeshes() pass could have changed the visible body
+    // set (full rebuild) or any body's geometry/visibility (partial rebuild) -
+    // see rebuildMeshes(). Consumed by renderViewport()'s minor-grid-tier
+    // extent check, which recomputes its cached verdict only when this is
+    // true (and a cooldown has elapsed) and clears it only once it actually
+    // recomputes. Starts true so the first eligible frame still computes the
+    // verdict.
+    bool m_gridExtentStale = true;
     int m_hoveredBodyId = -1;
 
     // Gizmo drag state for history commit
@@ -1805,6 +1830,50 @@ private:
     void attachRefImageToPlane(int planeId);
     bool loadRefImageFile(const std::string& path, RefImageEntry& out,
                           std::string& baseName);
+
+    // Mesh trace: three orthogonal construction planes through a mesh body's
+    // bbox center, each hosting a live cross-section of it (MeshTraceEntry).
+    // Reached from the mesh body's Items-panel context menu. Opens the guided
+    // setup dialog (renderMeshTraceSetupDialog) rather than baking geometry
+    // immediately - the overlay is a live PREVIEW while the user positions
+    // each plane; nothing becomes real sketch geometry until they click
+    // "Place Sketch" for it.
+    void beginMeshTraceSetup(int bodyId);
+    // The guided 3-plane setup session's dialog: Top/Front/Right selector
+    // buttons (so a viewport misclick can't switch which plane you're
+    // adjusting or end the session - see m_meshTraceSetupActive), the same
+    // controls renderMeshTraceControls draws, a Place Sketch button, and a
+    // Finish button that closes the session. Stays open across misclicks by
+    // design: unlike renderMeshTracePanel it does NOT depend on live
+    // selection.
+    void renderMeshTraceSetupDialog();
+    // Offset slider / opacity / Cross-section-vs-Shadow / Insert Outline /
+    // Remove Trace for one plane's mesh trace - shared body used by both
+    // renderMeshTracePanel (post-session, selection-driven touch-ups) and
+    // renderMeshTraceSetupDialog (during setup, driven by the plane selector
+    // buttons instead of selection). Mirrors renderRefImageControls's split
+    // from renderRefImagePanel.
+    void renderMeshTraceControls(int planeId);
+    // Floating panel (wraps renderMeshTraceControls) while a trace-hosting
+    // plane is selected and no setup session is active.
+    void renderMeshTracePanel();
+    // Computes the plane's CURRENT capture (CrossSection: sliceSection;
+    // Shadow: computeMeshShadowOutline) and appends each closed loop into
+    // the trace's paired sketch - as lines for Cross-section (exact mesh-
+    // edge intersections already), as recoverSketchLoop's line/spline mix
+    // for Shadow (a raster trace, so worth curve-fitting). Returns true if
+    // anything was inserted. Additive: call again after moving the plane to
+    // capture another slice into the same sketch (e.g. loft guide curves),
+    // or after switching back from Shadow.
+    bool insertMeshTraceIntoSketch(int planeId);
+    // Guided mesh-trace setup session state (see beginMeshTraceSetup /
+    // renderMeshTraceSetupDialog). Index 0/1/2 = Top/Front/Right, matching
+    // beginMeshTraceSetup's plane-creation order.
+    bool m_meshTraceSetupActive = false;
+    int  m_meshTraceSetupBodyId = -1;
+    int  m_meshTraceSetupPlaneIds[3] = {-1, -1, -1};
+    bool m_meshTraceSetupPlaced[3] = {false, false, false};
+    int  m_meshTraceSetupCurrent = 0;
     // Calibration popup state: which plane's image is being calibrated
     // (-1 = closed), the ImGui preview texture (panel-owned, one at a time),
     // and up to two picked points in IMAGE-PIXEL coordinates.
@@ -2162,7 +2231,9 @@ private:
     // earlier preview copies wouldn't survive the restore).
     std::set<int> m_sketchPatternPts;
     std::set<int> m_sketchPatternLines;
-    bool          m_sketchPatternSelectAll = false; // include all circles + arcs
+    std::set<int> m_sketchPatternCircles;
+    std::set<int> m_sketchPatternArcs;
+    bool          m_sketchPatternSelectAll = false; // whole-sketch fallback when nothing was selected
 
     void beginSketchPattern(PatternKind kind);
     void updateSketchPattern();   // re-apply preview from m_sketchPatternBefore

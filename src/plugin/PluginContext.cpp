@@ -30,6 +30,14 @@ void PluginContext::requestInteractiveOp(InteractiveOp op) {
     m_pendingInteractiveOp = op;
 }
 
+void PluginContext::queueHeavyImport(std::string message, std::function<bool()> importFn) {
+    if (m_queueHeavyImportFn) m_queueHeavyImportFn(std::move(message), std::move(importFn));
+}
+
+void PluginContext::_bindHeavyImport(std::function<void(std::string, std::function<bool()>)> fn) {
+    m_queueHeavyImportFn = std::move(fn);
+}
+
 InteractiveOp PluginContext::takeRequestedInteractiveOp() {
     const InteractiveOp taken = m_pendingInteractiveOp;
     m_pendingInteractiveOp = InteractiveOp::None;

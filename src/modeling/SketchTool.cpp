@@ -6,6 +6,7 @@
 #include <cmath>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -143,6 +144,9 @@ void SketchTool::onMouseDown(glm::vec2 pos, bool addToSel) {
             // Raw cursor, like Trim: snapping first would pull the pick toward
             // an unrelated nearby point and grab the wrong chain.
             handleOffsetTool(pos);
+            break;
+        case SketchToolMode::Point:
+            handlePointTool(snapped);
             break;
         default:
             break;
@@ -379,6 +383,7 @@ void SketchTool::onCancel() {
     m_rectDimStage = 0;
     m_rectDimH = 0.0f;
     m_lineChain.clear();
+    m_lineChainSegmentIds.clear();
 }
 
 bool SketchTool::dropLineChainTail() {
@@ -391,21 +396,34 @@ bool SketchTool::dropLineChainTail() {
     if (m_mode != SketchToolMode::Line || m_lineChain.size() < 2 || !m_sketch)
         return false;
     int tail = m_lineChain.back();
-    int prev = m_lineChain[m_lineChain.size() - 2];
 
-    // Delete the segment line joining prev <-> tail.
-    for (const auto& l : m_sketch->getLines()) {
-        if ((l.startPointId == prev && l.endPointId == tail) ||
-            (l.startPointId == tail && l.endPointId == prev)) {
-            m_sketch->removeElement(l.id);
-            break;
-        }
+    // Delete the EXACT segment line this chain step created (tracked in
+    // m_lineChainSegmentIds, pushed in lockstep with m_lineChain in
+    // handleLineTool) - not re-derived from the endpoint pair, which picks
+    // the WRONG line whenever another line (e.g. a pre-existing polygon
+    // edge) already shares those same two endpoints.
+    if (!m_lineChainSegmentIds.empty()) {
+        m_sketch->removeElement(m_lineChainSegmentIds.back());
+        m_lineChainSegmentIds.pop_back();
     }
     // Delete the tail vertex too, but only if nothing else references it - it
     // may have been snapped onto pre-existing geometry we mustn't disturb.
     bool stillUsed = false;
     for (const auto& l : m_sketch->getLines())
         if (l.startPointId == tail || l.endPointId == tail) { stillUsed = true; break; }
+    // A polygon's center is never a line endpoint (only its vertices are), so
+    // the line-only check above can't see it - without this, backtracking a
+    // line chain that happened to weld onto a pre-existing polygon's center
+    // point would delete the *entire* unrelated polygon as a side effect
+    // (same failure shape removeLastSplinePoint already guards against for
+    // splines, SketchTool.cpp:2947-2953). vertexPointIds is checked too for
+    // defense in depth, symmetric with that guard.
+    if (!stillUsed)
+        for (const auto& pg : m_sketch->getPolygons()) {
+            if (pg.centerPointId == tail) { stillUsed = true; break; }
+            if (std::find(pg.vertexPointIds.begin(), pg.vertexPointIds.end(), tail) !=
+                pg.vertexPointIds.end()) { stillUsed = true; break; }
+        }
     if (!stillUsed) m_sketch->removeElement(tail);
 
     m_lineChain.pop_back();
@@ -494,19 +512,10 @@ bool SketchTool::applyDimension(float value) {
             glm::vec2 second = (m_circleMode == CircleMode::TwoPoint)
                                    ? m_firstClick + dir * value
                                    : m_firstClick + dir * radius;
-            size_t cBefore = m_sketch->getCircles().size();
+            // handleCircleTool always adds the Radius constraint now (exact=true
+            // skips grid snapping, so the constraint's value matches this typed
+            // radius exactly).
             handleCircleTool(second, /*exact=*/true);
-            // Typed diameter → Radius constraint on the new circle.
-            if (m_sketch->getCircles().size() > cBefore) {
-                const auto& circ = m_sketch->getCircles().back();
-                Constraint c;
-                c.id = 0;
-                c.type = ConstraintType::Radius;
-                c.entityA = circ.id;
-                c.value = static_cast<double>(radius);
-                c.isSatisfied = true;
-                m_sketch->addConstraint(c);
-            }
             return true;
         }
         case SketchToolMode::Polygon: {
@@ -919,7 +928,10 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     // hijacked the cursor within 0.3 mm of any point (Steve's report). Coarse
     // grids are unaffected (gridStep·0.6 already dominated the floor above
     // ~0.42 mm). Grid OFF: the cursor is freehand, so keep an absolute band to
-    // grab endpoints reliably.
+    // grab endpoints reliably - deliberately NOT screen-scaled here (unlike
+    // the on-line band below): widening this at low zoom would start pulling
+    // in other, genuinely distinct nearby points as if they were the one
+    // aimed at.
     // Master snap band - endpoints, midpoints, face centres, on-line and
     // extension guides all derive from it, so the touch widening flows to all.
     const bool gridSnapOnForBand = m_snapToGridEnabled && m_gridStep > 0.0f;
@@ -1321,6 +1333,17 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
         // for every drift was visual noise. Such cands still participate
         // in pair-intersection (as one half of a useful composite).
         bool standaloneAllowed;
+        // False only for an on-SPLINE contact: `dir` there is just the local
+        // secant of one sampled polyline segment, not the true tangent, so
+        // gridAlongLine's walk-along-dir-to-hit-the-lattice drifts off the
+        // real curve (the spline bends away from that straight secant) -
+        // exactly the "close but not quite on it" miss this field exists to
+        // avoid. Defaults true (an aggregate with a default member
+        // initializer fills in unspecified trailing fields), so every OTHER
+        // candidate site - real lines, face-ref edges, perpendicular/
+        // parallel/tangent/axis guides - is unaffected and keeps the exact
+        // walk it already relied on.
+        bool exactDirection = true;
     };
     std::vector<LineCand> cands;
 
@@ -1329,7 +1352,20 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     // horizontal/vertical guide off a point within 0.2 mm on a fine grid,
     // hijacking the cursor within one increment. Tie it to the grid instead.
     const float axisThresh   = (gridActive ? tolStep() * 0.3f : 0.2f);
-    const float onLineThresh = pointSnapThreshold * 0.7f;
+    // Unlike point-to-point snapping above, this band is testing distance to
+    // a CURVE, not to a small set of discrete candidate points - there's no
+    // "other nearby line" to confuse it with in the way a second nearby point
+    // can confuse a vertex-weld. As a flat fraction of pointSnapThreshold it
+    // shrinks to sub-pixel at low zoom (e.g. on an 80 mm part viewed whole),
+    // so a click that lands visually dead-on a line or spline can still miss
+    // the band: no split point is registered, and the loop it was meant to
+    // close never does. Floor it in screen pixels too, same shape as
+    // findCoincidentPoint's weld radius (deliberate-aim tier: kWeldRadiusPx,
+    // not the looser kPointingRadiusPx) - registering a point ON a curve
+    // joins topology, same as welding one onto another point.
+    const float onLineThresh =
+        std::max(pointSnapThreshold * 0.7f,
+                 std::min(kWeldRadiusPx * m_mmPerPixel, kWeldRadiusCapMm));
     const float extThresh    = pointSnapThreshold * 0.6f;
     // POSITIONAL cap on directional / charged inferences: fires-checks are
     // ANGULAR for those, so capture distance grows with segment length (3°
@@ -1414,7 +1450,8 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
             }
             if (found) {
                 cands.push_back({bestProj, bestDir, InferenceGuide::OnLine, -1,
-                                 bestProj, true, onLineThresh * 4.0f, bestProj, bestD, true});
+                                 bestProj, true, onLineThresh * 4.0f, bestProj, bestD, true,
+                                 /*exactDirection=*/false});
             }
         }
     }
@@ -2071,8 +2108,14 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
                 bestIsect = onLattice(bestIsect);
         } else if (ci != cj) {
             const auto& con = ci ? cands[bestI] : cands[bestJ];
-            bestIsect = gridAlongLine(con.anchor, con.dir, con.isSegment,
-                                      con.segLen, bestIsect);
+            // See LineCand::exactDirection: a spline contact's `dir` is only
+            // a local secant, so walking the intersection along it to hit
+            // the grid would drift off the true curve the same way the
+            // single-candidate case below would. Leave the intersection as
+            // computed rather than nudge it off the curve.
+            if (con.exactDirection)
+                bestIsect = gridAlongLine(con.anchor, con.dir, con.isSegment,
+                                          con.segLen, bestIsect);
         }
         emitWithSnap(cands[bestI], bestIsect);
         emitWithSnap(cands[bestJ], bestIsect);
@@ -2092,7 +2135,14 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     }
     if (bestK >= 0) {
         const auto& c = cands[bestK];
-        glm::vec2 snapped = gridAlongLine(c.anchor, c.dir, c.isSegment, c.segLen, c.proj);
+        // See LineCand::exactDirection: an on-spline contact's `proj` is
+        // already the exact point on the true curve - walking it along the
+        // local secant to hit the grid (gridAlongLine) would drift it back
+        // off that curve, the same miss a straight-line contact would never
+        // have (there, dir IS the true line, so the walk stays exact).
+        glm::vec2 snapped = c.exactDirection
+            ? gridAlongLine(c.anchor, c.dir, c.isSegment, c.segLen, c.proj)
+            : c.proj;
         if (!isContact(c.kind) && axisAligned(c.dir)) snapped = onLattice(snapped);
         emitWithSnap(c, snapped);
         // Preserve a borrowed direction (parallel/perp/tangent/on-line) exactly;
@@ -2226,6 +2276,14 @@ int SketchTool::findCoincidentPoint(glm::vec2 pos, int excludeId) const {
         if (d < bestD) { bestD = d; best = pt.id; }
     }
     return best;
+}
+
+void SketchTool::handlePointTool(glm::vec2 pos) {
+    if (!m_sketch) return;
+    // Landing on an existing point/vertex (already what `pos` snapped to)
+    // adds nothing - there's already a point there.
+    if (findCoincidentPoint(pos, -1) >= 0) return;
+    m_sketch->addPoint(pos);
 }
 
 void SketchTool::selectAll() {
@@ -2373,6 +2431,7 @@ void SketchTool::handleLineTool(glm::vec2 pos) {
         m_chainStartPointId = m_lastPointId;
         m_lineChain.clear();
         m_lineChain.push_back(m_lastPointId);
+        m_lineChainSegmentIds.clear();
     } else {
         // Second click: create line and continue chain.
         // Reject a zero-length segment - a tap/release back onto the anchor (or
@@ -2409,7 +2468,6 @@ void SketchTool::handleLineTool(glm::vec2 pos) {
         // Constraints are entirely opt-in - no autoConstrain on creation. The
         // user applies Horizontal / Vertical / Coincident / etc. explicitly via
         // the toolbar when they want one.
-        (void)newLineId;
 
         // Remember the direction of the segment we just committed - the
         // perpendicular- and parallel-to-previous inferences need it while the
@@ -2437,6 +2495,7 @@ void SketchTool::handleLineTool(glm::vec2 pos) {
             m_hasPrevLineDir = false;
             m_activeInferences.clear();
             m_lineChain.clear();
+            m_lineChainSegmentIds.clear();
             return;
         }
 
@@ -2445,6 +2504,7 @@ void SketchTool::handleLineTool(glm::vec2 pos) {
         m_firstClick = pos;
         m_clickCount++;
         m_lineChain.push_back(endPointId);
+        m_lineChainSegmentIds.push_back(newLineId);
     }
 }
 
@@ -2489,7 +2549,19 @@ void SketchTool::handleCircleTool(glm::vec2 pos, bool exact) {
                              ? findExactCoincidentPoint(center, -1)
                              : findCoincidentPoint(center, -1);
             int centerId = (existing >= 0) ? existing : m_sketch->addPoint(center);
-            m_sketch->addCircle(centerId, static_cast<double>(radius));
+            int circleId = m_sketch->addCircle(centerId, static_cast<double>(radius));
+            // Every circle carries a Radius constraint from the moment it's
+            // placed - not just typed ones - so a click-drawn circle is just
+            // as editable from the History panel as a typed one (previously
+            // only a typed radius got this; a click-placed circle relied on
+            // SketchEditOp's constraint-less fallback instead).
+            Constraint rc;
+            rc.id = 0;
+            rc.type = ConstraintType::Radius;
+            rc.entityA = circleId;
+            rc.value = static_cast<double>(radius);
+            rc.isSatisfied = true;
+            m_sketch->addConstraint(rc);
         }
 
         m_isPlacing = false;
@@ -3037,8 +3109,18 @@ static int pickSketchElement(const Sketch& sketch, glm::vec2 pos, float threshol
     int bestId = -1;
     pickType.clear();
 
+    // A polygon's edges are real SketchLine entries (Sketch::addPolygon),
+    // also present in sketch.getLines(). Skip them in the Lines loop below so
+    // a click on a polygon edge is only ever claimed by the Polygons loop -
+    // without this, both loops compute the identical distance for the same
+    // edge and the Lines loop (running first) always wins the tie.
+    std::unordered_set<int> polygonLineIds;
+    for (const auto& po : sketch.getPolygons())
+        for (int lid : po.lineIds) polygonLineIds.insert(lid);
+
     // Lines
     for (const auto& ln : sketch.getLines()) {
+        if (polygonLineIds.count(ln.id)) continue;
         const SketchPoint* a = sketch.getPoint(ln.startPointId);
         const SketchPoint* b = sketch.getPoint(ln.endPointId);
         if (!a || !b) continue;
@@ -3103,8 +3185,11 @@ static int pickSketchElement(const Sketch& sketch, glm::vec2 pos, float threshol
 }
 
 // Collect intersection points + parameters along a given line element.
+// `threshold` is the same model-space pick radius the trim click itself used
+// (see handleTrimTool) - it's how a standalone SketchPoint sitting on the
+// line, below, decides whether it's actually ON the line or just nearby.
 static void collectLineIntersections(const Sketch& sketch, const SketchLine& target,
-                                     std::vector<Hit>& out) {
+                                     float threshold, std::vector<Hit>& out) {
     const SketchPoint* a = sketch.getPoint(target.startPointId);
     const SketchPoint* b = sketch.getPoint(target.endPointId);
     if (!a || !b) return;
@@ -3131,11 +3216,29 @@ static void collectLineIntersections(const Sketch& sketch, const SketchLine& tar
         float endA = std::atan2(e->pos.y - c->pos.y, e->pos.x - c->pos.x);
         intersectLineArc(p1, p2, c->pos, static_cast<float>(ar.radius), startA, endA, out);
     }
+    // A point isn't a curve, so it can never register a geometric
+    // intersection the way another line/circle/arc does above - but a point
+    // sitting on this line (e.g. placed there with the Point tool) is exactly
+    // what a user means by "trim boundary here". Only its own two endpoints
+    // are excluded; every other sketch point within pick range of the
+    // segment's INTERIOR (not clamped onto an endpoint) counts.
+    const float thresholdSq = threshold * threshold;
+    for (const auto& pt : sketch.getPoints()) {
+        if (pt.id == target.startPointId || pt.id == target.endPointId) continue;
+        if (pt.fromText) continue;
+        float t;
+        float dsq = distSqPointSegment(pt.pos, p1, p2, &t);
+        if (dsq < thresholdSq && t > 1e-3f && t < 1.0f - 1e-3f)
+            out.push_back({pt.pos, t});
+    }
 }
 
 // Collect intersection angles around a circle element (parameters are angles in [0,2π)).
+// `threshold` is the same model-space pick radius the trim click used (see
+// collectLineIntersections above for why: a standalone point on the rim is a
+// trim boundary too, even though it's not a curve and so intersects nothing).
 static void collectCircleIntersections(const Sketch& sketch, glm::vec2 center, float radius,
-                                       int skipId, std::vector<Hit>& out) {
+                                       int skipId, float threshold, std::vector<Hit>& out) {
     for (const auto& ln : sketch.getLines()) {
         if (ln.id == skipId) continue;
         const SketchPoint* a = sketch.getPoint(ln.startPointId);
@@ -3172,6 +3275,20 @@ static void collectCircleIntersections(const Sketch& sketch, glm::vec2 center, f
             if (!angleInArc(thetaOnOther, startA, endA)) continue;
             float theta = std::atan2(h.pos.y - center.y, h.pos.x - center.x);
             out.push_back({h.pos, wrap2Pi(theta)});
+        }
+    }
+    // Standalone points sitting on this rim - see comment above. A target
+    // arc's own start/end points land here too (they ARE on its rim by
+    // construction), but that's harmless: the caller's bounds math already
+    // discards hits within `threshold` of its own 0/total sweep angle.
+    const float thresholdSq = threshold * threshold;
+    for (const auto& pt : sketch.getPoints()) {
+        if (pt.fromText) continue;
+        float d = glm::length(pt.pos - center);
+        float rimDist = d - radius;
+        if (rimDist * rimDist < thresholdSq) {
+            float theta = std::atan2(pt.pos.y - center.y, pt.pos.x - center.x);
+            out.push_back({pt.pos, wrap2Pi(theta)});
         }
     }
 }
@@ -3234,7 +3351,7 @@ TrimAction planTrim(const Sketch& sketch, glm::vec2 pos, float threshold) {
         action.lineP2 = b->pos;
 
         std::vector<Hit> hits;
-        collectLineIntersections(sketch, *line, hits);
+        collectLineIntersections(sketch, *line, threshold, hits);
         if (hits.empty()) { action.kind = TrimAction::Kind::FullDelete; return action; }
 
         std::sort(hits.begin(), hits.end(),
@@ -3279,7 +3396,7 @@ TrimAction planTrim(const Sketch& sketch, glm::vec2 pos, float threshold) {
         action.circCenterPointId = circ->centerPointId;
 
         std::vector<Hit> hits;
-        collectCircleIntersections(sketch, action.circCenter, action.circRadius, id, hits);
+        collectCircleIntersections(sketch, action.circCenter, action.circRadius, id, threshold, hits);
         if (hits.empty()) { action.kind = TrimAction::Kind::FullDelete; return action; }
 
         std::sort(hits.begin(), hits.end(),
@@ -3322,7 +3439,7 @@ TrimAction planTrim(const Sketch& sketch, glm::vec2 pos, float threshold) {
         float totalCCW = wrap2Pi(endA - action.arcStartA);
 
         std::vector<Hit> hits;
-        collectCircleIntersections(sketch, action.arcCenter, action.arcRadius, id, hits);
+        collectCircleIntersections(sketch, action.arcCenter, action.arcRadius, id, threshold, hits);
         std::vector<float> inRangeD; // CCW distances of in-range intersections
         for (const auto& h : hits) {
             float d = wrap2Pi(h.param - action.arcStartA);
@@ -3936,7 +4053,7 @@ void SketchTool::undoLastStamp() {
     if (!m_sketch || m_stampStack.empty()) return;
     // Pop ONE stamp off the top - repeated calls walk back to the original.
     const std::vector<int>& ids = m_stampStack.back();
-    for (int id : ids) m_sketch->removeElement(id);
+    m_sketch->removeElements(ids);
     std::fprintf(stderr, "[Stamp] removed last placement (%zu elements, %zu stamp(s) left)\n",
                  ids.size(), m_stampStack.size() - 1);
     m_stampStack.pop_back();

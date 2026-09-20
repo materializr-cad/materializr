@@ -77,6 +77,7 @@ add_library(materializr_core STATIC
     ${CMAKE_SOURCE_DIR}/src/modeling/SewOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/SweepOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/ConstructionPlaneOp.cpp
+    ${CMAKE_SOURCE_DIR}/src/modeling/MeshTraceSetupOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/ConstructionAxisOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/OperationFactory.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/PatternOp.cpp
@@ -475,6 +476,18 @@ add_test(NAME test_face_lineage COMMAND test_face_lineage)
 add_executable(test_sticky_rim test_sticky_rim.cpp)
 target_link_libraries(test_sticky_rim PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_sticky_rim COMMAND test_sticky_rim)
+
+# Trim on a polygon edge deletes the whole polygon, not a partial line-trim
+add_executable(test_sketch_trim_polygon test_sketch_trim_polygon.cpp)
+target_link_libraries(test_sketch_trim_polygon PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_sketch_trim_polygon COMMAND test_sketch_trim_polygon)
+
+# Select+Delete on a polygon edge/vertex/center cascades the whole polygon,
+# not a partial corruption; Line-tool chain backtracking near a polygon
+# doesn't destroy it either
+add_executable(test_sketch_select_delete_polygon test_sketch_select_delete_polygon.cpp)
+target_link_libraries(test_sketch_select_delete_polygon PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_sketch_select_delete_polygon COMMAND test_sketch_select_delete_polygon)
 
 # Face-sketch grid direction: world-aligned edge beats the longest diagonal
 add_executable(test_sketch_plane_axis test_sketch_plane_axis.cpp)
@@ -1024,6 +1037,17 @@ add_test(NAME test_iop_latch COMMAND test_iop_latch)
 add_executable(test_sew test_sew.cpp)
 target_link_libraries(test_sew PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_sew COMMAND test_sew)
+
+# ─── wip-tests: staged, gitignored headless suites (see wip-tests/README.md) ─
+# Each .cpp there gets its own ctest target linking materializr_core, same
+# shape as every add_executable above. No-op when the folder is empty/absent.
+file(GLOB _mzr_wip_tests "${CMAKE_SOURCE_DIR}/wip-tests/*.cpp")
+foreach(_wip_src ${_mzr_wip_tests})
+    get_filename_component(_wip_name ${_wip_src} NAME_WE)
+    add_executable(${_wip_name} ${_wip_src})
+    target_link_libraries(${_wip_name} PRIVATE materializr_core gtest gtest_main)
+    add_test(NAME ${_wip_name} COMMAND ${_wip_name})
+endforeach()
 
 # ─── Loader path for a source-built OCCT ─────────────────────────────────────
 # With MZR_OCCT_PREFIX the kernel lives outside the loader's default search

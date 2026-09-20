@@ -516,6 +516,25 @@ ProjectSaveResult ProjectIO::save(const std::string& filePath, const Document& d
             }
         }
     }
+    // Mesh traces (STL cross-section underlays hosted on construction
+    // planes). Nothing to persist but the link + opacity - the slice itself
+    // is recomputed live from the referenced body + plane pose, both of
+    // which are already saved elsewhere. Keyed by the SAVED plane id, same
+    // remap as REFIMG; bodyId is NOT remapped - putBody keeps saved body ids
+    // as-is (see the BODY read arm), unlike planes.
+    {
+        std::vector<int> traceIds = doc.getAllMeshTracePlaneIds();
+        if (!traceIds.empty()) {
+            ofs << "MESHTRACE_COUNT " << static_cast<int>(traceIds.size()) << "\n";
+            for (int pid : traceIds) {
+                const auto* t = doc.getMeshTrace(pid);
+                if (!t) continue;
+                ofs << "MESHTRACE " << t->planeId << " " << t->bodyId << " "
+                    << t->opacity << " " << static_cast<int>(t->mode) << " "
+                    << t->sketchId << "\n";
+            }
+        }
+    }
 
     // --- History (optional) ---
     if (history && history->present) {
@@ -1298,6 +1317,35 @@ ProjectLoadResult loadImpl(const std::string& filePath, Document& doc,
                 e.widthMM = widthMM;
                 e.opacity = opacity;
                 doc.setRefImage(it->second, std::move(e));
+            }
+        } else if (tok == "MESHTRACE_COUNT") {
+            // Mesh traces. Plane id remaps through the CPLANE arm's map
+            // (same as REFIMG); body id is used as saved - see the write
+            // side's comment for why bodies don't need remapping.
+            int n = 0; iss >> n;
+            for (int i = 0; i < n; ++i) {
+                std::string mline;
+                if (!std::getline(ifs, mline)) break;
+                std::istringstream ms(mline);
+                std::string mtok; ms >> mtok;
+                if (mtok != "MESHTRACE") continue;
+                int savedPlane = -1, bodyId = -1, modeInt = 0, sketchId = -1;
+                float opacity = 0.5f;
+                // modeInt/sketchId default to 0/-1 so a MESHTRACE line written
+                // before Shadow mode or the paired-sketch link existed still
+                // parses fine - the stream extraction just leaves the tail
+                // fields at their default when the tokens aren't there.
+                ms >> savedPlane >> bodyId >> opacity >> modeInt >> sketchId;
+                auto it = refImgPlaneRemap.find(savedPlane);
+                if (it == refImgPlaneRemap.end()) continue; // orphaned trace
+                MeshTraceEntry e;
+                e.bodyId = bodyId;
+                e.opacity = opacity;
+                e.mode = (modeInt == static_cast<int>(MeshTraceMode::Shadow))
+                             ? MeshTraceMode::Shadow
+                             : MeshTraceMode::CrossSection;
+                e.sketchId = sketchId;
+                doc.setMeshTrace(it->second, e);
             }
         } else if (tok == "FACEID_NEXT") {
             int n = 0; iss >> n;

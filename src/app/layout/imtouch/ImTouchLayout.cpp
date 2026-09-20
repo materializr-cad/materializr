@@ -806,7 +806,7 @@ void Application::renderImTouchLayout() {
                         ImGui::PushID(idx++);
                         const bool clicked = touchui::railButton(
                             t->label, t->icon, tr(t->label), t->active, 64.0f * s);
-                        tip(t->tip);
+                        tip(materializr::tr(t->tip));
                         fire(*t, clicked, /*inPopup=*/true);
                         ImGui::PopID();
                     }

@@ -42,6 +42,7 @@ OVERRIDE = [
     ("src/app/Application_Viewport.cpp", "##bubbleDia", "CONVERTED"),   # commits via parseLength below
     ("src/app/Application_Viewport.cpp", "parseFinite(m_sketchDimBuf", "angle"),  # sweep deg / polygon sides
     ("src/plugins/SketchPlugin.cpp", "parseFinite(m_dimBuf", "angle"),            # same non-length branch
+    ("src/app/Application_Dialogs.cpp", "Slice position", "absolute-mm"),   # mesh-trace plane offset along its own normal: a genuine length, deliberately shown in mm
     ("src/app/Application_Dialogs.cpp", "Fillet time limit", "seconds"),
     ("src/app/Application_Dialogs.cpp", "Double-click speed", "seconds"),
     ("src/ui/MaterialPanel.cpp", "Roughness", "ratio"), ("src/ui/MaterialPanel.cpp", "Metallic", "ratio"),
@@ -256,6 +257,7 @@ LITERAL_ALLOW = [
     ("src/ai/AiToolDispatcher.cpp",     '"mm walls"',          "AI tool result message for LLM"),
     ("src/ai/AiToolDispatcher.cpp",     "z=%.1f)mm,",          "AI tool result message for LLM (list_bodies)"),
     ("src/ai/AiToolDispatcher.cpp",     "height=%.1f)mm%s",    "AI tool result message for LLM (list_bodies)"),
+    ("src/app/Application_Dialogs.cpp", '"%.1f mm")) {',       "mesh-trace slice-position readout, same absolute-mm choice as the control"),
 ]
 
 def classify_literal(f, code, ln=None):

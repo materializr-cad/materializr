@@ -74,6 +74,45 @@ struct RefImageEntry {
     float opacity = 0.6f;      // underlay strength for tracing
 };
 
+// How a mesh trace reads its source body against the plane (see
+// MeshTraceEntry): CrossSection is the exact intersection with the mesh at
+// the plane's CURRENT position (SectionCap::sliceSection) - precise, but only
+// shows what that one slice touches. Shadow is the mesh's overall silhouette
+// as seen along the plane's normal, regardless of where the plane sits -
+// good for tracing an outline whose depth varies (a curved or tapered part)
+// without hunting for the one slice that catches it. The live overlay uses
+// SectionCap::computeMeshShadow (every triangle flattened, cheap and robust
+// - no per-triangle facing classification to go numerically noisy on a
+// dense/curved mesh); "Insert Outline into Sketch" separately uses
+// SectionCap::computeMeshShadowOutline (rasterizes the flattened triangles
+// and traces the occupancy boundary - more work than the overlay, but a
+// one-shot cost) - see Application::insertMeshTraceIntoSketch.
+enum class MeshTraceMode { CrossSection = 0, Shadow = 1 };
+
+// Mesh trace - a tracing underlay computed live from an imported STL body,
+// hosted on a construction plane. Same 1:1-with-PlaneEntry shape as
+// RefImageEntry (plane supplies pose/gizmo/visibility/sketch-on-plane), but
+// instead of a decoded photo the renderer re-derives the underlay from
+// `bodyId`'s triangulation against the plane's CURRENT pose every time it
+// changes (SectionCap.h) - so sliding the plane with its normal move gizmo
+// re-traces through a different part of the mesh, no separate offset field
+// needed. Dragging the source body is not expected (mesh bodies are
+// reference-only, see MeshGuard.h), but bodyId is resolved by lookup each
+// render, not cached, so it would still track.
+struct MeshTraceEntry {
+    int planeId = -1;
+    int bodyId = -1;
+    float opacity = 0.5f;
+    MeshTraceMode mode = MeshTraceMode::CrossSection;
+    // The empty sketch beginMeshTraceSetup created on this plane, or -1. Not
+    // remapped on load (like body ids, unlike plane ids) - see putSketch.
+    // "Insert Outline into Sketch" (Application::insertMeshTraceIntoSketch)
+    // appends the CURRENT cross-section's closed loops here as real,
+    // editable sketch lines - the rendered overlay above is only a picture
+    // to look at; this is what turns it into geometry you can push/pull.
+    int sketchId = -1;
+};
+
 // Construction axis - a stored ray (origin + unit direction). Used as the
 // rotation axis for Revolve (post-0.6) and any other "around a line"
 // operation. Same plumbing shape as PlaneEntry: id / name / visibility /
@@ -347,6 +386,15 @@ public:
     void setRefImageOpacity(int planeId, float opacity);
     std::vector<int> getAllRefImagePlaneIds() const;
 
+    // Mesh traces - STL cross-section underlays hosted on construction planes
+    // (see MeshTraceEntry). Same lifecycle as reference images: keyed by the
+    // host plane's id, removePlane() drops the hosted trace with it.
+    void setMeshTrace(int planeId, MeshTraceEntry entry);   // add or replace
+    const MeshTraceEntry* getMeshTrace(int planeId) const;
+    void removeMeshTrace(int planeId);
+    void setMeshTraceOpacity(int planeId, float opacity);
+    std::vector<int> getAllMeshTracePlaneIds() const;
+
     // Construction axes - same shape as construction planes. Used by
     // Revolve and any other op that needs to rotate around a line.
     // Axis* events let the renderer + Items panel react without polling.
@@ -380,6 +428,7 @@ private:
     std::vector<BodyEntry> m_bodies;
     std::vector<PlaneEntry> m_planes;
     std::vector<RefImageEntry> m_refImages;
+    std::vector<MeshTraceEntry> m_meshTraces;
     std::vector<AxisEntry> m_axes;
     std::vector<SketchEntry> m_sketches;
     std::vector<materializr::Mate> m_mates;
