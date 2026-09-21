@@ -23,14 +23,14 @@ profile". Only the button is missing. The command palette action "Revolve"
 
 1. Rail region branch: add `add(MZ_ICON_LATHE, "Lathe", ToolAction::Revolve,
    false, "Spin the sketch's largest closed profile around an axis into a solid.")` after
-   Subtract. Same label/tooltip strings as the sketch-selected branch, which
-   are already in the i18n catalogue (`tools/i18n_catalogue.py` lines 598,
-   1099), so no catalogue change.
+   Subtract. Same label as the sketch-selected branch ("Lathe", already in the
+   i18n catalogue); the tooltip is a NEW string, so one new catalogue entry
+   (5 languages) and a regenerated `src/i18n_catalogue.h`.
 2. Classic `renderSketchRegionTools`: add a "Lathe" button after Subtract with
    the same tip; not gated on `catalogOffers` (Revolve is not a catalogue
    tool - RevolvePlugin registers only a command).
-3. No change to `beginRevolve`, `RevolveOp`, the touch layout (it consumes the
-   rail's items), or any i18n.
+3. No change to `beginRevolve`, `RevolveOp`, or the touch layout (it consumes
+   the rail's items).
 
 ## Verification
 
