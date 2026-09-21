@@ -354,7 +354,7 @@ src/ui/PropertiesPanel.cpp:877:
 src/ui/PropertiesPanel.cpp:917:
 src/ui/PropertiesPanel.h:137:
 src/ui/StepperRow.h:18:
-src/ui/Toolbar.cpp:537:
+src/ui/Toolbar.cpp:539:
 src/ui/TouchWidgets.h:94:
 src/ui/TouchWidgets.h:137:
 src/viewport/Camera.cpp:215:

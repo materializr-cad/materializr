@@ -622,7 +622,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | comment | src/ui/PropertiesPanel.cpp:917 | `// Lengths: display unit -> mm FIRST, then halve a circle's` |
 | comment | src/ui/PropertiesPanel.h:137 | `// Per-body bbox-extent cache for the "Size: X × Y × Z mm" readout.` |
 | comment | src/ui/StepperRow.h:18 | `// value, and pulling an 80 mm extrude down to 50 because you pressed +1 loses` |
-| allowed-by-hand | src/ui/Toolbar.cpp:537 | `tip(materializr::tr("Create a stock OCCT primitive (box / cylinder / sphere / cone / torus). Picking one opens` |
+| allowed-by-hand | src/ui/Toolbar.cpp:539 | `tip(materializr::tr("Create a stock OCCT primitive (box / cylinder / sphere / cone / torus). Picking one opens` |
 | allowed-by-hand | src/ui/TouchWidgets.h:94 | `const char* suffix = "mm", int decimals = 1,` |
 | allowed-by-hand | src/ui/TouchWidgets.h:137 | `const char* suffix = "mm", int decimals = 1,` |
 | comment | src/viewport/Camera.cpp:215 | `// least 0.1 mm of standoff so the view doesn't degenerate.` |

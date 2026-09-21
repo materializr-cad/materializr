@@ -1009,6 +1009,7 @@ inline const TrEntry kEsCatalogue[] = {
     { "Show the rotate gizmo: drag rings to rotate around each axis.", "Muestra el gizmo de rotaci\xc3""\xb3""n: arrastra los anillos para rotar alrededor de cada eje." },
     { "Show the translate gizmo: drag axes or planes to move.", "Muestra el gizmo de traslaci\xc3""\xb3""n: arrastra los ejes o planos para mover." },
     { "Spin the sketch profile around an axis into a solid.", "Gira el perfil del boceto alrededor de un eje para crear un s\xc3""\xb3""lido." },
+    { "Spin the sketch's largest closed profile around an axis into a solid.", "Gira el perfil cerrado m\xc3""\xa1""s grande del boceto alrededor de un eje para crear un s\xc3""\xb3""lido." },
     { "Start a sketch on the selected construction plane.", "Inicia un boceto en el plano de construcci\xc3""\xb3""n seleccionado." },
     { "Start a sketch on the selected face.", "Inicia un boceto en la cara seleccionada." },
     { "Step %d (%s) couldn't recompute - the geometry it referenced no longer exists after an upstream step was edited or disabled. Re-enable the disabled step, edit an upstream step (it retries automatically), edit this step's parameters, or delete it.", "El paso %d (%s) no se pudo recalcular - la geometr\xc3""\xad""a a la que hac\xc3""\xad""a referencia ya no existe despu\xc3""\xa9""s de que se editara o desactivara un paso anterior. Vuelve a activar el paso desactivado, edita un paso anterior (se reintentar\xc3""\xa1"" autom\xc3""\xa1""ticamente), edita los par\xc3""\xa1""metros de este paso o elim\xc3""\xad""nalo." },
@@ -1203,7 +1204,7 @@ inline const TrEntry kEsCatalogue[] = {
     { "Closes this dialog. Every plane keeps whatever you placed (or didn't) - re-select a plane any time to adjust it further.", "Cierra este di\xc3""\xa1""logo. Cada plano conserva lo que hayas colocado (o no) - vuelve a seleccionar un plano en cualquier momento para ajustarlo m\xc3""\xa1""s." },
     { "Undoes this whole setup - removes all 3 planes and sketches, re-shows the mesh. Same as Ctrl+Z right after running Set Up Tracing Planes.", "Deshace toda esta configuraci\xc3""\xb3""n - elimina los 3 planos y bocetos, y vuelve a mostrar la malla. Igual que Ctrl+Z justo despu\xc3""\xa9""s de ejecutar Configurar planos de calco." },
 };
-inline constexpr int kEsCount = 1191;
+inline constexpr int kEsCount = 1192;
 
 // --- Portuguese ---
 inline const TrEntry kPtCatalogue[] = {
@@ -2205,6 +2206,7 @@ inline const TrEntry kPtCatalogue[] = {
     { "Show the rotate gizmo: drag rings to rotate around each axis.", "Mostre o gizmo de rota\xc3""\xa7""\xc3""\xa3""o: arraste os an\xc3""\xa9""is para girar em torno de cada eixo." },
     { "Show the translate gizmo: drag axes or planes to move.", "Mostre o gizmo de transla\xc3""\xa7""\xc3""\xa3""o: arraste os eixos ou planos para mover." },
     { "Spin the sketch profile around an axis into a solid.", "Gire o perfil do esbo\xc3""\xa7""o em torno de um eixo para criar um s\xc3""\xb3""lido." },
+    { "Spin the sketch's largest closed profile around an axis into a solid.", "Gire o maior perfil fechado do esbo\xc3""\xa7""o em torno de um eixo para criar um s\xc3""\xb3""lido." },
     { "Start a sketch on the selected construction plane.", "Inicie um esbo\xc3""\xa7""o no plano de constru\xc3""\xa7""\xc3""\xa3""o selecionado." },
     { "Start a sketch on the selected face.", "Inicie um esbo\xc3""\xa7""o na face selecionada." },
     { "Step %d (%s) couldn't recompute - the geometry it referenced no longer exists after an upstream step was edited or disabled. Re-enable the disabled step, edit an upstream step (it retries automatically), edit this step's parameters, or delete it.", "A etapa %d (%s) n\xc3""\xa3""o p\xc3""\xb4""de ser recalculada - a geometria referenciada por ela n\xc3""\xa3""o existe mais depois que uma etapa anterior foi editada ou desativada. Reative a etapa desativada, edite uma etapa anterior (ela tenta novamente automaticamente), edite os par\xc3""\xa2""metros desta etapa ou exclua-a." },
@@ -2399,7 +2401,7 @@ inline const TrEntry kPtCatalogue[] = {
     { "Closes this dialog. Every plane keeps whatever you placed (or didn't) - re-select a plane any time to adjust it further.", "Fecha esta caixa de di\xc3""\xa1""logo. Cada plano mant\xc3""\xa9""m o que voc\xc3""\xaa"" colocou (ou n\xc3""\xa3""o) - selecione novamente um plano a qualquer momento para ajust\xc3""\xa1""-lo mais." },
     { "Undoes this whole setup - removes all 3 planes and sketches, re-shows the mesh. Same as Ctrl+Z right after running Set Up Tracing Planes.", "Desfaz toda esta configura\xc3""\xa7""\xc3""\xa3""o - remove os 3 planos e esbo\xc3""\xa7""os, e volta a mostrar a malha. O mesmo que Ctrl+Z logo ap\xc3""\xb3""s executar Configurar planos de decalque." },
 };
-inline constexpr int kPtCount = 1191;
+inline constexpr int kPtCount = 1192;
 
 // --- French ---
 inline const TrEntry kFrCatalogue[] = {
@@ -3401,6 +3403,7 @@ inline const TrEntry kFrCatalogue[] = {
     { "Show the rotate gizmo: drag rings to rotate around each axis.", "Afficher le gizmo de rotation : glisser les anneaux pour pivoter autour de chaque axe." },
     { "Show the translate gizmo: drag axes or planes to move.", "Afficher le gizmo de d\xc3""\xa9""placement : glisser les axes ou les plans pour d\xc3""\xa9""placer." },
     { "Spin the sketch profile around an axis into a solid.", "Faire tourner le profil de l'esquisse autour d'un axe pour cr\xc3""\xa9""er un solide." },
+    { "Spin the sketch's largest closed profile around an axis into a solid.", "Faire tourner le plus grand profil ferm\xc3""\xa9"" de l'esquisse autour d'un axe pour cr\xc3""\xa9""er un solide." },
     { "Start a sketch on the selected construction plane.", "D\xc3""\xa9""marrer une esquisse sur le plan de construction s\xc3""\xa9""lectionn\xc3""\xa9""." },
     { "Start a sketch on the selected face.", "D\xc3""\xa9""marrer une esquisse sur la face s\xc3""\xa9""lectionn\xc3""\xa9""e." },
     { "Step %d (%s) couldn't recompute - the geometry it referenced no longer exists after an upstream step was edited or disabled. Re-enable the disabled step, edit an upstream step (it retries automatically), edit this step's parameters, or delete it.", "L'\xc3""\xa9""tape %d (%s) n'a pas pu \xc3""\xaa""tre recalcul\xc3""\xa9""e - la g\xc3""\xa9""om\xc3""\xa9""trie qu'elle r\xc3""\xa9""f\xc3""\xa9""ren\xc3""\xa7""ait n'existe plus apr\xc3""\xa8""s la modification ou la d\xc3""\xa9""sactivation d'une \xc3""\xa9""tape en amont. R\xc3""\xa9""activer l'\xc3""\xa9""tape d\xc3""\xa9""sactiv\xc3""\xa9""e, modifier une \xc3""\xa9""tape en amont (nouvel essai automatique), modifier les param\xc3""\xa8""tres de cette \xc3""\xa9""tape, ou la supprimer." },
@@ -3595,7 +3598,7 @@ inline const TrEntry kFrCatalogue[] = {
     { "Closes this dialog. Every plane keeps whatever you placed (or didn't) - re-select a plane any time to adjust it further.", "Ferme cette bo\xc3""\xae""te de dialogue. Chaque plan conserve ce que vous y avez plac\xc3""\xa9"" (ou non) - res\xc3""\xa9""lectionnez un plan \xc3""\xa0"" tout moment pour l'ajuster davantage." },
     { "Undoes this whole setup - removes all 3 planes and sketches, re-shows the mesh. Same as Ctrl+Z right after running Set Up Tracing Planes.", "Annule toute cette configuration - supprime les 3 plans et esquisses, et r\xc3""\xa9""affiche le maillage. Comme Ctrl+Z juste apr\xc3""\xa8""s avoir ex\xc3""\xa9""cut\xc3""\xa9"" Configurer les plans de calque." },
 };
-inline constexpr int kFrCount = 1191;
+inline constexpr int kFrCount = 1192;
 
 // --- German ---
 inline const TrEntry kDeCatalogue[] = {
@@ -4597,6 +4600,7 @@ inline const TrEntry kDeCatalogue[] = {
     { "Show the rotate gizmo: drag rings to rotate around each axis.", "Das Rotations-Gizmo anzeigen: Ringe ziehen, um sich um jede Achse zu drehen." },
     { "Show the translate gizmo: drag axes or planes to move.", "Das Verschiebe-Gizmo anzeigen: Achsen oder Ebenen zum Verschieben ziehen." },
     { "Spin the sketch profile around an axis into a solid.", "Das Skizzenprofil um eine Achse zu einem Volumenk\xc3""\xb6""rper drehen." },
+    { "Spin the sketch's largest closed profile around an axis into a solid.", "Das gr\xc3""\xb6""\xc3""\x9f""te geschlossene Profil der Skizze um eine Achse zu einem Volumenk\xc3""\xb6""rper drehen." },
     { "Start a sketch on the selected construction plane.", "Eine Skizze auf der ausgew\xc3""\xa4""hlten Konstruktionsebene starten." },
     { "Start a sketch on the selected face.", "Eine Skizze auf der ausgew\xc3""\xa4""hlten Fl\xc3""\xa4""che starten." },
     { "Step %d (%s) couldn't recompute - the geometry it referenced no longer exists after an upstream step was edited or disabled. Re-enable the disabled step, edit an upstream step (it retries automatically), edit this step's parameters, or delete it.", "Schritt %d (%s) konnte nicht neu berechnet werden - die referenzierte Geometrie existiert nicht mehr, nachdem ein vorgelagerter Schritt bearbeitet oder deaktiviert wurde. Den deaktivierten Schritt wieder aktivieren, einen vorgelagerten Schritt bearbeiten (automatischer erneuter Versuch), die Parameter dieses Schritts bearbeiten oder ihn l\xc3""\xb6""schen." },
@@ -4791,7 +4795,7 @@ inline const TrEntry kDeCatalogue[] = {
     { "Closes this dialog. Every plane keeps whatever you placed (or didn't) - re-select a plane any time to adjust it further.", "Schlie\xc3""\x9f""t diesen Dialog. Jede Ebene beh\xc3""\xa4""lt, was Sie platziert haben (oder nicht) - eine Ebene jederzeit erneut ausw\xc3""\xa4""hlen, um sie weiter anzupassen." },
     { "Undoes this whole setup - removes all 3 planes and sketches, re-shows the mesh. Same as Ctrl+Z right after running Set Up Tracing Planes.", "Macht diese gesamte Einrichtung r\xc3""\xbc""ckg\xc3""\xa4""ngig - entfernt alle 3 Ebenen und Skizzen und zeigt das Netz wieder an. Wie Strg+Z direkt nach dem Ausf\xc3""\xbc""hren von Trace-Ebenen einrichten." },
 };
-inline constexpr int kDeCount = 1191;
+inline constexpr int kDeCount = 1192;
 
 // --- Italian ---
 inline const TrEntry kItCatalogue[] = {
@@ -5793,6 +5797,7 @@ inline const TrEntry kItCatalogue[] = {
     { "Show the rotate gizmo: drag rings to rotate around each axis.", "Mostra il gizmo di rotazione: trascina gli anelli per ruotare attorno a ciascun asse." },
     { "Show the translate gizmo: drag axes or planes to move.", "Mostra il gizmo di traslazione: trascina gli assi o i piani per spostare." },
     { "Spin the sketch profile around an axis into a solid.", "Ruota il profilo dello schizzo attorno a un asse per creare un solido." },
+    { "Spin the sketch's largest closed profile around an axis into a solid.", "Ruota il profilo chiuso pi\xc3""\xb9"" grande dello schizzo attorno a un asse per creare un solido." },
     { "Start a sketch on the selected construction plane.", "Avvia uno schizzo sul piano di costruzione selezionato." },
     { "Start a sketch on the selected face.", "Avvia uno schizzo sulla faccia selezionata." },
     { "Step %d (%s) couldn't recompute - the geometry it referenced no longer exists after an upstream step was edited or disabled. Re-enable the disabled step, edit an upstream step (it retries automatically), edit this step's parameters, or delete it.", "Non \xc3""\xa8"" stato possibile ricalcolare il passaggio %d (%s) - la geometria a cui faceva riferimento non esiste pi\xc3""\xb9"" dopo che un passaggio a monte \xc3""\xa8"" stato modificato o disattivato. Riattiva il passaggio disattivato, modifica un passaggio a monte (verr\xc3""\xa0"" ritentato automaticamente), modifica i parametri di questo passaggio oppure eliminalo." },
@@ -5987,6 +5992,6 @@ inline const TrEntry kItCatalogue[] = {
     { "Closes this dialog. Every plane keeps whatever you placed (or didn't) - re-select a plane any time to adjust it further.", "Chiude questa finestra di dialogo. Ogni piano mantiene ci\xc3""\xb2"" che hai posizionato (o meno) - riseleziona un piano in qualsiasi momento per modificarlo ulteriormente." },
     { "Undoes this whole setup - removes all 3 planes and sketches, re-shows the mesh. Same as Ctrl+Z right after running Set Up Tracing Planes.", "Annulla tutta questa configurazione - rimuove tutti e 3 i piani e gli schizzi, e mostra di nuovo la mesh. Come Ctrl+Z subito dopo aver eseguito Configura piani di tracciamento." },
 };
-inline constexpr int kItCount = 1191;
+inline constexpr int kItCount = 1192;
 
 } // namespace materializr

@@ -267,6 +267,8 @@ std::vector<Toolbar::RailTool> Toolbar::railTools() const {
         }
         add(MZ_ICON_SUBTRACT, "Subtract", ToolAction::SubtractSketch, false,
             "Extrude the region and cut it out of the body it runs into.");
+        add(MZ_ICON_LATHE,    "Lathe",    ToolAction::Revolve, false,
+            "Spin the sketch's largest closed profile around an axis into a solid.");
         add(MZ_ICON_EDIT,     "Edit",     ToolAction::EditSketch, false,
             "Reopen the sketch this region belongs to.");
         add(MZ_ICON_MOVE,     "Move",     ToolAction::Move, false,
@@ -1206,6 +1208,12 @@ ToolAction Toolbar::renderSketchRegionTools() {
             action = ToolAction::SubtractSketch;
         tip(materializr::tr("Cut this region into the body the sketch was drawn on (preview in red)."));
     }
+    // Revolve/Lathe is not a catalogue tool (RevolvePlugin registers only a
+    // command), so it is not gated on catalogOffers. beginRevolve accepts a
+    // selected region; applyRevolve spins the sketch's largest closed profile.
+    if (ImGui::Button(materializr::tr("Lathe"), ImVec2(-1, bh(30))))
+        action = ToolAction::Revolve;
+    tip(materializr::tr("Spin the sketch's largest closed profile around an axis into a solid."));
 
     // Any remaining HasSketchRegions plugin buttons.
     renderPluginButtons(1 << static_cast<int>(SelectionContext::HasSketchRegions));
