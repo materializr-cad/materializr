@@ -11,10 +11,13 @@ REGISTER_PLUGIN(StepIO, [](materializr::PluginContext& ctx) {
                 {{"STEP Files", "*.step *.stp *.STEP *.STP"}},
                 [&ctx](const std::string& path) {
                     if (path.empty()) return;
-                    auto result = materializr::StepIO::import(path, ctx.document());
-                    if (result.success) {
-                        ctx.markMeshesDirty();
-                    }
+                    // A large assembly's parse + tessellation can take seconds;
+                    // queueHeavyImport runs it deferred, under the same
+                    // pool+pump mesh path project load uses, instead of
+                    // freezing the window on the next full mesh rebuild.
+                    ctx.queueHeavyImport("Importing STEP\xE2\x80\xA6", [&ctx, path]() {
+                        return materializr::StepIO::import(path, ctx.document()).success;
+                    });
                 });
             return true;
         },

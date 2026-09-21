@@ -22,6 +22,7 @@ find_package(ZLIB REQUIRED)
 find_package(CURL REQUIRED)
 
 add_library(materializr_core STATIC
+    ${CMAKE_SOURCE_DIR}/src/core/Base64.cpp
     ${CMAKE_SOURCE_DIR}/src/core/Document.cpp
     ${CMAKE_SOURCE_DIR}/src/core/History.cpp
     ${CMAKE_SOURCE_DIR}/src/core/SelectionManager.cpp
@@ -105,6 +106,7 @@ add_library(materializr_core STATIC
     ${CMAKE_SOURCE_DIR}/src/io/DxfImport.cpp
     ${CMAKE_SOURCE_DIR}/src/io/ThreeMfExport.cpp
     ${CMAKE_SOURCE_DIR}/src/io/StlIO.cpp
+    ${CMAKE_SOURCE_DIR}/src/io/RefMeshImport.cpp
     ${CMAKE_SOURCE_DIR}/src/io/MeshDecimate.cpp
     ${CMAKE_SOURCE_DIR}/src/io/ProjectRecovery.cpp
     ${CMAKE_SOURCE_DIR}/src/io/SketchRecovery.cpp
@@ -475,6 +477,18 @@ add_executable(test_sticky_rim test_sticky_rim.cpp)
 target_link_libraries(test_sticky_rim PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_sticky_rim COMMAND test_sticky_rim)
 
+# Trim on a polygon edge deletes the whole polygon, not a partial line-trim
+add_executable(test_sketch_trim_polygon test_sketch_trim_polygon.cpp)
+target_link_libraries(test_sketch_trim_polygon PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_sketch_trim_polygon COMMAND test_sketch_trim_polygon)
+
+# Select+Delete on a polygon edge/vertex/center cascades the whole polygon,
+# not a partial corruption; Line-tool chain backtracking near a polygon
+# doesn't destroy it either
+add_executable(test_sketch_select_delete_polygon test_sketch_select_delete_polygon.cpp)
+target_link_libraries(test_sketch_select_delete_polygon PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_sketch_select_delete_polygon COMMAND test_sketch_select_delete_polygon)
+
 # Face-sketch grid direction: world-aligned edge beats the longest diagonal
 add_executable(test_sketch_plane_axis test_sketch_plane_axis.cpp)
 target_link_libraries(test_sketch_plane_axis PRIVATE materializr_core gtest gtest_main)
@@ -821,6 +835,14 @@ add_executable(test_project_thumbnail test_project_thumbnail.cpp)
 target_link_libraries(test_project_thumbnail PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_project_thumbnail COMMAND test_project_thumbnail)
 
+add_executable(test_base64 test_base64.cpp)
+target_link_libraries(test_base64 PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_base64 COMMAND test_base64)
+
+add_executable(test_ref_mesh_import test_ref_mesh_import.cpp)
+target_link_libraries(test_ref_mesh_import PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_ref_mesh_import COMMAND test_ref_mesh_import)
+
 # test_settings_sessions - tab-list persistence + the indexed-list SHRINK trap
 # (the writer preserves keys it didn't emit, which resurrected closed tabs).
 # Settings.cpp is not in materializr_core - compiled in directly, same as
@@ -859,6 +881,14 @@ add_executable(test_ai_session_controller test_ai_session_controller.cpp
     TestSignalInit.cpp)
 target_link_libraries(test_ai_session_controller PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_ai_session_controller COMMAND test_ai_session_controller)
+
+# ai_harness - manual tool, NOT a gtest and NOT registered with add_test. Drives
+# the real AiSessionController/AiToolDispatcher/OpenAiCompatibleClient path
+# over real HTTP against a mock OpenAI-compatible server, so the tool schema
+# and system prompt can be exercised by hand against a "dumb model" without
+# burning real API usage. See ai_harness_main.cpp for usage.
+add_executable(ai_harness ai_harness_main.cpp)
+target_link_libraries(ai_harness PRIVATE materializr_core)
 
 # test_multibody_export - several disjoint solids export as ONE file with
 # their spacing intact (print-in-place), and visibility selects the subset.

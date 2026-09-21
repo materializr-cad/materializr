@@ -92,23 +92,23 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | CONVERTED | src/app/Application_Dialogs.cpp:5922 | `if (materializr::lengthField(materializr::trFormat("Thickness (%s)", materializr::unitSuffix()).c_str(), &m_un` |
 | angle | src/app/Application_Dialogs.cpp:5936 | `if (ImGui::SliderFloat(materializr::tr("Curve detail"), &m_unfoldMaxBevelDeg, 2.0f, 40.0f, "%.0f°"))` |
 | angle | src/app/Application_Dialogs.cpp:5995 | `ImGui::SliderFloat(materializr::tr("Rotate"), &m_unfoldRotationDeg, -180.0f, 180.0f, "%.0f°");` |
-| CONVERTED | src/app/Application_Viewport.cpp:2073 | `(void)materializr::parseFinite(m_sketchShapeDimBuf,` |
-| CONVERTED | src/app/Application_Viewport.cpp:2075 | `if (touchui::numberField("##bubbleDia", nullptr,` |
-| CONVERTED | src/app/Application_Viewport.cpp:2096 | `materializr::lengthField("##bubbleW", &m_sketchShapeDimW);` |
-| CONVERTED | src/app/Application_Viewport.cpp:2099 | `materializr::lengthField("##bubbleH", &m_sketchShapeDimH);` |
-| CONVERTED | src/app/Application_Viewport.cpp:2119 | `if (!materializr::parseLength(m_sketchShapeDimBuf, mm) \|\| mm <= 0.0) return false;` |
-| CONVERTED | src/app/Application_Viewport.cpp:3242 | `(void)materializr::parseFinite(m_dimEditingBuf, dimPadV);` |
-| CONVERTED | src/app/Application_Viewport.cpp:3247 | `if (materializr::inputNumber("##dimval", &dimPadV, 0.0, 0.0, padFmt,` |
-| angle | src/app/Application_Viewport.cpp:6009 | `(void)materializr::parseFinite(m_sketchGizmoRotateBuf,` |
-| angle | src/app/Application_Viewport.cpp:6011 | `bool typedEnter = materializr::inputNumber(` |
-| angle | src/app/Application_Viewport.cpp:6024 | `(void)materializr::parseFinite(m_sketchGizmoRotateBuf, deg);` |
-| angle | src/app/Application_Viewport.cpp:6041 | `(void)materializr::parseFinite(m_sketchGizmoRotateBuf, deg);` |
-| CONVERTED | src/app/Application_Viewport.cpp:7342 | `materializr::lengthField("##dimW", &m_sketchShapeDimW);` |
-| CONVERTED | src/app/Application_Viewport.cpp:7345 | `materializr::lengthField("##dimH", &m_sketchShapeDimH);` |
-| CONVERTED | src/app/Application_Viewport.cpp:7381 | `const bool entered = materializr::inputNumber(` |
-| CONVERTED | src/app/Application_Viewport.cpp:7399 | `return dimIsLen ? materializr::lengthFieldCommit(shown) : shown;` |
-| CONVERTED | src/app/Application_Viewport.cpp:7434 | `const bool ok = isLen ? materializr::parseLength(m_sketchDimBuf, v0)` |
-| angle | src/app/Application_Viewport.cpp:7435 | `: materializr::parseFinite(m_sketchDimBuf, v0);` |
+| CONVERTED | src/app/Application_Viewport.cpp:2116 | `(void)materializr::parseFinite(m_sketchShapeDimBuf,` |
+| CONVERTED | src/app/Application_Viewport.cpp:2118 | `if (touchui::numberField("##bubbleDia", nullptr,` |
+| CONVERTED | src/app/Application_Viewport.cpp:2139 | `materializr::lengthField("##bubbleW", &m_sketchShapeDimW);` |
+| CONVERTED | src/app/Application_Viewport.cpp:2142 | `materializr::lengthField("##bubbleH", &m_sketchShapeDimH);` |
+| CONVERTED | src/app/Application_Viewport.cpp:2162 | `if (!materializr::parseLength(m_sketchShapeDimBuf, mm) \|\| mm <= 0.0) return false;` |
+| CONVERTED | src/app/Application_Viewport.cpp:3285 | `(void)materializr::parseFinite(m_dimEditingBuf, dimPadV);` |
+| CONVERTED | src/app/Application_Viewport.cpp:3290 | `if (materializr::inputNumber("##dimval", &dimPadV, 0.0, 0.0, padFmt,` |
+| angle | src/app/Application_Viewport.cpp:6052 | `(void)materializr::parseFinite(m_sketchGizmoRotateBuf,` |
+| angle | src/app/Application_Viewport.cpp:6054 | `bool typedEnter = materializr::inputNumber(` |
+| angle | src/app/Application_Viewport.cpp:6067 | `(void)materializr::parseFinite(m_sketchGizmoRotateBuf, deg);` |
+| angle | src/app/Application_Viewport.cpp:6084 | `(void)materializr::parseFinite(m_sketchGizmoRotateBuf, deg);` |
+| CONVERTED | src/app/Application_Viewport.cpp:7385 | `materializr::lengthField("##dimW", &m_sketchShapeDimW);` |
+| CONVERTED | src/app/Application_Viewport.cpp:7388 | `materializr::lengthField("##dimH", &m_sketchShapeDimH);` |
+| CONVERTED | src/app/Application_Viewport.cpp:7424 | `const bool entered = materializr::inputNumber(` |
+| CONVERTED | src/app/Application_Viewport.cpp:7442 | `return dimIsLen ? materializr::lengthFieldCommit(shown) : shown;` |
+| CONVERTED | src/app/Application_Viewport.cpp:7477 | `const bool ok = isLen ? materializr::parseLength(m_sketchDimBuf, v0)` |
+| angle | src/app/Application_Viewport.cpp:7478 | `: materializr::parseFinite(m_sketchDimBuf, v0);` |
 | CONVERTED | src/app/EdgeOpController.cpp:823 | `if (materializr::amountLengthField("edgeAmt", isFillet ? "Radius" : "Distance", &m_value, /*allowSign=*/false,` |
 | CONVERTED | src/app/EdgeOpController.cpp:836 | `(void)materializr::parseLength(m_inputBuf, m_value);` |
 | CONVERTED | src/app/EdgeOpController.cpp:844 | `if (materializr::parseLength(m_inputBuf, parsed) &&` |
@@ -259,83 +259,119 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 ## `mm` literals by class
 
 - CONVERTED: 1
-- allowed-by-hand: 56
+- allowed-by-hand: 92
 - comment: 266
 - diagnostic: 10
 - identifier/other: 9
 
 | class | file:line | code |
 |---|---|---|
-| comment | src/ai/AiToolDispatcher.cpp:194 | `// mm value formatted with up to 2 decimals, trailing zeros trimmed` |
-| allowed-by-hand | src/ai/AiToolDispatcher.cpp:901 | `o << " origin=(" << fmtMM(ox) << "," << fmtMM(oy) << "," << fmtMM(oz) << ")mm"` |
-| allowed-by-hand | src/ai/AiToolDispatcher.cpp:903 | `<< "mm (w x h x d)";` |
-| allowed-by-hand | src/ai/AiToolDispatcher.cpp:924 | `o << " plane_origin=(" << fmtMM(ox) << "," << fmtMM(oy) << "," << fmtMM(oz) << ")mm"` |
-| allowed-by-hand | src/ai/AiToolDispatcher.cpp:939 | `o << " origin=(" << fmtMM(ox) << "," << fmtMM(oy) << "," << fmtMM(oz) << ")mm"` |
-| allowed-by-hand | src/ai/AiToolDispatcher.cpp:956 | `o << " origin=(" << fmtMM(ox) << "," << fmtMM(oy) << "," << fmtMM(oz) << ")mm"` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:18 | `params.push_back(num("x", "World X position in mm (default 0).", false));` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:19 | `params.push_back(num("y", "World Y position in mm (default 0).", false));` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:20 | `params.push_back(num("z", "World Z position in mm (default 0).", false));` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:28 | `withOrigin({num("width", "Size along X in mm."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:29 | `num("height", "Size along the up axis (Z) in mm."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:30 | `num("depth", "Size along the horizontal depth axis (Y) in mm.")})},` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:32 | `withOrigin({num("radius", "Radius in mm."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:33 | `num("height", "Height in mm.")})},` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:35 | `withOrigin({num("radius", "Radius in mm.")})},` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:37 | `withOrigin({num("bottom_radius", "Base radius in mm."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:38 | `num("top_radius", "Top radius in mm; 0 for a point."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:39 | `num("height", "Height in mm.")})},` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:41 | `withOrigin({num("major_radius", "Distance from centre to tube centre, in mm."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:42 | `num("minor_radius", "Tube radius in mm.")})},` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:45 | `num("dx", "Move along X in mm."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:46 | `num("dy", "Move along Y in mm."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:47 | `num("dz", "Move along Z in mm.")}},` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:63 | `num("dx", "Offset along X in mm.", false),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:64 | `num("dy", "Offset along Y (user-space depth) in mm.", false),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:65 | `num("dz", "Offset along Z (user-space height/up) in mm.", false)}},` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:72 | `num("source_x", "X of the point on the body, in mm."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:73 | `num("source_y", "Depth (user-space Y) of the point on the body, in mm."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:74 | `num("source_z", "Height (user-space Z, up) of the point on the body, in mm."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:75 | `num("target_x", "X of the destination point, in mm."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:76 | `num("target_y", "Depth (user-space Y) of the destination point, in mm."),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:77 | `num("target_z", "Height (user-space Z, up) of the destination point, in mm.")}},` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:86 | `num("spacing_x", "Linear pattern: spacing along X per step, in mm. Ignored for radial.", false),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:87 | `num("spacing_y", "Linear pattern: spacing along user-space depth (Y) per step, in mm. Ignored for radial.", fa` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:88 | `num("spacing_z", "Linear pattern: spacing along user-space height (Z, up) per step, in mm. Ignored for radial.` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:107 | `num("offset", "Offset distance from the plane along its normal, in mm. Defaults to 0.", false),` |
-| allowed-by-hand | src/ai/AiToolSchema.cpp:112 | `num("distance", "Sweep distance in mm. Must be nonzero. The sign picks a direction (positive = along the profi` |
-| comment | src/app/Application.cpp:910 | `// ios_platform.mm).` |
-| comment | src/app/Application.cpp:1168 | `// Create a demo box so there's something to see (a 20 mm cube) - but only` |
-| comment | src/app/Application.cpp:1953 | `// Absolute linear deflection (mm) and angular deflection (radians). Lower` |
-| comment | src/app/Application.cpp:2027 | `// or, from before the presets converted, wrote 1 and reloaded as a 1 mm` |
-| comment | src/app/Application.cpp:4379 | `// Sketch origin should lie on the face's plane within 0.05 mm.` |
-| comment | src/app/Application.cpp:4405 | `// origin on the face plane within 0.05 mm). Used to re-adopt a sketch whose` |
-| comment | src/app/Application.cpp:4850 | `// step is the snap lattice and the visible grid, so leaving it at 1 mm` |
-| comment | src/app/Application.cpp:4858 | `// 152 mm - see 0733a59, which reverted exactly that.` |
-| comment | src/app/Application.cpp:5460 | `// the surface's parametric origin ~0.3 mm off-axis - the fitted anchor` |
-| comment | src/app/Application.cpp:5522 | `// 0.64 mm off-axis). Fit a circle to the OUTER wire instead, then` |
-| comment | src/app/Application.cpp:5587 | `// then keeps the wrong band, landing 0.6 mm off with a` |
-| comment | src/app/Application.cpp:5636 | `// 0.64 mm off-axis at the surface origin) that WON` |
-| comment | src/app/Application.cpp:5730 | `// sides at a generous offset (1 mm) so tessellation slack near the` |
-| comment | src/app/Application.cpp:5745 | `const double eps = 1.0; // mm` |
-| comment | src/app/Application.cpp:6373 | `// lines wrote raw millimetres: placing a dimension under any non-mm unit` |
-| comment | src/app/Application.cpp:6408 | `// Hash point positions and circle/arc radii too (quantised to 1e-4 mm)` |
-| comment | src/app/Application.cpp:6747 | `// millimetres. 40 mm is a reasonable first view in millimetres and an` |
-| comment | src/app/Application.cpp:6807 | `// Measured offsets were 10–50% of a cell. At a 1 mm grid that reads as` |
-| comment | src/app/Application.cpp:6808 | `// slightly-fat lines; at 0.1 mm it is most of a cell, i.e. "I can't draw a` |
-| comment | src/app/Application.h:657 | `// buttons are an explicit fine override (a 0.1 nudge under a 1 mm grid must` |
-| comment | src/app/Application.h:936 | `// Ceiling on the opening view of an EMPTY sketch, in mm of half-span.` |
-| comment | src/app/Application.h:938 | `// 300 mm because it reads as a round number in the units that needed` |
-| comment | src/app/Application.h:940 | `// the unit-aware 40-unit span is 12192 mm - a twelve-metre view, which put` |
-| comment | src/app/Application.h:943 | `// 40 mm and this never engages, so the common case does not move.` |
-| comment | src/app/Application.h:945 | `// Metres are the unit this serves least well: a 300 mm view makes every` |
-| comment | src/app/Application.h:951 | `// Sketch grid step in mm. This is the BASE the user chose (a display` |
-| comment | src/app/Application.h:1149 | `// sketch mm, so the tag keeps its grab point instead of snapping its centre` |
-| comment | src/app/Application.h:1352 | `// Scale popup unit mode. Percent is the multi-body-safe default; mm only` |
-| comment | src/app/Application.h:1358 | `// mm-mode text buffer + focus state per user axis (X, Y, Z in Z-up` |
-| comment | src/app/Application.h:1438 | `float  m_threadClearance = 0.0f; // radial fit gap for printed threads (mm)` |
-| comment | src/app/Application.h:1440 | `float  m_threadGrooveWidth = 0.0f; // explicit cut width (mm); 0 = from pitch` |
-| comment | src/app/Application.h:1656 | `float m_patternDistance = 5.0f; // linear: spacing in mm along chosen axis` |
-| comment | src/app/Application.h:2155 | `// (0.1 / 1 / 10 mm) and gets a solid-blue border when snap is on. Click` |
+| comment | src/ai/AiToolDispatcher.cpp:227 | `// mm value formatted with up to 2 decimals, trailing zeros trimmed` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:345 | `"centered at (x=%.1f, y=%.1f, z=%.1f)mm, size (width=%.1f, depth=%.1f, height=%.1f)mm",` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:735 | `" at radius " + std::to_string(radius) + "mm"};` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:759 | `" at distance " + std::to_string(distance) + "mm"};` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:856 | `std::to_string(radius) + "mm"};` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:888 | `std::to_string(distance) + "mm"};` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:962 | `" - at radius " + std::to_string(radius) + "mm"};` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:1000 | `" - at distance " + std::to_string(distance) + "mm"};` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:1044 | `"mm (positive = outward, negative = cut inward)"};` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:1363 | `std::to_string(thickness) + "mm walls" +` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:1746 | `o << " origin=(" << fmtMM(ox) << "," << fmtMM(oy) << "," << fmtMM(oz) << ")mm"` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:1748 | `<< "mm (w x h x d)";` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:1769 | `o << " plane_origin=(" << fmtMM(ox) << "," << fmtMM(oy) << "," << fmtMM(oz) << ")mm"` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:1784 | `o << " origin=(" << fmtMM(ox) << "," << fmtMM(oy) << "," << fmtMM(oz) << ")mm"` |
+| allowed-by-hand | src/ai/AiToolDispatcher.cpp:1801 | `o << " origin=(" << fmtMM(ox) << "," << fmtMM(oy) << "," << fmtMM(oz) << ")mm"` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:29 | `std::string xDesc = "World X position in mm (default 0).";` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:30 | `if (anchor) xDesc = "World X position in mm (default 0) - " + std::string(anchor);` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:32 | `params.push_back(num("y", "World Y position in mm (default 0).", false));` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:33 | `params.push_back(num("z", "World Z position in mm (default 0).", false));` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:64 | `withOrigin({num("width", "Size along X in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:65 | `num("height", "Size along the up axis (Z) in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:66 | `num("depth", "Size along the horizontal depth axis (Y) in mm.")},` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:72 | `withOrigin({num("radius", "Radius in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:73 | `num("height", "Height in mm.")})},` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:75 | `withOrigin({num("radius", "Radius in mm.")})},` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:77 | `withOrigin({num("bottom_radius", "Base radius in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:78 | `num("top_radius", "Top radius in mm; 0 for a point."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:79 | `num("height", "Height in mm.")})},` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:81 | `withOrigin({num("major_radius", "Distance from centre to tube centre, in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:82 | `num("minor_radius", "Tube radius in mm.")})},` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:86 | `num("dx", "Move along X in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:87 | `num("dy", "Move along Y in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:88 | `num("dz", "Move along Z in mm.")}},` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:112 | `num("dx", "Offset of the copy along X in mm (default 20).", false),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:113 | `num("dy", "Offset of the copy along Y in mm (default 0).", false),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:114 | `num("dz", "Offset of the copy along Z in mm (default 0).", false)}},` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:136 | `"between copies along X in mm.", false),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:137 | `num("spacing_y", "LINEAR ONLY: spacing along Y in mm.", false),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:138 | `num("spacing_z", "LINEAR ONLY: spacing along Z in mm.", false),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:144 | `"through, X in mm (default 0 - the world origin).", false),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:145 | `num("origin_y", "RADIAL ONLY: rotation axis point, Y in mm (default 0).", false),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:146 | `num("origin_z", "RADIAL ONLY: rotation axis point, Z in mm (default 0).", false),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:153 | `num("radius", "Fillet radius in mm. Must be small enough to fit the body's "` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:157 | `num("distance", "Chamfer distance in mm, measured along each adjoining face.")}},` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:165 | `num("radius", "Fillet radius in mm. Must be small enough to fit the face's "` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:180 | `num("distance", "Chamfer distance in mm, measured along each adjoining face."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:193 | `num("radius", "Fillet radius in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:194 | `num("x", "Approximate X position near the edge to fillet, in mm - same "` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:197 | `num("y", "Approximate Y position near the edge, in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:198 | `num("z", "Approximate Z position near the edge, in mm.")}},` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:205 | `num("distance", "Chamfer distance in mm, measured along each adjoining face."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:206 | `num("x", "Approximate X position near the edge to chamfer, in mm - same "` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:209 | `num("y", "Approximate Y position near the edge, in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:210 | `num("z", "Approximate Z position near the edge, in mm.")}},` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:217 | `num("distance", "Distance in mm. Positive extends the face outward (adds "` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:219 | `num("x", "Approximate X position near the face to push/pull, in mm - same "` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:222 | `num("y", "Approximate Y position near the face, in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:223 | `num("z", "Approximate Z position near the face, in mm.")}},` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:230 | `{num("width", "Profile width in mm, along the extrude direction's local X."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:231 | `num("depth", "Profile depth in mm, along the extrude direction's local Y."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:232 | `num("distance", "Extrude distance in mm along the direction (can be "` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:240 | `{num("radius", "Profile radius in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:241 | `num("distance", "Extrude distance in mm along the direction (can be "` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:259 | `num("distance", "Extrude distance in mm along the direction (can be "` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:283 | `num("thickness", "Wall thickness in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:318 | `num("source_x", "X of the point on the body, in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:319 | `num("source_y", "Depth (user-space Y) of the point on the body, in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:320 | `num("source_z", "Height (user-space Z, up) of the point on the body, in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:321 | `num("target_x", "X of the destination point, in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:322 | `num("target_y", "Depth (user-space Y) of the destination point, in mm."),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:323 | `num("target_z", "Height (user-space Z, up) of the destination point, in mm.")}},` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:335 | `num("offset", "Offset distance from the plane along its normal, in mm. Defaults to 0.", false),` |
+| allowed-by-hand | src/ai/AiToolSchema.cpp:340 | `num("distance", "Sweep distance in mm. Must be nonzero. The sign picks a direction (positive = along the profi` |
+| comment | src/app/Application.cpp:923 | `// ios_platform.mm).` |
+| comment | src/app/Application.cpp:1181 | `// Create a demo box so there's something to see (a 20 mm cube) - but only` |
+| comment | src/app/Application.cpp:1966 | `// Absolute linear deflection (mm) and angular deflection (radians). Lower` |
+| comment | src/app/Application.cpp:2040 | `// or, from before the presets converted, wrote 1 and reloaded as a 1 mm` |
+| comment | src/app/Application.cpp:4402 | `// Sketch origin should lie on the face's plane within 0.05 mm.` |
+| comment | src/app/Application.cpp:4428 | `// origin on the face plane within 0.05 mm). Used to re-adopt a sketch whose` |
+| comment | src/app/Application.cpp:4814 | `// step is the snap lattice and the visible grid, so leaving it at 1 mm` |
+| comment | src/app/Application.cpp:4822 | `// 152 mm - see 0733a59, which reverted exactly that.` |
+| comment | src/app/Application.cpp:5595 | `// the surface's parametric origin ~0.3 mm off-axis - the fitted anchor` |
+| comment | src/app/Application.cpp:5657 | `// 0.64 mm off-axis). Fit a circle to the OUTER wire instead, then` |
+| comment | src/app/Application.cpp:5722 | `// then keeps the wrong band, landing 0.6 mm off with a` |
+| comment | src/app/Application.cpp:5771 | `// 0.64 mm off-axis at the surface origin) that WON` |
+| comment | src/app/Application.cpp:5865 | `// sides at a generous offset (1 mm) so tessellation slack near the` |
+| comment | src/app/Application.cpp:5880 | `const double eps = 1.0; // mm` |
+| comment | src/app/Application.cpp:6508 | `// lines wrote raw millimetres: placing a dimension under any non-mm unit` |
+| comment | src/app/Application.cpp:6543 | `// Hash point positions and circle/arc radii too (quantised to 1e-4 mm)` |
+| comment | src/app/Application.cpp:6890 | `// millimetres. 40 mm is a reasonable first view in millimetres and an` |
+| comment | src/app/Application.cpp:6950 | `// Measured offsets were 10–50% of a cell. At a 1 mm grid that reads as` |
+| comment | src/app/Application.cpp:6951 | `// slightly-fat lines; at 0.1 mm it is most of a cell, i.e. "I can't draw a` |
+| comment | src/app/Application.h:684 | `// buttons are an explicit fine override (a 0.1 nudge under a 1 mm grid must` |
+| comment | src/app/Application.h:963 | `// Ceiling on the opening view of an EMPTY sketch, in mm of half-span.` |
+| comment | src/app/Application.h:965 | `// 300 mm because it reads as a round number in the units that needed` |
+| comment | src/app/Application.h:967 | `// the unit-aware 40-unit span is 12192 mm - a twelve-metre view, which put` |
+| comment | src/app/Application.h:970 | `// 40 mm and this never engages, so the common case does not move.` |
+| comment | src/app/Application.h:972 | `// Metres are the unit this serves least well: a 300 mm view makes every` |
+| comment | src/app/Application.h:978 | `// Sketch grid step in mm. This is the BASE the user chose (a display` |
+| comment | src/app/Application.h:1176 | `// sketch mm, so the tag keeps its grab point instead of snapping its centre` |
+| comment | src/app/Application.h:1387 | `// Scale popup unit mode. Percent is the multi-body-safe default; mm only` |
+| comment | src/app/Application.h:1393 | `// mm-mode text buffer + focus state per user axis (X, Y, Z in Z-up` |
+| comment | src/app/Application.h:1473 | `float  m_threadClearance = 0.0f; // radial fit gap for printed threads (mm)` |
+| comment | src/app/Application.h:1475 | `float  m_threadGrooveWidth = 0.0f; // explicit cut width (mm); 0 = from pitch` |
+| comment | src/app/Application.h:1691 | `float m_patternDistance = 5.0f; // linear: spacing in mm along chosen axis` |
+| comment | src/app/Application.h:2190 | `// (0.1 / 1 / 10 mm) and gets a solid-blue border when snap is on. Click` |
 | comment | src/app/Application_Dialogs.cpp:1027 | `// mm mode only makes sense for a single body - multi-body scale needs a` |
 | comment | src/app/Application_Dialogs.cpp:1033 | `// Resolve the (single-body) bbox now so mm-mode fields can pre-fill from` |
 | identifier/other | src/app/Application_Dialogs.cpp:1072 | `const bool mm = (m_scaleUnitMode == ScaleUnitMode::Millimeter);` |
@@ -381,26 +417,26 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | allowed-by-hand | src/app/Application_Dialogs.cpp:5746 | `pdff(s, "BT /F1 8 Tf %.2f %.2f Td (50 mm \\(5 cm\\) - verify print scale) Tj ET\n",` |
 | allowed-by-hand | src/app/Application_Dialogs.cpp:6174 | `: "Tiled, full-size (1:1) PDF with crop marks, a 50 mm scale bar, and "` |
 | comment | src/app/Application_InteractiveOps.cpp:309 | `// field defaulting to 1.0 mm. Typing rebuilds via ShellOp::execute against` |
-| comment | src/app/Application_Viewport.cpp:143 | `// 0.05 mm-per-pixel, which felt sluggish zoomed in and jumpy zoomed out.` |
-| comment | src/app/Application_Viewport.cpp:499 | `// the step (base 1 mm -> 10 mm) the drawn grid sat up to a full` |
-| comment | src/app/Application_Viewport.cpp:560 | `// 1-mm lines are clutter that drowns the major (10-mm) lines.` |
-| comment | src/app/Application_Viewport.cpp:1075 | `// coarsen them pinned the trim/pick radius at its 10 mm cap the` |
-| comment | src/app/Application_Viewport.cpp:1657 | `// Push/pull STARTS at 0 mm (no change), and drawDim draws` |
-| comment | src/app/Application_Viewport.cpp:1776 | `// the analogue of the mm readout for moves. Uses the cached pivot` |
-| comment | src/app/Application_Viewport.cpp:1842 | `// format hid everything under 0.1 mm. (No <cstring> needed -` |
-| comment | src/app/Application_Viewport.cpp:1844 | `auto fmtLen = [](char* out, size_t n, float v) {   // v is mm; prints display unit` |
-| identifier/other | src/app/Application_Viewport.cpp:2118 | `double mm = 0.0;   // "2in" honoured; bare = display unit` |
-| identifier/other | src/app/Application_Viewport.cpp:2119 | `if (!materializr::parseLength(m_sketchShapeDimBuf, mm) \|\| mm <= 0.0) return false;` |
-| identifier/other | src/app/Application_Viewport.cpp:2120 | `v = static_cast<float>(mm);` |
-| comment | src/app/Application_Viewport.cpp:2621 | `// Cursor in sketch mm - the space labelOffX/Y lives in, so a` |
-| comment | src/app/Application_Viewport.cpp:3269 | `// Convert to mm FIRST, then halve a circle's` |
-| comment | src/app/Application_Viewport.cpp:4793 | `// 0.5 mm + 0.5 % of view distance instead; an actually-` |
-| comment | src/app/Application_Viewport.cpp:4794 | `// occluding face is normally many mm in front.` |
-| comment | src/app/Application_Viewport.cpp:5252 | `// ~ 0.85 mm at 240 dpi is unhittable). Still clamped` |
-| comment | src/app/Application_Viewport.cpp:5694 | `// 0.5 mm line nudge → 1 mm mirror shift on a 1 mm grid).` |
-| comment | src/app/Application_Viewport.cpp:6220 | `// user lands within 0.4 mm of the previous click -` |
-| comment | src/app/Application_Viewport.cpp:7396 | `// The pad edits in the display unit; the floor is mm.` |
-| comment | src/app/Application_Viewport.cpp:7430 | `// Converting those display->mm made a typed 180 deg arrive` |
+| comment | src/app/Application_Viewport.cpp:144 | `// 0.05 mm-per-pixel, which felt sluggish zoomed in and jumpy zoomed out.` |
+| comment | src/app/Application_Viewport.cpp:500 | `// the step (base 1 mm -> 10 mm) the drawn grid sat up to a full` |
+| comment | src/app/Application_Viewport.cpp:561 | `// 1-mm lines are clutter that drowns the major (10-mm) lines.` |
+| comment | src/app/Application_Viewport.cpp:1118 | `// coarsen them pinned the trim/pick radius at its 10 mm cap the` |
+| comment | src/app/Application_Viewport.cpp:1700 | `// Push/pull STARTS at 0 mm (no change), and drawDim draws` |
+| comment | src/app/Application_Viewport.cpp:1819 | `// the analogue of the mm readout for moves. Uses the cached pivot` |
+| comment | src/app/Application_Viewport.cpp:1885 | `// format hid everything under 0.1 mm. (No <cstring> needed -` |
+| comment | src/app/Application_Viewport.cpp:1887 | `auto fmtLen = [](char* out, size_t n, float v) {   // v is mm; prints display unit` |
+| identifier/other | src/app/Application_Viewport.cpp:2161 | `double mm = 0.0;   // "2in" honoured; bare = display unit` |
+| identifier/other | src/app/Application_Viewport.cpp:2162 | `if (!materializr::parseLength(m_sketchShapeDimBuf, mm) \|\| mm <= 0.0) return false;` |
+| identifier/other | src/app/Application_Viewport.cpp:2163 | `v = static_cast<float>(mm);` |
+| comment | src/app/Application_Viewport.cpp:2664 | `// Cursor in sketch mm - the space labelOffX/Y lives in, so a` |
+| comment | src/app/Application_Viewport.cpp:3312 | `// Convert to mm FIRST, then halve a circle's` |
+| comment | src/app/Application_Viewport.cpp:4836 | `// 0.5 mm + 0.5 % of view distance instead; an actually-` |
+| comment | src/app/Application_Viewport.cpp:4837 | `// occluding face is normally many mm in front.` |
+| comment | src/app/Application_Viewport.cpp:5295 | `// ~ 0.85 mm at 240 dpi is unhittable). Still clamped` |
+| comment | src/app/Application_Viewport.cpp:5737 | `// 0.5 mm line nudge → 1 mm mirror shift on a 1 mm grid).` |
+| comment | src/app/Application_Viewport.cpp:6263 | `// user lands within 0.4 mm of the previous click -` |
+| comment | src/app/Application_Viewport.cpp:7439 | `// The pad edits in the display unit; the floor is mm.` |
+| comment | src/app/Application_Viewport.cpp:7473 | `// Converting those display->mm made a typed 180 deg arrive` |
 | diagnostic | src/app/EdgeOpController.cpp:546 | `std::fprintf(stdout, "%s edited to %.1f mm\n",` |
 | diagnostic | src/app/EdgeOpController.cpp:558 | `std::fprintf(stdout, "%s %.1f mm committed\n",` |
 | comment | src/app/EdgeOpController.cpp:597 | `// visible arrow length (1 mm single / 0.6 mm per chamfer arrow) keeps the hit` |
@@ -437,9 +473,9 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | comment | src/io/Settings.h:184 | `// to mm on load, after the display unit is applied.` |
 | comment | src/io/Settings.h:209 | `// (0 mm, 1 cm, 2 m, 3 in, 4 ft). An int for the same reason language is -` |
 | comment | src/io/Settings.h:210 | `// this header stays free of core/Units.h. The model is always mm; this only` |
-| comment | src/io/StlExport.cpp:216 | `// OrcaSlicer silently dropped the bottom 5 mm of the print.` |
-| comment | src/io/StlExport.cpp:218 | `// Welding vertices at 1e-3 mm alone took those 6,904 open edges to ONE` |
-| comment | src/io/StlExport.cpp:248 | `{   // weld at 1e-3 mm` |
+| comment | src/io/StlExport.cpp:252 | `// OrcaSlicer silently dropped the bottom 5 mm of the print.` |
+| comment | src/io/StlExport.cpp:254 | `// Welding vertices at 1e-3 mm alone took those 6,904 open edges to ONE` |
+| comment | src/io/StlExport.cpp:294 | `{   // weld at 1e-3 mm` |
 | comment | src/io/StlExport.h:13 | `double linearDeflection = 0.01;  // mm - chord deviation (smaller = smoother)` |
 | comment | src/io/SvgExport.cpp:150 | `// 1 SVG user unit = 1 mm; Y flipped (CAD Y-up -> SVG Y-down).` |
 | comment | src/ios_platform.h:4 | `// iOS runtime services (implemented in ios_platform.mm). Safe to include` |
@@ -486,57 +522,57 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | allowed-by-hand | src/modeling/ResizeCylindricalOp.cpp:517 | `"[Resize] cap-following fill built (final vol=%.3f mm³)\n",` |
 | allowed-by-hand | src/modeling/ResizeCylindricalOp.cpp:542 | `"[Resize] fuse: bodyVol %.3f → %.3f mm³ (delta=%+.3f)\n",` |
 | comment | src/modeling/ScaleFaceOp.cpp:368 | `// they were converted display->mm on commit, so typing 100 under inches` |
-| allowed-by-hand | src/modeling/SewOp.cpp:199 | `ImGui::TextDisabled(materializr::tr("Joined at %.4f mm."), m_tolUsed);` |
+| allowed-by-hand | src/modeling/SewOp.cpp:214 | `ImGui::TextDisabled(materializr::tr("Joined at %.4f mm."), m_tolUsed);` |
 | allowed-by-hand | src/modeling/ShellOp.cpp:221 | `"body (thickness %.3f mm).\n", m_thickness);` |
 | allowed-by-hand | src/modeling/ShellOp.cpp:337 | `"[Shell] failed at thickness %.3f mm - the wall is too thick, "` |
 | comment | src/modeling/Sketch.cpp:556 | `// these a later dimension (e.g. a 2 mm gap to another edge) lets the naive` |
-| comment | src/modeling/Sketch.cpp:631 | `// point pair a handful of mm apart (anywhere someone clicks close` |
-| comment | src/modeling/Sketch.cpp:636 | `// so a gently curving stretch of a real part's outline can go many mm` |
+| comment | src/modeling/Sketch.cpp:645 | `// point pair a handful of mm apart (anywhere someone clicks close` |
+| comment | src/modeling/Sketch.cpp:650 | `// so a gently curving stretch of a real part's outline can go many mm` |
 | comment | src/modeling/SketchConstraints.h:84 | `// dimension label rather than clicking it. Pixels rather than sketch mm because` |
 | comment | src/modeling/SketchEditOp.cpp:140 | `// "Add sketch element" into "Rectangle 80 × 45 mm", "Circle Ø20 mm", etc.,` |
 | comment | src/modeling/SketchOffset.cpp:796 | `// comfortably more than 1e-3 mm - so an analytic epsilon condemns perfectly` |
 | comment | src/modeling/SketchOffset.cpp:959 | `// accept the (sub-0.1 mm) deviation that comes with it.` |
-| comment | src/modeling/SketchTool.cpp:488 | `// Popup asks for DIAMETER (matching the on-canvas "X.X mm dia"` |
-| comment | src/modeling/SketchTool.cpp:684 | `// comes out NEARLY axis-aligned, "nearly" is the bug: 1° over 80 mm is` |
-| comment | src/modeling/SketchTool.cpp:711 | `// 4° rule. (Steve: a 1 mm rise over a long run must not snap to horizontal.)` |
-| comment | src/modeling/SketchTool.cpp:915 | `// neighbouring grid intersection. The old absolute 0.25 mm floor meant a` |
-| comment | src/modeling/SketchTool.cpp:916 | `// fine grid was swamped by it: at a 0.1 mm grid a second point placed one` |
-| comment | src/modeling/SketchTool.cpp:917 | `// or two steps (0.1–0.2 mm) from the first snapped straight back onto it -` |
-| comment | src/modeling/SketchTool.cpp:918 | `// so nothing shorter than ~0.3 mm could be drawn, and an endpoint snap` |
-| comment | src/modeling/SketchTool.cpp:919 | `// hijacked the cursor within 0.3 mm of any point (Steve's report). Coarse` |
-| comment | src/modeling/SketchTool.cpp:921 | `// ~0.42 mm). Grid OFF: the cursor is freehand, so keep an absolute band to` |
-| comment | src/modeling/SketchTool.cpp:974 | `// 0.25 mm even with snap off), which is why Steve couldn't make a line` |
-| comment | src/modeling/SketchTool.cpp:975 | `// under ~0.25 mm with grid AND inferences both off. Loop closure welds` |
-| comment | src/modeling/SketchTool.cpp:1342 | `// snap above: with grid snap on, an absolute 0.2 mm floor would fire a` |
-| comment | src/modeling/SketchTool.cpp:1343 | `// horizontal/vertical guide off a point within 0.2 mm on a fine grid,` |
-| comment | src/modeling/SketchTool.cpp:1350 | `// shrinks to sub-pixel at low zoom (e.g. on an 80 mm part viewed whole),` |
-| comment | src/modeling/SketchTool.cpp:1363 | `// at 100 mm = 5 mm of cursor theft). An inference may only pull the` |
-| comment | src/modeling/SketchTool.cpp:1366 | `// absolute 1.5 mm floor let a directional guide yank the cursor ~1.5 mm -` |
-| comment | src/modeling/SketchTool.cpp:1367 | `// 15 increments at a 0.1 mm grid - so once the (now tight) endpoint band` |
-| comment | src/modeling/SketchTool.cpp:1369 | `// ~1.3 mm out. Tie the pull to the grid so it can't reach past ~1.5` |
-| comment | src/modeling/SketchTool.cpp:1798 | `// angular window up: at a 1 mm grid it means 5.7 deg of catch` |
-| comment | src/modeling/SketchTool.cpp:1799 | `// on a 3 mm leg and worse below that, which is exactly the` |
-| comment | src/modeling/SketchTool.cpp:1974 | `// x=9.0033 on a 0.1 mm grid, a guide pair at y=12.2012. Over a few` |
-| comment | src/modeling/SketchTool.cpp:1996 | `// a 1 mm grid: 8.4 deg on a 3 mm leg off a 70 deg corner, 3.4 deg at` |
-| comment | src/modeling/SketchTool.cpp:1997 | `// 5 mm, decaying as 1/length). The guide still highlights, because it` |
-| comment | src/modeling/SketchTool.cpp:2012 | `// charged vertical, that can be a few mm off the cursor's perpendicular` |
-| comment | src/modeling/SketchTool.cpp:2013 | `// path. With posCap (1.5 mm) we'd silently fall through to single-line` |
-| comment | src/modeling/SketchTool.cpp:2015 | `// which is what Steve hit in the 18.9 mm screenshot.` |
-| comment | src/modeling/SketchTool.cpp:2020 | `// does is relative to the segment being drawn - 1.5 mm off a 100 mm line` |
-| comment | src/modeling/SketchTool.cpp:2021 | `// is nothing, 1.5 mm off a 2 mm line is the line. That asymmetry is why` |
-| comment | src/modeling/SketchTool.cpp:2023 | `// near the anchor (Steve, 2026-09-03: a 2 mm line placed fine, 1 mm and` |
-| comment | src/modeling/SketchTool.cpp:2024 | `// 3 mm were unreachable, the only alternatives being no line at all - an` |
-| comment | src/modeling/SketchTool.cpp:2026 | `// 19 mm jump to a farther intersection still inside the 5x pair cap).` |
-| comment | src/modeling/SketchTool.cpp:2029 | `// out of the way: past ~6 mm of draw the absolute caps bind again, so` |
-| comment | src/modeling/SketchTool.cpp:2169 | `// (Steve.) Grid off keeps the original mm-based cap.` |
-| comment | src/modeling/SketchTool.cpp:2208 | `// when they explicitly asked for 1 mm precision. The toolbar "Snap to` |
-| comment | src/modeling/SketchTool.cpp:2218 | `// declaration for why. 0.3 mm is the radius every caller here used before the` |
-| comment | src/modeling/SketchTool.cpp:2237 | `// A weld radius is a SCREEN distance. As a fixed 0.3 mm it shrank with the` |
-| comment | src/modeling/SketchTool.cpp:2242 | `// welded. Change the lattice underfoot and it stops - switching feet -> mm` |
-| comment | src/modeling/SketchTool.cpp:2244 | `// (304.8-based vs 1-based), the closing click snaps elsewhere, and 0.3 mm` |
-| comment | src/modeling/SketchTool.cpp:2247 | `// Same shape as tolStep()'s screen term, and the 0.3 mm stays as a floor so` |
-| comment | src/modeling/SketchTool.cpp:2428 | `// It used to be a hand-rolled scan at 1e-4 mm, which is exact equality` |
-| comment | src/modeling/SketchTool.cpp:2435 | `// sketch to extrude" after switching feet -> mm, then as "I can't close` |
+| comment | src/modeling/SketchTool.cpp:506 | `// Popup asks for DIAMETER (matching the on-canvas "X.X mm dia"` |
+| comment | src/modeling/SketchTool.cpp:693 | `// comes out NEARLY axis-aligned, "nearly" is the bug: 1° over 80 mm is` |
+| comment | src/modeling/SketchTool.cpp:720 | `// 4° rule. (Steve: a 1 mm rise over a long run must not snap to horizontal.)` |
+| comment | src/modeling/SketchTool.cpp:924 | `// neighbouring grid intersection. The old absolute 0.25 mm floor meant a` |
+| comment | src/modeling/SketchTool.cpp:925 | `// fine grid was swamped by it: at a 0.1 mm grid a second point placed one` |
+| comment | src/modeling/SketchTool.cpp:926 | `// or two steps (0.1–0.2 mm) from the first snapped straight back onto it -` |
+| comment | src/modeling/SketchTool.cpp:927 | `// so nothing shorter than ~0.3 mm could be drawn, and an endpoint snap` |
+| comment | src/modeling/SketchTool.cpp:928 | `// hijacked the cursor within 0.3 mm of any point (Steve's report). Coarse` |
+| comment | src/modeling/SketchTool.cpp:930 | `// ~0.42 mm). Grid OFF: the cursor is freehand, so keep an absolute band to` |
+| comment | src/modeling/SketchTool.cpp:983 | `// 0.25 mm even with snap off), which is why Steve couldn't make a line` |
+| comment | src/modeling/SketchTool.cpp:984 | `// under ~0.25 mm with grid AND inferences both off. Loop closure welds` |
+| comment | src/modeling/SketchTool.cpp:1351 | `// snap above: with grid snap on, an absolute 0.2 mm floor would fire a` |
+| comment | src/modeling/SketchTool.cpp:1352 | `// horizontal/vertical guide off a point within 0.2 mm on a fine grid,` |
+| comment | src/modeling/SketchTool.cpp:1359 | `// shrinks to sub-pixel at low zoom (e.g. on an 80 mm part viewed whole),` |
+| comment | src/modeling/SketchTool.cpp:1372 | `// at 100 mm = 5 mm of cursor theft). An inference may only pull the` |
+| comment | src/modeling/SketchTool.cpp:1375 | `// absolute 1.5 mm floor let a directional guide yank the cursor ~1.5 mm -` |
+| comment | src/modeling/SketchTool.cpp:1376 | `// 15 increments at a 0.1 mm grid - so once the (now tight) endpoint band` |
+| comment | src/modeling/SketchTool.cpp:1378 | `// ~1.3 mm out. Tie the pull to the grid so it can't reach past ~1.5` |
+| comment | src/modeling/SketchTool.cpp:1807 | `// angular window up: at a 1 mm grid it means 5.7 deg of catch` |
+| comment | src/modeling/SketchTool.cpp:1808 | `// on a 3 mm leg and worse below that, which is exactly the` |
+| comment | src/modeling/SketchTool.cpp:1983 | `// x=9.0033 on a 0.1 mm grid, a guide pair at y=12.2012. Over a few` |
+| comment | src/modeling/SketchTool.cpp:2005 | `// a 1 mm grid: 8.4 deg on a 3 mm leg off a 70 deg corner, 3.4 deg at` |
+| comment | src/modeling/SketchTool.cpp:2006 | `// 5 mm, decaying as 1/length). The guide still highlights, because it` |
+| comment | src/modeling/SketchTool.cpp:2021 | `// charged vertical, that can be a few mm off the cursor's perpendicular` |
+| comment | src/modeling/SketchTool.cpp:2022 | `// path. With posCap (1.5 mm) we'd silently fall through to single-line` |
+| comment | src/modeling/SketchTool.cpp:2024 | `// which is what Steve hit in the 18.9 mm screenshot.` |
+| comment | src/modeling/SketchTool.cpp:2029 | `// does is relative to the segment being drawn - 1.5 mm off a 100 mm line` |
+| comment | src/modeling/SketchTool.cpp:2030 | `// is nothing, 1.5 mm off a 2 mm line is the line. That asymmetry is why` |
+| comment | src/modeling/SketchTool.cpp:2032 | `// near the anchor (Steve, 2026-09-03: a 2 mm line placed fine, 1 mm and` |
+| comment | src/modeling/SketchTool.cpp:2033 | `// 3 mm were unreachable, the only alternatives being no line at all - an` |
+| comment | src/modeling/SketchTool.cpp:2035 | `// 19 mm jump to a farther intersection still inside the 5x pair cap).` |
+| comment | src/modeling/SketchTool.cpp:2038 | `// out of the way: past ~6 mm of draw the absolute caps bind again, so` |
+| comment | src/modeling/SketchTool.cpp:2178 | `// (Steve.) Grid off keeps the original mm-based cap.` |
+| comment | src/modeling/SketchTool.cpp:2217 | `// when they explicitly asked for 1 mm precision. The toolbar "Snap to` |
+| comment | src/modeling/SketchTool.cpp:2227 | `// declaration for why. 0.3 mm is the radius every caller here used before the` |
+| comment | src/modeling/SketchTool.cpp:2246 | `// A weld radius is a SCREEN distance. As a fixed 0.3 mm it shrank with the` |
+| comment | src/modeling/SketchTool.cpp:2251 | `// welded. Change the lattice underfoot and it stops - switching feet -> mm` |
+| comment | src/modeling/SketchTool.cpp:2253 | `// (304.8-based vs 1-based), the closing click snaps elsewhere, and 0.3 mm` |
+| comment | src/modeling/SketchTool.cpp:2256 | `// Same shape as tolStep()'s screen term, and the 0.3 mm stays as a floor so` |
+| comment | src/modeling/SketchTool.cpp:2446 | `// It used to be a hand-rolled scan at 1e-4 mm, which is exact equality` |
+| comment | src/modeling/SketchTool.cpp:2453 | `// sketch to extrude" after switching feet -> mm, then as "I can't close` |
 | comment | src/modeling/SketchTool.h:26 | `// current geometry value: mm for distances, RADIUS in mm for Radius (UI` |
 | comment | src/modeling/SketchTool.h:172 | `// Unrotated text extents relative to the anchor (mm), pushed by the app` |
 | comment | src/modeling/SketchTool.h:182 | `// Actual glyph contours (anchor-relative, unrotated mm - same space as the` |
@@ -555,12 +591,12 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | comment | src/modeling/SketchTool.h:344 | `// ~1.5 mm pick radius into 10 mm - an 80-pixel grab - for no reason` |
 | comment | src/modeling/SketchTool.h:400 | `// on the drawing (a 90-degree corner versus a 6 mm fillet run). The cursor's` |
 | comment | src/modeling/SketchTool.h:407 | `// display->mm on the way in, so under inches a typed 180 deg arrived as` |
-| comment | src/modeling/SketchTool.h:608 | `// or diameter (2-point mode) to whole grid units, so a 1 mm grid can't` |
-| comment | src/modeling/SketchTool.h:609 | `// produce a 10.05 mm circle. No-op when grid snap is off.` |
-| comment | src/modeling/SketchTool.h:664 | `float m_textHeight = 8.0f;  // capital height, mm` |
-| comment | src/modeling/SketchTool.h:674 | `float m_airfoilChord = 100.0f;  // mm, a typical model-wing root chord` |
-| comment | src/modeling/SketchTool.h:676 | `float m_svgWidth = 50.0f; // target artwork width, mm` |
-| comment | src/modeling/SketchTool.h:702 | `float m_gridStep = 1.0f; // default 1 mm grid (zoom-scaled; snapping)` |
+| comment | src/modeling/SketchTool.h:619 | `// or diameter (2-point mode) to whole grid units, so a 1 mm grid can't` |
+| comment | src/modeling/SketchTool.h:620 | `// produce a 10.05 mm circle. No-op when grid snap is off.` |
+| comment | src/modeling/SketchTool.h:675 | `float m_textHeight = 8.0f;  // capital height, mm` |
+| comment | src/modeling/SketchTool.h:685 | `float m_airfoilChord = 100.0f;  // mm, a typical model-wing root chord` |
+| comment | src/modeling/SketchTool.h:687 | `float m_svgWidth = 50.0f; // target artwork width, mm` |
+| comment | src/modeling/SketchTool.h:713 | `float m_gridStep = 1.0f; // default 1 mm grid (zoom-scaled; snapping)` |
 | comment | src/modeling/SubShapeIndex.cpp:136 | `constexpr double kDistTol = 1e-3;   // mm` |
 | comment | src/modeling/SubShapeIndex.cpp:183 | `// same-curve-type candidate within 2 mm ONLY when it wins unambiguously` |
 | allowed-by-hand | src/modeling/SvgImport.cpp:706 | `NSVGimage* img = nsvgParse(text.data(), "mm", 96.0f);` |
@@ -586,7 +622,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | comment | src/ui/PropertiesPanel.cpp:917 | `// Lengths: display unit -> mm FIRST, then halve a circle's` |
 | comment | src/ui/PropertiesPanel.h:137 | `// Per-body bbox-extent cache for the "Size: X × Y × Z mm" readout.` |
 | comment | src/ui/StepperRow.h:18 | `// value, and pulling an 80 mm extrude down to 50 because you pressed +1 loses` |
-| allowed-by-hand | src/ui/Toolbar.cpp:534 | `tip(materializr::tr("Create a stock OCCT primitive (box / cylinder / sphere / cone / torus). Picking one opens` |
+| allowed-by-hand | src/ui/Toolbar.cpp:537 | `tip(materializr::tr("Create a stock OCCT primitive (box / cylinder / sphere / cone / torus). Picking one opens` |
 | allowed-by-hand | src/ui/TouchWidgets.h:94 | `const char* suffix = "mm", int decimals = 1,` |
 | allowed-by-hand | src/ui/TouchWidgets.h:137 | `const char* suffix = "mm", int decimals = 1,` |
 | comment | src/viewport/Camera.cpp:215 | `// least 0.1 mm of standoff so the view doesn't degenerate.` |
@@ -651,11 +687,11 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | no-length | src/modeling/RevolveOp.cpp:267 | `RevolveOp` |
 | CONVERTED | src/modeling/ScaleFaceOp.cpp:357 | `ScaleFaceOp` |
 | no-length | src/modeling/SeparateBodyOp.cpp:85 | `SeparateBodyOp` |
-| no-length | src/modeling/SewOp.cpp:181 | `SewOp` |
+| no-length | src/modeling/SewOp.cpp:196 | `SewOp` |
 | CONVERTED | src/modeling/ShellOp.cpp:366 | `ShellOp` |
 | CONVERTED | src/modeling/SketchEditOp.cpp:59 | `SketchEditOp` |
 | stored-string | src/modeling/SketchTransformOp.h:31 | `SketchTransformOp` |
-| no-length | src/modeling/SplitBodyOp.cpp:112 | `SplitBodyOp` |
+| no-length | src/modeling/SplitBodyOp.cpp:116 | `SplitBodyOp` |
 | no-length | src/modeling/SweepOp.cpp:64 | `SweepOp` |
 | no-length | src/modeling/TaperOp.cpp:149 | `TaperOp` |
 | CONVERTED | src/modeling/ThreadOp.cpp:2100 | `ThreadOp` |

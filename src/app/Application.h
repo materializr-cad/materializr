@@ -270,6 +270,23 @@ private:
 
     void importStepFile();
     void exportStepFile();
+    // Shared deferred+pumped+pooled import path; see PluginContext::queueHeavyImport.
+    void queueHeavyImport(std::string message, std::function<bool()> importFn);
+    // Mesh getCandidateIds()'s bodies through the parallel-mesh pool (falls
+    // back to a no-op when MZR_PARALLEL_MESH_SUPPORTED isn't defined for this
+    // build), pumping progressLabel between jobs and logging as "[diagTag]
+    // ...". Shared by loadProjectAt and queueHeavyImport so both get the same
+    // test seams and diagnostics instead of hand-copied logic drifting
+    // between the two. getCandidateIds is a callback, not a precomputed list,
+    // because it must run AFTER the MZR_PARALLEL_MESH_TESTING setup hook -
+    // that hook can mutate the document (add a body), and the test fixture
+    // built around loadProjectAt relies on the enumeration seeing it.
+    // Returns true if the user clicked Cancel during the pool's progress
+    // pump. Dispatched jobs still run to completion either way (the pool
+    // has no mid-flight abort) - the return value is for the caller to
+    // decide whether to keep or discard the result.
+    bool prewarmMeshPool(std::function<std::vector<int>()> getCandidateIds,
+                          const char* progressLabel, const char* diagTag);
     // Per-body STL export: opens a save dialog with the body's current name
     // (from the Items panel) as the default filename and writes JUST that
     // body's mesh. Triggered from the viewport right-click menu and the
@@ -309,6 +326,16 @@ private:
     // to show (no visible bodies) - the save then simply carries no thumbnail.
     // Main thread only (needs the GL context).
     bool captureProjectThumbnailPNG(std::vector<uint8_t>& pngOut);
+    // Render exactly what the LIVE viewport currently shows - the user's own
+    // camera angle, bodies, edges, and any plugin overlay drawn after bodies
+    // (reference images/planes/axes, the AI Assistant's reference-mesh
+    // overlay) - into an offscreen PNG. Unlike captureProjectThumbnailPNG,
+    // the camera is never touched (no reset/zoom-fit) and there is no
+    // "nothing visible" failure case (an empty scene is still a meaningful
+    // screenshot). Used by the AI Assistant's capture_view tool so the model
+    // can compare its own progress against a loaded reference. Main thread
+    // only (needs the GL context).
+    bool captureViewportPng(std::vector<uint8_t>& pngOut);
     // Landing page: rebuild the tile list from m_recentProjects (peeking each
     // file's embedded thumbnail into a GL texture) and show it. Rendered by
     // renderLandingPage() each frame; actions (new/open/dismiss) are handled
@@ -1219,6 +1246,14 @@ private:
     // updates only those bodies' meshes via setBodyMesh / removeBody. Cleared
     // after each rebuild pass.
     std::set<int> m_dirtyBodyIds;
+    // Set whenever a rebuildMeshes() pass could have changed the visible body
+    // set (full rebuild) or any body's geometry/visibility (partial rebuild) -
+    // see rebuildMeshes(). Consumed by renderViewport()'s minor-grid-tier
+    // extent check, which recomputes its cached verdict only when this is
+    // true (and a cooldown has elapsed) and clears it only once it actually
+    // recomputes. Starts true so the first eligible frame still computes the
+    // verdict.
+    bool m_gridExtentStale = true;
     int m_hoveredBodyId = -1;
 
     // Gizmo drag state for history commit
@@ -2196,7 +2231,9 @@ private:
     // earlier preview copies wouldn't survive the restore).
     std::set<int> m_sketchPatternPts;
     std::set<int> m_sketchPatternLines;
-    bool          m_sketchPatternSelectAll = false; // include all circles + arcs
+    std::set<int> m_sketchPatternCircles;
+    std::set<int> m_sketchPatternArcs;
+    bool          m_sketchPatternSelectAll = false; // whole-sketch fallback when nothing was selected
 
     void beginSketchPattern(PatternKind kind);
     void updateSketchPattern();   // re-apply preview from m_sketchPatternBefore

@@ -155,9 +155,12 @@ std::vector<Toolbar::RailTool> Toolbar::railTools() const {
 
     if (m_sketchMode) {
         // SketchToolMode ints per setActiveSketchMode(): 1=Select … 8=Trim,
-        // 12=Dimension, 14=Offset.
+        // 12=Dimension, 14=Offset, 15=Point.
         add(MZ_ICON_SELECT,  "Select",  ToolAction::SelectSketch, m_activeSketchMode == 1,
             "Pick sketch elements (points, lines, regions). Drag a selection to move it.");
+        add(MZ_ICON_POINT,   "Point",   ToolAction::SketchPoint,  m_activeSketchMode == 15,
+            "Place a standalone point. Snaps to existing points, lines and curves "
+            "like every other sketch tool.");
         add(MZ_ICON_LINE,    "Line",    ToolAction::Line,         m_activeSketchMode == 2,
             "Draw straight line segments. Tap to add vertices; Finish ends the chain.");
         add(MZ_ICON_CIRCLE,  "Circle",  ToolAction::Circle,       m_activeSketchMode == 3,
@@ -682,7 +685,7 @@ ToolAction Toolbar::renderSketchTools() {
             ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 2.0f);
             ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
         }
-        bool clicked = ImGui::Button(label, ImVec2(-1, bh(30)));
+        bool clicked = ImGui::Button(materializr::tr(label), ImVec2(-1, bh(30)));
         if (active) {
             ImGui::PopStyleColor();
             ImGui::PopStyleVar();
@@ -711,6 +714,8 @@ ToolAction Toolbar::renderSketchTools() {
 
     if (skBtn("Select / Move", 1)) action = ToolAction::SelectSketch;
     tip(materializr::tr("Pick sketch elements (points, lines, regions). Drag selection to move."));
+    if (skBtn("Point",     15))    action = ToolAction::SketchPoint;
+    tip(materializr::tr("Place a standalone point. Snaps to existing points, lines and curves like every other sketch tool."));
     if (skBtn("Line",      2))     action = ToolAction::Line;
     tip(materializr::tr("Draw straight line segments. Click to add vertices, Esc to finish."));
     if (skBtn("Circle",    3))     action = ToolAction::Circle;

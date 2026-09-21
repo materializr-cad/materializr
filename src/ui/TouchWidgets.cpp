@@ -141,6 +141,15 @@ void drawIconCentered(ImDrawList* dl, const ImVec2& center, float size,
                     col, size * 0.06f, 0, th);
         return;
     }
+    // MZ_ICON_POINT sentinel (U+E007): a solid filled square, matching how a
+    // sketch point itself renders. Iconoir is outline-only - no glyph reads
+    // as a filled dot/vertex.
+    if (std::strcmp(icon, "\xee\x80\x87") == 0) {
+        const float hs = size * 0.22f; // square half-side
+        dl->AddRectFilled(ImVec2(center.x - hs, center.y - hs),
+                          ImVec2(center.x + hs, center.y + hs), col);
+        return;
+    }
     ImFont* font = ImGui::GetFont();
     const ImVec2 ts = font->CalcTextSizeA(size, FLT_MAX, 0.0f, icon);
     dl->AddText(font, size, ImVec2(center.x - ts.x * 0.5f, center.y - ts.y * 0.5f),

@@ -16,7 +16,9 @@ std::future<LlmTurnResult> testConnection(const AppSettings::AiSettings& ai) {
     return std::async(std::launch::async,
         [c = std::shared_ptr<LlmClient>(std::move(client))]() {
             std::vector<ChatMessage> msgs = {{ChatRole::User, "Reply with OK.", ""}};
-            return c->sendTurn(msgs, {});
+            // No cancel UI for the one-shot connection test - it's a single
+            // small request the safety-net CURLOPT_TIMEOUT already bounds.
+            return c->sendTurn(msgs, {}, nullptr);
         });
 }
 

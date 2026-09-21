@@ -33,6 +33,7 @@
 #include <TopTools_ListOfShape.hxx>
 #include <Bnd_Box.hxx>
 #include <BRepBndLib.hxx>
+#include <Standard_Failure.hxx>
 #include "io/ImageEncode.h"
 #include "viewport/Gizmo.h"
 #include "viewport/SelectionHighlight.h"
@@ -565,33 +566,75 @@ void Application::renderViewport() {
                                m_edgeCtl.active();
             float minorAlpha = 1.0f;
             if (!interactive) {
-                // This used to walk every visible body's bbox on every frame
-                // to decide whether the project is "big enough" to suppress
-                // the 1× minor grid. On a 65-body airplane that's ~65 OCCT
-                // bbox calls per frame; even cheap each, the cumulative
-                // baseline cost is real. We only need this threshold check
-                // to feel responsive - not to update every frame - so cache
-                // the verdict and refresh every ~0.25s. A topology change
-                // can wait that long to flip the grid tier.
+                // Walks every visible body's exact bbox to decide whether the
+                // project is "big enough" to suppress the 1x minor grid -
+                // BRepBndLib::Add is a real geometry pass, not a cached-bounds
+                // read, and on a 423-body dense-import scene one walk costs
+                // ~100ms (measured via GL timer queries + wall-clock spike,
+                // issue #110). A 65-body-project-era version of this comment
+                // used to unconditionally poll every ~0.25s - that aliased
+                // against the idle frame cadence and fired every other
+                // frame, which is what produced the reported ~8fps.
+                // m_gridExtentStale (set by rebuildMeshes() whenever a full or
+                // partial rebuild ran - body add/remove/visibility/edit, but
+                // also a theme or mesh-quality switch that can't change the
+                // bounds) now gates whether there is anything to check at
+                // all, so a truly idle frame costs nothing; the 0.25s
+                // cooldown below still caps the worst case for a rapid
+                // string of non-geometric edits (e.g. a body-colour drag off
+                // a live colour wheel), which dirty m_dirtyBodyIds many
+                // times a second without ever changing the bounds.
+                static bool s_hideMinor = false;
                 static double s_nextCheckTime = 0.0;
-                static bool   s_hideMinor    = false;
-                double now = ImGui::GetTime();
-                if (now >= s_nextCheckTime) {
+                const double now = ImGui::GetTime();
+                if (m_gridExtentStale && now >= s_nextCheckTime) {
+                    m_gridExtentStale = false;
+                    // Fresh each pass, not left at its previous value: an
+                    // empty or fully-hidden scene must clear back to
+                    // "not hidden", not freeze at whatever the last
+                    // nonempty scene decided.
+                    bool hideMinor = false;
                     try {
                         Bnd_Box bb;
-                        bool any = false;
                         for (int id : m_document->getAllBodyIds()) {
                             if (!m_document->isBodyVisible(id)) continue;
-                            BRepBndLib::Add(m_document->getBody(id), bb);
-                            any = true;
+                            // Per-body, not just around the Add call below:
+                            // one body with a stale/invalid shape must not
+                            // blank the bounds of every other body that
+                            // resolved fine. The outer try is the same
+                            // safety net the pre-existing code had around
+                            // the whole scan (getAllBodyIds/isBodyVisible
+                            // aren't expected to throw, but nothing here
+                            // relies on that).
+                            try {
+                                BRepBndLib::Add(m_document->getBody(id), bb);
+                            } catch (const Standard_Failure& e) {
+                                // The realistic failure here - OCCT derives
+                                // its own exceptions from Standard_Transient,
+                                // not std::exception, same as every other
+                                // OCCT try/catch in this codebase (BrepIO,
+                                // StepIO, ProjectIO, MoveHoleOp).
+                                if (materializr::isVerbose())
+                                    std::fprintf(stderr,
+                                        "[GridExtent] body %d bounds failed: %s\n",
+                                        id, e.GetMessageString() ? e.GetMessageString() : "unknown");
+                                continue;
+                            } catch (const std::exception& e) {
+                                if (materializr::isVerbose())
+                                    std::fprintf(stderr,
+                                        "[GridExtent] body %d bounds failed: %s\n",
+                                        id, e.what());
+                                continue;
+                            } catch (...) { continue; }
                         }
-                        if (any && !bb.IsVoid()) {
+                        if (!bb.IsVoid()) {
                             double xmn,ymn,zmn,xmx,ymx,zmx;
                             bb.Get(xmn,ymn,zmn,xmx,ymx,zmx);
                             double ext = std::max({xmx-xmn, ymx-ymn, zmx-zmn});
-                            s_hideMinor = (ext > 100.0);
+                            hideMinor = (ext > 100.0);
                         }
                     } catch (...) {}
+                    s_hideMinor = hideMinor;
                     s_nextCheckTime = now + 0.25;
                 }
                 if (s_hideMinor) minorAlpha = 0.0f;
@@ -7588,6 +7631,124 @@ bool Application::captureProjectThumbnailPNG(std::vector<uint8_t>& pngOut) {
         }
     }
     return materializr::encodePng(rgba.data(), kThumbPx, kThumbPx, pngOut);
+}
+
+bool Application::captureViewportPng(std::vector<uint8_t>& pngOut) {
+    if (!m_viewport || !m_shapeRenderer || !m_edgeRenderer || !m_backgroundRenderer)
+        return false;
+
+    landMeshes();
+    if (m_meshesDirty || !m_dirtyBodyIds.empty()) {
+        rebuildMeshes();
+        m_meshesDirty = false;
+    }
+
+    // Long edge 1024px - plenty of detail for a vision model without being
+    // wasteful, matched to the LIVE camera's aspect (never touched: this
+    // capture must show exactly what the user is currently looking at, angle
+    // and all). Rendered at 2x and box-downscaled below, the same cheap
+    // antialiasing trick captureProjectThumbnailPNG uses instead of MSAA
+    // plumbing.
+    const float aspect = m_viewport->getCamera().getAspect();
+    const int kOutLong = 1024;
+    const int kOutW = aspect >= 1.0f ? kOutLong : std::max(1, static_cast<int>(kOutLong * aspect));
+    const int kOutH = aspect >= 1.0f ? std::max(1, static_cast<int>(kOutLong / aspect)) : kOutLong;
+    const int kRenderW = kOutW * 2;
+    const int kRenderH = kOutH * 2;
+
+    GLuint fbo = 0, colorTex = 0, depthRb = 0;
+    glGenFramebuffers(1, &fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    glGenTextures(1, &colorTex);
+    glBindTexture(GL_TEXTURE_2D, colorTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, kRenderW, kRenderH, 0,
+                 GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                           GL_TEXTURE_2D, colorTex, 0);
+    glGenRenderbuffers(1, &depthRb);
+    glBindRenderbuffer(GL_RENDERBUFFER, depthRb);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, kRenderW, kRenderH);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
+                              GL_RENDERBUFFER, depthRb);
+    auto cleanup = [&]() {
+        glBindFramebuffer(GL_FRAMEBUFFER, g_windowFramebuffer);
+        if (colorTex) glDeleteTextures(1, &colorTex);
+        if (depthRb) glDeleteRenderbuffers(1, &depthRb);
+        if (fbo) glDeleteFramebuffers(1, &fbo);
+    };
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        cleanup();
+        return false;
+    }
+    glViewport(0, 0, kRenderW, kRenderH);
+
+    Camera& cam = m_viewport->getCamera(); // LIVE camera - read only, never mutated
+
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+    glDisable(GL_SCISSOR_TEST);
+    const bool lightBg = m_themeManager &&
+                         m_themeManager->getTheme() == Theme::Light;
+    if (lightBg) {
+        m_backgroundRenderer->setTopColor(glm::vec3(0.92f, 0.93f, 0.96f));
+        m_backgroundRenderer->setBottomColor(glm::vec3(0.78f, 0.80f, 0.85f));
+    } else {
+        m_backgroundRenderer->setTopColor(glm::vec3(0.22f, 0.22f, 0.28f));
+        m_backgroundRenderer->setBottomColor(glm::vec3(0.12f, 0.12f, 0.15f));
+    }
+    m_backgroundRenderer->render();
+    glEnable(GL_DEPTH_TEST);
+
+    // Same as captureProjectThumbnailPNG: a live section cut would carve this
+    // capture too - always off, so the model always sees the whole part.
+    m_shapeRenderer->setSectionPlane(false, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    m_edgeRenderer->setSectionPlane(false, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+
+    glm::mat4 view = cam.getViewMatrix();
+    glm::mat4 proj = cam.getProjectionMatrix();
+    m_shapeRenderer->render(view, proj, cam.getPosition());
+    m_edgeRenderer->render(view, proj);
+    // Plugin passes drawn after bodies (>= kBodyPassPriority): reference
+    // images/planes/axes, and the AI Assistant's own reference-mesh overlay
+    // (RefMeshPlugin) - the whole reason this capture exists is so the model
+    // can see that overlay alongside its own work. Passes drawn BEFORE
+    // bodies are skipped (nothing registers there today - see renderViewport
+    // - and this capture only needs the model + what's meant to be compared
+    // against it, not underlay decoration).
+    if (m_pluginContext) {
+        for (auto& pass : materializr::PluginRegistry::instance().renderPasses()) {
+            if (pass.priority >= kBodyPassPriority && pass.render)
+                pass.render(*m_pluginContext, view, proj);
+        }
+    }
+
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    std::vector<uint8_t> raw(static_cast<size_t>(kRenderW) * kRenderH * 4);
+    glReadPixels(0, 0, kRenderW, kRenderH, GL_RGBA, GL_UNSIGNED_BYTE, raw.data());
+    cleanup();
+
+    // 2x2 box downscale + vertical flip (GL reads bottom-up), same as
+    // captureProjectThumbnailPNG.
+    std::vector<uint8_t> rgba(static_cast<size_t>(kOutW) * kOutH * 4);
+    for (int y = 0; y < kOutH; ++y) {
+        const int sy0 = kRenderH - 1 - (y * 2);
+        const int sy1 = sy0 - 1;
+        for (int x = 0; x < kOutW; ++x) {
+            const int sx = x * 2;
+            for (int c = 0; c < 4; ++c) {
+                const unsigned sum =
+                    raw[(static_cast<size_t>(sy0) * kRenderW + sx) * 4 + c] +
+                    raw[(static_cast<size_t>(sy0) * kRenderW + sx + 1) * 4 + c] +
+                    raw[(static_cast<size_t>(sy1) * kRenderW + sx) * 4 + c] +
+                    raw[(static_cast<size_t>(sy1) * kRenderW + sx + 1) * 4 + c];
+                rgba[(static_cast<size_t>(y) * kOutW + x) * 4 + c] =
+                    static_cast<uint8_t>(sum / 4);
+            }
+        }
+    }
+    return materializr::encodePng(rgba.data(), kOutW, kOutH, pngOut);
 }
 
 } // namespace materializr

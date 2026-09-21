@@ -100,7 +100,11 @@ bool MeshTraceSetupOp::undo(Document& doc) {
 }
 
 std::string MeshTraceSetupOp::description() const {
-    return "3 tracing planes + sketches";
+    // Lead with an alphabetic op name, not the digit - HistoryPanel only
+    // translates the leading alphabetic run of a composed description (see
+    // its comment), and a leading "3" makes that run zero-length so this
+    // would otherwise never translate no matter what the catalogue holds.
+    return "Mesh trace setup (3 planes + sketches)";
 }
 
 std::string MeshTraceSetupOp::serializeParams() const {

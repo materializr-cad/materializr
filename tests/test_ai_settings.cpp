@@ -58,14 +58,12 @@ TEST(AiSettings, ExcludedFromJsonExportAndImport) {
     s.ai.anthropicApiKey = "sk-ant-should-not-leak";
     ASSERT_TRUE(SettingsIO::exportJson(exportPath, s));
 
-    {
-        std::ifstream f(exportPath);
-        ASSERT_TRUE(f.is_open());
-        std::string body((std::istreambuf_iterator<char>(f)),
-                         std::istreambuf_iterator<char>());
-        EXPECT_EQ(body.find("sk-ant-should-not-leak"), std::string::npos)
-            << "an API key must never appear in an exported settings file";
-    }
+    std::ifstream f(exportPath);
+    std::string body((std::istreambuf_iterator<char>(f)),
+                     std::istreambuf_iterator<char>());
+    f.close();
+    EXPECT_EQ(body.find("sk-ant-should-not-leak"), std::string::npos)
+        << "an API key must never appear in an exported settings file";
 
     // A malicious/foreign import file setting an AI key must not be applied.
     const std::string importPath = tmpCfg("import") + ".json";

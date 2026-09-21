@@ -9,8 +9,12 @@ public:
     AnthropicClient(std::string apiKey, std::string model)
         : m_apiKey(std::move(apiKey)), m_model(std::move(model)) {}
 
+    // Does not stream yet - onDelta is accepted (to satisfy LlmClient) but
+    // never called. See OpenAiCompatibleClient for the streaming path.
     LlmTurnResult sendTurn(const std::vector<ChatMessage>& messages,
-                          const std::vector<ToolDef>& tools) override;
+                          const std::vector<ToolDef>& tools,
+                          const std::atomic<bool>* cancelFlag,
+                          const StreamDeltaCallback& onDelta = {}) override;
 
     // Pure, network-free - directly unit-testable.
     static nlohmann::json buildRequestBody(const std::vector<ChatMessage>& messages,

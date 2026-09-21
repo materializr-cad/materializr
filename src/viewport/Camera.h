@@ -40,6 +40,11 @@ public:
     /// Update the aspect ratio (e.g. on viewport resize).
     void setAspect(float aspect);
 
+    /// Current aspect ratio (width/height). Used by an off-screen capture
+    /// that wants to match the live viewport's framing exactly - see
+    /// Application::captureViewportPng - without disturbing the camera.
+    float getAspect() const { return m_aspect; }
+
     /// Reset to default isometric-like view (looking at origin from (5,5,5)).
     void reset();
 

@@ -17,15 +17,53 @@ void AiSessionController::submitPrompt(const std::string& userText) {
 }
 
 void AiSessionController::startTurn() {
-    // Captured by value: m_client is a pointer the lambda doesn't own the
-    // lifetime of, but AiSessionController outlives every turn it starts
-    // (poll() always completes a turn before the next submitPrompt can
-    // start another - see the isBusy() guard above).
+    // Captured by value/raw pointer: m_client and &m_cancelRequested outlive
+    // every turn they're used in - AiSessionController never rebuilds/
+    // destroys itself while a turn is in flight (poll() always completes one
+    // before the next submitPrompt can start another - see the isBusy()
+    // guard above; the chat overlay's sessionFor() has the matching
+    // "never rebuild while busy" rule on its side).
+    m_cancelRequested = false;
+    m_turnStartedAt = std::chrono::steady_clock::now();
+    {
+        std::lock_guard<std::mutex> lock(m_streamMutex);
+        m_streamingText.clear();
+    }
     LlmClient* client = m_client.get();
+    const std::atomic<bool>* cancelFlag = &m_cancelRequested;
     std::vector<ChatMessage> messagesCopy = m_messages;
-    m_future = std::async(std::launch::async, [client, messagesCopy]() {
-        return client->sendTurn(messagesCopy, allTools());
+    // Runs on the SAME background thread as sendTurn itself (see
+    // StreamDeltaCallback's doc comment) - must only touch the mutex-guarded
+    // buffer, never m_scrollback/m_messages or anything ImGui-related.
+    StreamDeltaCallback onDelta = [this](const std::string& deltaText) {
+        std::lock_guard<std::mutex> lock(m_streamMutex);
+        m_streamingText += deltaText;
+    };
+    m_future = std::async(std::launch::async, [client, messagesCopy, cancelFlag, onDelta]() {
+        return client->sendTurn(messagesCopy, allTools(), cancelFlag, onDelta);
     });
+}
+
+std::string AiSessionController::streamingText() const {
+    std::lock_guard<std::mutex> lock(m_streamMutex);
+    return m_streamingText;
+}
+
+void AiSessionController::cancel() {
+    if (isBusy()) m_cancelRequested = true;
+}
+
+double AiSessionController::elapsedSeconds() const {
+    if (!isBusy()) return 0.0;
+    return std::chrono::duration<double>(
+        std::chrono::steady_clock::now() - m_turnStartedAt).count();
+}
+
+void AiSessionController::clear() {
+    if (isBusy()) return;
+    m_messages.clear();
+    m_scrollback.clear();
+    m_stepCount = 0;
 }
 
 void AiSessionController::poll(materializr::PluginContext& ctx) {
@@ -42,7 +80,11 @@ void AiSessionController::poll(materializr::PluginContext& ctx) {
     }
 
     if (!result.ok) {
-        m_scrollback.push_back({ScrollbackLine::Kind::Error,
+        // A deliberate cancel() isn't a failure - don't red-flag it as one.
+        m_scrollback.push_back(
+            result.error == "Cancelled"
+                ? ScrollbackLine{ScrollbackLine::Kind::ToolSummary, "Cancelled."}
+                : ScrollbackLine{ScrollbackLine::Kind::Error,
                                 "AI request failed: " + result.error});
         return;
     }
@@ -55,6 +97,21 @@ void AiSessionController::poll(materializr::PluginContext& ctx) {
         if (!result.finalText.empty()) {
             m_scrollback.push_back({ScrollbackLine::Kind::Assistant, result.finalText});
             m_messages.push_back({ChatRole::Assistant, result.finalText, "", {}});
+        } else {
+            // An empty reply with no tool calls used to go here silently -
+            // looked identical to the UI just doing nothing. A reasoning
+            // model spending its whole token budget on hidden "thinking"
+            // before ever producing a tool call or reply text lands here
+            // with result.truncated set - tell the user that specifically
+            // rather than leaving them staring at a chat box that went
+            // quiet with zero explanation.
+            m_scrollback.push_back({ScrollbackLine::Kind::Error,
+                result.truncated
+                    ? "The model ran out of its response budget while "
+                      "thinking, before it replied or used a tool. Try a "
+                      "simpler request, or break it into smaller steps."
+                    : "The model gave an empty reply and made no tool "
+                      "calls for this turn."});
         }
         return;
     }
@@ -93,7 +150,8 @@ void AiSessionController::poll(materializr::PluginContext& ctx) {
         m_scrollback.push_back({toolResult.ok ? ScrollbackLine::Kind::ToolSummary
                                               : ScrollbackLine::Kind::Error,
                                 "-> " + toolResult.message});
-        m_messages.push_back({ChatRole::ToolResult, toolResult.message, call.id, {}});
+        m_messages.push_back({ChatRole::ToolResult, toolResult.message, call.id, {},
+                              toolResult.imagePng});
         ++m_stepCount;
     }
     if (m_stepCount >= kMaxStepsPerPrompt) {

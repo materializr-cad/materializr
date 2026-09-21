@@ -4,6 +4,7 @@
 #include <BRepMesh_IncrementalMesh.hxx>
 #include "core/MeshParams.h"
 #include <BRepBuilderAPI_Transform.hxx>
+#include <BRepBuilderAPI_Sewing.hxx>
 #include <StlAPI_Writer.hxx>
 #include <gp_Trsf.hxx>
 #include <gp_Ax1.hxx>
@@ -15,9 +16,13 @@
 #include <BRep_Tool.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Compound.hxx>
+#include <TopoDS_Edge.hxx>
 #include <TopoDS_Face.hxx>
+#include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
+#include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
 #include <Poly_Triangulation.hxx>
+#include <Poly_PolygonOnTriangulation.hxx>
 #include <TopLoc_Location.hxx>
 #include <algorithm>
 #include <array>
@@ -26,6 +31,7 @@
 #include <cstring>
 #include <fstream>
 #include <map>
+#include <set>
 #include <unordered_map>
 #include <vector>
 
@@ -197,6 +203,36 @@ StlExportResult StlExport::exportShape(const std::string& filePath, const TopoDS
     TopoDS_Shape shape = BRepBuilderAPI_Transform(inShape, yUpToZUp,
                                                   Standard_True).Shape();
 
+    // Sew before meshing: closes any genuinely-free edges (faces that
+    // are meant to be adjacent but, within tolerance, aren't actually
+    // topologically shared) before they can crack the mesh below.
+    // Non-solid shapes (a bare compound of faces, e.g. from a partial
+    // repair) sew to a shell/compound rather than a solid, which is
+    // fine here - only the triangulated faces matter for STL, not
+    // solid-ness.
+    {
+        BRepBuilderAPI_Sewing sewer(1e-3);
+        sewer.Add(shape);
+        sewer.Perform();
+        const TopoDS_Shape sewn = sewer.SewedShape();
+        if (!sewn.IsNull()) shape = sewn;
+    }
+
+    // A boolean/fillet/chamfer chain can also leave a genuinely
+    // NON-MANIFOLD edge behind - one real topological edge shared by
+    // three (or more) faces instead of two, usually because a sliver
+    // face the operation introduced never got merged into its big
+    // neighbour. Sewing can't fix this (the edge already IS shared, so
+    // there's no free-edge gap to close) and BRepCheck_Analyzer doesn't
+    // flag it either (each face and edge is individually well-formed).
+    // Record every such edge's mesh vertices now, from the real BRep
+    // topology, so the weld below can tell a genuine 3-face edge apart
+    // from an unrelated pair of vertices that only LOOK adjacent because
+    // they happen to land in the same weld cell.
+    TopTools_IndexedDataMapOfShapeListOfShape edgeFaceMap;
+    TopExp::MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, edgeFaceMap);
+    std::vector<std::pair<int,int>> nonManifoldRawEdges;
+
     // Tessellate the shape
     BRepMesh_IncrementalMesh mesh(
         shape, materializr::meshParams(options.linearDeflection, options.angularDeflection, false));
@@ -240,6 +276,16 @@ StlExportResult StlExport::exportShape(const std::string& filePath, const TopoDS
             if (rev) std::swap(b, c);
             tris.push_back({base + a - 1, base + b - 1, base + c - 1});
         }
+        for (TopExp_Explorer ee(f, TopAbs_EDGE); ee.More(); ee.Next()) {
+            const TopoDS_Edge& edge = TopoDS::Edge(ee.Current());
+            if (edgeFaceMap.FindFromKey(edge).Extent() <= 2) continue;
+            const Handle(Poly_PolygonOnTriangulation)& poly =
+                BRep_Tool::PolygonOnTriangulation(edge, t, loc);
+            if (poly.IsNull()) continue;
+            const TColStd_Array1OfInteger& nodes = poly->Nodes();
+            for (int k = nodes.Lower(); k < nodes.Upper(); ++k)
+                nonManifoldRawEdges.push_back({base + nodes(k) - 1, base + nodes(k + 1) - 1});
+        }
     }
     if (tris.empty()) {
         result.errorMessage = "Tessellation produced no triangles.";
@@ -272,6 +318,16 @@ StlExportResult StlExport::exportShape(const std::string& filePath, const TopoDS
         };
         std::vector<T3> nt = buildTris(remap);
 
+        // Welded ids for the genuinely non-manifold BRep edges recorded
+        // above - these are allowed to be shared by more than 2
+        // triangles below without tripping the anti-fold guard.
+        std::set<std::pair<int,int>> legitMultiUse;
+        for (const auto& re : nonManifoldRawEdges) {
+            int a = remap[re.first], b = remap[re.second];
+            if (a > b) std::swap(a, b);
+            legitMultiUse.insert({a, b});
+        }
+
         // A weld only reconnects a real crack (2 faces' independent
         // triangulations of the SAME B-Rep edge) when it leaves that edge
         // shared by exactly 2 triangles, same as any interior edge. A grid
@@ -290,7 +346,10 @@ StlExportResult StlExport::exportShape(const std::string& filePath, const TopoDS
             for (const auto& ed : e) { int a=ed[0], b=ed[1]; if (a>b) std::swap(a,b); ++ec[{a,b}]; }
         }
         std::unordered_map<int, char> poisoned;   // welded-id -> present
-        for (const auto& kv : ec) if (kv.second > 2) { poisoned[kv.first.first] = 1; poisoned[kv.first.second] = 1; }
+        for (const auto& kv : ec) {
+            if (kv.second <= 2 || legitMultiUse.count(kv.first)) continue;
+            poisoned[kv.first.first] = 1; poisoned[kv.first.second] = 1;
+        }
         if (!poisoned.empty()) {
             std::vector<int> remap2 = remap;
             for (std::size_t i = 0; i < remap.size(); ++i)

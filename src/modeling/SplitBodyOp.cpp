@@ -73,8 +73,12 @@ bool SplitBodyOp::execute(Document& doc) {
 
         std::fprintf(stderr, "[Split] splitter produced %d solid(s)\n",
                      static_cast<int>(solids.size()));
-        if (solids.size() < 2) {
-            // Split did not produce two bodies (plane may not intersect)
+        if (solids.size() != 2) {
+            // <2: the plane missed the body, nothing to split.
+            // >2: a multi-lobed/disjoint body cut into 3+ pieces - this op
+            // only ever keeps solids[0] and solids[1], so anything past
+            // that would be silently discarded (#114). Fail cleanly instead
+            // of dropping geometry; a proper N-way split is future work.
             return false;
         }
 

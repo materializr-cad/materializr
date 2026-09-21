@@ -5,6 +5,8 @@ All notable changes to Materializr are documented here. Format loosely follows
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-09-19
+
 ### Added
 
 - **Assembly Mates.** Position one body against another and keep the
@@ -15,6 +17,49 @@ All notable changes to Materializr are documented here. Format loosely follows
   everything mated to it along; the first body you reference becomes the
   assembly's grounded root. Mates persist through save/reload and survive
   undo/redo of the ops that move a mated body.
+- **AI Assistant.** A chat panel (desktop only) that turns a plain-language
+  request - "make a 20mm cube with a 5mm hole through the center" - into
+  real, undoable modeling operations. Point it at Anthropic's API, OpenAI's,
+  or any OpenAI-compatible endpoint (Ollama, LM Studio, OpenRouter) with your
+  own key; a Test Connection button in Settings -> AI Assistant confirms your
+  setup before you ever open the chat. The assistant works in a loop: it can
+  list the bodies already in your project, read your current selection, add
+  and transform primitives, run booleans, push/pull faces, extrude sketched
+  shapes and polygons, loft between profiles, fillet or chamfer one edge or
+  all of them on a body or face, shell a body, mirror/duplicate/pattern/delete
+  bodies, and take its own screenshot of the viewport to check its progress
+  against a translucent reference mesh you supply - correcting its own
+  mistakes within a bounded number of steps per prompt. Every action it takes
+  is a normal operation in your History, so Ctrl+Z undoes it exactly like
+  anything you did by hand. Reasoning and replies stream in live for
+  OpenAI-compatible providers instead of sitting behind a static "Thinking..."
+  label, and a Cancel button stops a request that's taking too long (common
+  with a local model on modest hardware). API keys live in your local
+  settings file only - never in an exported settings backup, and never sent
+  anywhere but the provider you chose.
+- **Display units.** Settings gains a display unit (millimetres, centimetres,
+  metres, inches, or feet) that every length field, dimension, caption, and
+  the sketch grid itself now reads and writes in - type "2 in" for a hole
+  size without doing the mm conversion in your head, or read a part's
+  bounding box in feet on a large assembly. The model, the .mzr file, and the
+  scripting API stay millimetres underneath; only what you see and type
+  changes. Angles, percentages, and pixel counts are unaffected.
+- **Unofficial FreeBSD build support**, alongside Linux, Windows and macOS.
+
+### Changed
+
+- **The sketch grid now scales with zoom.** The grid step you set is a base
+  value; the step actually drawn and snapped to is that base scaled by whole
+  decades so a grid cell stays a sensible size on screen (matching how Fusion
+  360 and Onshape behave) - zoom out far enough from a 1 mm base and you're
+  snapping at 10 mm, then 100 mm, instead of an invisible sub-pixel lattice.
+  The number you typed and saved is unchanged; only what it expands to at the
+  current zoom is new.
+- **A new sketch's opening view no longer floats a shape metres above the
+  origin.** Framing a fixed number of display units around an empty sketch
+  made sense in millimetres (40 mm) but not in larger units (40 ft opened a
+  twelve-metre view); the opening view is now bounded at the equivalent of
+  300 mm regardless of your display unit.
 
 ### Fixed
 
@@ -188,6 +233,97 @@ All notable changes to Materializr are documented here. Format loosely follows
   worker thread is no longer meshed a second time on the main thread. glTF
   export now meshes a copy of each body, so an export can no longer leave the
   viewport holding an export-quality mesh.
+- **Exported STL could fold in on itself near a fillet or fine thread.** The
+  pinhole-repair pass that welds nearby mesh vertices used a pure
+  spatial-distance check with no verification that a merge corresponded to an
+  actual shared edge in the underlying model - on one part it welded vertices
+  from unrelated, merely-nearby surface patches into a mesh that visibly
+  overlapped itself (2012 non-manifold edges introduced by the weld pass
+  alone, confirmed by direct measurement). Welds are now checked against the
+  model's real edges and any that don't correspond to one are undone; a small
+  hole's closing fan is also now cut by proper ear-clipping instead of
+  blindly fanning from one vertex, which had the same fold risk on a
+  non-convex loop.
+- **Sew and Split could silently discard whole bodies.** Sew collapsed to a
+  single shell whenever nothing had visibly failed to join, even when that
+  meant several genuinely separate closed solids (two boxes that never
+  touched); Split kept only the first two pieces of a cut that actually
+  produced three or more. Both operations now refuse cleanly with an
+  explanation instead of quietly returning fewer bodies than you started
+  with.
+- **Trim and Select+Delete on a sketch polygon corrupted the sketch.**
+  Clicking Trim on a polygon's edge partial-trimmed the underlying line
+  instead of deleting the whole polygon (the intended behavior), and
+  Select+Delete on a polygon's edge, vertex, or center point left the
+  polygon's internal bookkeeping pointing at a piece that no longer existed -
+  both left a rendered gap that persisted through save/reload and
+  undo/redo. Both tools now cascade to the whole polygon, the same way they
+  already do everywhere else a polygon is involved.
+- **A click that looked dead-on a spline could silently miss it.** The
+  tolerance for detecting a click on an existing curve (needed to split and
+  weld it into a shared vertex, e.g. to close a loop) didn't scale with zoom
+  like every other snap radius, so on a normally-sized part viewed whole it
+  shrank to sub-pixel and the click registered nothing. It now has its own
+  screen-pixel floor. Separately, hovering or selecting a sketch region
+  before double-clicking into it to edit could leave that region highlight
+  re-running a full boolean fuse on every single frame for the rest of the
+  session, reading as the app hanging on messy geometry - both highlights are
+  now skipped for the sketch actually being edited.
+- **The crash-recovery autosave could take multiple seconds on a project with
+  a lot of history.** It re-serialized and re-compressed the entire undo
+  history on every write, so cost scaled with total historical churn rather
+  than current complexity. It now only needs to restore current geometry on a
+  crash, so it skips the undo history entirely; a normal Ctrl+S save is
+  unaffected and keeps the full history as always.
+- **"Autosave" was a periodic full-fidelity save on the main thread**,
+  blocking the UI for seconds at a time on a project with a lot of
+  accumulated history, every time the interval elapsed. It's now a save that
+  happens once, right before the project actually closes - including when
+  quitting the app via the window's close button or Ctrl+Q, which previously
+  fell back to a save prompt instead of honoring the setting.
+- **A crash-recovery snapshot from an unrelated, separately-crashed window
+  could overwrite an open tab.** Restoring an orphaned recovery file always
+  landed it in whichever tab was currently active, which is only safe right
+  after a fresh launch. It now checks whether that tab already holds a real
+  project and opens the orphan in a new tab instead of silently replacing
+  your work.
+- **A spline endpoint placed visibly on a curve could save measurably off
+  it, with grid snap on.** The grid-snap walk that lands a point on the
+  lattice assumed a straight-line direction; against a curve it used only a
+  rough local approximation of the tangent, dragging the saved point off the
+  actual curve by an amount that grew with local curvature. On-curve contact
+  points now skip that walk and use the exact curve projection.
+- **Importing a STEP or IGES file could freeze the window for 5-12+ seconds
+  on a many-body assembly.** The import ran on the main thread and the
+  resulting mesh rebuild tessellated every body serially with no deferral.
+  Both the menu import and the Ctrl+I shortcut now run through the same
+  deferred, worker-pooled path project load already uses.
+- **Steady-state viewport framerate dropped to about 8fps once a project held
+  400+ bodies, even fully idle.** A grid-tier check re-walked every visible
+  body's exact bounding box on a fixed timer regardless of whether anything
+  had changed. It now only recomputes when a body is actually added,
+  removed, or edited; idle framerate on a 423-body project rises from ~8fps
+  to a steady 12fps.
+- **Push/Pull could implicitly target an imported STL mesh body it should
+  have refused.** Push/Pull's own selection is already blocked from picking a
+  mesh body, but two other paths - re-hosting a sketch onto its source body
+  after a reload, and the sweep that finds a body to cut through - still
+  handed a mesh body to the same boolean, which can produce a non-manifold
+  result. Both paths now exclude mesh bodies the same way extrude's own
+  cut-candidate search already does.
+- **A Fillet or Chamfer could enter a blend that couldn't be cancelled.** The
+  OCCT call that builds the blend can't be interrupted once started, so a
+  radius that turns out to be infeasible on the given geometry could hang the
+  app until it finished on its own. The radius is now probed under a
+  configurable time limit first, and the whole retry ladder is bounded.
+- **Dimension labels can now be dragged** to a new position, and a plain
+  click no longer pins an auto-placed label in place.
+- **A sketch line drawn to close a loop right on top of its start point could
+  fail to close after switching the display unit.** The coincidence check
+  that welds a closing line's endpoint used a radius scaled from the old
+  millimetre-valued grid step; it's now a screen-space check like every other
+  click-aim tolerance in the tool, so closing a loop behaves the same
+  regardless of your display unit.
 
 ## [1.6.3] - 2026-08-28
 

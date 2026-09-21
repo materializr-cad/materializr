@@ -17,6 +17,19 @@ TEST(AnthropicClient, BuildRequestBodyIncludesModelMessagesAndTools) {
     EXPECT_EQ(body["tools"].size(), allTools().size());
 }
 
+TEST(AnthropicClient, BuildRequestBodySetsTheSystemPromptStatingTheAxisConvention) {
+    // Anthropic's Messages API has a dedicated top-level "system" field, so
+    // unlike OpenAiCompatibleClient this never touches the messages array -
+    // see the sibling test there for why this prompt exists at all (Steve
+    // reported the model sometimes treats Y as up and misses edges/faces).
+    std::vector<ChatMessage> messages = {{ChatRole::User, "hi", "", {}}};
+    nlohmann::json body = AnthropicClient::buildRequestBody(messages, {}, "claude-sonnet-4-5");
+    ASSERT_TRUE(body.contains("system"));
+    std::string prompt = body["system"].get<std::string>();
+    EXPECT_NE(prompt.find("Z = up"), std::string::npos) << prompt;
+    EXPECT_NE(prompt.find("list_bodies"), std::string::npos) << prompt;
+}
+
 TEST(AnthropicClient, BuildRequestBodyMapsToolResultMessagesToUserToolResultBlocks) {
     // Anthropic has no separate "tool" role - a tool result rides inside a
     // user-role message as a tool_result content block.
@@ -68,6 +81,41 @@ TEST(AnthropicClient, BuildRequestBodyGroupsConsecutiveToolResultsIntoOneUserMes
     EXPECT_EQ(toolResultsMsg["content"][1]["tool_use_id"], "call_2");
 }
 
+TEST(AnthropicClient, BuildRequestBodyEmitsImageBlockForAToolResultCarryingAScreenshot) {
+    std::vector<uint8_t> png = {0x89, 'P', 'N', 'G', 0x0d, 0x0a};
+    std::vector<ChatMessage> messages = {
+        {ChatRole::User, "make a box", "", {}},
+        {ChatRole::Assistant, "", "", {{"call_1", "capture_view", {}}}},
+        {ChatRole::ToolResult, "Captured the current view", "call_1", {}, png},
+    };
+    nlohmann::json body = AnthropicClient::buildRequestBody(messages, {}, "claude-sonnet-4-5");
+    const auto& last = body["messages"].back();
+    EXPECT_EQ(last["role"], "user");
+    ASSERT_EQ(last["content"].size(), 1u);
+    const auto& toolResult = last["content"][0];
+    EXPECT_EQ(toolResult["type"], "tool_result");
+    ASSERT_TRUE(toolResult["content"].is_array())
+        << "an image-bearing result must switch content from a plain string to a block array";
+    ASSERT_EQ(toolResult["content"].size(), 2u);
+    EXPECT_EQ(toolResult["content"][0]["type"], "text");
+    EXPECT_EQ(toolResult["content"][0]["text"], "Captured the current view");
+    EXPECT_EQ(toolResult["content"][1]["type"], "image");
+    EXPECT_EQ(toolResult["content"][1]["source"]["type"], "base64");
+    EXPECT_EQ(toolResult["content"][1]["source"]["media_type"], "image/png");
+    EXPECT_FALSE(toolResult["content"][1]["source"]["data"].get<std::string>().empty());
+}
+
+TEST(AnthropicClient, BuildRequestBodyOmitsTheTextBlockWhenAnImageResultHasNoMessage) {
+    std::vector<uint8_t> png = {0x89, 'P', 'N', 'G'};
+    std::vector<ChatMessage> messages = {
+        {ChatRole::ToolResult, "", "call_1", {}, png},
+    };
+    nlohmann::json body = AnthropicClient::buildRequestBody(messages, {}, "claude-sonnet-4-5");
+    const auto& content = body["messages"][0]["content"][0]["content"];
+    ASSERT_EQ(content.size(), 1u);
+    EXPECT_EQ(content[0]["type"], "image");
+}
+
 TEST(AnthropicClient, ParseResponseExtractsFinalTextWhenNoToolUse) {
     nlohmann::json response = {
         {"content", {{{"type", "text"}, {"text", "Done!"}}}},
@@ -105,6 +153,28 @@ TEST(AnthropicClient, ParseResponseHandlesUnparseableJsonGracefully) {
     LlmTurnResult r = AnthropicClient::parseResponseFromRawBody("not json at all", 200);
     EXPECT_FALSE(r.ok);
     EXPECT_FALSE(r.error.empty());
+}
+
+TEST(AnthropicClient, ParseResponseFlagsTruncationOnMaxTokensStopReason) {
+    nlohmann::json response = {
+        {"stop_reason", "max_tokens"},
+        {"content", nlohmann::json::array()},
+    };
+    LlmTurnResult r = AnthropicClient::parseResponse(response, 200);
+    ASSERT_TRUE(r.ok);
+    EXPECT_TRUE(r.truncated);
+    EXPECT_TRUE(r.toolCalls.empty());
+    EXPECT_TRUE(r.finalText.empty());
+}
+
+TEST(AnthropicClient, ParseResponseDoesNotFlagTruncationOnNormalStop) {
+    nlohmann::json response = {
+        {"stop_reason", "end_turn"},
+        {"content", {{{"type", "text"}, {"text", "Done!"}}}},
+    };
+    LlmTurnResult r = AnthropicClient::parseResponse(response, 200);
+    ASSERT_TRUE(r.ok);
+    EXPECT_FALSE(r.truncated);
 }
 
 TEST(AnthropicClient, ParseResponseCapturesTextAlongsideToolCalls) {

@@ -12,10 +12,15 @@ REGISTER_PLUGIN(BrepIO, [](materializr::PluginContext& ctx) {
                 {{"BREP Files", "*.brep *.BREP"}},
                 [&ctx](const std::string& path) {
                     if (path.empty()) return;
-                    auto result = materializr::BrepIO::import(path, ctx.document());
-                    if (result.success) {
-                        ctx.markMeshesDirty();
-                    }
+                    // A large multi-body BREP assembly is exactly as prone
+                    // to the main-thread freeze STEP/IGES import had -
+                    // queueHeavyImport runs it deferred, under the same
+                    // pool+pump mesh path project load uses, instead of
+                    // freezing the window on the next full mesh rebuild.
+                    // Mirrors StepIOPlugin.cpp/IgesIOPlugin.cpp's identical fix.
+                    ctx.queueHeavyImport("Importing BREP\xE2\x80\xA6", [&ctx, path]() {
+                        return materializr::BrepIO::import(path, ctx.document()).success;
+                    });
                 });
             return true;
         },

@@ -15,7 +15,7 @@ enum class ToolAction {
     // Sketch tools (still dispatched via ToolAction - tightly coupled to viewport)
     StartSketch, StartSketchXY, StartSketchXZ, StartSketchYZ,
     SketchOnFace, SelectSketch, Line, Circle, Rectangle, Arc, Spline, Polygon, Trim, SketchText,
-    SketchSvg, SketchAirfoil, SketchDimension, SketchOffset,
+    SketchSvg, SketchAirfoil, SketchDimension, SketchOffset, SketchPoint,
     FinishSketch, ExitSketchDiscard, EditSketch, ExtrudeSketch, SubtractSketch, PushPull, MoveFace, LookAtSketch,
     SketchCopy, SketchMirror, SketchLinearPattern, SketchRadialPattern,
     // Cycle the drawing-inference level Full → Reduced → Off.

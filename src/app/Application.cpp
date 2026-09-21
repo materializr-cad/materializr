@@ -477,12 +477,25 @@ void Application::wireDocumentConsumers() {
     m_history->setEventBus(m_eventBus.get());
     m_selection->setEventBus(m_eventBus.get());
     m_history->setThreadsLastDeclineCallback([this]{ showThreadsLastToast(); });
-    if (m_pluginContext && m_viewport)
+    if (m_pluginContext && m_viewport) {
         m_pluginContext->_bind(m_document, m_history, m_selection,
                                m_eventBus.get(), &m_viewport->getCamera(),
                                &m_meshesDirty, &m_inSketchMode,
                                &m_aiSettings,
-                               [this]{ markDirty(); });
+                               [this]{ markDirty(); },
+                               [this](std::vector<uint8_t>& out) {
+                                   return captureViewportPng(out);
+                               });
+    }
+    // No viewport/camera dependency (unlike _bind above), so it doesn't need
+    // to wait on m_viewport - keeping it separate avoids a silent no-op if
+    // that invariant ever changes.
+    if (m_pluginContext) {
+        m_pluginContext->_bindHeavyImport(
+            [this](std::string message, std::function<bool()> importFn) {
+                queueHeavyImport(std::move(message), std::move(importFn));
+            });
+    }
     // Tell everything that caches DOCUMENT-DERIVED state to rebuild. The
     // setters above only reach consumers Application knows by name; plugins
     // own their render caches in file-local statics this function cannot
@@ -2397,6 +2410,9 @@ void Application::handleToolAction(int action) {
         case ToolAction::SelectSketch:
             if (m_inSketchMode) m_sketchTool->setMode(SketchToolMode::Select);
             break;
+        case ToolAction::SketchPoint:
+            if (m_inSketchMode) toggleSketchMode(m_sketchTool.get(), SketchToolMode::Point);
+            break;
         case ToolAction::Line:
             if (m_inSketchMode) toggleSketchMode(m_sketchTool.get(), SketchToolMode::Line);
             break;
@@ -3525,6 +3541,13 @@ void Application::rebuildMeshes() {
     // freeze - say so, with the trigger state.
     const uint32_t rmStart = m_meshesDirty ? SDL_GetTicks() : 0;
     const bool rmWasFull = m_meshesDirty;
+    // A full rebuild (body add/remove/reload) or any partial one (a per-body
+    // edit routed through markBodyDirty, which covers visibility toggles
+    // among other things) can change the scene's bounding extent - see
+    // renderViewport()'s minor-grid-tier check. Read before the partial pass
+    // below clears m_dirtyBodyIds.
+    if (m_meshesDirty || !m_dirtyBodyIds.empty())
+        m_gridExtentStale = true;
 
     if (m_meshesDirty) {
         // Full rebuild - clear everything and re-tessellate every visible
@@ -4493,67 +4516,8 @@ bool Application::loadProjectAt(const std::string& path) {
         std::fprintf(stderr, "Load failed: %s\n", result.errorMessage.c_str());
         return false;
     }
-#if defined(MZR_PARALLEL_MESH_SUPPORTED)
-    float deflection, angularDeflection;
-    meshQualityParams(deflection, angularDeflection);
-    ParallelMeshOptions options;
-#ifdef MZR_PARALLEL_MESH_TESTING
-    if (m_parallelMeshTestSetup) m_parallelMeshTestSetup(options);
-#endif
-    std::vector<ParallelMeshJob> jobs;
-    for (int id : m_document->getAllBodyIds()) {
-        if (id < 0 || !m_document->isBodyVisible(id)) continue;
-        TopoDS_Shape shape;
-        try { shape = m_document->getBody(id); } catch (...) { continue; }
-        if (!m_shapeRenderer->isPreMeshed(shape, deflection, angularDeflection))
-            jobs.push_back({id, shape});
-    }
-    DrawThrottle throttle;
-    options.onTick = [&](size_t done, size_t total) {
-        if (!m_pumpMeshProgress) return;
-        const float frac = parallelMeshFraction(done, total);
-        pumpStep(throttle, progressFrameWouldDraw(frac),
-                 [] { return DrawThrottle::clock::now(); },
-                 [&] {
-                     renderProgressFrame(frac, "Preparing view\xE2\x80\xA6");
-                     return DrawThrottle::clock::now();
-                 },
-                 [&] { if (m_window) m_window->pollEvents(); });
-    };
-    const auto batch = parallelMesh(jobs, deflection, angularDeflection, options);
-#ifdef MZR_PARALLEL_MESH_TESTING
-    if (m_parallelMeshTestBeforeBookkeeping) m_parallelMeshTestBeforeBookkeeping(batch);
-#endif
-    const auto bookStart = std::chrono::steady_clock::now();
-    size_t pooled = 0;
-    for (size_t i = 0; i < jobs.size(); ++i) {
-        if (batch.results[i].ok) {
-            m_shapeRenderer->notePreMeshed(jobs[i].shape, deflection, angularDeflection);
-            // Provisional: OFF under pool contention can over-predict the
-            // in-frame cost. An adopted async result replaces this estimate.
-            m_meshDispatch.meshedInFrame(jobs[i].bodyId, batch.results[i].millis);
-            ++pooled;
-        } else {
-            m_shapeRenderer->forgetPreMeshed(jobs[i].shape);
-            // Mirrors forgetPreMeshed: a failed job leaves nothing behind in
-            // either cache that could bias a later decision for this body.
-            m_meshDispatch.forget(jobs[i].bodyId);
-        }
-    }
-#ifdef MZR_PARALLEL_MESH_TESTING
-    if (m_parallelMeshTestAfterBookkeeping) m_parallelMeshTestAfterBookkeeping(batch);
-#endif
-    // fallback is 0 only when every job was pooled and succeeded; an empty
-    // job list (nothing to mesh) is not a fallback and reports 0 too.
-    const bool fellBack = !jobs.empty() &&
-                         (batch.path == ParallelMeshPath::Sequential || pooled != jobs.size());
-    std::fprintf(stderr, "[load-parmesh] jobs=%zu pooled=%zu fallback=%d reason=%s "
-                         "poolMs=%.1f scanMs=%.1f bookMs=%.1f\n",
-                 jobs.size(), pooled, fellBack ? 1 : 0,
-                 batch.reason, batch.poolMs, batch.scanMs,
-                 std::chrono::duration<double, std::milli>(
-                     std::chrono::steady_clock::now() - bookStart).count());
-#endif
+    prewarmMeshPool([this]{ return m_document->getAllBodyIds(); },
+                    "Preparing view\xE2\x80\xA6", "load-parmesh");
     rebuildHistoryFromProject(hist, result.savedByVersion);
     // A reopened project should sit at the history tip with no redo stack - a
     // phantom redo tail would, e.g., block autosave (which won't save below-tip).
@@ -4959,19 +4923,190 @@ void Application::renderSavePrompt() {
 }
 
 void Application::importStepFile() {
+    // Ctrl+I's own path (see handleShortcuts) - StepIOPlugin's menu entry is
+    // the other caller of StepIO::import. Both go through queueHeavyImport,
+    // which pumps the window during the (usually dominant) tessellation
+    // phase. StepIO::import's own parse still runs uninterrupted on the main
+    // thread first - a known, unaddressed gap on a STEP file whose parse
+    // itself is slow, not just its body count.
     FileDialogs::openFile("Import STEP",
         {{"STEP Files", "*.step *.stp *.STEP *.STP"}},
         [this](const std::string& path) {
             if (path.empty()) return;
-            auto result = StepIO::import(path, *m_document);
-            if (result.success) {
-                m_meshesDirty = true;
-                markDirty();
+            queueHeavyImport("Importing STEP\xE2\x80\xA6", [this, path]() {
+                auto result = StepIO::import(path, *m_document);
+                if (!result.success) {
+                    std::fprintf(stderr, "Import failed: %s\n", result.errorMessage.c_str());
+                    return false;
+                }
                 std::fprintf(stdout, "Imported %d bodies from %s\n", result.bodiesImported, path.c_str());
-            } else {
-                std::fprintf(stderr, "Import failed: %s\n", result.errorMessage.c_str());
-            }
+                return true;
+            });
         });
+}
+
+void Application::queueHeavyImport(std::string message, std::function<bool()> importFn) {
+    // Shared by any import that can add many bodies at once (STEP today):
+    // defer the call itself, then mesh under the same pool+pump machinery
+    // loadProjectAt uses, instead of a plain m_meshesDirty=true that leaves
+    // the next full rebuild to tessellate everything serially on the main
+    // thread - see the STEP-import freeze this was written for.
+    m_deferredHeavy.queue([this, message = std::move(message), importFn = std::move(importFn)]() {
+        // Honour Cancel on the initial indeterminate frame, same as
+        // commitStlImport: importing anyway would make the button look broken.
+        if (renderProgressFrame(-1.0f, message.c_str())) return;
+        // loadProjectAt's identical pool-prewarm block is safe scanning EVERY
+        // body because a fresh load is guaranteed bare (ProjectIO never
+        // persists a triangulation). This caller runs against a live,
+        // possibly-populated document, so a pre-existing body whose mesh
+        // cache happens to miss isPreMeshed would otherwise be handed to the
+        // pool's uncleaned BRepMesh_IncrementalMesh path - safe only for
+        // never-before-meshed shapes. Snapshot before/after and mesh only
+        // what this import actually added.
+        const auto before = m_document->getAllBodyIds();
+        const std::set<int> beforeIds(before.begin(), before.end());
+        const bool importOk = importFn();
+        // A callback, not a precomputed vector, called fresh each time: both
+        // StepIO::import and IgesIO::import add bodies in a loop and only
+        // report failure when a LATER shape/entity fails (IGES's own
+        // kMaxEntities cap trips mid-loop; a STEP file can throw mid-parse
+        // too), so importFn() returning false does not mean the Document is
+        // unchanged. This used to be checked only on the success path,
+        // silently orphaning whatever was added before the failure point:
+        // invisible (never meshed), untracked by autosave, until some
+        // unrelated later action happened to flag a rebuild.
+        auto newIdsNow = [this, &beforeIds] {
+            std::vector<int> ids;
+            for (int id : m_document->getAllBodyIds())
+                if (!beforeIds.count(id)) ids.push_back(id);
+            return ids;
+        };
+        if (!importOk && newIdsNow().empty()) {
+            showToast("Import failed.", 6.0);
+            return;
+        }
+        markDirty();
+        // The import only touched the Document; without this, rebuildMeshes()
+        // below is a no-op (neither m_meshesDirty nor m_dirtyBodyIds is set)
+        // and the new bodies never reach the renderer until something
+        // unrelated later flips the flag.
+        m_meshesDirty = true;
+        struct PumpGuard {
+            bool& flag;
+            bool previous;
+            ~PumpGuard() { flag = previous; }
+        } guard{m_pumpMeshProgress, m_pumpMeshProgress};
+        m_pumpMeshProgress = true;
+        const bool cancelled = prewarmMeshPool([this, beforeIds]{
+                            std::vector<int> newIds;
+                            for (int id : m_document->getAllBodyIds())
+                                if (!beforeIds.count(id)) newIds.push_back(id); // see comment above
+                            return newIds;
+                        }, message.c_str(), "heavy-parmesh");
+        if (cancelled) {
+            // Honour Cancel for real: the pool's own job loop can't be
+            // interrupted mid-flight (see prewarmMeshPool), so tessellation
+            // already dispatched still runs to completion, but discard its
+            // RESULT rather than silently keeping bodies the user asked to
+            // cancel - previously Cancel here did nothing observable.
+            for (int id : newIdsNow()) m_document->removeBody(id);
+            m_meshesDirty = false;
+            showToast("Import cancelled.", 4.0);
+            return;
+        }
+        if (!importOk) {
+            showToast("Import failed partway through - kept the bodies "
+                      "added before the error.", 6.0);
+        }
+        rebuildMeshes();
+        m_meshesDirty = false;
+    });
+}
+
+bool Application::prewarmMeshPool(std::function<std::vector<int>()> getCandidateIds,
+                                   const char* progressLabel, const char* diagTag) {
+#if defined(MZR_PARALLEL_MESH_SUPPORTED)
+    float deflection, angularDeflection;
+    meshQualityParams(deflection, angularDeflection);
+    ParallelMeshOptions options;
+#ifdef MZR_PARALLEL_MESH_TESTING
+    if (m_parallelMeshTestSetup) m_parallelMeshTestSetup(options);
+#endif
+    std::vector<ParallelMeshJob> jobs;
+    for (int id : getCandidateIds()) {
+        if (id < 0 || !m_document->isBodyVisible(id)) continue;
+        TopoDS_Shape shape;
+        try { shape = m_document->getBody(id); } catch (...) { continue; }
+        if (!m_shapeRenderer->isPreMeshed(shape, deflection, angularDeflection))
+            jobs.push_back({id, shape});
+    }
+    DrawThrottle throttle;
+    // parallelMesh() below has no mid-flight abort - once dispatched, a
+    // job's tessellation runs to completion on its worker thread regardless
+    // of Cancel. What Cancel actually controls is what the CALLER does with
+    // the result: queueHeavyImport discards the imported bodies rather than
+    // keeping them once this returns true - previously the
+    // renderProgressFrame return value was simply discarded here, so Cancel
+    // did nothing user-visible during this phase.
+    //
+    // Reusing m_progressCancelled (set by renderProgressFrame itself) rather
+    // than a local flag, and NOT early-returning from onTick once it's set:
+    // pumpStep's contract is poll-first-unconditionally, draw-only-if-
+    // allowed (progressFrameWouldDraw already checks m_progressCancelled),
+    // so the window keeps answering the compositor for the remainder of the
+    // pool's work even after Cancel is clicked. An early return here on our
+    // own tracked flag skipped that poll too - freezing event processing for
+    // however long the (uninterruptible) meshing had left, worse than the
+    // original bug.
+    options.onTick = [&](size_t done, size_t total) {
+        if (!m_pumpMeshProgress) return;
+        const float frac = parallelMeshFraction(done, total);
+        pumpStep(throttle, progressFrameWouldDraw(frac),
+                 [] { return DrawThrottle::clock::now(); },
+                 [&] {
+                     renderProgressFrame(frac, progressLabel);
+                     return DrawThrottle::clock::now();
+                 },
+                 [&] { if (m_window) m_window->pollEvents(); });
+    };
+    const auto batch = parallelMesh(jobs, deflection, angularDeflection, options);
+#ifdef MZR_PARALLEL_MESH_TESTING
+    if (m_parallelMeshTestBeforeBookkeeping) m_parallelMeshTestBeforeBookkeeping(batch);
+#endif
+    const auto bookStart = std::chrono::steady_clock::now();
+    size_t pooled = 0;
+    for (size_t i = 0; i < jobs.size(); ++i) {
+        if (batch.results[i].ok) {
+            m_shapeRenderer->notePreMeshed(jobs[i].shape, deflection, angularDeflection);
+            // Provisional: OFF under pool contention can over-predict the
+            // in-frame cost. An adopted async result replaces this estimate.
+            m_meshDispatch.meshedInFrame(jobs[i].bodyId, batch.results[i].millis);
+            ++pooled;
+        } else {
+            m_shapeRenderer->forgetPreMeshed(jobs[i].shape);
+            // Mirrors forgetPreMeshed: a failed job leaves nothing behind in
+            // either cache that could bias a later decision for this body.
+            m_meshDispatch.forget(jobs[i].bodyId);
+        }
+    }
+#ifdef MZR_PARALLEL_MESH_TESTING
+    if (m_parallelMeshTestAfterBookkeeping) m_parallelMeshTestAfterBookkeeping(batch);
+#endif
+    // fallback is 0 only when every job was pooled and succeeded; an empty
+    // job list (nothing to mesh) is not a fallback and reports 0 too.
+    const bool fellBack = !jobs.empty() &&
+                         (batch.path == ParallelMeshPath::Sequential || pooled != jobs.size());
+    std::fprintf(stderr, "[%s] jobs=%zu pooled=%zu fallback=%d reason=%s "
+                         "poolMs=%.1f scanMs=%.1f bookMs=%.1f\n",
+                 diagTag, jobs.size(), pooled, fellBack ? 1 : 0,
+                 batch.reason, batch.poolMs, batch.scanMs,
+                 std::chrono::duration<double, std::milli>(
+                     std::chrono::steady_clock::now() - bookStart).count());
+    return m_progressCancelled;
+#else
+    (void)getCandidateIds; (void)progressLabel; (void)diagTag;
+    return false;
+#endif
 }
 
 void Application::exportStepFile() {
@@ -5404,7 +5539,7 @@ void Application::enterSketchOnFace(const TopoDS_Face& face, int sourceBodyId) {
         TopLoc_Location loc;
         Handle(Poly_Triangulation) tri = BRep_Tool::Triangulation(face, loc);
         if (tri.IsNull()) {
-            BRepMesh_IncrementalMesh mesher(face, materializr::meshParams(0.1, 0.5, false));
+            materializr::meshWithFallback(face, 0.1, 0.5, false);
             tri = BRep_Tool::Triangulation(face, loc);
         }
         if (!tri.IsNull() && tri->NbTriangles() > 0) {
@@ -6536,8 +6671,16 @@ void Application::deleteSelectedSketchElements() {
     const auto lns = m_sketchTool->getSelectedLines();
     if (pts.empty() && lns.empty()) return;
     recordSketchMutation([&]{
-        for (int lid : lns) m_activeSketch->removeElement(lid);
-        for (int pid : pts) m_activeSketch->removeElement(pid);
+        // One combined-batch call, not separate per-category loops:
+        // removeElements resolves polygon ownership across the WHOLE
+        // selection against pre-mutation state, so a selection spanning more
+        // than one piece of the same polygon (an edge plus a shared vertex,
+        // two shared vertices, ...) can't have a later id lose its
+        // owning-polygon protection because an earlier id already cascaded
+        // that polygon away.
+        std::vector<int> ids(pts.begin(), pts.end());
+        ids.insert(ids.end(), lns.begin(), lns.end());
+        m_activeSketch->removeElements(ids);
         // Deleting a line leaves its two endpoints behind (they weren't in
         // the selection) - sweep up the now-unreferenced points so no orphan
         // vertices linger.

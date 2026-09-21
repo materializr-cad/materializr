@@ -30,6 +30,14 @@ void PluginContext::requestInteractiveOp(InteractiveOp op) {
     m_pendingInteractiveOp = op;
 }
 
+void PluginContext::queueHeavyImport(std::string message, std::function<bool()> importFn) {
+    if (m_queueHeavyImportFn) m_queueHeavyImportFn(std::move(message), std::move(importFn));
+}
+
+void PluginContext::_bindHeavyImport(std::function<void(std::string, std::function<bool()>)> fn) {
+    m_queueHeavyImportFn = std::move(fn);
+}
+
 InteractiveOp PluginContext::takeRequestedInteractiveOp() {
     const InteractiveOp taken = m_pendingInteractiveOp;
     m_pendingInteractiveOp = InteractiveOp::None;
@@ -69,11 +77,16 @@ const AppSettings::AiSettings& PluginContext::aiSettings() const {
     return m_aiSettings ? *m_aiSettings : kEmpty;
 }
 
+bool PluginContext::captureViewportPng(std::vector<uint8_t>& pngOut) const {
+    return m_captureViewportPngFn && m_captureViewportPngFn(pngOut);
+}
+
 void PluginContext::_bind(Document* doc, History* hist, SelectionManager* sel,
                           EventBus* bus, Camera* cam, bool* meshesDirtyFlag,
                           const bool* sketchModeFlag,
                           const AppSettings::AiSettings* aiSettings,
-                          std::function<void()> markDirtyFn) {
+                          std::function<void()> markDirtyFn,
+                          std::function<bool(std::vector<uint8_t>&)> captureViewportPngFn) {
     m_document = doc;
     m_history = hist;
     m_selection = sel;
@@ -83,6 +96,7 @@ void PluginContext::_bind(Document* doc, History* hist, SelectionManager* sel,
     m_sketchModeFlag = sketchModeFlag;
     m_aiSettings = aiSettings;
     if (markDirtyFn) m_markDirtyFn = std::move(markDirtyFn);
+    if (captureViewportPngFn) m_captureViewportPngFn = std::move(captureViewportPngFn);
 }
 
 } // namespace materializr

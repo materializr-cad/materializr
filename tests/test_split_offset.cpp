@@ -12,7 +12,9 @@
 
 #include <BRepGProp.hxx>
 #include <BRepPrimAPI_MakeBox.hxx>
+#include <BRep_Builder.hxx>
 #include <GProp_GProps.hxx>
+#include <TopoDS_Compound.hxx>
 #include <gp_Dir.hxx>
 #include <gp_Pln.hxx>
 #include <gp_Pnt.hxx>
@@ -87,6 +89,31 @@ TEST(SplitOffset, PlaneClearOfTheBodyDoesNothing) {
     } else {
         EXPECT_EQ(doc.getAllBodyIds().size(), before);
     }
+}
+
+TEST(SplitOffset, ThreeOrMorePiecesFailsCleanly) {
+    // Two boxes far enough apart along X that they never touch, each
+    // straddling z=10 - one plane splits each independently, so the
+    // splitter hands back 4 solids total. SplitBodyOp only ever keeps the
+    // first two (#114); it must refuse rather than silently drop the rest.
+    Document doc;
+    TopoDS_Shape a = BRepPrimAPI_MakeBox(gp_Pnt(0, 0, 0), gp_Pnt(10, 10, 20)).Shape();
+    TopoDS_Shape b = BRepPrimAPI_MakeBox(gp_Pnt(100, 0, 0), gp_Pnt(110, 10, 20)).Shape();
+    TopoDS_Compound both;
+    BRep_Builder bb;
+    bb.MakeCompound(both);
+    bb.Add(both, a);
+    bb.Add(both, b);
+    const int id = doc.addBody(both, "Two Boxes");
+    const size_t before = doc.getAllBodyIds().size();
+
+    SplitBodyOp op;
+    op.setBody(id);
+    op.setSplitPlane(gp_Pln(gp_Pnt(0, 0, 10), gp_Dir(0, 0, 1)));
+    EXPECT_FALSE(op.execute(doc));
+    EXPECT_EQ(doc.getAllBodyIds().size(), before) << "nothing should be added";
+    EXPECT_NEAR(volumeOf(doc.getBody(id)), 2 * 10.0 * 10.0 * 20.0, 1.0)
+        << "the original body must be left untouched, not half-cut";
 }
 
 TEST(SplitOffset, UndoRestoresTheWholeBody) {

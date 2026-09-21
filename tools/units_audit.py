@@ -244,6 +244,19 @@ LITERAL_ALLOW = [
     ("src/ai/AiToolSchema.cpp",         "position in mm",       "AI tool parameter description for LLM"),
     ("src/ai/AiToolSchema.cpp",         "in mm.",              "AI tool parameter description for LLM"),
     ("src/ai/AiToolSchema.cpp",         "in mm;",              "AI tool parameter description for LLM"),
+    ("src/ai/AiToolSchema.cpp",         "in mm,",              "AI tool parameter description for LLM"),
+    ("src/ai/AiToolSchema.cpp",         "in mm -",             "AI tool parameter description for LLM"),
+    ("src/ai/AiToolSchema.cpp",         "in mm along",         "AI tool parameter description for LLM"),
+    ("src/ai/AiToolSchema.cpp",         "in mm (default",      "AI tool parameter description for LLM"),
+    # AI tool RESULT messages: text handed back to the LLM as the outcome of a
+    # tool call (e.g. "Filleted all edges of body 3 at radius 2mm"), not a UI
+    # readout - same reasoning as the schema descriptions above, just on the
+    # dispatcher side instead of the schema side.
+    ("src/ai/AiToolDispatcher.cpp",     '+ "mm"}',             "AI tool result message for LLM"),
+    ("src/ai/AiToolDispatcher.cpp",     "mm (positive = outward", "AI tool result message for LLM"),
+    ("src/ai/AiToolDispatcher.cpp",     '"mm walls"',          "AI tool result message for LLM"),
+    ("src/ai/AiToolDispatcher.cpp",     "z=%.1f)mm,",          "AI tool result message for LLM (list_bodies)"),
+    ("src/ai/AiToolDispatcher.cpp",     "height=%.1f)mm%s",    "AI tool result message for LLM (list_bodies)"),
     ("src/app/Application_Dialogs.cpp", '"%.1f mm")) {',       "mesh-trace slice-position readout, same absolute-mm choice as the control"),
     # describe_scene's tool RESULT text (the readout side of the same AI
     # tool schema, via fmtMM - a local absolute-mm formatter, not one of

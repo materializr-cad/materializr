@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Materializr VERSION 1.6.4 LANGUAGES CXX)
+project(Materializr VERSION 1.7.0 LANGUAGES CXX)
 
 # Pre-release suffix appended to the reported version (e.g. "-beta.1"). Empty on
 # stable releases. Kept here next to project() so a beta build self-identifies
@@ -264,6 +264,7 @@ add_executable(materializr
     src/plugins/ShellPlugin.cpp
     src/plugins/ConstructionPlanePlugin.cpp
     src/plugins/RefImagePlugin.cpp
+    src/plugins/RefMeshPlugin.cpp
     src/plugins/MeshTracePlugin.cpp
     src/plugins/BoundaryFillPlugin.cpp
     src/plugins/PatchPlugin.cpp
@@ -288,6 +289,7 @@ add_executable(materializr
     src/ai/OpenAiCompatibleClient.cpp
     src/ai/AiSessionController.cpp
     src/ai/AiConnectionTest.cpp
+    src/core/Base64.cpp
     src/core/Document.cpp
     src/core/History.cpp
     src/core/SelectionManager.cpp
@@ -371,6 +373,7 @@ add_executable(materializr
     src/viewport/EdgeRenderer.cpp
     src/viewport/PlaneRenderer.cpp
     src/viewport/RefImageRenderer.cpp
+    src/viewport/RefMeshRenderer.cpp
     src/viewport/MeshTraceRenderer.cpp
     src/viewport/AxisRenderer.cpp
     src/viewport/BackgroundRenderer.cpp
@@ -410,6 +413,7 @@ add_executable(materializr
     src/io/Settings.cpp
     src/io/StepIO.cpp
     src/io/StlIO.cpp
+    src/io/RefMeshImport.cpp
     src/io/MeshDecimate.cpp
     src/io/StlExport.cpp
     src/io/SvgExport.cpp

@@ -17,7 +17,7 @@ namespace materializr {
 // (Application::setActiveSketchMode) and the sketch toolbar hardcodes those
 // indices, so inserting a mode in the middle silently highlights the wrong
 // button -- Dimension would become 13 while the button still tests 12.
-enum class SketchToolMode { None, Select, Line, Circle, Rectangle, Arc, Spline, Polygon, Trim, Text, Svg, Mirror, Dimension, Airfoil, Offset };
+enum class SketchToolMode { None, Select, Line, Circle, Rectangle, Arc, Spline, Polygon, Trim, Text, Svg, Mirror, Dimension, Airfoil, Offset, Point };
 
 enum class DimEntityKind { None, Point, Line, Circle, Arc };
 struct DimPick { DimEntityKind kind = DimEntityKind::None; int id = -1; };
@@ -567,6 +567,13 @@ private:
     // back = current tail). Mirrors the committed segments so the touch "Back"
     // button can drop the tail and re-anchor after the host undoes a segment.
     std::vector<int> m_lineChain;
+    // Line id of each committed segment, in lockstep with m_lineChain (one
+    // shorter - segment i connects m_lineChain[i] to m_lineChain[i+1]).
+    // dropLineChainTail pops the exact id here instead of re-deriving "the"
+    // segment by matching endpoints, which picks the WRONG line whenever
+    // another line (e.g. a pre-existing polygon edge) already shares those
+    // same two endpoints. Cleared everywhere m_lineChain is.
+    std::vector<int> m_lineChainSegmentIds;
 
     // Snap to grid/points
     glm::vec2 snap(glm::vec2 pos) const;
@@ -587,6 +594,10 @@ private:
     int findExactCoincidentPoint(glm::vec2 pos, int excludeId = -1) const;
 
     void handleLineTool(glm::vec2 pos);
+    // Single-click placement: weld onto an existing point within range, else
+    // add a brand-new one. No chain/placing state - unlike Line, there's
+    // nothing to preview between click and commit.
+    void handlePointTool(glm::vec2 pos);
     // exact = the position came from a typed value; skip the grid rounding.
     void handleCircleTool(glm::vec2 pos, bool exact = false);
     void handleRectangleTool(glm::vec2 pos);

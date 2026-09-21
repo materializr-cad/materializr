@@ -11,10 +11,14 @@ REGISTER_PLUGIN(IgesIO, [](materializr::PluginContext& ctx) {
                 {{"IGES Files", "*.iges *.igs *.IGES *.IGS"}},
                 [&ctx](const std::string& path) {
                     if (path.empty()) return;
-                    auto result = materializr::IgesIO::import(path, ctx.document());
-                    if (result.success) {
-                        ctx.markMeshesDirty();
-                    }
+                    // A large assembly's parse + tessellation can take seconds;
+                    // queueHeavyImport runs it deferred, under the same
+                    // pool+pump mesh path project load uses, instead of
+                    // freezing the window on the next full mesh rebuild.
+                    // Mirrors StepIOPlugin.cpp's identical fix.
+                    ctx.queueHeavyImport("Importing IGES\xE2\x80\xA6", [&ctx, path]() {
+                        return materializr::IgesIO::import(path, ctx.document()).success;
+                    });
                 });
             return true;
         },

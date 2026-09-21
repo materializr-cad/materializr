@@ -111,6 +111,21 @@ bool SewOp::execute(Document& doc) {
 
         TopoDS_Shape result = best;
         m_madeSolid = false;
+        int shellCount = 0;
+        for (TopExp_Explorer ex(best, TopAbs_SHELL); ex.More(); ex.Next()) ++shellCount;
+        // Zero free edges can mean either "this closed into one solid" or
+        // "these were N already-closed, genuinely disjoint shells that never
+        // touched" - sewing can't join what doesn't share an edge. Solidifying
+        // just the first shell and then deleting the rest via m_consumed below
+        // would silently discard real geometry the caller asked to combine,
+        // not discard (#115). Bail out before that loop runs.
+        if (bestFree == 0 && shellCount > 1) {
+            std::fprintf(stderr,
+                         "[Sew] %d disjoint closed shells - nothing actually "
+                         "joined, refusing to discard bodies.\n",
+                         shellCount);
+            return false;
+        }
         if (bestFree == 0) {
             for (TopExp_Explorer ex(best, TopAbs_SHELL); ex.More(); ex.Next()) {
                 TopoDS_Shell shell = TopoDS::Shell(ex.Current());

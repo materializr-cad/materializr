@@ -2150,11 +2150,11 @@ void Application::beginRefImageImport() {
 void Application::beginMeshTraceSetup(int bodyId) {
     if (!m_document || !m_history) return;
     if (m_meshTraceSetupActive) {
-        showToast("Finish the current tracing-plane setup first.");
+        showToast(materializr::tr("Finish the current tracing-plane setup first."));
         return;
     }
     if (!m_document->isBodyMesh(bodyId)) {
-        showToast("Set Up Tracing Planes only works on an imported mesh body.");
+        showToast(materializr::tr("Set Up Tracing Planes only works on an imported mesh body."));
         return;
     }
 
@@ -2167,7 +2167,7 @@ void Application::beginMeshTraceSetup(int bodyId) {
     op->setBodyId(bodyId);
     MeshTraceSetupOp* opPtr = op.get();
     if (!m_history->pushOperation(std::move(op), *m_document)) {
-        showToast("Couldn't set up tracing planes for that mesh.");
+        showToast(materializr::tr("Couldn't set up tracing planes for that mesh."));
         return;
     }
 
@@ -2208,7 +2208,7 @@ bool Application::insertMeshTraceIntoSketch(int planeId) {
     const MeshTraceEntry* trace = m_document->getMeshTrace(planeId);
     if (!trace) return false;
     if (trace->sketchId < 0 || !m_document->getSketch(trace->sketchId)) {
-        showToast("This plane has no paired sketch to insert into.");
+        showToast(materializr::tr("This plane has no paired sketch to insert into."));
         return false;
     }
     const PlaneEntry* plane = m_document->getPlane(planeId);
@@ -2223,10 +2223,10 @@ bool Application::insertMeshTraceIntoSketch(int planeId) {
         materializr::sliceSection(materializr::faceMeshes(shape), plane->plane, slice);
     if (slice.loops.empty()) {
         showToast(trace->mode == MeshTraceMode::Shadow
-            ? "No closed silhouette here - the mesh may be open/non-manifold "
-              "from this direction."
-            : "No closed cross-section here - move the plane through the "
-              "mesh first.");
+            ? materializr::tr("No closed silhouette here - the mesh may be open/non-manifold "
+                              "from this direction.")
+            : materializr::tr("No closed cross-section here - move the plane through the "
+                              "mesh first."));
         return false;
     }
 
