@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 690" font-family="-apple-system, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M1 1 L9 5 L1 9" fill="none" stroke="#d9480f" stroke-width="1.6" stroke-linecap="round"/>
+    </marker>
+    <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+      <path d="M20 0 H0 V20" fill="none" stroke="#e6e8ec" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="900" height="690" fill="#ffffff"/>
+  <text x="24" y="34" font-size="20" font-weight="700" fill="#1b1f24">Sketch Fillet tool - rough concept (Onshape-style)</text>
+  <text x="24" y="56" font-size="13" fill="#59636e">Click a corner, get a tangent arc, then keep editing it by dragging. Nothing here is built yet.</text>
+
+  <!-- ============ PANEL 1 ============ -->
+  <g transform="translate(24,76)">
+    <rect width="416" height="250" rx="8" fill="url(#grid)" stroke="#d0d7de"/>
+    <text x="14" y="24" font-size="14" font-weight="700" fill="#1b1f24">1  Hover a corner</text>
+    <path d="M110 200 H370 M110 200 V70" stroke="#1a5ae0" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <circle cx="110" cy="200" r="15" fill="none" stroke="#d9480f" stroke-width="2" stroke-dasharray="4 3"/>
+    <circle cx="110" cy="200" r="4" fill="#d9480f"/>
+    <g transform="translate(140,148)">
+      <rect width="222" height="34" rx="5" fill="#fff4e6" stroke="#d9480f"/>
+      <text x="10" y="15" font-size="12" fill="#a63c06" font-weight="700">Fillet tool (F)</text>
+      <text x="10" y="28" font-size="11" fill="#a63c06">corner point + both lines light up</text>
+    </g>
+    <text x="14" y="238" font-size="11" fill="#59636e">Works on any two lines sharing a point (also line + arc).</text>
+  </g>
+
+  <!-- ============ PANEL 2 ============ -->
+  <g transform="translate(460,76)">
+    <rect width="416" height="250" rx="8" fill="url(#grid)" stroke="#d0d7de"/>
+    <text x="14" y="24" font-size="14" font-weight="700" fill="#1b1f24">2  Click: arc drops in at a default radius</text>
+    <!-- ghost sharp corner -->
+    <path d="M110 200 H140 M110 200 V170" stroke="#9aa4af" stroke-width="1.5" stroke-dasharray="3 3" fill="none"/>
+    <path d="M110 200 H370 M110 200 V70" stroke="none"/>
+    <path d="M140 200 H370" stroke="#1a5ae0" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M110 170 V70" stroke="#1a5ae0" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M110 170 A30 30 0 0 0 140 200" stroke="#0a8f52" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <circle cx="140" cy="170" r="2.5" fill="#0a8f52"/>
+    <line x1="140" y1="170" x2="124" y2="186" stroke="#0a8f52" stroke-width="1" stroke-dasharray="2 2"/>
+    <circle cx="110" cy="170" r="4" fill="#fff" stroke="#0a8f52" stroke-width="2"/>
+    <circle cx="140" cy="200" r="4" fill="#fff" stroke="#0a8f52" stroke-width="2"/>
+    <!-- tangent badges -->
+    <g font-size="10" font-weight="700" fill="#0a8f52">
+      <rect x="80" y="152" width="16" height="16" rx="3" fill="#e6f7ee" stroke="#0a8f52"/><text x="84" y="164">T</text>
+      <rect x="146" y="206" width="16" height="16" rx="3" fill="#e6f7ee" stroke="#0a8f52"/><text x="150" y="218">T</text>
+    </g>
+    <!-- radius readout -->
+    <g transform="translate(190,92)">
+      <rect width="196" height="70" rx="6" fill="#ffffff" stroke="#1a5ae0"/>
+      <text x="10" y="18" font-size="11" fill="#59636e">Radius (typed value + Enter)</text>
+      <rect x="10" y="26" width="86" height="28" rx="4" fill="#f6f8fa" stroke="#1a5ae0"/>
+      <text x="18" y="45" font-size="14" font-weight="700" fill="#1b1f24">30 mm</text>
+      <text x="106" y="41" font-size="11" fill="#59636e">Tab: toggle</text>
+      <text x="106" y="53" font-size="11" fill="#59636e">Trim lines: on</text>
+    </g>
+    <text x="14" y="238" font-size="11" fill="#59636e">Dotted = old sharp corner. Lines auto-trim to the tangent points.</text>
+  </g>
+
+  <!-- ============ PANEL 3 ============ -->
+  <g transform="translate(24,346)">
+    <rect width="416" height="250" rx="8" fill="url(#grid)" stroke="#d0d7de"/>
+    <text x="14" y="24" font-size="14" font-weight="700" fill="#1b1f24">3  Drag the arc to resize it live</text>
+    <!-- ghost old arc r=30 -->
+    <path d="M110 170 A30 30 0 0 0 140 200" stroke="#b6bec7" stroke-width="2" fill="none" stroke-dasharray="3 3"/>
+    <!-- new r=70 arc: tangent points at (110,130) and (180,200) -->
+    <path d="M180 200 H370" stroke="#1a5ae0" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M110 130 V70" stroke="#1a5ae0" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M110 130 A70 70 0 0 0 180 200" stroke="#0a8f52" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <circle cx="110" cy="130" r="4" fill="#fff" stroke="#0a8f52" stroke-width="2"/>
+    <circle cx="180" cy="200" r="4" fill="#fff" stroke="#0a8f52" stroke-width="2"/>
+    <!-- drag handle at arc midpoint (110+70-70*cos45 , ...) approx (140.5,169.5) -->
+    <circle cx="140.5" cy="180.5" r="7" fill="#fff4e6" stroke="#d9480f" stroke-width="2"/>
+    <path d="M140.5 180.5 L182 138" stroke="#d9480f" stroke-width="2" marker-end="url(#ah)" fill="none"/>
+    <text x="192" y="132" font-size="12" fill="#a63c06" font-weight="700">drag: R follows cursor</text>
+    <text x="192" y="148" font-size="11" fill="#a63c06">(distance to the corner)</text>
+    <g transform="translate(232,168)">
+      <rect width="90" height="24" rx="12" fill="#1a5ae0"/>
+      <text x="45" y="16" font-size="12" font-weight="700" fill="#fff" text-anchor="middle">R 70</text>
+    </g>
+    <text x="14" y="238" font-size="11" fill="#59636e">Tangent points slide along both lines; no re-picking.</text>
+  </g>
+
+  <!-- ============ PANEL 4 ============ -->
+  <g transform="translate(460,346)">
+    <rect width="416" height="250" rx="8" fill="url(#grid)" stroke="#d0d7de"/>
+    <text x="14" y="24" font-size="14" font-weight="700" fill="#1b1f24">4  Pull a line back - arc stays put</text>
+    <path d="M140 200 H250" stroke="#1a5ae0" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M250 200 H370" stroke="#c5cfdb" stroke-width="3" fill="none" stroke-dasharray="4 4" stroke-linecap="round"/>
+    <path d="M110 170 V70" stroke="#1a5ae0" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M110 170 A30 30 0 0 0 140 200" stroke="#0a8f52" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <circle cx="250" cy="200" r="7" fill="#fff4e6" stroke="#d9480f" stroke-width="2"/>
+    <path d="M370 200 L262 200" stroke="#d9480f" stroke-width="2" marker-end="url(#ah)" fill="none"/>
+    <text x="270" y="182" font-size="12" fill="#a63c06" font-weight="700">drag far end back</text>
+    <!-- clamp zone -->
+    <rect x="110" y="205" width="30" height="26" rx="3" fill="#ffe3e3" stroke="#e03131" stroke-dasharray="3 2"/>
+    <text x="146" y="222" font-size="11" fill="#c92a2a">can't go past the tangent point</text>
+    <text x="14" y="238" font-size="11" fill="#59636e">Dragging the arc's own endpoint slides it along the line and re-solves R.</text>
+  </g>
+
+  <!-- ============ MODEL STRIP ============ -->
+  <g transform="translate(24,606)">
+    <rect width="852" height="72" rx="8" fill="#f6f8fa" stroke="#d0d7de"/>
+    <text x="14" y="22" font-size="13" font-weight="700" fill="#1b1f24">What a fillet is in the data model (mostly reuses what exists)</text>
+    <text x="14" y="42" font-size="12" fill="#3d4650">1 Arc  +  2 Tangent constraints (arc-to-each-line, already in SketchConstraints)  +  1 Radius constraint (already exists).</text>
+    <text x="14" y="60" font-size="12" fill="#3d4650">New: SketchToolMode::Fillet, corner-finding + trim math, and a remembered corner point so "delete the arc" restores the sharp corner.</text>
+  </g>
+</svg>
