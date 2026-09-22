@@ -155,9 +155,24 @@ void createMate(materializr::PluginContext& ctx) {
 
     // A body can only be placed by one mate. Refusing here, at creation, is
     // what keeps the solver a topological walk instead of a constraint system
-    // that has to reconcile two answers.
-    for (const auto& m : doc.getMates())
-        if (!m.suppressed && m.bodyB == moveBody) return;
+    // that has to reconcile two answers. This used to return with no feedback
+    // at all - indistinguishable from the button doing nothing, and the most
+    // likely way to actually HIT it: the mated body sits wherever it was
+    // dragged to when picked as the reference on some earlier, unrelated
+    // mate, so a later attempt that happens to pick it second silently
+    // refuses (Steve, antenna tracker: base lid was already bodyB of an
+    // existing Fasten mate).
+    for (const auto& m : doc.getMates()) {
+        if (m.suppressed || m.bodyB != moveBody) continue;
+        g_mateConfirmText = bodyLabel(ctx, moveBody) +
+            " already has a mate (to " + bodyLabel(ctx, m.bodyA) +
+            ") - a body can only be placed by one. Edit or delete that mate "
+            "in the Mates section below first, or pick the bodies in the "
+            "other order if you meant to mate " + bodyLabel(ctx, refBody) +
+            " to it instead.";
+        g_mateConfirmOpenRequested = true;
+        return;
+    }
 
     // The grounded body anchors the whole graph. If nothing is grounded yet,
     // the first reference picked becomes it - otherwise the first mate a user
@@ -367,12 +382,12 @@ REGISTER_PLUGIN(Mate, [](materializr::PluginContext& ctx) {
     confirm.name = "MateConfirm";
     confirm.render = [](materializr::PluginContext&) {
         if (g_mateConfirmOpenRequested) {
-            ImGui::OpenPopup("Mate created##mateConfirm");
+            ImGui::OpenPopup("Mate##mateConfirm");
             g_mateConfirmOpenRequested = false;
         }
         ImVec2 center = ImGui::GetMainViewport()->GetCenter();
         ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-        if (ImGui::BeginPopupModal("Mate created##mateConfirm", nullptr,
+        if (ImGui::BeginPopupModal("Mate##mateConfirm", nullptr,
                                    ImGuiWindowFlags_AlwaysAutoResize)) {
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 320.0f);
             // Body names are baked in, so this can't route through tr() like a
