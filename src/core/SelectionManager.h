@@ -47,6 +47,14 @@ public:
     int selectedSketchCount() const;
     int selectedSketchRegionCount() const;
 
+    // Distinct bodies touched by the selection, counting a Body OR a Face/Edge
+    // pick on that body once each - e.g. one face selected on each of two
+    // parts reads as 2, the same as selecting the two bodies outright. Plugin
+    // contributions gated on SelectionContext::MultipleBodies (Union, Mate...)
+    // use this so picking faces across bodies (the natural "align these two
+    // faces" gesture) still surfaces them, not just whole-body picks.
+    int distinctSelectedBodyCount() const;
+
     void setEventBus(materializr::EventBus* bus) { m_eventBus = bus; }
 
     // For adaptive toolbar

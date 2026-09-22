@@ -416,7 +416,17 @@ std::vector<Toolbar::RailTool> Toolbar::railTools() const {
                 "faces aren't really one surface.");
         add(MZ_ICON_UNFOLD, "Unfold", ToolAction::Unfold, false,
             "Flatten the selected faces into a 2D cut pattern (SVG / tiled PDF).");
-        addPlugins(1 << static_cast<int>(SelectionContext::HasFaces));
+        {
+            // Faces picked across two different bodies (e.g. one face on each
+            // part to align them) is the MultipleBodies gesture same as
+            // picking the bodies outright - Mate infers its type from exactly
+            // this pick, so without this the button that would use it never
+            // appears (Steve).
+            int mask = 1 << static_cast<int>(SelectionContext::HasFaces);
+            if (m_selection->distinctSelectedBodyCount() >= 2)
+                mask |= 1 << static_cast<int>(SelectionContext::MultipleBodies);
+            addPlugins(mask);
+        }
     } else if (m_selection->hasSelectedBodies()) {
         add(MZ_ICON_MOVE,   "Move",   ToolAction::Move, false,
             "Show the translate gizmo: drag axes or planes to move.");
@@ -1064,8 +1074,15 @@ ToolAction Toolbar::renderFaceTools() {
     renderAddPlaneMenu();
     renderAddAxisMenu();
 
-    // Plugin buttons for HasFaces context
-    renderPluginButtons(1 << static_cast<int>(SelectionContext::HasFaces));
+    // Plugin buttons for HasFaces context, plus MultipleBodies when the
+    // picked faces span two or more bodies - the same gesture as picking the
+    // bodies outright (see railTools()'s twin of this).
+    {
+        int mask = 1 << static_cast<int>(SelectionContext::HasFaces);
+        if (m_selection->distinctSelectedBodyCount() >= 2)
+            mask |= 1 << static_cast<int>(SelectionContext::MultipleBodies);
+        renderPluginButtons(mask);
+    }
 
     return action;
 }

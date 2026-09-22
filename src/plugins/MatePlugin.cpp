@@ -40,6 +40,20 @@ const char* typeName(MateType t) {
     return "Fasten";
 }
 
+// Confirmation popup after a mate is created. Clicking "Mate" used to have no
+// feedback at all - a body-to-body pick with no faces always falls back to an
+// anchorless Fasten, which captures the CURRENT arrangement (offset 0 means
+// "keep what I have", see createMate below), so nothing visibly moves and the
+// button looked broken. This tells the user what got created either way, and
+// for the no-visible-effect case, where to go to actually see or change it.
+bool g_mateConfirmOpenRequested = false;
+std::string g_mateConfirmText;
+
+std::string bodyLabel(materializr::PluginContext& ctx, int id) {
+    std::string name = ctx.document().getBodyName(id);
+    return name.empty() ? ("Body " + std::to_string(id)) : name;
+}
+
 // The two bodies a mate would join, in selection order: the first pick is the
 // reference that stays put, the second is the one that moves. That ordering is
 // the whole mental model, so the panel states it rather than leaving the user
@@ -189,6 +203,20 @@ void createMate(materializr::PluginContext& ctx) {
 
     doc.addMate(m);
     resolve(ctx);
+
+    std::string ref = bodyLabel(ctx, refBody);
+    std::string mv  = bodyLabel(ctx, moveBody);
+    if (m.type == MateType::Fasten) {
+        g_mateConfirmText = mv + " is now mated to " + ref +
+            " (Fasten). It's holding its current position - nothing moved. "
+            "Open the Mates section below to set an offset, or pick faces on "
+            "both bodies first for a Planar / Concentric mate that aligns them.";
+    } else {
+        g_mateConfirmText = mv + " is now mated to " + ref + " (" +
+            typeName(m.type) + "), aligned to the picked faces. Adjust "
+            "offset, roll or Flip in the Mates section below.";
+    }
+    g_mateConfirmOpenRequested = true;
 }
 
 bool renderPanel(materializr::PluginContext& ctx) {
@@ -334,4 +362,28 @@ REGISTER_PLUGIN(Mate, [](materializr::PluginContext& ctx) {
 
     ctx.registerPropertySection({
         "Mates", materializr::SelectionContext::Always, 420, renderPanel});
+
+    materializr::OverlayContribution confirm;
+    confirm.name = "MateConfirm";
+    confirm.render = [](materializr::PluginContext&) {
+        if (g_mateConfirmOpenRequested) {
+            ImGui::OpenPopup("Mate created##mateConfirm");
+            g_mateConfirmOpenRequested = false;
+        }
+        ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+        ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+        if (ImGui::BeginPopupModal("Mate created##mateConfirm", nullptr,
+                                   ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 320.0f);
+            // Body names are baked in, so this can't route through tr() like a
+            // static string - a translated catalogue lookup on this exact
+            // concatenation would never hit.
+            ImGui::TextUnformatted(g_mateConfirmText.c_str());
+            ImGui::PopTextWrapPos();
+            ImGui::Separator();
+            if (ImGui::Button(materializr::tr("OK"))) ImGui::CloseCurrentPopup();
+            ImGui::EndPopup();
+        }
+    };
+    ctx.registerOverlay(std::move(confirm));
 })
