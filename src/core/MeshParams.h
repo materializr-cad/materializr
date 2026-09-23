@@ -22,6 +22,7 @@
 #include <TopoDS.hxx>
 #include <TopoDS_Face.hxx>
 #include <TopoDS_Shape.hxx>
+#include <algorithm>
 
 namespace materializr {
 
@@ -35,6 +36,34 @@ inline IMeshTools_Parameters meshParams(double deflection, double angularDeflect
     p.InParallel = inParallel;
     p.MeshAlgo = IMeshTools_MeshAlgoType_Delabella;
     return p;
+}
+
+// A face where even the Watson retry above fails - real and reproducible on
+// an entirely ordinary planar face (10-edge boundary, no degenerate edges),
+// not just a theoretical edge case: confirmed mesh-failing under BOTH
+// Delabella and Watson at a project's "High"/"Ultra" quality settings
+// (0.03/0.15 and 0.01/0.10) while succeeding fine at "Medium" (0.10/0.30)
+// and coarser. Whatever OCCT's samplers dislike about that fine a spacing on
+// this face, backing off clears it - recovered at 2x deflection for the
+// High-quality case above, 4x for Ultra. A locally coarser single face is a
+// far smaller defect than a hole clean through the model, so escalate
+// through a few factors (capping angular deflection around 34 degrees,
+// where facets stop looking meaningfully different) before giving up.
+inline bool meshBareFaceEscalating(const TopoDS_Face& f, double deflection,
+                                   double angularDeflection) {
+    TopLoc_Location loc;
+    for (double factor : {2.0, 4.0, 8.0, 16.0, 32.0}) {
+        try {
+            IMeshTools_Parameters wp = meshParams(
+                deflection * factor, std::min(angularDeflection * factor, 0.6), false);
+            wp.MeshAlgo = IMeshTools_MeshAlgoType_Watson;
+            BRepMesh_IncrementalMesh(f, wp);
+        } catch (...) {
+            continue;
+        }
+        if (!BRep_Tool::Triangulation(f, loc).IsNull()) return true;
+    }
+    return false;
 }
 
 // Delabella (meshParams()'s algorithm, chosen for speed on many-holed faces)
@@ -62,9 +91,10 @@ inline void meshWithFallback(const TopoDS_Shape& shape, double deflection,
             wp.MeshAlgo = IMeshTools_MeshAlgoType_Watson;
             BRepMesh_IncrementalMesh(f, wp);
         } catch (...) {
-            // Leave it bare - genuinely unmeshable geometry (a
-            // self-intersecting wire, degenerate surface).
+            // Fall through to the escalating retry below.
         }
+        if (BRep_Tool::Triangulation(f, loc).IsNull())
+            meshBareFaceEscalating(f, deflection, angularDeflection);
     }
 }
 
