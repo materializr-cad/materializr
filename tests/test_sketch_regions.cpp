@@ -15,6 +15,10 @@
 #include <gp_Ax3.hxx>
 #include <glm/glm.hpp>
 #include <vector>
+#include <BRepCheck_Analyzer.hxx>
+#include <BRepGProp.hxx>
+#include <GProp_GProps.hxx>
+#include <cmath>
 
 using materializr::Sketch;
 
@@ -130,4 +134,47 @@ TEST(SketchRegions, RimPointKeepsConcentricAnnulus) {
     for (const auto& r : regions)
         if (sk.isPointInRegion(r, glm::vec2(-4.0f, -4.0f))) bandHit = true;
     EXPECT_TRUE(bandHit) << "the ring between the circles must be selectable";
+}
+
+// Regression: a plain concentric-circle annulus (no rim-point involved) could
+// come back from BOPAlgo_Builder's general fuse as a face BRepCheck_Analyzer
+// flags BadOrientationOfSubshape - individually the outer and hole wires
+// check out, but the face itself doesn't. Push/Pull swept that invalid face
+// straight into an invalid prism (a boolean merge downstream rejected it,
+// leaving a malformed blob with no wall/cap on screen - Steve's report on
+// sica-cam-mount.mzr sketch 6). The region's face must be BRepCheck-valid,
+// and - the sharper regression, since an earlier fix attempt "solved" the
+// validity by silently reclassifying the hole as solid material - the
+// annulus must still genuinely EXCLUDE its centre, and its area must net
+// out to outer-minus-inner rather than the full outer disk.
+TEST(SketchRegions, ConcentricAnnulusFaceIsValidAndHollow) {
+    using materializr::Sketch;
+    Sketch sk;
+    sk.setPlane(gp_Pln(gp_Ax3(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1), gp_Dir(1, 0, 0))));
+    const double outerR = 3.0199, innerR = 1.1935;
+    int c = sk.addPoint({0.0f, 0.0f});
+    sk.addCircle(c, outerR);
+    sk.addCircle(c, innerR);
+
+    auto regions = sk.buildRegions();
+    ASSERT_EQ(regions.size(), 2u) << "inner disk + annulus";
+
+    const Sketch::Region* annulus = nullptr;
+    for (const auto& r : regions)
+        if (!r.holeWires.empty()) annulus = &r;
+    ASSERT_NE(annulus, nullptr) << "one region must be the ring, with a hole wire";
+
+    ASSERT_FALSE(annulus->face.IsNull());
+    EXPECT_TRUE(BRepCheck_Analyzer(annulus->face).IsValid())
+        << "annulus face must be topologically valid - Push/Pull sweeps it as-is";
+
+    EXPECT_FALSE(sk.isPointInRegion(*annulus, glm::vec2(0.0f, 0.0f)))
+        << "the centre must stay excluded - the hole must not have been "
+           "reclassified as solid material";
+
+    GProp_GProps g;
+    BRepGProp::SurfaceProperties(annulus->face, g);
+    const double expected = M_PI * (outerR * outerR - innerR * innerR);
+    EXPECT_NEAR(g.Mass(), expected, expected * 0.02)
+        << "annulus area must be outer-minus-inner, not the full outer disk";
 }

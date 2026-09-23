@@ -2074,6 +2074,56 @@ std::vector<Sketch::Region> Sketch::buildRegionsUncached() const {
         }
     }
 
+    // BOPAlgo_Builder (and, before it, the splitter) can hand back a
+    // multiply-connected face whose hole wire is wound wrong relative to its
+    // outer wire for THIS surface - individually each wire/edge checks out,
+    // but BRepCheck_Analyzer flags the face itself as BadOrientationOfSubshape.
+    // A prism swept from that face comes out invalid (a Push/Pull on the
+    // region never gets a clean tube: a boolean merge later rejects the
+    // result and the raw, invalid prism is what's left on screen).
+    //
+    // Coaxing ShapeFix_Face into fixing the orientation in place is a trap:
+    // it satisfies BRepCheck by flipping WHICHEVER wire it judges wrong, and
+    // it isn't obliged to pick the one that keeps the hole a hole - it can
+    // just as validly flip the outer wire instead, netting a face whose
+    // "hole" no longer subtracts (a Push/Pull then swept a solid disc, not a
+    // tube). buildProfileShape() sidesteps the whole question the same way
+    // it always has here: rebuild the outer face from its own wire alone and
+    // remove each hole with a boolean cut, so no wire-orientation coordination
+    // between outer and hole is ever required. Do the same for the
+    // interactively-picked region, only when the face actually needs it.
+    for (auto& f : atomic) {
+        if (f.IsNull() || BRepCheck_Analyzer(f).IsValid()) continue;
+        try {
+            TopoDS_Wire outerW = BRepTools::OuterWire(f);
+            if (outerW.IsNull()) continue;
+            BRepBuilderAPI_MakeFace mkOuter(m_plane, outerW);
+            if (!mkOuter.IsDone()) continue;
+            TopoDS_Shape rebuilt = mkOuter.Face();
+            TopTools_ListOfShape holeFaces;
+            for (TopExp_Explorer wex(f, TopAbs_WIRE); wex.More(); wex.Next()) {
+                TopoDS_Wire w = TopoDS::Wire(wex.Current());
+                if (w.IsSame(outerW)) continue;
+                BRepBuilderAPI_MakeFace mkHole(m_plane, w);
+                if (mkHole.IsDone()) holeFaces.Append(mkHole.Face());
+            }
+            if (!holeFaces.IsEmpty()) {
+                BRepAlgoAPI_Cut cut;
+                TopTools_ListOfShape args;
+                args.Append(rebuilt);
+                cut.SetArguments(args);
+                cut.SetTools(holeFaces);
+                cut.Build();
+                if (cut.IsDone() && !cut.Shape().IsNull()) rebuilt = cut.Shape();
+            }
+            TopExp_Explorer fx(rebuilt, TopAbs_FACE);
+            if (fx.More()) {
+                TopoDS_Face cand = TopoDS::Face(fx.Current());
+                if (BRepCheck_Analyzer(cand).IsValid()) f = cand;
+            }
+        } catch (...) {}
+    }
+
     // Project a 3D point onto sketch-plane 2D coordinates.
     const gp_Ax3& ax = m_plane.Position();
     gp_Pnt planeOrigin = ax.Location();
