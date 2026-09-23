@@ -193,6 +193,11 @@ void MeshWorker::run()
                     wp.MeshAlgo = IMeshTools_MeshAlgoType_Watson;
                     BRepMesh_IncrementalMesh retry(jf.copy, wp);
                 } catch (...) {}
+                // Watson at the requested quality isn't always enough either
+                // - see meshBareFaceEscalating.
+                if (BRep_Tool::Triangulation(jf.copy, loc).IsNull())
+                    materializr::meshBareFaceEscalating(jf.copy, job.deflection,
+                                                        job.angularDeflection);
             }
             for (const auto& jf : job.faces) {
                 Result::Face rf;

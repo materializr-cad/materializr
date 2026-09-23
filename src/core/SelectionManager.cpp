@@ -149,6 +149,17 @@ int SelectionManager::selectedSketchRegionCount() const {
     return count;
 }
 
+int SelectionManager::distinctSelectedBodyCount() const {
+    std::vector<int> ids;
+    for (const auto& entry : m_selection) {
+        if (entry.bodyId < 0) continue;
+        bool dup = false;
+        for (int id : ids) dup = dup || (id == entry.bodyId);
+        if (!dup) ids.push_back(entry.bodyId);
+    }
+    return static_cast<int>(ids.size());
+}
+
 bool SelectionManager::hasSelectedBodies() const {
     return selectedBodyCount() > 0;
 }

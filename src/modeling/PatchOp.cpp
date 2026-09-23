@@ -1,6 +1,8 @@
 #include "PatchOp.h"
 
+#include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakeSolid.hxx>
+#include <BRepBuilderAPI_MakeWire.hxx>
 #include <BRepBuilderAPI_Sewing.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <BRepGProp.hxx>
@@ -13,10 +15,12 @@
 #include <TopExp.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopTools_ListIteratorOfListOfShape.hxx>
+#include <TopTools_ListOfShape.hxx>
 #include <TopoDS.hxx>
 #include <TopoDS_Compound.hxx>
 #include <TopoDS_Iterator.hxx>
 #include <TopoDS_Shell.hxx>
+#include <TopoDS_Wire.hxx>
 #include <imgui.h>
 
 #include <algorithm>
@@ -94,6 +98,44 @@ bool faceCarriesEdge(const TopoDS_Face& f, const TopoDS_Edge& e) {
     for (TopExp_Explorer ex(f, TopAbs_EDGE); ex.More(); ex.Next())
         if (ex.Current().IsSame(e)) return true;
     return false;
+}
+
+// A closed ring of edges that is already flat: build the plane directly
+// rather than asking GeomPlate to discover it. Null if the ring doesn't close
+// or isn't planar.
+//
+// This is the common case - capping a hole left by a straight cut - and the
+// one GeomPlate is least reliable on. Its own initial surface is an averaged
+// plane through the rim, and the bending-energy system it then solves has a
+// flat, zero-curvature answer everywhere: a degenerate case for an iterative
+// solver, which can fail to converge (reported as "no surface fits") or spin
+// without ever returning (reported as the app not responding) instead of just
+// handing back the plane. BRepBuilderAPI_MakeFace's OnlyPlane path finds the
+// same plane analytically, with no iteration to get stuck in.
+TopoDS_Face tryPlanarFace(const std::vector<TopoDS_Edge>& edges) {
+    if (edges.empty()) return TopoDS_Face();
+    try {
+        OCC_CATCH_SIGNALS
+        TopTools_ListOfShape list;
+        for (const auto& e : edges)
+            if (!e.IsNull()) list.Append(e);
+        if (list.IsEmpty()) return TopoDS_Face();
+
+        BRepBuilderAPI_MakeWire mkWire;
+        mkWire.Add(list);
+        if (!mkWire.IsDone()) return TopoDS_Face();
+        const TopoDS_Wire wire = mkWire.Wire();
+        if (!wire.Closed()) return TopoDS_Face();
+
+        BRepBuilderAPI_MakeFace mkFace(wire, Standard_True);
+        if (!mkFace.IsDone()) return TopoDS_Face();
+        const TopoDS_Face face = mkFace.Face();
+        if (!BRepCheck_Analyzer(face).IsValid() || area(face) <= 1e-12)
+            return TopoDS_Face();
+        return face;
+    } catch (...) {
+        return TopoDS_Face();
+    }
 }
 
 } // namespace
@@ -276,7 +318,17 @@ bool PatchOp::execute(Document& doc) {
         //  2. Same ask, seeded with a C0 pre-fit as the initial surface. Rescues
         //     the case where GeomPlate's own average-plane guess is degenerate
         //     and the constructor throws before the solve even starts.
-        //  3. Position only. The surface the user can always have.
+        //  3. Closed + planar ring: build the plane analytically, no GeomPlate
+        //     involved. Tried only once continuity above position has already
+        //     had its shot (rungs 1-2 still get to dome a cap that leans away
+        //     from flat) - this rung exists for the config GeomPlate is least
+        //     reliable on: a boundary whose only honest answer is already flat,
+        //     which is a degenerate input for an energy-minimizing solver and
+        //     can fail to converge ("no surface fits") or spin without ever
+        //     returning (the app not responding) instead of just handing back
+        //     the plane. See tryPlanarFace.
+        //  4. One last cold GeomPlate position-only attempt, for a ring that
+        //     isn't planar but still might have a C0 answer.
         Fit fit;
         bool fitted = fitOnce(edges, ancestors, order, TopoDS_Face(), fit);
         if (!fitted && order != GeomAbs_C0) {
@@ -284,8 +336,20 @@ bool PatchOp::execute(Document& doc) {
             if (fitOnce(edges, ancestors, GeomAbs_C0, TopoDS_Face(), seed))
                 fitted = fitOnce(edges, ancestors, order, seed.face, fit);
         }
-        if (!fitted && order != GeomAbs_C0)
-            fitted = fitOnce(edges, ancestors, GeomAbs_C0, TopoDS_Face(), fit);
+
+        bool planarShortcut = false;
+        if (!fitted) {
+            const TopoDS_Face planar = tryPlanarFace(edges);
+            if (!planar.IsNull()) {
+                fit.face = planar;
+                fit.g0 = fit.g1 = fit.g2 = 0.0;
+                fit.unsupported = 0;
+                fitted = true;
+                planarShortcut = true;
+            } else if (order != GeomAbs_C0) {
+                fitted = fitOnce(edges, ancestors, GeomAbs_C0, TopoDS_Face(), fit);
+            }
+        }
         if (!fitted) {
             std::fprintf(stderr,
                 "[Patch] the surface fit didn't converge on these %zu edges.\n",
@@ -312,9 +376,15 @@ bool PatchOp::execute(Document& doc) {
         // vertical loses tangency entirely, 2.9 degrees gets it to 1e-2 rad, and
         // anything past ~6 degrees lands at 1e-5. The user is told which of
         // those they got rather than being handed a flat patch labelled tangent.
-        m_continuityAchieved =
-            order == GeomAbs_C0 ||
-            (fit.unsupported == 0 && fit.g1 <= std::max(m_solver.tolAng, 1e-3));
+        //
+        // The planar shortcut never asked GeomPlate for tangency at all, so
+        // its zeroed-out fit.g1 would otherwise read as a perfect result -
+        // judge it on the request instead: a flat plane only ever holds
+        // position.
+        m_continuityAchieved = planarShortcut
+            ? order == GeomAbs_C0
+            : (order == GeomAbs_C0 ||
+               (fit.unsupported == 0 && fit.g1 <= std::max(m_solver.tolAng, 1e-3)));
 
         const TopoDS_Face patch = fit.face;
         m_patchFace = patch;

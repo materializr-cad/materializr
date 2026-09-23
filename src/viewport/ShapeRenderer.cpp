@@ -289,12 +289,16 @@ int ShapeRenderer::tessellate(const TopoDS_Shape& shape, float deflection,
                     materializr::meshParams(deflection, angularDeflection, false);
                 wp.MeshAlgo = IMeshTools_MeshAlgoType_Watson;
                 BRepMesh_IncrementalMesh retry(bareFace, wp);
-                if (!BRep_Tool::Triangulation(bareFace, loc).IsNull()) ++watsonRecovered;
             } catch (...) {
-                // Leave it bare - genuinely unmeshable geometry (a
-                // self-intersecting wire, degenerate surface). The mesh tag
-                // below still records it so this isn't retried every frame.
+                // Fall through to the escalating retry below.
             }
+            // Watson at the requested quality isn't always enough either - a
+            // real planar face has been seen failing BOTH meshers at fine
+            // (High/Ultra) deflection while meshing fine at anything coarser.
+            // Back off in a few steps rather than leave a hole on screen.
+            if (!BRep_Tool::Triangulation(bareFace, loc).IsNull() ||
+                materializr::meshBareFaceEscalating(bareFace, deflection, angularDeflection))
+                ++watsonRecovered;
         }
         if (watsonRetried > 0) {
             std::fprintf(stderr,
