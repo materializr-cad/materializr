@@ -90,11 +90,23 @@ float gridCoverage(vec2 coord, float widthPx) {
 void main() {
     vec3 dir = v_farPoint - v_nearPoint;
     float denom = dot(dir, u_planeNormal);
-    if (abs(denom) < 1e-6) discard;
-    float t = dot(u_planeOrigin - v_nearPoint, u_planeNormal) / denom;
-    if (t < 0.0) discard; // plane behind the camera
+    // Don't discard here: an early discard runs BEFORE the fwidth() calls
+    // below, and fwidth() needs every fragment in a pixel's 2x2 quad to take
+    // the same code path to produce a valid derivative. At grazing camera
+    // angles (near-parallel to the grid plane - see #123) `denom`/`t` sit
+    // right at the noise floor and flip sign between neighbouring pixels
+    // from ordinary FP32 rounding, so some quads had only some invocations
+    // discard. On most drivers that's harmless; on the reporter's Intel Arc
+    // it poisoned fwidth() for the whole quad, showing up as a dashed/static
+    // grid rather than a clean-but-thin one. Clamp instead, and defer the
+    // actual discard to after every derivative is computed (see `valid`
+    // below), so quads stay uniform.
+    float denomSafe = (abs(denom) < 1e-6) ? ((denom < 0.0) ? -1e-6 : 1e-6) : denom;
+    float t = dot(u_planeOrigin - v_nearPoint, u_planeNormal) / denomSafe;
+    bool valid = (abs(denom) >= 1e-6) && (t >= 0.0);
+    float tClamped = clamp(t, 0.0, 1.0e6); // bound so an invalid ray can't blow up fragPos3D
 
-    vec3 fragPos3D = v_nearPoint + t * dir;
+    vec3 fragPos3D = v_nearPoint + tClamped * dir;
     // Bias the grid's depth slightly toward the camera so it doesn't z-fight
     // with geometry that lies on the plane (the common "sketch on a face"
     // case). The bias is computed in world space - a fixed NDC offset would
@@ -177,8 +189,10 @@ void main() {
     if (axisV > 0.0) { rgb = mix(rgb, vec3(0.20, 0.20, 0.80), axisV); a = max(a, axisV); }
 
     // Distance fade, then the global opacity slider - both linear multipliers so
-    // the whole grid dims uniformly instead of culling lines one by one.
-    float alpha = a * fade * u_globalAlpha;
+    // the whole grid dims uniformly instead of culling lines one by one. The
+    // `valid` mask (deferred from above) is applied here too, after every
+    // fwidth() call, instead of as an early discard.
+    float alpha = a * fade * u_globalAlpha * (valid ? 1.0 : 0.0);
     if (alpha < 0.001) discard;
 
     fragColor = vec4(rgb, alpha);
