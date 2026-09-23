@@ -233,9 +233,9 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | unitless | src/modeling/TransformOp.cpp:288 | `materializr::inputNumber(materializr::tr("Axis Z"), &m_az, 0.1, 1.0, "%g");` |
 | angle | src/modeling/TransformOp.cpp:289 | `materializr::inputNumber(materializr::tr("Angle (deg)"), &m_angle, 1.0, 15.0, "%.1f");` |
 | ratio | src/modeling/TransformOp.cpp:292 | `materializr::inputNumber(materializr::tr("Scale Factor"), &m_scale, 0.1, 0.5, "%g");` |
-| CONVERTED | src/plugins/MatePlugin.cpp:258 | `if (materializr::lengthField("Offset", &offset)) {` |
-| angle | src/plugins/MatePlugin.cpp:280 | `if (materializr::inputNumber("Angle (deg)", &angleDeg)) {` |
-| angle | src/plugins/MatePlugin.cpp:288 | `materializr::inputNumber("Angle (deg)", &angleDeg);` |
+| CONVERTED | src/plugins/MatePlugin.cpp:301 | `if (materializr::lengthField("Offset", &offset)) {` |
+| angle | src/plugins/MatePlugin.cpp:323 | `if (materializr::inputNumber("Angle (deg)", &angleDeg)) {` |
+| angle | src/plugins/MatePlugin.cpp:331 | `materializr::inputNumber("Angle (deg)", &angleDeg);` |
 | CONVERTED | src/plugins/PushPullPlugin.cpp:139 | `(void)materializr::parseLength(m_inputBuf, m_distance);` |
 | CONVERTED | src/plugins/PushPullPlugin.cpp:144 | `if (materializr::parseLength(m_inputBuf, parsed) &&` |
 | CONVERTED | src/plugins/PushPullPlugin.cpp:154 | `if (materializr::lengthStepperRow("ppStep", &m_distance,` |
@@ -513,7 +513,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | comment | src/modeling/MergeFacesOp.cpp:290 | `// "Extrude"): two coplanar faces, centres 0.47 mm apart, outward normals` |
 | comment | src/modeling/MergeFacesOp.cpp:292 | `// thing it was not: they are the same plane to 3e-6 mm.` |
 | comment | src/modeling/MoveHoleOp.cpp:296 | `// measured on a Ø10 hole it left a 14 mm-wide opening, the silhouette of the` |
-| allowed-by-hand | src/modeling/PatchOp.cpp:389 | `ImGui::TextDisabled(materializr::tr("Fit: gap %.4f mm, tangency %.2f deg"),` |
+| allowed-by-hand | src/modeling/PatchOp.cpp:459 | `ImGui::TextDisabled(materializr::tr("Fit: gap %.4f mm, tangency %.2f deg"),` |
 | comment | src/modeling/PatchOp.h:96 | `double tol3d       = 1e-4;   // G0: max gap to the boundary, mm` |
 | comment | src/modeling/PatchOp.h:106 | `double g0Error() const { return m_g0Error; }  // mm` |
 | comment | src/modeling/PrimitiveOp.h:23 | `// Box: XYZ extents in mm.` |
@@ -622,7 +622,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | comment | src/ui/PropertiesPanel.cpp:917 | `// Lengths: display unit -> mm FIRST, then halve a circle's` |
 | comment | src/ui/PropertiesPanel.h:137 | `// Per-body bbox-extent cache for the "Size: X × Y × Z mm" readout.` |
 | comment | src/ui/StepperRow.h:18 | `// value, and pulling an 80 mm extrude down to 50 because you pressed +1 loses` |
-| allowed-by-hand | src/ui/Toolbar.cpp:539 | `tip(materializr::tr("Create a stock OCCT primitive (box / cylinder / sphere / cone / torus). Picking one opens` |
+| allowed-by-hand | src/ui/Toolbar.cpp:549 | `tip(materializr::tr("Create a stock OCCT primitive (box / cylinder / sphere / cone / torus). Picking one opens` |
 | allowed-by-hand | src/ui/TouchWidgets.h:94 | `const char* suffix = "mm", int decimals = 1,` |
 | allowed-by-hand | src/ui/TouchWidgets.h:137 | `const char* suffix = "mm", int decimals = 1,` |
 | comment | src/viewport/Camera.cpp:215 | `// least 0.1 mm of standoff so the view doesn't degenerate.` |
@@ -676,7 +676,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | no-length | src/modeling/MirrorOp.cpp:102 | `MirrorOp` |
 | no-length | src/modeling/MoveFaceOp.cpp:668 | `MoveFaceOp` |
 | CONVERTED | src/modeling/MoveHoleOp.cpp:657 | `MoveHoleOp` |
-| no-length | src/modeling/PatchOp.cpp:375 | `PatchOp` |
+| no-length | src/modeling/PatchOp.cpp:445 | `PatchOp` |
 | no-length | src/modeling/PatternOp.cpp:140 | `PatternOp` |
 | no-length | src/modeling/PlaneTransformOp.cpp:26 | `PlaneTransformOp` |
 | CONVERTED | src/modeling/PrimitiveOp.cpp:116 | `PrimitiveOp` |

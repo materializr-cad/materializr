@@ -245,7 +245,7 @@ src/modeling/MergeFacesOp.cpp:231:
 src/modeling/MergeFacesOp.cpp:290:
 src/modeling/MergeFacesOp.cpp:292:
 src/modeling/MoveHoleOp.cpp:296:
-src/modeling/PatchOp.cpp:389:
+src/modeling/PatchOp.cpp:459:
 src/modeling/PatchOp.h:96:
 src/modeling/PatchOp.h:106:
 src/modeling/PrimitiveOp.h:23:
@@ -354,7 +354,7 @@ src/ui/PropertiesPanel.cpp:877:
 src/ui/PropertiesPanel.cpp:917:
 src/ui/PropertiesPanel.h:137:
 src/ui/StepperRow.h:18:
-src/ui/Toolbar.cpp:539:
+src/ui/Toolbar.cpp:549:
 src/ui/TouchWidgets.h:94:
 src/ui/TouchWidgets.h:137:
 src/viewport/Camera.cpp:215:
