@@ -23,7 +23,7 @@ using materializr::ai::LlmClient;
 std::unique_ptr<AiSessionController> g_session;
 materializr::AiProvider g_sessionProvider;
 std::string g_sessionKeyOrUrlFingerprint;
-static bool g_overlayOpen = true;
+static bool g_overlayOpen = false;
 
 std::string fingerprint(const materializr::AppSettings::AiSettings& s) {
     return s.provider == materializr::AiProvider::Anthropic
