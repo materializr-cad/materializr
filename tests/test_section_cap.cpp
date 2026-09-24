@@ -510,6 +510,47 @@ TEST(SectionSlice, ABareFaceWithNoUsableBoxCountsAsAGap) {
     }
 }
 
+namespace {
+// One vertical quad wall (two triangles) between two ground-plane corners,
+// spanning z in [-5, 5] - a hand-rolled substitute for a real BRep face's
+// triangulation, so a "shared" corner between two walls can be given
+// deliberately mismatched coordinates the way two independently-tessellated
+// OCCT faces meeting at an edge sometimes do.
+materializr::FaceMesh makeWall(const gp_Pnt2d& a, const gp_Pnt2d& b) {
+    Handle(Poly_Triangulation) tri = new Poly_Triangulation(4, 2, Standard_False);
+    tri->SetNode(1, gp_Pnt(a.X(), a.Y(), -5.0));
+    tri->SetNode(2, gp_Pnt(b.X(), b.Y(), -5.0));
+    tri->SetNode(3, gp_Pnt(b.X(), b.Y(), 5.0));
+    tri->SetNode(4, gp_Pnt(a.X(), a.Y(), 5.0));
+    tri->SetTriangle(1, Poly_Triangle(1, 2, 3));
+    tri->SetTriangle(2, Poly_Triangle(1, 3, 4));
+    return {tri, Bnd_Box(), gp_Trsf(), false};
+}
+} // namespace
+
+TEST(SectionSlice, AnInnerWallSeamMismatchGivesNoCap) {
+    // Four outer walls close a real 10x10 square loop at z=0. Four inner
+    // walls SHOULD close a 4x4 square hole in the middle the same way, but
+    // one corner is authored twice - once per adjacent wall, like two
+    // independently-tessellated faces meeting at a shared edge - 0.01 mm
+    // apart, far past the 1e-4 mm snap tolerance. Every wall has a real,
+    // non-null triangulation (`complete` under the old per-face-only check
+    // would stay true), but the inner loop's segments never stitch shut, so
+    // it falls into `open` instead of `loops`. Without accounting for that,
+    // the outer loop is the only "loop" sliceSection sees and it fills
+    // solid right over the hole - exactly the reported "hollow body renders
+    // solid" bug. The fix must suppress the fill instead.
+    gp_Pnt2d O0(0, 0), O1(10, 0), O2(10, 10), O3(0, 10);
+    gp_Pnt2d I0(3, 3), I1(7, 3), I1b(7.01, 3), I2(7, 7), I3(3, 7);
+    std::vector<materializr::FaceMesh> faces{
+        makeWall(O0, O1), makeWall(O1, O2), makeWall(O2, O3), makeWall(O3, O0),
+        makeWall(I0, I1), makeWall(I1b, I2), makeWall(I2, I3), makeWall(I3, I0),
+    };
+    SectionSlice slice;
+    EXPECT_TRUE(sliceSection(faces, gp_Pln(gp_Pnt(5, 5, 0), gp_Dir(0, 0, 1)), slice));
+    EXPECT_TRUE(slice.cap.empty());
+}
+
 TEST(SectionSlice, UnmeshedFaceStillDrawsTheRest) {
     // Strip one side face's triangulation: the loop cannot close, so there is
     // no cap, but the three meshed sides still draw their outline.

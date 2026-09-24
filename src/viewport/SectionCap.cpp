@@ -475,6 +475,17 @@ bool sliceSection(const std::vector<FaceMesh>& faces, const gp_Pln& cuttingPlane
         // wall (a bore) leaves its loop out entirely, and the outer loop
         // would be filled solid over the hole. Outline only until the body
         // is whole - finishSlice's `fill` flag gates exactly that.
+        //
+        // A chain that never closes is the same failure by another route:
+        // every face involved DOES have a triangulation, but the segments
+        // it contributed don't stitch shut (a seam mismatch between two
+        // faces' independently-tessellated edges, a non-manifold junction).
+        // That loop never reaches `loops`, so the nesting pass never sees
+        // it - a hollow interior's wall can silently vanish instead of
+        // leaving a hole, and the outer loop then fills solid right over
+        // the cavity (the "hollow body renders solid" report). Treat it
+        // exactly like a missing face: outline only, never a guessed fill.
+        if (!ch.open.empty()) complete = false;
         finishSlice(sl, std::move(ch.loops), ch.open, frame, complete, out);
     } catch (...) {
         out.lines.resize(lines0);
