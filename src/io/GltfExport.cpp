@@ -35,7 +35,10 @@ struct MeshBufferData {
 static void tessellateMesh(const TopoDS_Shape& shape, MeshBufferData& out, float deflection) {
     // Pass an angular deflection too - the single-arg ctor defaults it to 0.5rad
     // (~28°), which left small fillets visibly faceted/rippled.
-    BRepMesh_IncrementalMesh meshGen(shape, materializr::meshParams(deflection, 0.2, false));
+    // meshWithFallback, not a raw Delabella pass: Delabella can leave a face
+    // with zero triangles on otherwise valid geometry (spline-derived faces
+    // in particular) - see StlExport.cpp for the full story.
+    materializr::meshWithFallback(shape, deflection, 0.2, false);
 
     for (TopExp_Explorer explorer(shape, TopAbs_FACE); explorer.More(); explorer.Next()) {
         const TopoDS_Face& face = TopoDS::Face(explorer.Current());

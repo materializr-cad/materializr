@@ -233,14 +233,11 @@ StlExportResult StlExport::exportShape(const std::string& filePath, const TopoDS
     TopExp::MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, edgeFaceMap);
     std::vector<std::pair<int,int>> nonManifoldRawEdges;
 
-    // Tessellate the shape
-    BRepMesh_IncrementalMesh mesh(
-        shape, materializr::meshParams(options.linearDeflection, options.angularDeflection, false));
-
-    if (!mesh.IsDone()) {
-        result.errorMessage = "Tessellation failed.";
-        return result;
-    }
+    // Tessellate the shape. Delabella (meshParams()'s algorithm) can leave a
+    // face with zero triangles on otherwise valid geometry - meshWithFallback
+    // retries any bare face with Watson, then escalating deflection, so a
+    // spline-derived face doesn't silently vanish from the export.
+    materializr::meshWithFallback(shape, options.linearDeflection, options.angularDeflection, false);
 
     // Gather, weld, and repair the mesh before writing.
     //

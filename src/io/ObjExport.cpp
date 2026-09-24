@@ -38,8 +38,10 @@ struct IndexedMesh {
 };
 
 bool harvest(const TopoDS_Shape& shape, IndexedMesh& out) {
-    BRepMesh_IncrementalMesh meshGen(shape, materializr::meshParams(0.01, 0.1, false));
-    if (!meshGen.IsDone()) return false;
+    // meshWithFallback, not a raw Delabella pass: Delabella can leave a face
+    // with zero triangles on otherwise valid geometry (spline-derived faces
+    // in particular) - see StlExport.cpp for the full story.
+    materializr::meshWithFallback(shape, 0.01, 0.1, false);
 
     std::map<std::tuple<double, double, double>, int> index;
     auto vid = [&](const gp_Pnt& p) {
