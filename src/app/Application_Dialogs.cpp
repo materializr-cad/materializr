@@ -4666,6 +4666,13 @@ void Application::renderSectionPanel() {
         ImGui::SetNextItemWidth(200.0f);
         if (materializr::lengthSlider(materializr::trFormat("Offset (%s)", materializr::unitSuffix()).c_str(), &m_sectionOffset, -s_secRange, s_secRange))
             m_sectionDirty = true; // Ctrl+click still types exact values past the range
+        // Same ±10/1/0.1 stepper the plane-offset dial and Push/Pull use - the
+        // slider alone can't land on a round mm value once the range has
+        // scaled up for a large part (Steve, 2026-09-23: "no way to move
+        // millimeter by millimeter... on large objects").
+        if (materializr::lengthStepperRow("sectionOffsetStep", &m_sectionOffset,
+                                    /*allowNegative=*/true, -s_secRange, s_secRange))
+            m_sectionDirty = true;
         if (ImGui::Checkbox(materializr::tr("Flip side"), &m_sectionFlip))
             m_sectionDirty = true;
 
