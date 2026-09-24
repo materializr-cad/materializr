@@ -2362,9 +2362,27 @@ void MoveFaceController::renderMoveFacePanel(const IopContext& ctx,
         if (ch) updateMoveFace(ctx);
     } else {
         ImGui::Text("%s", materializr::trFormat("Slide (%s)", materializr::unitSuffix()).c_str()); ImGui::Separator();
-        ImGui::Text("(%.1f, %.1f, %.1f)  |%.1f|",
-                    m_st.moveFaceVec.x, m_st.moveFaceVec.y, m_st.moveFaceVec.z,
-                    glm::length(m_st.moveFaceVec));
+        // Dragging the gizmo is exact-but-zoom-relative and can't land on a
+        // round mm value on a large face; these steppers give the same
+        // typed/nudge control push/pull and the plane-offset dial already have.
+        float a = glm::dot(m_st.moveFaceVec, m_st.moveFaceAxisA);
+        float b = glm::dot(m_st.moveFaceVec, m_st.moveFaceAxisB);
+        bool ch = false;
+        ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.45f, 1.0f), "%s", materializr::tr("Axis A (red)"));
+        ImGui::SetNextItemWidth(150);
+        ImGui::TextDisabled("%s", materializr::fmtLength(a).c_str());
+        if (materializr::lengthStepperRow("slideAStep", &a, /*allowNegative=*/true, -1000.0f, 1000.0f))
+            ch = true;
+        ImGui::TextColored(ImVec4(0.4f, 0.95f, 0.45f, 1.0f), "%s", materializr::tr("Axis B (green)"));
+        ImGui::SetNextItemWidth(150);
+        ImGui::TextDisabled("%s", materializr::fmtLength(b).c_str());
+        if (materializr::lengthStepperRow("slideBStep", &b, /*allowNegative=*/true, -1000.0f, 1000.0f))
+            ch = true;
+        if (ch) {
+            m_st.moveFaceVec = a * m_st.moveFaceAxisA + b * m_st.moveFaceAxisB;
+            updateMoveFace(ctx);
+        }
+        ImGui::TextDisabled("%s", materializr::trFormat("Total: %s", materializr::fmtLength(glm::length(m_st.moveFaceVec))).c_str());
     }
 
     // Read-out of what the SELECTION will do (the selection IS the control
