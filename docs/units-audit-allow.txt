@@ -210,9 +210,9 @@ src/io/Settings.h:176:
 src/io/Settings.h:184:
 src/io/Settings.h:209:
 src/io/Settings.h:210:
-src/io/StlExport.cpp:252:
-src/io/StlExport.cpp:254:
-src/io/StlExport.cpp:294:
+src/io/StlExport.cpp:249:
+src/io/StlExport.cpp:251:
+src/io/StlExport.cpp:291:
 src/io/StlExport.h:13:
 src/io/SvgExport.cpp:150:
 src/modeling/BooleanOp.cpp:203:
