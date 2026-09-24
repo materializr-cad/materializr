@@ -8485,14 +8485,50 @@ void Application::run() {
       }
     }
 
-    // Persist preferences on a clean exit (in addition to saving on each change).
+    // Quietly save any DIRTY INACTIVE tab that already has a file, same as the
+    // active-tab quiet-autosave shortcut in closeProject()/requestClose(). Skip
+    // it and the tab's only record of the unsaved delta is the recovery
+    // snapshot below - which reopens as a SEPARATE new tab next launch (via the
+    // orphan-recovery prompt) alongside the same project's last-saved state
+    // reopening from its ordinary sessionPaths entry, i.e. two tabs for one
+    // project (Steve's report, 2026-09-23). Saving here means that tab is
+    // clean by the time the recovery loop below runs, so it clears its
+    // snapshot outright instead of orphaning it. Same tip-only guard as those
+    // two call sites: below the history tip a quiet save would silently drop
+    // the redo tail.
+    if (m_autosaveEnabled) {
+        const size_t originalActive = m_activeSession;
+        for (size_t i = 0; i < m_sessions.size(); ++i) {
+            if (i == m_activeSession) continue;
+            const auto& s = m_sessions[i];
+            const bool dirty =
+                (s->history && s->history->currentStep() != s->savedAtHistoryStep) ||
+                s->unsavedNonHistoryChanges;
+            if (!dirty || s->projectPath.empty()) continue;
+            if (s->history && s->history->canRedo()) continue;
+            stashActiveSessionState();
+            applySessionState(i);
+            saveProjectQuick();
+        }
+        stashActiveSessionState();
+        applySessionState(originalActive);
+    }
+
+    // Persist preferences on a clean exit (in addition to saving on each
+    // change). Deliberately AFTER the block above: saveProjectQuick() calls
+    // saveAppSettings() itself while a background tab is temporarily swapped
+    // in as "active" to save it, which would otherwise persist the WRONG
+    // sessionActive/lastProjectPath (the tab being saved, not the one the
+    // user actually left active) if this ran first.
     saveAppSettings();
+
     // Clean exit → clear the recovery snapshots, with one deliberate
     // exception: a DIRTY INACTIVE tab keeps its file. The quit prompt only
-    // covers the active project, so an unsaved background tab was never
-    // offered a save - deleting its snapshot here would silently destroy its
-    // only copy. It is offered back on the next launch instead. (The active
-    // session always clears: if it was dirty, the user answered the prompt.)
+    // covers the active project, so an unsaved background tab with no path
+    // yet (never saved - autosave can't touch it) was never offered a save -
+    // deleting its snapshot here would silently destroy its only copy. It is
+    // offered back on the next launch instead. (The active session always
+    // clears: if it was dirty, the user answered the prompt.)
     for (size_t i = 0; i < m_sessions.size(); ++i) {
         const auto& s = m_sessions[i];
         if (i != m_activeSession) {
