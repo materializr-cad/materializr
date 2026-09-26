@@ -938,6 +938,35 @@ bool ItemsPanel::renderBodyRow(int id, int folderId) {
             }
             m_exportToProject(targets);
         }
+        // Copy this body (or the whole selection) straight into an ALREADY
+        // OPEN tab - switches to it and selects the arrivals so the move
+        // gizmo comes up immediately for the user to drag into place. Hidden
+        // when there's no other tab open to send to.
+        if (!deleted && m_sendToTab) {
+            const auto tabs = m_openTabsProvider
+                                   ? m_openTabsProvider()
+                                   : std::vector<std::pair<size_t, std::string>>{};
+            if (!tabs.empty() &&
+                ImGui::BeginMenu(materializr::tr("Send to Open Project"))) {
+                // Same selection rule as Export above: the whole selection
+                // when this body is part of one.
+                std::vector<int> targets;
+                if (m_selection) {
+                    for (const auto& e : m_selection->getSelection())
+                        if (e.type == SelectionType::Body && e.bodyId >= 0)
+                            targets.push_back(e.bodyId);
+                }
+                if (std::find(targets.begin(), targets.end(), id) == targets.end() ||
+                    targets.size() <= 1) {
+                    targets.clear();
+                    targets.push_back(id);
+                }
+                for (const auto& [idx, label] : tabs) {
+                    if (ImGui::MenuItem(label.c_str())) m_sendToTab(targets, idx);
+                }
+                ImGui::EndMenu();
+            }
+        }
         // Move-to-folder submenu. If the right-clicked body is part of a
         // multi-selection, the action moves EVERY selected body at once;
         // otherwise it just moves this one. Lists existing folders + a "(root)"

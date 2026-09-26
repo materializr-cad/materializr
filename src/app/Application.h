@@ -497,6 +497,13 @@ private:
     // this part elsewhere" flow. Not a file write: you see what you got
     // first, and save it (or not) like any other project.
     void exportBodiesToNewProject(const std::vector<int>& bodyIds);
+    // Items-panel body context menu, "Send to Open Project" submenu: copy
+    // one or more bodies into an ALREADY-OPEN tab. Switches to it (refusing
+    // mid-sketch etc. like any other tab switch), drops in baked copies at
+    // their original coordinates, and selects the arrivals so the move
+    // gizmo comes up immediately - placement is a drag away, not a second
+    // menu.
+    void sendBodiesToTab(const std::vector<int>& bodyIds, size_t tabIndex);
     void loadProject();         // File dialog → loadProjectAt
     // Load a project file directly by path. Used by loadProject() and by the
     // "auto-open last project on launch" path.

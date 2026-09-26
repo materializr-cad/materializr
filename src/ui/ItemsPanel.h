@@ -2,6 +2,7 @@
 #include <functional>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 class Document;
@@ -64,6 +65,24 @@ public:
         std::function<void(const std::vector<int>&)> cb) {
         m_exportToProject = std::move(cb);
     }
+    // The other open tabs, as (session index, display label) pairs, for a
+    // body's "Send to Open Project" submenu - a PROVIDER, not a captured
+    // list, because tabs open/close/rename while the app runs and this menu
+    // is asked fresh each time it opens. Excludes the active tab.
+    void setOpenTabsProvider(
+        std::function<std::vector<std::pair<size_t, std::string>>()> p) {
+        m_openTabsProvider = std::move(p);
+    }
+    // Called when the user picks a tab off that submenu. Routes to
+    // Application::sendBodiesToTab, which switches to the chosen tab, drops
+    // baked copies of the bodies in at their original coordinates, and
+    // selects the arrivals so the move gizmo comes up immediately - the
+    // point of this flow is picking where they land, not just having them
+    // exist somewhere in that project.
+    void setSendToTabCallback(
+        std::function<void(const std::vector<int>&, size_t)> cb) {
+        m_sendToTab = std::move(cb);
+    }
     // Called when the user picks "Edit Sketch" from a sketch's right-click
     // menu. Routes to Application::editSketch which enters sketch mode on
     // that sketch - the only way to re-enter a sketch that was created in
@@ -105,6 +124,8 @@ private:
     std::function<void()> m_markDirty;
     std::function<void(int)> m_exportStl;
     std::function<void(const std::vector<int>&)> m_exportToProject;
+    std::function<std::vector<std::pair<size_t, std::string>>()> m_openTabsProvider;
+    std::function<void(const std::vector<int>&, size_t)> m_sendToTab;
     std::function<std::vector<std::string>()> m_exportFormats;
     std::function<void(const std::vector<int>&, const std::string&)> m_exportBodies;
     std::function<void(int)> m_editSketch;

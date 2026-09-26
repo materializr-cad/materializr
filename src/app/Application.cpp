@@ -375,6 +375,18 @@ Application::Application(bool safeMode, float uiScaleOverride)
         });
     m_itemsPanel->setExportToProjectCallback(
         [this](const std::vector<int>& ids) { exportBodiesToNewProject(ids); });
+    // "Send to Open Project" submenu: the other open tabs, asked fresh each
+    // time the menu opens (not captured once) since tabs come and go.
+    m_itemsPanel->setOpenTabsProvider([this]() {
+        std::vector<std::pair<size_t, std::string>> tabs;
+        for (size_t i = 0; i < m_sessions.size(); ++i) {
+            if (i == m_activeSession) continue;
+            tabs.push_back({i, sessionDisplayLabel(i)});
+        }
+        return tabs;
+    });
+    m_itemsPanel->setSendToTabCallback(
+        [this](const std::vector<int>& ids, size_t idx) { sendBodiesToTab(ids, idx); });
     m_itemsPanel->setEditSketchCallback([this](int sketchId) { editSketch(sketchId); });
     m_itemsPanel->setExportSketchSvgCallback([this](int sketchId) { exportSketchAsSvg(sketchId); });
     m_itemsPanel->setExportSketchDxfCallback([this](int sketchId) { exportSketchAsDxf(sketchId); });

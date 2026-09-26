@@ -6647,6 +6647,53 @@ void Application::exportBodiesToNewProject(const std::vector<int>& bodyIds) {
                         " parts opened in a new tab - unsaved.");
 }
 
+void Application::sendBodiesToTab(const std::vector<int>& bodyIds, size_t tabIndex) {
+    if (!m_document || bodyIds.empty() || tabIndex >= m_sessions.size() ||
+        tabIndex == m_activeSession)
+        return;
+    // Snapshot BEFORE switching: switchToSession repoints m_document at the
+    // target session, so anything read afterwards would come from THAT one.
+    struct Part { TopoDS_Shape shape; std::string name; glm::vec3 color; };
+    std::vector<Part> parts;
+    for (int id : bodyIds) {
+        TopoDS_Shape s;
+        try { s = m_document->getBody(id); } catch (...) {}
+        if (s.IsNull()) continue;
+        parts.push_back({s, m_document->getBodyName(id),
+                         m_document->getBodyColor(id)});
+    }
+    if (parts.empty()) {
+        showToast("Those bodies have no geometry.");
+        return;
+    }
+    const std::string destLabel = sessionDisplayLabel(tabIndex);
+    if (!switchToSession(tabIndex)) return;   // refused (mid-sketch etc.) - already toasted
+
+    std::vector<int> newIds;
+    newIds.reserve(parts.size());
+    for (const auto& p : parts) {
+        const int nid = m_document->addBody(p.shape, p.name);
+        m_document->setBodyColor(nid, p.color);
+        newIds.push_back(nid);
+    }
+    m_meshesDirty = true;
+    markDirty();
+    // Select the arrivals so the move gizmo comes straight up and frame them
+    // - they land at the SOURCE project's coordinates, which may be nowhere
+    // near wherever this tab's camera was left. The whole point of this flow
+    // is picking where they go, so the user needs to see them to drag them.
+    if (m_selection) {
+        m_selection->clear();
+        for (int nid : newIds)
+            m_selection->addToSelection(SelectionEntry{SelectionType::Body, nid});
+    }
+    frameSelection();
+    showToast((parts.size() == 1
+                   ? std::string("Sent to ")
+                   : std::to_string(parts.size()) + " parts sent to ") +
+              destLabel + " - drag to place.");
+}
+
 void Application::renderLandingPage() {
     if (!m_landingPage || !m_landingPage->isVisible()) return;
     // Thumbnails peeked off-thread since the last frame become textures here,
