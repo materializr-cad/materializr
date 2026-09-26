@@ -175,13 +175,6 @@ bool ItemsPanel::renderContent() {
             ImGui::SetNextItemOpen(wantExpanded, ImGuiCond_Always);
 
             std::string fname = m_document->getFolderName(folderId);
-            // Reserve room for the colour swatch on the right. The gap must be
-            // the style's ItemSpacing.x - that's what SameLine() actually
-            // advances by - or the swatch overhangs the panel edge under a
-            // theme with wider spacing (the im-touch shell clipped it).
-            float swatchW = ImGui::GetFrameHeight();
-            float nameW = ImGui::GetContentRegionAvail().x - swatchW -
-                          ImGui::GetStyle().ItemSpacing.x;
             bool open = ImGui::TreeNodeEx(("##fnode" + std::to_string(folderId)).c_str(),
                                           fflags | (wantExpanded ? ImGuiTreeNodeFlags_DefaultOpen : 0));
             if (open != wantExpanded) {
@@ -189,6 +182,18 @@ bool ItemsPanel::renderContent() {
             }
             // Folder label, overlaid on the tree-node line.
             ImGui::SameLine();
+            // Reserve room for the colour swatch on the right. Measured HERE,
+            // after the tree-arrow is already drawn - taking this width
+            // before the arrow (as a previous version did) under-accounts for
+            // it, and since the name below is a real fixed-width Selectable
+            // (not auto-sized Text), that overshoot pushes the swatch past
+            // the panel's right edge and off-screen. The gap must be the
+            // style's ItemSpacing.x - that's what SameLine() actually
+            // advances by - or the swatch overhangs the panel edge under a
+            // theme with wider spacing (the im-touch shell clipped it).
+            float swatchW = ImGui::GetFrameHeight();
+            float nameW = ImGui::GetContentRegionAvail().x - swatchW -
+                          ImGui::GetStyle().ItemSpacing.x;
             const int renameKey = 2000000 + folderId;
             if (m_renamingId == renameKey) {
                 ImGui::SetNextItemWidth(nameW);
