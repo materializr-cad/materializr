@@ -145,6 +145,22 @@ private:
     // Empty = create the folder empty (e.g. "+ Folder" header button).
     std::vector<int> m_newFolderForBodyIds;
 
+    // Drag-and-drop reordering (bodies/folders in the Items panel). ImGui's
+    // payload buffer is a flat byte copy, so it can't hold a real vector<int>
+    // - the ids being dragged live here instead, and the payload is just a
+    // same-process tag telling the drop target "read m_dragBodyIds". Snapshot
+    // at drag-source time: if the dragged row is part of the current multi-
+    // selection, the WHOLE selection moves together (matching "Move to
+    // folder"'s multi-select rule below); otherwise just that one body.
+    std::vector<int> m_dragBodyIds;
+    // Same tag trick for a dragged folder header (see MZR_FOLDER_ID below).
+    // -1 outside of an active folder drag.
+    int m_dragFolderId = -1;
+    // Moves bodyId (or its whole multi-selection, per m_dragBodyIds above) to
+    // just before beforeBodyId (or the end, if < 0) inside targetFolderId.
+    // Shared by every body-row / folder-header drop target.
+    void dropBodiesOn(int targetFolderId, int beforeBodyId);
+
     // Click behaviour for the sketch / plane / axis rows: a plain click
     // selects just this item, Ctrl+click toggles it in or out of whatever is
     // already selected. Body rows keep their own version because they also
@@ -154,10 +170,18 @@ private:
     // extend, which is what made the behaviour look arbitrary.
     void applyRowClick(const SelectionEntry& entry);
 
+    // Body ids in the same top-to-bottom order they're drawn in: every
+    // folder's members (in folder iteration order), then root bodies. Shared
+    // by shift-click range-select and multi-body drag (both need "what's
+    // between/around these two rows on screen").
+    std::vector<int> bodyDisplayOrder() const;
+
     // Renders one body row (visibility + name + colour + context menu).
     // Pulled out of render() so it can be called both at the root level and
-    // inside each folder's expanded content.
-    bool renderBodyRow(int id);
+    // inside each folder's expanded content. folderId is where THIS row
+    // lives (-1 = root) - needed so a drop onto this row knows which folder
+    // to re-parent the dragged body/bodies into.
+    bool renderBodyRow(int id, int folderId);
 };
 
 } // namespace materializr

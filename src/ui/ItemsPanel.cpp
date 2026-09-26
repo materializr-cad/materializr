@@ -36,6 +36,31 @@ void ItemsPanel::setHistory(History* hist) {
     m_history = hist;
 }
 
+std::vector<int> ItemsPanel::bodyDisplayOrder() const {
+    std::vector<int> order;
+    if (!m_document) return order;
+    for (int fid : m_document->getAllFolderIds())
+        for (int b : m_document->getBodiesInFolder(fid))
+            order.push_back(b);
+    for (int b : m_document->getBodiesInFolder(-1))
+        order.push_back(b);
+    return order;
+}
+
+void ItemsPanel::dropBodiesOn(int targetFolderId, int beforeBodyId) {
+    if (!m_document || m_dragBodyIds.empty()) return;
+    // Insert each in its current relative (on-screen) order, right before
+    // beforeBodyId - moveBody re-finds beforeBodyId's index every call, so
+    // each subsequent insert lands just after the ones already placed,
+    // keeping the dragged set's relative order intact.
+    for (int bid : m_dragBodyIds) {
+        if (bid == beforeBodyId) continue; // dropped a row onto itself
+        m_document->moveBody(bid, targetFolderId, beforeBodyId);
+    }
+    if (m_markDirty) m_markDirty();
+    m_dragBodyIds.clear();
+}
+
 void ItemsPanel::applyRowClick(const SelectionEntry& entry) {
     if (!m_selection) return;
     if (ImGui::GetIO().KeyCtrl) m_selection->toggleSelection(entry);
@@ -181,7 +206,36 @@ bool ItemsPanel::renderContent() {
                     m_renamingId = -1;
                 }
             } else {
-                ImGui::TextUnformatted(fname.c_str());
+                // A Selectable (not plain Text) so it's a real drag-and-drop
+                // item, same as every other row type in this panel. Not
+                // wired into SelectionManager - folders aren't selectable -
+                // so its own click/highlight is otherwise a no-op.
+                ImGui::Selectable(fname.c_str(), false, 0, ImVec2(nameW, 0.0f));
+                if (ImGui::BeginDragDropSource()) {
+                    int tag = folderId;
+                    ImGui::SetDragDropPayload("MZR_FOLDER_ID", &tag, sizeof(tag));
+                    m_dragFolderId = folderId;
+                    ImGui::TextUnformatted(fname.c_str());
+                    ImGui::EndDragDropSource();
+                }
+                if (ImGui::BeginDragDropTarget()) {
+                    if (ImGui::AcceptDragDropPayload("MZR_FOLDER_ID")) {
+                        if (m_dragFolderId >= 0 && m_dragFolderId != folderId) {
+                            m_document->moveFolder(m_dragFolderId, folderId);
+                            if (m_markDirty) m_markDirty();
+                        }
+                        m_dragFolderId = -1;
+                    }
+                    // A body (or the current multi-selection) dropped on a
+                    // folder header moves it into THIS folder, appended at
+                    // the end - beforeBodyId=-1 is "the folder's header" (as
+                    // opposed to dropping on a member row, which inserts
+                    // ahead of that specific body).
+                    if (ImGui::AcceptDragDropPayload("MZR_BODY_IDS")) {
+                        dropBodiesOn(folderId, -1);
+                    }
+                    ImGui::EndDragDropTarget();
+                }
                 if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) {
                     m_renamingId = renameKey;
                     std::strncpy(m_renameBuffer, fname.c_str(), sizeof(m_renameBuffer) - 1);
@@ -216,7 +270,7 @@ bool ItemsPanel::renderContent() {
             if (open) {
                 ImGui::Indent();
                 for (int bid : m_document->getBodiesInFolder(folderId)) {
-                    if (!renderBodyRow(bid)) {
+                    if (!renderBodyRow(bid, folderId)) {
                         // Body was deleted; member list is stale. Bail to
                         // outer loop, will re-fetch next frame.
                         ImGui::Unindent();
@@ -233,7 +287,18 @@ bool ItemsPanel::renderContent() {
 
         // 2) Root-level bodies (folderId == -1).
         for (int id : m_document->getBodiesInFolder(-1)) {
-            if (!renderBodyRow(id)) goto end_bodies;
+            if (!renderBodyRow(id, -1)) goto end_bodies;
+        }
+        // Drop zone below the last root row - dropping ON a row inserts
+        // BEFORE it, which can't reach "last in the root list"; this thin
+        // strip is the only way to land there (mirrors a folder header
+        // itself always meaning "append to this folder's end").
+        ImGui::Dummy(ImVec2(-1.0f, 4.0f));
+        if (ImGui::BeginDragDropTarget()) {
+            if (ImGui::AcceptDragDropPayload("MZR_BODY_IDS")) {
+                dropBodiesOn(-1, -1);
+            }
+            ImGui::EndDragDropTarget();
         }
         end_bodies:;
 
@@ -626,7 +691,7 @@ bool ItemsPanel::renderContent() {
 // inside a folder's expanded contents (indented by the caller). Returns false
 // if this body was deleted via its context menu - caller must stop iterating
 // because the body list is now stale.
-bool ItemsPanel::renderBodyRow(int id) {
+bool ItemsPanel::renderBodyRow(int id, int folderId) {
     ImGui::PushID(id);
 
     bool visible = m_document->isBodyVisible(id);
@@ -689,6 +754,32 @@ bool ItemsPanel::renderBodyRow(int id) {
     if (isMesh && ImGui::IsItemHovered()) {
         ImGui::SetTooltip("%s", materializr::tr("Imported mesh - a reference body.\nSketch on it and snap to it; modelling operations (booleans, fillets, push/pull) decline it."));
     }
+    if (ImGui::BeginDragDropSource()) {
+        // Dragging a row that's part of the current multi-selection moves
+        // the WHOLE selection together - the same rule "Move to folder" and
+        // "Export" already apply to a right-click on a multi-selected row.
+        if (isSelected && m_selection && m_selection->selectedBodyCount() > 1) {
+            std::vector<int> order = bodyDisplayOrder();
+            m_dragBodyIds.clear();
+            for (int b : order)
+                if (m_selectedBodyIdsFrame.count(b)) m_dragBodyIds.push_back(b);
+        } else {
+            m_dragBodyIds = { id };
+        }
+        int tag = id; // payload is just a same-process tag - see m_dragBodyIds
+        ImGui::SetDragDropPayload("MZR_BODY_IDS", &tag, sizeof(tag));
+        if (m_dragBodyIds.size() > 1)
+            ImGui::Text(materializr::tr("%zu bodies"), m_dragBodyIds.size());
+        else
+            ImGui::TextUnformatted(label.c_str());
+        ImGui::EndDragDropSource();
+    }
+    if (ImGui::BeginDragDropTarget()) {
+        if (ImGui::AcceptDragDropPayload("MZR_BODY_IDS")) {
+            dropBodiesOn(folderId, id);
+        }
+        ImGui::EndDragDropTarget();
+    }
     if (rowClicked) {
         if (m_selection) {
             ImGuiIO& io = ImGui::GetIO();
@@ -700,15 +791,8 @@ bool ItemsPanel::renderBodyRow(int id) {
                 return e;
             };
             if (io.KeyShift && m_anchorBodyId >= 0) {
-                // Range select from the anchor to here using display order:
-                // folder members first (in folder iteration order), then root.
-                std::vector<int> displayOrder;
-                for (int fid : m_document->getAllFolderIds()) {
-                    for (int b : m_document->getBodiesInFolder(fid))
-                        displayOrder.push_back(b);
-                }
-                for (int b : m_document->getBodiesInFolder(-1))
-                    displayOrder.push_back(b);
+                // Range select from the anchor to here using display order.
+                std::vector<int> displayOrder = bodyDisplayOrder();
                 int a = -1, b = -1;
                 for (int i = 0; i < static_cast<int>(displayOrder.size()); ++i) {
                     if (displayOrder[i] == m_anchorBodyId) a = i;

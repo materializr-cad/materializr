@@ -171,3 +171,73 @@ TEST(DocumentTest, FolderColourAndVisibilityCascadeToExactlyTheFoldersMembers) {
     // an unguarded -1 would mark every body at the root.
     EXPECT_EQ(doc.getBodyFolder(out), -1);
 }
+
+// Items-panel drag-and-drop: moveBody repositions within getAllBodyIds()'s
+// order (the thing the panel actually renders in), not just folder membership.
+TEST(DocumentTest, MoveBodyReordersWithoutChangingFolder) {
+    Document doc;
+    const int a = doc.addBody(makeTestBox(), "a");
+    const int b = doc.addBody(makeTestBox(), "b");
+    const int c = doc.addBody(makeTestBox(), "c");
+    ASSERT_EQ(doc.getAllBodyIds(), (std::vector<int>{a, b, c}));
+
+    // Drag c to sit before a.
+    doc.moveBody(c, -1, a);
+    EXPECT_EQ(doc.getAllBodyIds(), (std::vector<int>{c, a, b}));
+    EXPECT_EQ(doc.getBodyFolder(c), -1);
+
+    // beforeBodyId < 0 moves to the true end.
+    doc.moveBody(c, -1, -1);
+    EXPECT_EQ(doc.getAllBodyIds(), (std::vector<int>{a, b, c}));
+}
+
+TEST(DocumentTest, MoveBodyIntoFolderReparentsAndPositions) {
+    Document doc;
+    const int fid = doc.addFolder("group");
+    const int inFolder = doc.addBody(makeTestBox(), "in-folder");
+    doc.setBodyFolder(inFolder, fid);
+    const int atRoot = doc.addBody(makeTestBox(), "at-root");
+
+    // Drag the root body to just before the folder's member - it should
+    // both re-parent into the folder AND land ahead of that member.
+    doc.moveBody(atRoot, fid, inFolder);
+    EXPECT_EQ(doc.getBodyFolder(atRoot), fid);
+    EXPECT_EQ(doc.getBodiesInFolder(fid), (std::vector<int>{atRoot, inFolder}));
+    EXPECT_TRUE(doc.getBodiesInFolder(-1).empty());
+
+    // Dropping on the folder header itself (beforeBodyId = -1) appends to
+    // the folder's end instead of its start.
+    const int another = doc.addBody(makeTestBox(), "another");
+    doc.moveBody(another, fid, -1);
+    EXPECT_EQ(doc.getBodiesInFolder(fid), (std::vector<int>{atRoot, inFolder, another}));
+}
+
+TEST(DocumentTest, MoveBodyIgnoresUnknownIdsAndSelfDrop) {
+    Document doc;
+    const int a = doc.addBody(makeTestBox(), "a");
+    const int b = doc.addBody(makeTestBox(), "b");
+
+    doc.moveBody(a, -1, a);      // dropped onto itself - no-op
+    EXPECT_EQ(doc.getAllBodyIds(), (std::vector<int>{a, b}));
+
+    doc.moveBody(999, -1, a);    // unknown dragged id - no-op
+    EXPECT_EQ(doc.getAllBodyIds(), (std::vector<int>{a, b}));
+
+    doc.moveBody(a, 999, b);     // unknown target folder - no-op
+    EXPECT_EQ(doc.getBodyFolder(a), -1);
+    EXPECT_EQ(doc.getAllBodyIds(), (std::vector<int>{a, b}));
+}
+
+TEST(DocumentTest, MoveFolderReorders) {
+    Document doc;
+    const int f1 = doc.addFolder("one");
+    const int f2 = doc.addFolder("two");
+    const int f3 = doc.addFolder("three");
+    ASSERT_EQ(doc.getAllFolderIds(), (std::vector<int>{f1, f2, f3}));
+
+    doc.moveFolder(f3, f1);
+    EXPECT_EQ(doc.getAllFolderIds(), (std::vector<int>{f3, f1, f2}));
+
+    doc.moveFolder(f1, -1); // to the end
+    EXPECT_EQ(doc.getAllFolderIds(), (std::vector<int>{f3, f2, f1}));
+}

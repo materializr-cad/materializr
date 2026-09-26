@@ -804,6 +804,43 @@ std::vector<int> Document::getBodiesInFolder(int folderId) const {
     return ids;
 }
 
+void Document::moveBody(int bodyId, int folderId, int beforeBodyId) {
+    if (beforeBodyId == bodyId) return;
+    int idx = findBodyIndex(bodyId);
+    if (idx < 0) return;
+    if (folderId >= 0 && findFolderIndex(folderId) < 0) return; // unknown folder
+
+    BodyEntry entry = std::move(m_bodies[idx]);
+    m_bodies.erase(m_bodies.begin() + idx);
+    entry.folderId = folderId;
+
+    // Re-find beforeBodyId's index - it shifted if it sat after `idx`.
+    int insertIdx = static_cast<int>(m_bodies.size()); // default: true end
+    if (beforeBodyId >= 0) {
+        int bidx = findBodyIndex(beforeBodyId);
+        if (bidx >= 0) insertIdx = bidx;
+    }
+    m_bodies.insert(m_bodies.begin() + insertIdx, std::move(entry));
+    if (m_eventBus) m_eventBus->publish(materializr::DocumentModifiedEvent{true});
+}
+
+void Document::moveFolder(int folderId, int beforeFolderId) {
+    if (beforeFolderId == folderId) return;
+    int idx = findFolderIndex(folderId);
+    if (idx < 0) return;
+
+    FolderEntry entry = std::move(m_folders[idx]);
+    m_folders.erase(m_folders.begin() + idx);
+
+    int insertIdx = static_cast<int>(m_folders.size());
+    if (beforeFolderId >= 0) {
+        int fidx = findFolderIndex(beforeFolderId);
+        if (fidx >= 0) insertIdx = fidx;
+    }
+    m_folders.insert(m_folders.begin() + insertIdx, std::move(entry));
+    if (m_eventBus) m_eventBus->publish(materializr::DocumentModifiedEvent{true});
+}
+
 int Document::findFolderIndex(int id) const {
     for (int i = 0; i < static_cast<int>(m_folders.size()); ++i) {
         if (m_folders[i].id == id) return i;

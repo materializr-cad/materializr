@@ -232,6 +232,22 @@ public:
     void setBodyFolder(int bodyId, int folderId); // -1 = move to root
     std::vector<int> getBodiesInFolder(int folderId) const; // folderId=-1 = root bodies
 
+    // Items-panel drag-and-drop: repositions bodyId's entry in m_bodies (the
+    // vector order IS the display order every getBodiesInFolder/getAllBodyIds
+    // caller already relies on) and re-parents it to folderId in one atomic
+    // step, so dragging a body across a folder boundary doesn't need a
+    // separate setBodyFolder call that would otherwise always append.
+    // beforeBodyId >= 0 inserts immediately ahead of that body (which may be
+    // in a different folder than folderId - callers pass the folder the drop
+    // target row actually belongs to); beforeBodyId < 0 moves to the true end
+    // of m_bodies, which reads as "last" within whichever folder it lands in
+    // once getBodiesInFolder filters it back out. No-op if bodyId is unknown,
+    // folderId names a nonexistent folder, or beforeBodyId == bodyId.
+    void moveBody(int bodyId, int folderId, int beforeBodyId);
+    // Same idea for the folder list itself (m_folders order = the Items
+    // panel's folder order). beforeFolderId < 0 moves to the end.
+    void moveFolder(int folderId, int beforeFolderId);
+
     // Sketch management
     int addSketch(std::shared_ptr<materializr::Sketch> sketch, const std::string& name = "");
     // Insert/replace a sketch under a SPECIFIC id (mirrors putBody). Used by
