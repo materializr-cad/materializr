@@ -269,6 +269,7 @@ bool ItemsPanel::renderContent() {
                     ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel |
                     ImGuiColorEditFlags_PickerHueWheel)) {
                 setFolderColorAndMark(*m_document, folderId, fcol, m_markBodyDirty);
+                if (m_markDirty) m_markDirty();
             }
 
             // Member bodies, only when expanded.
@@ -1022,6 +1023,7 @@ bool ItemsPanel::renderBodyRow(int id, int folderId) {
             ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel |
             ImGuiColorEditFlags_PickerHueWheel)) {
         setBodyColorAndMark(*m_document, id, col, m_markBodyDirty);
+        if (m_markDirty) m_markDirty();
     }
 
     ImGui::PopID();
