@@ -565,8 +565,18 @@ bool Gizmo::ringAngle(float mx, float my, float vpW, float vpH,
     else                           { n = {0,0,1}; u = {1,0,0}; v = {0,1,0}; }
 
     float denom = glm::dot(rayDir, n);
-    if (std::abs(denom) < 1e-6f) return false; // ray parallel to the ring plane
+    // Reject near-grazing rays: at the true parallel limit t explodes towards
+    // +/-infinity, but well before that the intersection point races across
+    // the plane for a pixel of mouse motion - a tiny cursor nudge reads as a
+    // huge swept angle (the "spins thousands of degrees" bug). 1e-5 (matching
+    // the equivalent guard on the revolve-arc and Move-Face ring drags) is
+    // too tight to catch this; widen it so the ring keeps its low-sensitivity
+    // handoff to the None case well before the hit point runs away.
+    if (std::abs(denom) < 0.15f) return false;
     float t = glm::dot(m_position - rayOrigin, n) / denom;
+    // A hit behind the camera is not where the cursor visually is either -
+    // same failure mode as above, just on the other side of the singularity.
+    if (t <= 0.0f) return false;
     glm::vec3 hit = rayOrigin + rayDir * t;
     glm::vec3 vec = hit - m_position;
     outDeg = glm::degrees(std::atan2(glm::dot(vec, v), glm::dot(vec, u)));
@@ -583,12 +593,20 @@ GizmoResult Gizmo::handleInput(float mouseX, float mouseY,
     if (mouseJustPressed) {
         auto pick = pickNearest(mouseX, mouseY, vpWidth, vpHeight, camera);
         if (pick.axis != GizmoAxis::None) {
-            m_draggingAxis = pick.axis;
-            m_draggingMode = pick.mode;
+            bool started = true;
             if (pick.mode == GizmoMode::Rotate) {
-                ringAngle(mouseX, mouseY, vpWidth, vpHeight, camera, pick.axis, m_lastDragAngle);
+                // If the ring can't be read at press time, don't start the
+                // drag at all - starting it here would leave m_lastDragAngle
+                // stale, so the next good frame diffs against an unrelated
+                // baseline angle and reads as a huge spurious rotation.
+                started = ringAngle(mouseX, mouseY, vpWidth, vpHeight, camera,
+                                     pick.axis, m_lastDragAngle);
             } else {
                 m_lastDragPos = projectOnAxis(mouseX, mouseY, vpWidth, vpHeight, camera, pick.axis);
+            }
+            if (started) {
+                m_draggingAxis = pick.axis;
+                m_draggingMode = pick.mode;
             }
         }
     }
