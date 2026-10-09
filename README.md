@@ -5,7 +5,7 @@ modeling, threads, SVG & text engraving, STEP/STL/SVG/DXF/OBJ/3MF exchange.
 
 > **📱 Now on Android and iPad:** Materializr runs on Android (arm64-v8a) and
 > **iPad - [get it on the App Store](https://apps.apple.com/us/app/materializr/id6787741207)** -
-> reusing the entire geometry codebase via an SDL2 + OpenGL ES 3.0 backend and
+> reusing the entire geometry codebase via an SDL3 + OpenGL ES 3.0 backend and
 > cross-compiled OpenCASCADE, with a runtime *touch mode* that adapts gestures
 > and hit targets. **Designed for tablets** - a phone screen will be cramped.
 > On Android, get it on **[Google Play](https://play.google.com/store/apps/details?id=org.ravenhold.materializr)**,
@@ -226,7 +226,7 @@ this would exist without them.
 
 - [Dear ImGui](https://github.com/ocornut/imgui) - immediate-mode GUI,
   used for every panel and overlay (MIT).
-- [SDL2](https://www.libsdl.org/) - window, input, and OpenGL context
+- [SDL3](https://www.libsdl.org/) - window, input, and OpenGL context
   creation on every platform, desktop and mobile alike (zlib).
 - [GLEW](https://glew.sourceforge.net/) - OpenGL extension loading on
   Windows (modified BSD / MIT).

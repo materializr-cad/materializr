@@ -15,7 +15,7 @@
 namespace materializr {
 
 // Milliseconds since SDL initialised. 32-bit and WRAPPING (about 49 days), like
-// SDL2's SDL_GetTicks; compare with unsigned subtraction, never `<` on two
+// SDL2's old SDL_GetTicks (SDL3's is 64-bit); compare with unsigned subtraction, never `<` on two
 // absolute values.
 std::uint32_t platformTicksMs();
 

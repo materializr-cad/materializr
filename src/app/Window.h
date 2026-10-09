@@ -8,8 +8,8 @@ struct SDL_Window;
 
 namespace materializr {
 
-// Windowing/GL-context wrapper. Backed by SDL2 on every platform: a GL 3.3 core
-// context on desktop, a GL ES 3.0 context on Android. SDL gives us one input and
+// Windowing/GL-context wrapper. Backed by SDL3 on every platform: a GL 3.3 core
+// context on desktop, a GL ES 3.0 context on Android/iOS. SDL gives us one input and
 // windowing path for both, and maps touch events to mouse so the click-and-drag
 // interaction model works on a phone unchanged.
 class Window {

@@ -9,7 +9,7 @@ project(Materializr VERSION 1.7.2 LANGUAGES CXX)
 set(MATERIALIZR_VERSION_SUFFIX "")
 
 # macOS: deliberately do NOT pin CMAKE_OSX_DEPLOYMENT_TARGET. The bundled Homebrew
-# OpenCASCADE/SDL2 dylibs are built for the build host's macOS, so they - not our
+# OpenCASCADE/SDL3 dylibs are built for the build host's macOS, so they - not our
 # compile flag - set the real floor of a packaged .dmg. Letting the binary inherit
 # the host target keeps it consistent with those dylibs (no "built for newer
 # version" linker warnings), and packaging/macos/build-dmg.sh derives the true
@@ -17,7 +17,7 @@ set(MATERIALIZR_VERSION_SUFFIX "")
 # with -DCMAKE_OSX_DEPLOYMENT_TARGET=… only alongside dylibs built for that target.)
 
 # macOS: deliberately do NOT pin CMAKE_OSX_DEPLOYMENT_TARGET. The bundled Homebrew
-# OpenCASCADE/SDL2 dylibs are built for the build host's macOS, so they - not our
+# OpenCASCADE/SDL3 dylibs are built for the build host's macOS, so they - not our
 # compile flag - set the real floor of a packaged .dmg. Letting the binary inherit
 # the host target keeps it consistent with those dylibs (no "built for newer
 # version" linker warnings), and packaging/macos/build-dmg.sh derives the true
@@ -157,7 +157,7 @@ target_link_libraries(imgui_lib PUBLIC ${MZ_SDL_TARGET})
 # AppImage that died at startup with
 #     error while loading shared libraries: libOpenGL.so.0
 # on any clean Ubuntu. libGL.so.1 is present wherever working drivers are, and
-# is what SDL2 itself dlopens, so LEGACY is the portable choice here.
+# is what SDL itself dlopens, so LEGACY is the portable choice here.
 set(OpenGL_GL_PREFERENCE LEGACY)
 find_package(OpenGL REQUIRED)
 

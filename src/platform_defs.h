@@ -34,7 +34,7 @@
 #endif
 
 //   MZ_TOUCH_INPUT - the SDL finger-gesture pipeline is COMPILED IN. Defined
-//               everywhere: SDL2 reports SDL_FINGER* on desktop X11/Wayland
+//               everywhere: SDL reports SDL_EVENT_FINGER_* on desktop X11/Wayland
 //               just as it does on Android, and a Surface/2-in-1 running the
 //               desktop build has a real touchscreen. This is deliberately
 //               separate from MZ_MOBILE, which stays "is a touch-FIRST

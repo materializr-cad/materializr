@@ -135,7 +135,7 @@ Window::Window(int width, int height, const std::string& title,
 
     // Let the screen blank/lock and the machine idle-suspend normally. A CAD
     // app is a document editor: it should idle out like every other one, not
-    // hold the idle timer off for as long as it is open (SDL2 inhibited the
+    // hold the idle timer off for as long as it is open (SDL inhibits the
     // screensaver by default - on Linux a GNOME idle inhibitor literally reasoned
     // "Playing a game" - and laptops left with a model on screen ran their
     // battery flat). Set before SDL_Init: the video subsystem reads it once.

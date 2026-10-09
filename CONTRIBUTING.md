@@ -1,7 +1,7 @@
 # Contributing to Materializr
 
 Thanks for your interest! Materializr is parametric 3D CAD built on the
-OpenCASCADE kernel with a Dear ImGui / SDL2 interface. It runs on Linux,
+OpenCASCADE kernel with a Dear ImGui / SDL3 interface. It runs on Linux,
 Windows, and Android from a single codebase.
 
 ## Reporting bugs / requesting features
@@ -31,9 +31,10 @@ This keeps `Fixes #<n>` → commit → changed files traceable end to end.
 
 - **Desktop (Linux/Windows):** see [`BUILD.md`](BUILD.md). In short - configure a
   CMake build dir, build the `materializr` target, and run `ctest` for the unit
-  suites. You need OpenCASCADE, SDL2, and a C++17 compiler.
+  suites. You need OpenCASCADE and a C++17 compiler (SDL3 is
+  built from source by CMake when the system has none).
 - **Android:** see [`android/README.md`](android/README.md). `android/scripts/setup-deps.sh`
-  fetches and SHA-256-verifies SDL2 / FreeType / OpenCASCADE and cross-compiles
+  fetches and SHA-256-verifies SDL3 / FreeType / OpenCASCADE and cross-compiles
   them for arm64, then `./gradlew assembleDebug` builds the APK.
 
 Please make sure the desktop build compiles and `ctest` passes before opening a PR.

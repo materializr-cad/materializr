@@ -111,7 +111,7 @@ below.
 |-----------|-----------|
 | Geometry kernel | OpenCASCADE Technology (OCCT) 7.9.3 - the same version on every platform, built from source for the Linux/Docker builds |
 | UI framework | Dear ImGui (pinned release tag of the docking branch) |
-| Windowing / input | SDL2 - one backend on desktop, Android and iOS alike |
+| Windowing / input | SDL3 - one backend on desktop, Android and iOS alike |
 | Rendering | OpenGL 3.3 Core on desktop, OpenGL ES 3.0 on mobile, PBR shading |
 | GL loader | Mesa prototypes (Linux), GLEW (Windows), `OpenGL.framework` (macOS), GLES3 headers direct (Android/iOS) |
 | Math | GLM |

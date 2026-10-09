@@ -35,10 +35,10 @@ make -j$(nproc)
 ./materializr
 ```
 
-SDL2, GLM, and Dear ImGui are pulled in via CMake `FetchContent`, so they
-don't need to be installed system-wide. (A system SDL2 is used when present;
-otherwise 2.30.9 is built from source, which needs the X11 dev headers the GL
-stack already requires.)
+SDL3, GLM, and Dear ImGui are pulled in via CMake `FetchContent`, so they
+don't need to be installed system-wide. (A system SDL3 3.4.18 or newer is used
+when present; otherwise the pinned 3.4.18 release is built from source, which
+needs the X11 and Wayland dev headers listed in [`BUILD.md`](../BUILD.md).)
 
 ### Tests
 

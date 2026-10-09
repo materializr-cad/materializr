@@ -76,7 +76,7 @@ void AboutDialog::render() {
         ImGui::BulletText("%s", materializr::tr("Claude (Anthropic) - pair-coding collaborator"));
 
         ImGui::Spacing();
-        ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "%s", materializr::tr("Built with OpenCASCADE, Dear ImGui, SDL2, GLM, libcurl."));
+        ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "%s", materializr::tr("Built with OpenCASCADE, Dear ImGui, SDL3, GLM, libcurl."));
         // GPLv3 since 0.9.8 (the old "MIT" line survived the relicense);
         // section-7 additional permissions live in LICENSE-EXCEPTIONS.md.
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.7f, 0.7f, 1.0f));

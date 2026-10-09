@@ -7,7 +7,7 @@ directory-by-directory file reference, then a "where do I look if…" index.
 
 > Roughly 105k lines of C++17 across ~320 files in `src/`. The geometry kernel is
 > [OpenCASCADE](https://dev.opencascade.org/) (OCCT); the UI is Dear ImGui on an
-> SDL2 + OpenGL (Core on desktop, ES 3.0 on Android) backend.
+> SDL3 + OpenGL (Core on desktop, ES 3.0 on Android and iOS) backend.
 
 ---
 
