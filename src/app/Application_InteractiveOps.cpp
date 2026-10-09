@@ -18,6 +18,7 @@
 #include "core/SelectionManager.h"
 
 #include "modeling/Sketch.h"
+#include "modeling/SketchRegionWorker.h"
 #include "modeling/SketchEditOp.h"
 #include "modeling/SketchTool.h"
 #include "modeling/ExtrudeOp.h"
@@ -403,12 +404,27 @@ Application::SketchRegionHit Application::pickSketchRegion(float screenX, float 
         if (!projectToPlane(rayOrigin, rayDir, t, p2d)) return;
         if (t >= bestT) return;
 
-        // Cold region cache: building it runs the OCCT general fuse - on a
-        // heavy sketch (SVG import, text) that's a SECONDS-long stall. The
-        // per-frame HOVER pick must never trigger it (unhiding a complex
-        // sketch used to freeze the app on the very next mouse move); a
-        // CLICK still builds (one user-initiated wait, exactly as before).
-        if (!buildIfCold && !sketch.regionsCached()) return;
+        // Cold region cache: building it runs the OCCT general fuse - seconds
+        // on text or an SVG import, minutes on a tablet when the sketch lies
+        // along a B-spline host face's edges (#130). It never runs here: the
+        // region worker builds it off-thread. Hover only asks for the build;
+        // a click also waits a moment for it, so a light sketch still selects
+        // its region on the very click. Until the regions land, a click falls
+        // through to edge picking (whole-sketch hit).
+        //
+        // A heavy sketch (long traced spline: minutes of fuse, 179 s measured)
+        // is never built implicitly at all, not even off-thread - it keeps the
+        // whole-sketch selection unless something explicitly asks for regions.
+        const bool heavyCold = sketch.regionBuildIsHeavy() && !sketch.regionsCached();
+        bool ready = sketch.regionsCached();
+        if (!ready && !heavyCold && m_regionWorker) {
+            constexpr int kClickWaitMs = 150;
+            ready = buildIfCold ? m_regionWorker->ensureWithin(sketch, kClickWaitMs)
+                                : m_regionWorker->ensure(sketch);
+        }
+        // Not ready: no regions to match, but edge picking below still works.
+        // That matters on touch, where the selecting tap-LIFT frame is a
+        // hover frame (buildIfCold false), not the press frame that waited.
 
         // Screen-space pick tolerance: how far ~6px maps to on this plane, so the
         // boundary catch area is a consistent, comfortable width at any zoom.
@@ -417,12 +433,26 @@ Application::SketchRegionHit Application::pickSketchRegion(float screenX, float 
         rayAt(screenX + 6.0f, screenY, o2, d2);
         if (projectToPlane(o2, d2, t2, p2d2)) tol = glm::length(p2d2 - p2d);
 
-        // A heavy sketch (long traced spline) on a cold cache would run a
-        // multi-minute general fuse here - and a click is also the first frame
-        // of an orbit drag, so that read as "rotating freezes the app". Skip
-        // region matching and fall through to edge picking (whole-sketch hit).
-        const bool skipRegions = sketch.regionBuildIsHeavy() && !sketch.regionsCached();
-        auto regions = skipRegions ? std::vector<Sketch::Region>{} : sketch.buildRegions();
+        // Still building: say so when the point is over this sketch at all,
+        // so the click can explain why nothing region-sized got selected.
+        if (!ready && !heavyCold) {
+            bool any = false;
+            glm::vec2 lo(0.0f), hi(0.0f);
+            auto grow = [&](glm::vec2 q, float r) {
+                if (!any) { lo = q - r; hi = q + r; any = true; return; }
+                lo = glm::min(lo, q - r);
+                hi = glm::max(hi, q + r);
+            };
+            for (const auto& pt : sketch.getPoints()) grow(pt.pos, 0.0f);
+            for (const auto& c : sketch.getCircles())
+                if (const SketchPoint* ctr = sketch.getPoint(c.centerPointId))
+                    grow(ctr->pos, static_cast<float>(c.radius));
+            if (any && p2d.x >= lo.x - tol && p2d.x <= hi.x + tol &&
+                p2d.y >= lo.y - tol && p2d.y <= hi.y + tol)
+                hit.regionsPending = true;
+        }
+
+        auto regions = ready ? sketch.buildRegions() : std::vector<Sketch::Region>{};
         // Resolve overlapping candidates by two ranked rules instead of
         // first-match (BOP region order is arbitrary):
         //   1. STRICT containment beats near-boundary proximity. A click

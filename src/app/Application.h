@@ -67,6 +67,7 @@ class BackgroundRenderer;
 class ViewCube;
 class Picker;
 class MeshWorker;
+class SketchRegionWorker;
 class Gizmo;
 class SelectionHighlight;
 class BoxSelect;
@@ -696,7 +697,12 @@ private:
     // required on the per-frame hover path (a cold complex sketch would
     // freeze the app on the first mouse move after being unhidden); click
     // frames pass true and build as before.
-    struct SketchRegionHit { int sketchId = -1; int regionIndex = -1; glm::vec3 worldPoint{0.0f}; };
+    struct SketchRegionHit {
+        int sketchId = -1; int regionIndex = -1; glm::vec3 worldPoint{0.0f};
+        // The point lies over a sketch whose regions are still being built
+        // off-thread, so it could not be matched to a region yet.
+        bool regionsPending = false;
+    };
     SketchRegionHit pickSketchRegion(float screenX, float screenY,
                                      float vpW, float vpH,
                                      bool buildIfCold = true) const;
@@ -799,6 +805,11 @@ private:
     // Off-thread meshing of heavy bodies (see rebuildMeshes / meshAsync).
     std::unique_ptr<MeshWorker> m_meshWorker;
     MeshDispatch m_meshDispatch; // which bodies go to the worker, what is in flight
+    // Off-thread sketch region builds (#130): picking and region highlights
+    // never run the general fuse on the main thread.
+    std::unique_ptr<SketchRegionWorker> m_regionWorker;
+    uint32_t m_regionPrewarmMs = 0; // last prewarmSketchRegions() pass
+    void prewarmSketchRegions();
     void landMeshes(); // adopt finished worker meshes; call before the dirty check
     bool meshAsync(int bodyId, const TopoDS_Shape& shape, float deflection,
                    float angularDeflection);

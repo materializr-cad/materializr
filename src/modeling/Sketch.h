@@ -9,6 +9,7 @@
 #include <TopoDS_Face.hxx>
 #include <gp_Pln.hxx>
 #include <gp_Pnt.hxx>
+#include <Message_ProgressRange.hxx>
 
 namespace materializr {
 
@@ -206,6 +207,20 @@ public:
     // they fall back to whole-sketch selection instead.
     bool regionBuildIsHeavy() const;
 
+    // --- Off-thread region builds (SketchRegionWorker, #130) ---------------
+    // The cache key: buildRegions() is a hit while this is unchanged.
+    uint64_t regionKey() const { return geometryHash(); }
+    // The uncached build, for a worker running on a PRIVATE copy of this
+    // sketch (its host face deep-copied). Polls `range` for a user break, so
+    // a superseded build stops early; a broken-off result is meaningless and
+    // must be thrown away.
+    std::vector<Region> buildRegionsCancellable(const Message_ProgressRange& range) const {
+        return buildRegionsUncached(range);
+    }
+    // Main thread. Install a build's result as the cache, if `key` still
+    // matches the current geometry. Returns whether it was installed.
+    bool adoptRegions(uint64_t key, std::vector<Region> regions) const;
+
     // 2D point-in-region test (sketch-space coordinates)
     bool isPointInRegion(const Region& region, glm::vec2 p) const;
 
@@ -398,7 +413,8 @@ private:
     mutable uint64_t m_regionHash = 0;
     mutable bool m_regionCacheValid = false;
     uint64_t geometryHash() const;
-    std::vector<Region> buildRegionsUncached() const;
+    std::vector<Region> buildRegionsUncached(
+        const Message_ProgressRange& range = Message_ProgressRange()) const;
 
     int nextId() { return m_nextId++; }
     SketchPoint* findPoint(int id);

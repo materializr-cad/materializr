@@ -6,6 +6,7 @@
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BOPAlgo_Builder.hxx>
 #include <BRepAlgoAPI_Splitter.hxx>
+#include <Message_ProgressScope.hxx>
 #include <BRepAlgoAPI_Cut.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <ShapeFix_Face.hxx>
@@ -1713,6 +1714,14 @@ bool Sketch::regionsCached() const {
     return m_regionCacheValid && geometryHash() == m_regionHash;
 }
 
+bool Sketch::adoptRegions(uint64_t key, std::vector<Region> regions) const {
+    if (key != geometryHash()) return false;
+    m_regionCache = std::move(regions);
+    m_regionHash = key;
+    m_regionCacheValid = true;
+    return true;
+}
+
 // FNV-1a over everything region construction depends on. ~10 µs on a text
 // sketch - noise next to the general fuse this guards (tens of ms).
 uint64_t Sketch::geometryHash() const {
@@ -1885,8 +1894,13 @@ TopoDS_Shape Sketch::buildProfileShape() const {
     return comp;
 }
 
-std::vector<Sketch::Region> Sketch::buildRegionsUncached() const {
+std::vector<Sketch::Region> Sketch::buildRegionsUncached(
+    const Message_ProgressRange& range) const {
     std::vector<Region> regions;
+    // Two steps, the only two that run long: the general fuse, then the
+    // open-curve splitter. Both poll the range, so an off-thread build that
+    // has been superseded stops inside the boolean (SketchRegionWorker).
+    Message_ProgressScope steps(range, nullptr, 2);
 
     // Build a planar face from every closed wire the sketch forms. Each
     // sketch face is then augmented with any holes from the source face
@@ -1968,7 +1982,7 @@ std::vector<Sketch::Region> Sketch::buildRegionsUncached() const {
         try {
             BOPAlgo_Builder gf;
             for (const auto& f : faces) gf.AddArgument(f);
-            gf.Perform();
+            gf.Perform(steps.Next());
             if (!gf.HasErrors()) {
                 for (TopExp_Explorer ex(gf.Shape(), TopAbs_FACE); ex.More(); ex.Next())
                     atomic.push_back(TopoDS::Face(ex.Current()));
@@ -2087,7 +2101,7 @@ std::vector<Sketch::Region> Sketch::buildRegionsUncached() const {
                 for (const auto& f : atomic) args.Append(f);
                 sp.SetArguments(args);
                 sp.SetTools(toolEdges);
-                sp.Build();
+                sp.Build(steps.Next());
                 if (!sp.HasErrors()) {
                     std::vector<TopoDS_Face> split;
                     for (TopExp_Explorer ex(sp.Shape(), TopAbs_FACE); ex.More(); ex.Next())

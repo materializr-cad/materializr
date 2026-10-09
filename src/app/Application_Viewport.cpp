@@ -27,6 +27,7 @@
 #include "viewport/SketchRenderer.h"
 #include "viewport/ViewCube.h"
 #include "viewport/Picker.h"
+#include "modeling/SketchRegionWorker.h"
 #include <TopExp.hxx>
 #include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
 #include <TopTools_IndexedMapOfShape.hxx>
@@ -1154,6 +1155,11 @@ void Application::renderViewport() {
             if (sketchId == m_activeSketchId && m_activeSketch) sk = m_activeSketch;
             else sk = m_document->getSketch(sketchId);
             if (!sk) return;
+            // The renderer reads Sketch::buildRegions(). A selection outliving
+            // a host-body rebuild (undo, an upstream edit) finds the cache
+            // cold; rebuild it off-thread and draw once it lands (#130).
+            if (!sk->regionsCached() && !(m_regionWorker && m_regionWorker->ensure(*sk)))
+                return;
             if (fillAlpha > 0.0f)
                 m_sketchRenderer->renderRegionFill(sk.get(), regionIdx, color,
                                                    fillAlpha, view, proj);
@@ -5225,6 +5231,14 @@ void Application::renderViewport() {
                             regionConsumedClick = true;
                         }
                     }
+                    // The click landed on a sketch whose regions are still
+                    // being built off-thread (#130): say why no region got
+                    // picked, instead of leaving it looking unselectable.
+                    if (clickSelectionAllowed && selectClicked &&
+                        regionHit.regionsPending && regionHit.regionIndex < 0)
+                        showToast(materializr::tr(
+                            "Still working out this sketch's regions - they become "
+                            "selectable as soon as that finishes."));
 
                     // Mirror "across a face" mode: the next planar face click
                     // defines the mirror plane (Esc cancels via handleShortcuts).
@@ -5678,11 +5692,16 @@ void Application::renderViewport() {
                                     // same (working) path. The whole-sketch
                                     // entry survives only for open profiles
                                     // that have no regions to offer.
-                                    // Heavy cold sketch: no multi-minute fuse on a drag-select;
-                                    // take the whole-sketch entry below instead.
-                                    auto regions = (sk.regionBuildIsHeavy() && !sk.regionsCached())
-                                                       ? std::vector<Sketch::Region>{}
-                                                       : sk.buildRegions();
+                                    // Cold cache: never fuse on the main
+                                    // thread during a drag-select (#130).
+                                    // Give the region worker a moment, else
+                                    // take the whole-sketch entry below. A
+                                    // heavy sketch is not built at all.
+                                    bool ready = sk.regionsCached();
+                                    if (!ready && !sk.regionBuildIsHeavy() && m_regionWorker)
+                                        ready = m_regionWorker->ensureWithin(sk, 150);
+                                    auto regions = ready ? sk.buildRegions()
+                                                         : std::vector<Sketch::Region>{};
                                     int added = 0;
                                     const gp_Pln& pln = sk.getPlane();
                                     const gp_Ax3& rax = pln.Position();

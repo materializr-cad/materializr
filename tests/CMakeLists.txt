@@ -118,6 +118,7 @@ add_library(materializr_core STATIC
     ${CMAKE_SOURCE_DIR}/src/modeling/Unfold.cpp
     ${CMAKE_SOURCE_DIR}/src/viewport/SectionCap.cpp
     ${CMAKE_SOURCE_DIR}/src/viewport/MeshWorker.cpp
+    ${CMAKE_SOURCE_DIR}/src/modeling/SketchRegionWorker.cpp
     ${CMAKE_SOURCE_DIR}/src/viewport/ParallelMesh.cpp
     # Picker + Camera are GL-free (pure OCCT + glm), so the hover-pick
     # regression test (test_picker.cpp) can drive them headless.
@@ -645,6 +646,11 @@ add_test(NAME test_sketch_offset COMMAND test_sketch_offset)
 add_executable(test_sketch_regions test_sketch_regions.cpp)
 target_link_libraries(test_sketch_regions PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_sketch_regions COMMAND test_sketch_regions)
+
+# test_sketch_region_worker - off-thread region builds for picking (#130)
+add_executable(test_sketch_region_worker test_sketch_region_worker.cpp)
+target_link_libraries(test_sketch_region_worker PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_sketch_region_worker COMMAND test_sketch_region_worker)
 
 # probe_shell - diagnostic: reproduce Shell crash/failure headless (not ctest)
 add_executable(probe_shell probe_shell.cpp)

@@ -49,6 +49,7 @@ inline void resetFpuForOcct() {
 #include "viewport/ViewCube.h"
 #include "viewport/Picker.h"
 #include "viewport/MeshWorker.h"
+#include "modeling/SketchRegionWorker.h"
 #include "viewport/ParallelMesh.h"
 #include "viewport/Gizmo.h"
 #include "viewport/SelectionHighlight.h"
@@ -301,6 +302,7 @@ Application::Application(bool safeMode, float uiScaleOverride)
     m_viewCube = std::make_unique<ViewCube>();
     m_picker = std::make_unique<Picker>();
     m_meshWorker = std::make_unique<MeshWorker>();
+    m_regionWorker = std::make_unique<SketchRegionWorker>();
     m_gizmo = std::make_unique<Gizmo>();
     m_selectionHighlight = std::make_unique<SelectionHighlight>();
     m_boxSelect = std::make_unique<BoxSelect>();
@@ -3506,6 +3508,29 @@ void Application::handleShortcuts() {
         }
         // Explicit ask for a gizmo: drop any navigation-only suppression.
         if (changed) m_selection->setNavigationOnly(false);
+    }
+}
+
+// Queue off-thread region builds for every visible sketch, so the first click
+// finds them ready (#130): on the tablet that click used to run a minutes-long
+// general fuse on the main thread. Waits out a load's meshing and any heavy
+// task, so it never competes with them for cores, and is throttled - each
+// pass hashes every visible sketch. Skipped during a live preview, which can
+// rebuild a host body every frame (each rebuild is a new cache key). Heavy
+// sketches are left alone, as they are by picking.
+void Application::prewarmSketchRegions() {
+    if (!m_regionWorker || !m_document || m_inSketchMode) return;
+    if (!m_deferredHeavy.empty() || m_meshDispatch.anyPending() ||
+        anyInteractivePreviewActive())
+        return;
+    const uint32_t now = platformTicksMs();
+    if (now - m_regionPrewarmMs < 250u) return;
+    m_regionPrewarmMs = now;
+    for (int sid : m_document->getAllSketchIds()) {
+        if (!m_document->isSketchVisible(sid)) continue;
+        auto sk = m_document->getSketch(sid);
+        if (!sk || sk->regionBuildIsHeavy()) continue;
+        m_regionWorker->ensure(*sk);
     }
 }
 
@@ -7689,6 +7714,7 @@ void Application::run() {
             IopContext ictx = iopContext();
             for (auto* c : m_iops) c->pollPreview(ictx);
         }
+        prewarmSketchRegions();
 
         // True while any interactive tool or animation is in flight and needs
         // continuous rendering even with no user input.
