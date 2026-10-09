@@ -12,8 +12,10 @@
 	<string>AppIcon</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
-	<!-- Required by App Store validation (ITMS-90683): the statically linked
-	     SDL2 references CoreBluetooth from its game-controller backend.
+	<!-- Required by App Store validation (ITMS-90683) while the statically
+	     linked SDL referenced CoreBluetooth from its game-controller backend.
+	     setup-deps.sh now builds that backend OFF; kept so an older prefix
+	     still validates.
 	     Materializr never scans for or connects to Bluetooth devices. -->
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Bluetooth would only be used to detect optional wireless game controllers. Materializr never scans for or connects to Bluetooth devices.</string>
@@ -32,8 +34,9 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<!-- UIScene lifecycle: required by iOS 27 (scene-less apps are killed at
-	     launch, #129). SDLUIKitSceneDelegate comes from the patched SDL2, see
-	     ios/patches/sdl2-uikit-scene-lifecycle.patch. -->
+	     launch, #129). SDLUIKitSceneDelegate is SDL3's own scene delegate;
+	     SDL3 also opts in programmatically, the manifest just makes the
+	     configuration explicit. -->
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

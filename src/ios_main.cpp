@@ -1,6 +1,7 @@
-// iOS entry point. SDL2 owns the real platform main on iOS (SDL2main's
-// SDL_UIKitRunApp starts the UIApplication and calls SDL_main); including
-// SDL_main.h renames the function below to SDL_main. The body mirrors
+// iOS entry point. SDL owns the real platform main on iOS: including
+// SDL_main.h supplies a main() that calls SDL_RunApp (which starts the
+// UIApplication with SDL's scene delegate and calls SDL_main), and renames the
+// function below to SDL_main. The body mirrors
 // android_main.cpp minus the Android-only fdsan workaround.
 //
 // Guarded by MZ_IOS (not a build-system exclusion) so the Android build - which
@@ -15,7 +16,7 @@
 #include "ios_platform.h"
 
 #include <OSD.hxx>
-#include <SDL_main.h>
+#include <SDL3/SDL_main.h>
 
 #include <iostream>
 

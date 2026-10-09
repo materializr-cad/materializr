@@ -2,7 +2,7 @@
 
 Builds the Materializr CAD app for **iPadOS 15+ (arm64)**, reusing the entire
 `core/` + `modeling/` geometry codebase unchanged - the same architecture as
-the Android port: SDL2 + OpenGL ES 3.0 + cross-compiled OpenCASCADE, with the
+the Android port: SDL3 + OpenGL ES 3.0 + cross-compiled OpenCASCADE, with the
 runtime *touch mode*.
 
 > **Status: scaffolding, not yet compiled on a Mac.** The shared-code refactor
@@ -22,18 +22,17 @@ runtime *touch mode*.
 | System pickers | SAF via JNI | `UIDocumentPickerViewController` | `src/ios_files.mm` |
 | Recents refs | persistable content:// URIs | security-scoped bookmarks | `src/ios_files.mm` |
 | OCCT / deps | shared `.so`, NDK | **static** `.a`, Xcode | `ios/scripts/setup-deps.sh` |
-| Background GL | activity pause handles it | hard gate on `SDL_APP_WILLENTERBACKGROUND` | `src/ios_platform.mm` + `Application.cpp` |
+| Background GL | activity pause handles it | hard gate on `SDL_EVENT_WILL_ENTER_BACKGROUND` | `src/ios_platform.mm` + `Application.cpp` |
 
 ## UIScene lifecycle (iOS 27)
 
 iOS 27 kills apps built with its SDK that don't adopt the UIScene lifecycle
 (`EXC_BREAKPOINT` in `UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption`,
-#129), and SDL2's UIKit backend predates scenes. `setup-deps.sh` therefore applies
-`ios/patches/sdl2-uikit-scene-lifecycle.patch` to the SDL2 source (scene-attached
-windows + an `SDLUIKitSceneDelegate`), and `Info.plist.in` carries the matching
-`UIApplicationSceneManifest`. After pulling this, **re-run `setup-deps.sh`** so the
-static SDL2 is rebuilt with the patch, or the manifest points at a class that
-does not exist. The patch goes away with the move to SDL3.
+#129). SDL3's UIKit backend adopts it natively: `SDL_RunApp` starts UIKit with
+SDL's `SDLUIKitSceneDelegate`, and `Info.plist.in` names that class in its
+`UIApplicationSceneManifest`. (The SDL2 build needed a source patch for this;
+it is gone.) A prefix built before the move to SDL3 still holds SDL2 -
+**re-run `setup-deps.sh`** after pulling, or the configure step won't find SDL3.
 
 ## Prerequisites
 
@@ -45,7 +44,7 @@ does not exist. The patch goes away with the move to SDL3.
 ## Build
 
 ```bash
-# 1. Cross-build FreeType + OpenCASCADE + SDL2 as static libs (~30-60 min).
+# 1. Cross-build FreeType + OpenCASCADE + SDL3 as static libs (~30-60 min).
 #    Same pinned versions/SHA-256s as the Android build.
 cd ios && ./scripts/setup-deps.sh          # -> ~/iOS/prefix/iphoneos-arm64
 
@@ -77,9 +76,9 @@ Simulator (arm64, Apple Silicon Macs): re-run `setup-deps.sh` with
    them under `Resources/` instead (CMake `MACOSX_PACKAGE_LOCATION` mapping),
    adjust the `chdir`/`CSF_*` paths in `src/ios_platform.mm` accordingly.
    Startup logs the resolved paths to the Xcode console.
-2. **SDL2 static target name** - `CMakeLists.txt` prefers `SDL2::SDL2-static`
-   and falls back to `SDL2::SDL2`. If configure fails at `find_package(SDL2)`,
-   check `~/iOS/prefix/iphoneos-arm64/lib/cmake/SDL2/` for the exported names.
+2. **SDL3 static target name** - `CMakeLists.txt` prefers `SDL3::SDL3-static`
+   and falls back to `SDL3::SDL3`. If configure fails at `find_package(SDL3)`,
+   check `~/iOS/prefix/iphoneos-arm64/lib/cmake/SDL3/` for the exported names.
 3. **OCCT static link** - if the app fails to link with missing `Standard_*`
    or `TK*` symbols, the archive glob may need `-Wl,-force_load` on specific
    toolkits, or additional system libs. Report the first ~20 error lines.

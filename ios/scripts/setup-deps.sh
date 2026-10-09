@@ -4,7 +4,7 @@
 #   * OpenCASCADE 7.9.3 (static - no dylib embedding, and static sidesteps the
 #     empty-Standard_EXPORT inline-symbol problem documented for the Android
 #     shared build in android/scripts/setup-deps.sh)
-#   * SDL2 2.30.9 (static)
+#   * SDL3 3.4.18 (static)
 #
 # Same pinned versions and SHA-256s as the Android build - one supply chain,
 # two mobile targets. Run on macOS with Xcode 15+ and CMake 3.24+ installed.
@@ -18,7 +18,7 @@ set -euo pipefail
 
 MIN_IOS="${MIN_IOS:-15.0}"
 JOBS="${JOBS:-$(sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
-SDL_VER="2.30.9"
+SDL_VER="3.4.18"
 FT_VER="2.13.3"
 OCCT_TAG="V7_9_3"
 
@@ -43,7 +43,7 @@ echo "PREFIX: $PREFIX"
 # Expected SHA-256 of each pinned source tarball - verified after download so a
 # corrupted mirror or tampered upstream can't slip in. Identical pins to
 # android/scripts/setup-deps.sh.
-SDL2_SHA256="24b574f71c87a763f50704bbb630cbe38298d544a1f890f099a4696b1d6beba4"
+SDL3_SHA256="9c75cf16330322c217dedd2e0609f1124f1b54b8633e763467b4684d0f4334a3"
 FT_SHA256="5c3a8e78f7b24c20b25b54ee575d6daa40007a5f4eea2845861c3409b3021747"
 OCCT_SHA256="5ecf094ec6b12d5413dfb851d8c3590c354058aee556e32e408bdfbf8c357d57"
 
@@ -105,29 +105,25 @@ cmake -S "$OCCT_DIR" -B "$BUILD/occt-$PLATFORM" \
     -DUSE_RAPIDJSON=OFF -DUSE_OPENVR=OFF -DUSE_DRACO=OFF -DUSE_FFMPEG=OFF
 cmake --build "$BUILD/occt-$PLATFORM" --target install -j"$JOBS"
 
-# ── SDL2 (static) ────────────────────────────────────────────────────────────
-fetch "https://github.com/libsdl-org/SDL/releases/download/release-$SDL_VER/SDL2-$SDL_VER.tar.gz" "$DL/sdl2.tar.gz" "$SDL2_SHA256"
-# Always re-extract so the patch below applies to a pristine tree (re-runs
-# would otherwise stack it).
-rm -rf "$SRC/SDL2-$SDL_VER"
-tar -xzf "$DL/sdl2.tar.gz" -C "$SRC"
-# SDL2's UIKit backend predates the UIScene lifecycle, which iOS 27 enforces for
-# apps built with the iOS 27 SDK (scene-less apps are killed at launch with
-# EXC_BREAKPOINT in UIKit, #129). This adds scene-attached windows and a scene
-# delegate; the matching Info.plist UIApplicationSceneManifest is in
-# ios/Info.plist.in. Drop this once we are on SDL3, which supports scenes natively.
-patch -d "$SRC/SDL2-$SDL_VER" -p1 < "$(cd "$(dirname "$0")/.." && pwd)/patches/sdl2-uikit-scene-lifecycle.patch"
-rm -rf "$BUILD/sdl2-$PLATFORM"
-# Joystick/haptic/sensor/hidapi OFF: a CAD app uses none of them, and their
-# iOS backends reference CoreBluetooth/CoreMotion/CoreHaptics/GameController -
+# ── SDL3 (static) ────────────────────────────────────────────────────────────
+# Same release and SHA-256 as the desktop (CMakeLists.txt) and Android builds.
+# SDL3's UIKit backend adopts the UIScene lifecycle iOS 27 requires (#129)
+# natively, so the SDL2-era scene patch is gone.
+fetch "https://github.com/libsdl-org/SDL/releases/download/release-$SDL_VER/SDL3-$SDL_VER.tar.gz" "$DL/sdl3.tar.gz" "$SDL3_SHA256"
+rm -rf "$SRC/SDL3-$SDL_VER"
+tar -xzf "$DL/sdl3.tar.gz" -C "$SRC"
+rm -rf "$BUILD/sdl3-$PLATFORM"
+# Joystick/haptic/sensor/hidapi/camera OFF: a CAD app uses none of them, and
+# their iOS backends reference CoreBluetooth/CoreMotion/CoreHaptics/AVCapture -
 # App Store validation (ITMS-90683) demands purpose strings for APIs the
 # binary merely references. SDL keeps its public API as stubs, so callers
 # (e.g. ImGui's gamepad path) still link; the subsystems just report absent.
-cmake -S "$SRC/SDL2-$SDL_VER" -B "$BUILD/sdl2-$PLATFORM" \
+cmake -S "$SRC/SDL3-$SDL_VER" -B "$BUILD/sdl3-$PLATFORM" \
     "${IOS_CMAKE_FLAGS[@]}" \
-    -DSDL_STATIC=ON -DSDL_SHARED=OFF -DSDL_TEST=OFF \
-    -DSDL_JOYSTICK=OFF -DSDL_HAPTIC=OFF -DSDL_SENSOR=OFF -DSDL_HIDAPI=OFF
-cmake --build "$BUILD/sdl2-$PLATFORM" --target install -j"$JOBS"
+    -DSDL_STATIC=ON -DSDL_SHARED=OFF -DSDL_TESTS=OFF -DSDL_TEST_LIBRARY=OFF \
+    -DSDL_JOYSTICK=OFF -DSDL_HAPTIC=OFF -DSDL_SENSOR=OFF -DSDL_HIDAPI=OFF \
+    -DSDL_CAMERA=OFF
+cmake --build "$BUILD/sdl3-$PLATFORM" --target install -j"$JOBS"
 
 echo
 echo "Done. Static prerequisites installed to:"

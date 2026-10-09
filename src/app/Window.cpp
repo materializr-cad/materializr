@@ -270,16 +270,22 @@ Window::Window(int width, int height, const std::string& title,
 
 #if defined(MZ_IOS)
     // On iOS the screen is NOT framebuffer 0 - SDL backs the window with a
-    // renderbuffer FBO and binding 0 draws into the void. Capture the real
-    // one (bound current by SDL_GL_CreateContext) so g_windowFramebuffer
-    // binds the screen everywhere the code would otherwise bind 0. The color
-    // renderbuffer matters too: SDL's swap presents whatever GL_RENDERBUFFER
-    // is bound at that moment, so swapBuffers() re-binds this before swapping
-    // (Viewport's own depth/MSAA renderbuffer setup leaves others bound).
+    // renderbuffer FBO and binding 0 draws into the void. SDL3 publishes the
+    // real ones as window properties; g_windowFramebuffer binds the screen
+    // everywhere the code would otherwise bind 0. The color renderbuffer
+    // matters too: SDL's swap presents whatever GL_RENDERBUFFER is bound at
+    // that moment, so swapBuffers() re-binds this before swapping (Viewport's
+    // own depth/MSAA renderbuffer setup leaves others bound). The bindings
+    // SDL_GL_CreateContext left current are the fallback.
     {
         GLint fbo = 0, rbo = 0;
         glGetIntegerv(GL_FRAMEBUFFER_BINDING, &fbo);
         glGetIntegerv(GL_RENDERBUFFER_BINDING, &rbo);
+        const SDL_PropertiesID wp = SDL_GetWindowProperties(m_window);
+        fbo = static_cast<GLint>(SDL_GetNumberProperty(
+            wp, SDL_PROP_WINDOW_UIKIT_OPENGL_FRAMEBUFFER_NUMBER, fbo));
+        rbo = static_cast<GLint>(SDL_GetNumberProperty(
+            wp, SDL_PROP_WINDOW_UIKIT_OPENGL_RENDERBUFFER_NUMBER, rbo));
         g_windowFramebuffer = static_cast<unsigned int>(fbo);
         m_windowRenderbuffer = static_cast<unsigned int>(rbo);
         std::cout << "iOS window framebuffer=" << fbo

@@ -9,7 +9,7 @@
 #
 # Mirrors android/app/jni/src/CMakeLists.txt: glob the shared src/ tree, drop
 # the desktop/Android entry points, link the cross-built static OCCT/FreeType/
-# SDL2 prefix produced by ios/scripts/setup-deps.sh.
+# SDL3 prefix produced by ios/scripts/setup-deps.sh.
 cmake_minimum_required(VERSION 3.24)
 project(MaterializriOS CXX OBJCXX)
 
@@ -24,7 +24,7 @@ set(CMAKE_OBJCXX_STANDARD 17)
 get_filename_component(MZ_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
 set(MZ_SRC "${MZ_ROOT}/src")
 
-# Cross-built static prefix (FreeType + OCCT + SDL2).
+# Cross-built static prefix (FreeType + OCCT + SDL3).
 if(NOT DEFINED MATERIALIZR_IOS_PREFIX)
     set(MATERIALIZR_IOS_PREFIX "$ENV{HOME}/iOS/prefix/iphoneos-arm64")
 endif()
@@ -34,21 +34,26 @@ endif()
 set(OCCT_INC "${MATERIALIZR_IOS_PREFIX}/include/opencascade")
 set(OCCT_LIB "${MATERIALIZR_IOS_PREFIX}/lib")
 
-# ── SDL2 (static, from the prefix) ───────────────────────────────────────────
+# ── SDL3 (static, from the prefix) ───────────────────────────────────────────
 # CMake's iOS platform sets CMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY, re-rooting
 # every find_package() path under the SDK sysroot; the prefix must be a find
-# root itself or its SDL2Config.cmake is invisible.
+# root itself or its SDL3Config.cmake is invisible. No SDL3main library: SDL3's
+# iOS main() comes from SDL_main.h (included by ios_main.cpp), and it starts
+# UIKit with SDL's own scene delegate (the UIScene lifecycle iOS 27 requires).
 list(APPEND CMAKE_FIND_ROOT_PATH "${MATERIALIZR_IOS_PREFIX}")
-find_package(SDL2 CONFIG REQUIRED PATHS "${MATERIALIZR_IOS_PREFIX}" NO_DEFAULT_PATH)
-if(TARGET SDL2::SDL2-static)
-    set(MZ_SDL2_TARGET SDL2::SDL2-static)
+find_package(SDL3 CONFIG REQUIRED PATHS "${MATERIALIZR_IOS_PREFIX}" NO_DEFAULT_PATH)
+if(TARGET SDL3::SDL3-static)
+    set(MZ_SDL3_TARGET SDL3::SDL3-static)
 else()
-    set(MZ_SDL2_TARGET SDL2::SDL2)
+    set(MZ_SDL3_TARGET SDL3::SDL3)
 endif()
 
 # ── ImGui (docking) + GLM, same versions as the desktop/Android builds ───────
 include(FetchContent)
-FetchContent_Declare(imgui GIT_REPOSITORY https://github.com/ocornut/imgui.git GIT_TAG docking)
+# Pinned to the same release tag as the desktop and Android builds (the
+# docking branch head is rebased, which orphans commits and breaks clean builds).
+FetchContent_Declare(imgui GIT_REPOSITORY https://github.com/ocornut/imgui.git
+                     GIT_TAG v1.92.8-docking) # b61e56346a92cfcaf1f43a545ca37b0b32239654
 FetchContent_MakeAvailable(imgui)
 FetchContent_Declare(glm GIT_REPOSITORY https://github.com/g-truc/glm.git GIT_TAG 1.0.1)
 FetchContent_MakeAvailable(glm)
@@ -59,12 +64,12 @@ add_library(imgui_lib STATIC
     ${imgui_SOURCE_DIR}/imgui_draw.cpp
     ${imgui_SOURCE_DIR}/imgui_tables.cpp
     ${imgui_SOURCE_DIR}/imgui_widgets.cpp
-    ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl2.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl3.cpp
     ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp)
 target_include_directories(imgui_lib PUBLIC
     ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
 target_compile_definitions(imgui_lib PUBLIC IMGUI_IMPL_OPENGL_ES3)
-target_link_libraries(imgui_lib PUBLIC ${MZ_SDL2_TARGET})
+target_link_libraries(imgui_lib PUBLIC ${MZ_SDL3_TARGET})
 
 # ── App sources ──────────────────────────────────────────────────────────────
 # Glob the shared tree, drop foreign entry points. ios_main.cpp is picked up by
@@ -88,7 +93,7 @@ add_executable(materializr MACOSX_BUNDLE ${MZ_SOURCES} ${MZ_OBJCXX_SOURCES})
 
 target_include_directories(materializr PRIVATE "${MZ_SRC}")
 target_include_directories(materializr SYSTEM PRIVATE "${OCCT_INC}")
-target_link_libraries(materializr PRIVATE ${MZ_SDL2_TARGET} SDL2::SDL2main imgui_lib glm::glm)
+target_link_libraries(materializr PRIVATE ${MZ_SDL3_TARGET} imgui_lib glm::glm)
 
 # OpenCASCADE static toolkits. ld64 re-searches archives, so the glob order is
 # fine despite OCCT's internal cycles. FreeType resolves TKService's font refs.
@@ -97,7 +102,7 @@ list(LENGTH OCCT_A_PATHS _occt_count)
 message(STATUS "Linking ${_occt_count} static OpenCASCADE toolkits from ${OCCT_LIB}")
 target_link_libraries(materializr PRIVATE ${OCCT_A_PATHS} "${MATERIALIZR_IOS_PREFIX}/lib/libfreetype.a")
 
-# System libs + frameworks. The SDL2 static config carries its own framework
+# System libs + frameworks. The SDL3 static config carries its own framework
 # deps; the explicit list below covers our direct uses (GLES, pickers, share
 # sheet) and doubles as insurance if the config's interface is incomplete.
 # CoreBluetooth/CoreMotion/CoreHaptics are deliberately absent: they were only

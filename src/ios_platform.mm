@@ -10,7 +10,7 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 #include <atomic>
 #include <cstdio>
@@ -25,17 +25,17 @@ namespace {
 
 std::atomic<bool> g_inBackground{false};
 
-// SDL delivers SDL_APP_WILLENTERBACKGROUND / DIDENTERFOREGROUND through event
+// SDL delivers SDL_EVENT_WILL_ENTER_BACKGROUND / DID_ENTER_FOREGROUND through event
 // watches *during* the UIKit callback - they cannot be polled later, because
 // the process may be suspended before the queue is drained. The watch just
 // flips the flag Application::run() gates rendering on.
-int lifecycleWatch(void*, SDL_Event* e) {
-    if (e->type == SDL_APP_WILLENTERBACKGROUND) {
+bool SDLCALL lifecycleWatch(void*, SDL_Event* e) {
+    if (e->type == SDL_EVENT_WILL_ENTER_BACKGROUND) {
         g_inBackground = true;
-    } else if (e->type == SDL_APP_DIDENTERFOREGROUND) {
+    } else if (e->type == SDL_EVENT_DID_ENTER_FOREGROUND) {
         g_inBackground = false;
     }
-    return 1;
+    return true;
 }
 
 } // namespace
