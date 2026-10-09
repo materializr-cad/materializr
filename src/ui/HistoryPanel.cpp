@@ -22,6 +22,23 @@
 
 namespace materializr {
 
+namespace {
+// `s` cut to fit `maxW` pixels, ending in "\xE2\x80\xA6" when it had to be shortened.
+std::string fitWithEllipsis(const std::string& s, float maxW) {
+    if (maxW <= 0.0f || ImGui::CalcTextSize(s.c_str()).x <= maxW) return s;
+    const std::string ell = "\xE2\x80\xA6";
+    std::string out = s;
+    while (!out.empty()) {
+        std::size_t n = out.size();
+        do { --n; } while (n > 0 && (static_cast<unsigned char>(out[n]) & 0xC0) == 0x80);
+        out.erase(n);                       // drop one whole UTF-8 code point
+        while (!out.empty() && out.back() == ' ') out.pop_back();
+        if (ImGui::CalcTextSize((out + ell).c_str()).x <= maxW) return out + ell;
+    }
+    return ell;
+}
+} // namespace
+
 HistoryPanel::HistoryPanel() = default;
 
 void HistoryPanel::setHistory(History* history) {
@@ -194,7 +211,15 @@ void HistoryPanel::renderContent() {
                       isDisabled ? " [disabled]" : "",
                       isFrozen ? " (frozen)" : "");
         bool selected = (i == m_editingStep) || isHighlighted;
-        if (ImGui::Selectable(label, selected)) {
+        // Fit the row to the panel: a plain Selectable hard-clips at the edge, so a
+        // long step name just stopped mid-word. Cut with an ellipsis and keep the
+        // whole text in a tooltip. "###row" keeps the
+        // widget id fixed, so the context menu survives a resize re-cutting the text.
+        const std::string fullLabel = label;
+        const std::string shownLabel =
+            fitWithEllipsis(fullLabel, ImGui::GetContentRegionAvail().x - 6.0f);
+        const std::string rowLabel = shownLabel + "###row";
+        if (ImGui::Selectable(rowLabel.c_str(), selected)) {
             // Re-clicking the active step toggles it off, clearing the orange
             // viewport highlight (which tracks the editing step) - otherwise
             // there's no way to dismiss it.
@@ -207,7 +232,10 @@ void HistoryPanel::renderContent() {
             }
             m_deleteConflict = false;
         }
-        if (ImGui::IsItemHovered()) m_hoveredStep = i; // drives the viewport preview
+        if (ImGui::IsItemHovered()) {
+            m_hoveredStep = i; // drives the viewport preview
+            if (shownLabel != fullLabel) ImGui::SetTooltip("%s", fullLabel.c_str());
+        }
         if (pushedText) {
             ImGui::PopStyleColor();
         }

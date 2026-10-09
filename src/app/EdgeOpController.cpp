@@ -770,7 +770,10 @@ void EdgeOpController::renderEdgeOpPanel(const IopContext& ctx) {
     const bool imTouch = ctx.panel.imTouch;
     const bool isFillet = m_kind == EdgeOpKind::Fillet;
     const char* opName = isFillet ? "FILLET" : "CHAMFER";
-    const char* label  = isFillet ? "Radius (%s)" : "Distance (%s)";
+    // The unit goes in at draw time: the label is a printf template ("(%s)"), and
+    // printing it as-is showed a literal "Radius (%s)" in every non-im-touch layout.
+    const std::string label = materializr::trFormat(
+        isFillet ? "Radius (%s)" : "Distance (%s)", materializr::unitSuffix());
 
     materializr::viewportBanner(
         ImVec4(0.2f, 1.0f, 0.5f, 1.0f),
@@ -809,7 +812,7 @@ void EdgeOpController::renderEdgeOpPanel(const IopContext& ctx) {
     opDialogDragGrip(s);
 
     if (!imTouch) {   // im-touch: just the value well below
-        ImGui::Text("%s", label);
+        ImGui::Text("%s", label.c_str());
         ImGui::Separator();
     }
 

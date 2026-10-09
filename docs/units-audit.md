@@ -263,7 +263,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 
 - CONVERTED: 1
 - allowed-by-hand: 92
-- comment: 283
+- comment: 282
 - diagnostic: 11
 - identifier/other: 9
 
@@ -541,7 +541,6 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | comment | src/modeling/Sketch.cpp | `// point pair a handful of mm apart (anywhere someone clicks close` |
 | comment | src/modeling/Sketch.cpp | `// so a gently curving stretch of a real part's outline can go many mm` |
 | comment | src/modeling/SketchConstraints.h | `// dimension label rather than clicking it. Pixels rather than sketch mm because` |
-| comment | src/modeling/SketchEditOp.cpp | `// "Add sketch element" into "Rectangle 80 × 45 mm", "Circle Ø20 mm", etc.,` |
 | comment | src/modeling/SketchOffset.cpp | `// comfortably more than 1e-3 mm - so an analytic epsilon condemns perfectly` |
 | comment | src/modeling/SketchOffset.cpp | `// accept the (sub-0.1 mm) deviation that comes with it.` |
 | comment | src/modeling/SketchTool.cpp | `// Popup asks for DIAMETER (matching the on-canvas "X.X mm dia"` |

@@ -9,6 +9,8 @@ namespace materializr {
 // same document, so a job for one answers the other.
 //
 //   inline  the op runs in the frame, as it always did;
+//   probe   (opt-in, probeFirstOnWorker) the gesture's FIRST preview runs on the
+//           worker, and how long it took decides inline or async for the rest;
 //   async   once one inline preview took kAsyncPreviewMs or more, the rest
 //           of the gesture runs the op on a worker, one job at a time; a
 //           finished job whose key no longer matches what the gesture asks
@@ -21,8 +23,30 @@ public:
     // Below it a worker round trip would only add a frame of latency.
     static constexpr double kAsyncPreviewMs = 30.0;
 
+    // True once a preview is KNOWN to be slow. Not true while only probing.
     bool async() const { return m_async; }
+    // Previews are to run on the worker: known slow, or the probe not done yet.
+    bool onWorker() const { return m_async || m_probe; }
     bool running() const { return m_running; }
+
+    // A preview can be slow with no warning: a sketch lying along a B-spline host
+    // face's edges took ONE edge-edge intersection of ~25 s on a tablet, and an
+    // inline probe pays that on the main thread (the app is frozen, taps queue).
+    // Probing on the worker instead costs a cheap gesture one frame of latency,
+    // once, and decides the rest of the gesture from how long that job took.
+    void probeFirstOnWorker() { m_probe = true; }
+
+    // The probing job finished in `millis`: slow stays on the worker, fast goes
+    // back to inline. A no-op once the probe is over.
+    void jobTook(double millis)
+    {
+        if (!m_probe) return;
+        m_probe = false;
+        if (millis >= kAsyncPreviewMs) m_async = true;
+    }
+
+    // No worker could be started: probing cannot finish, so run inline.
+    void probeAbandoned() { m_probe = false; }
 
     void inlinePreviewTook(double millis)
     {
@@ -33,7 +57,7 @@ public:
     // and not for the key already applied on screen.
     bool shouldLaunch(const Key& want) const
     {
-        if (!m_async || m_running) return false;
+        if (!onWorker() || m_running) return false;
         if (m_hasApplied && m_applied == want) return false;
         return true;
     }
@@ -77,6 +101,7 @@ public:
 
 private:
     bool m_async = false;
+    bool m_probe = false;
     bool m_running = false;
     bool m_hasApplied = false;
     Key m_launched;

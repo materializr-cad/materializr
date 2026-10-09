@@ -270,7 +270,6 @@ src/modeling/Sketch.cpp: // these a later dimension (e.g. a 2 mm gap to another 
 src/modeling/Sketch.cpp: // point pair a handful of mm apart (anywhere someone clicks close
 src/modeling/Sketch.cpp: // so a gently curving stretch of a real part's outline can go many mm
 src/modeling/SketchConstraints.h: // dimension label rather than clicking it. Pixels rather than sketch mm because
-src/modeling/SketchEditOp.cpp: // "Add sketch element" into "Rectangle 80 × 45 mm", "Circle Ø20 mm", etc.,
 src/modeling/SketchOffset.cpp: // comfortably more than 1e-3 mm - so an analytic epsilon condemns perfectly
 src/modeling/SketchOffset.cpp: // accept the (sub-0.1 mm) deviation that comes with it.
 src/modeling/SketchTool.cpp: // Popup asks for DIAMETER (matching the on-canvas "X.X mm dia"

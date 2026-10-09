@@ -4703,11 +4703,12 @@ void Application::removeRecentProject(const std::string& ref) {
     if (changed) saveAppSettings();
 }
 
-void Application::guardedOpen(std::function<void()> doOpen) {
+void Application::guardedOpen(std::function<void()> doOpen, bool closingTab) {
     if (!isDirty()) { doOpen(); return; }
     // Unsaved changes: defer the open until the save prompt resolves so we never
     // silently discard work (this also closes the same gap on the Open dialog).
     m_pendingOpenAction = std::move(doOpen);
+    m_pendingActionClosesTab = closingTab;
     m_postSaveAction = PostSaveAction::OpenProject;
     m_showSavePrompt = true;
 }
@@ -4988,7 +4989,10 @@ void Application::renderSavePrompt() {
             case PostSaveAction::CloseProject:
                 prompt = "You have unsaved changes. Save before closing the project?"; break;
             case PostSaveAction::OpenProject:
-                prompt = "You have unsaved changes. Save before opening another project?"; break;
+                prompt = m_pendingActionClosesTab
+                    ? "You have unsaved changes. Save before closing this tab?"
+                    : "You have unsaved changes. Save before opening another project?";
+                break;
             default:
                 prompt = "You have unsaved changes. Save before exiting?"; break;
         }

@@ -56,11 +56,85 @@ static const char* constraintName(ConstraintType t) {
     return "Constraint";
 }
 
+// Names the geometry that was ADDED between two snapshots, measured directly off
+// them (no constraint required): a rectangle, a circle, an arc or a single line,
+// with its measured size. A reference dimension for display only - it drives
+// nothing, so there is no over-constraint risk. Empty when the addition is none
+// of those shapes.
+static std::string describeAddedGeometry(const Sketch& before, const Sketch& after) {
+    auto posOf = [](const Sketch& sk, int ptId) -> glm::vec2 {
+        for (const auto& p : sk.getPoints()) if (p.id == ptId) return p.pos;
+        return glm::vec2(0.0f, 0.0f);
+    };
+    auto isNew = [](int id, const auto& beforeVec) {
+        for (const auto& b : beforeVec) if (b.id == id) return false;
+        return true;
+    };
+    std::vector<const SketchLine*> nl;
+    for (const auto& l : after.getLines())
+        if (isNew(l.id, before.getLines())) nl.push_back(&l);
+    std::vector<const SketchCircle*> nc;
+    for (const auto& c : after.getCircles())
+        if (isNew(c.id, before.getCircles())) nc.push_back(&c);
+    std::vector<const SketchArc*> na;
+    for (const auto& a : after.getArcs())
+        if (isNew(a.id, before.getArcs())) na.push_back(&a);
+
+    auto lineLen = [&](const SketchLine* l) {
+        glm::vec2 a = posOf(after, l->startPointId);
+        glm::vec2 b = posOf(after, l->endPointId);
+        double dx = b.x - a.x, dy = b.y - a.y;
+        return std::sqrt(dx * dx + dy * dy);
+    };
+    char buf[96];
+    if (nc.size() == 1 && nl.empty() && na.empty()) {
+        std::snprintf(buf, sizeof(buf), "Circle \xC3\x98%s", materializr::fmtLength(nc[0]->radius * 2.0).c_str());
+        return std::string(buf);
+    }
+    if (na.size() == 1 && nl.empty() && nc.empty()) {
+        std::snprintf(buf, sizeof(buf), "Arc R%s", materializr::fmtLength(na[0]->radius).c_str());
+        return std::string(buf);
+    }
+    if (nl.size() == 4 && nc.empty() && na.empty()) {
+        // Rectangle iff the four sides form two equal pairs (W,W,H,H).
+        double L[4]; for (int i = 0; i < 4; ++i) L[i] = lineLen(nl[i]);
+        std::sort(L, L + 4);
+        const double tol = 1e-3 + 0.01 * L[3];   // 1% of the longest side
+        if (std::abs(L[0] - L[1]) < tol && std::abs(L[2] - L[3]) < tol) {
+            // Report width × height as the sketch-plane bounding box, so an
+            // axis-aligned rectangle reads "80 × 45" (x-extent × y-extent)
+            // the way it was drawn rather than sorted side lengths.
+            float minx = 1e30f, miny = 1e30f, maxx = -1e30f, maxy = -1e30f;
+            for (const auto* l : nl)
+                for (int pid : {l->startPointId, l->endPointId}) {
+                    glm::vec2 p = posOf(after, pid);
+                    minx = std::min(minx, p.x); maxx = std::max(maxx, p.x);
+                    miny = std::min(miny, p.y); maxy = std::max(maxy, p.y);
+                }
+            std::snprintf(buf, sizeof(buf), "Rectangle %s \xC3\x97 %s", materializr::fmtLength(maxx - minx).c_str(), materializr::fmtLength(maxy - miny).c_str());
+            return std::string(buf);
+        }
+    }
+    if (nl.size() == 1 && nc.empty() && na.empty()) {
+        std::snprintf(buf, sizeof(buf), "Line %s", materializr::fmtLength(lineLen(nl[0])).c_str());
+        return std::string(buf);
+    }
+    return std::string();
+}
+
 std::string SketchEditOp::description() const {
     if (!m_before || !m_after) return "Sketch edit";
 
-    // Constraint diff first - these read more specifically than the generic
-    // geometry-count descriptions below.
+    // Elements ADDED: name the shape. A rectangle or polygon arrives with its own
+    // automatic constraints, and describing those ("Add Horizontal") hid the
+    // thing the user actually drew. Constraint-only edits fall through below.
+    if (m_after->elementCount() > m_before->elementCount()) {
+        std::string g = describeAddedGeometry(*m_before, *m_after);
+        if (!g.empty()) return g;
+    }
+
+    // Constraint diff - these read more specifically than the generic
+    // geometry-count descriptions further down.
     const auto& cBefore = m_before->getConstraints();
     const auto& cAfter  = m_after->getConstraints();
     if (cBefore.size() != cAfter.size()) {
@@ -135,69 +209,10 @@ std::string SketchEditOp::description() const {
         }
     }
 
-    // No constraint diff - describe the GEOMETRY that was added, measured
-    // directly off the snapshot (no constraint required). Turns the generic
-    // "Add sketch element" into "Rectangle 80 × 45 mm", "Circle Ø20 mm", etc.,
-    // so the history reads meaningfully. (A "reference dimension" for display
-    // only - it drives nothing, so there's no over-constraint risk.)
+    // No constraint diff - describe the GEOMETRY that was added.
     {
-        auto posOf = [](const Sketch& sk, int ptId) -> glm::vec2 {
-            for (const auto& p : sk.getPoints()) if (p.id == ptId) return p.pos;
-            return glm::vec2(0.0f, 0.0f);
-        };
-        auto isNew = [](int id, const auto& beforeVec) {
-            for (const auto& b : beforeVec) if (b.id == id) return false;
-            return true;
-        };
-        std::vector<const SketchLine*> nl;
-        for (const auto& l : m_after->getLines())
-            if (isNew(l.id, m_before->getLines())) nl.push_back(&l);
-        std::vector<const SketchCircle*> nc;
-        for (const auto& c : m_after->getCircles())
-            if (isNew(c.id, m_before->getCircles())) nc.push_back(&c);
-        std::vector<const SketchArc*> na;
-        for (const auto& a : m_after->getArcs())
-            if (isNew(a.id, m_before->getArcs())) na.push_back(&a);
-
-        auto lineLen = [&](const SketchLine* l) {
-            glm::vec2 a = posOf(*m_after, l->startPointId);
-            glm::vec2 b = posOf(*m_after, l->endPointId);
-            double dx = b.x - a.x, dy = b.y - a.y;
-            return std::sqrt(dx * dx + dy * dy);
-        };
-        char buf[96];
-        if (nc.size() == 1 && nl.empty() && na.empty()) {
-            std::snprintf(buf, sizeof(buf), "Circle \xC3\x98%s", materializr::fmtLength(nc[0]->radius * 2.0).c_str());
-            return buf;
-        }
-        if (na.size() == 1 && nl.empty() && nc.empty()) {
-            std::snprintf(buf, sizeof(buf), "Arc R%s", materializr::fmtLength(na[0]->radius).c_str());
-            return buf;
-        }
-        if (nl.size() == 4 && nc.empty() && na.empty()) {
-            // Rectangle iff the four sides form two equal pairs (W,W,H,H).
-            double L[4]; for (int i = 0; i < 4; ++i) L[i] = lineLen(nl[i]);
-            std::sort(L, L + 4);
-            const double tol = 1e-3 + 0.01 * L[3];   // 1% of the longest side
-            if (std::abs(L[0] - L[1]) < tol && std::abs(L[2] - L[3]) < tol) {
-                // Report width × height as the sketch-plane bounding box, so an
-                // axis-aligned rectangle reads "80 × 45" (x-extent × y-extent)
-                // the way it was drawn rather than sorted side lengths.
-                float minx = 1e30f, miny = 1e30f, maxx = -1e30f, maxy = -1e30f;
-                for (const auto* l : nl)
-                    for (int pid : {l->startPointId, l->endPointId}) {
-                        glm::vec2 p = posOf(*m_after, pid);
-                        minx = std::min(minx, p.x); maxx = std::max(maxx, p.x);
-                        miny = std::min(miny, p.y); maxy = std::max(maxy, p.y);
-                    }
-                std::snprintf(buf, sizeof(buf), "Rectangle %s \xC3\x97 %s", materializr::fmtLength(maxx - minx).c_str(), materializr::fmtLength(maxy - miny).c_str());
-                return buf;
-            }
-        }
-        if (nl.size() == 1 && nc.empty() && na.empty()) {
-            std::snprintf(buf, sizeof(buf), "Line %s", materializr::fmtLength(lineLen(nl[0])).c_str());
-            return buf;
-        }
+        std::string g = describeAddedGeometry(*m_before, *m_after);
+        if (!g.empty()) return g;
     }
 
     // Anything else - fall back to the generic element-count diff.

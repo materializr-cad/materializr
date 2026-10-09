@@ -104,7 +104,7 @@ bool PushPullController::wantsDeferredCommit(const IopContext& ctx) const {
     // relative to the 3D pass, which has not been pinned down. The exposure is
     // at most one frame and may be none; against 565 ms of frozen UI it is
     // worth it either way.
-    return shouldDeferCommit(m_st.heavyPreview, m_ppDispatch.async(),
+    return shouldDeferCommit(m_st.heavyPreview, m_ppDispatch.onWorker(),
                              anyVisibleBodyThreaded(ctx));
 }
 
@@ -320,6 +320,7 @@ int PushPullController::onBegin(const IopContext& ctx) {
     // preview frame).
     m_originals = snapshotBodies(ctx.doc);
     m_ppDispatch.reset();
+    m_ppDispatch.probeFirstOnWorker(); // the first preview may be slow: never inline
     m_ppJob.abandon();
 
     // Push/Pull may edit several bodies at once, and a free-space one CREATES
@@ -459,7 +460,7 @@ void PushPullController::updatePushPull(const IopContext& ctx, bool applySnap) {
         updateGhost(ctx);
         return;
     }
-    if (m_ppDispatch.async()) {
+    if (m_ppDispatch.onWorker()) {
         if (std::abs(m_st.distance) <= 1e-6) {
             // Back at zero: nothing to preview, and the last landed preview
             // must not stay on the body (no job runs for zero, so nothing
@@ -516,6 +517,7 @@ void PushPullController::launchPreviewIfWanted(const IopContext& ctx) {
     if (!m_ppJob.launch([shared] { return shared->run(); })) {
         retractLivePreview(ctx);
         m_ppDispatch.refused(want);
+        m_ppDispatch.probeAbandoned(); // no worker to learn from: later frames run inline
         return;
     }
     m_ppDispatch.launched(want);
@@ -526,6 +528,7 @@ void PushPullController::pollPreview(const IopContext& ctx) {
     if (!active()) return;
     std::optional<PreviewResult> result = m_ppJob.take();
     if (!result) return;
+    m_ppDispatch.jobTook(result->millis); // the probe: fast goes inline, slow stays here
     const PushPullKey now{static_cast<double>(m_st.distance), m_st.symmetric};
     const bool current = m_ppDispatch.finished(now);
     if (current) {
@@ -586,7 +589,12 @@ std::unique_ptr<Operation> PushPullController::buildCommitOp(const IopContext& c
     // clears it.
     if (ctx.clearGhost) ctx.clearGhost();
 
-    if (m_ppDispatch.async()) {
+    // A preview applied from a worker result carries no face lineage, whatever
+    // the dispatch has decided since (a fast probe goes back to inline, but the
+    // body on screen is still that result), so it must not be what is recorded.
+    const bool appliedFromWorker =
+        liveOp() && static_cast<PushPullOp*>(liveOp())->usedPrecomputed();
+    if (m_ppDispatch.onWorker() || appliedFromWorker) {
         // Async path: the applied preview has no face lineage and may trail
         // the arrow by one job, so it is never what gets recorded; the base
         // undoes it and runs this fresh op once, at the arrow's distance.

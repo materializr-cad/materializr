@@ -537,6 +537,34 @@ TEST(SketchHistory, MeaningfulDescriptions) {
     materializr::setCurrentUnit(materializr::LengthUnit::Mm);
 }
 
+// A rectangle arrives with its own automatic constraints. The history step must
+// name the rectangle, not the first of those constraints ("Add Horizontal") - and
+// an edit that ONLY adds a constraint must still be named for it.
+TEST(SketchHistory, DrawnShapeIsNamedNotItsAutoConstraints) {
+    using materializr::Sketch;
+    using materializr::SketchEditOp;
+    using materializr::fmtLength;
+    auto before = std::make_shared<Sketch>();
+    auto after  = std::make_shared<Sketch>();
+    int p0 = after->addPoint({0,0}),  p1 = after->addPoint({25,0});
+    int p2 = after->addPoint({25,22}), p3 = after->addPoint({0,22});
+    int l0 = after->addLine(p0,p1), l1 = after->addLine(p1,p2);
+    after->addLine(p2,p3); after->addLine(p3,p0);
+    materializr::Constraint h; h.id = 1; h.type = materializr::ConstraintType::Horizontal; h.entityA = l0;
+    materializr::Constraint v; v.id = 2; v.type = materializr::ConstraintType::Vertical; v.entityA = l1;
+    after->addConstraint(h);
+    after->addConstraint(v);
+    EXPECT_EQ(SketchEditOp(after, before, after).description(),
+              "Rectangle " + fmtLength(25) + " \xC3\x97 " + fmtLength(22));
+
+    // Constraint-only edit: same geometry both sides, one more constraint.
+    auto geom = std::make_shared<Sketch>(*after);
+    auto dim  = std::make_shared<Sketch>(*after);
+    materializr::Constraint d; d.id = 3; d.type = materializr::ConstraintType::Distance; d.entityA = p0; d.entityB = p1; d.value = 25.0;
+    dim->addConstraint(d);
+    EXPECT_EQ(SketchEditOp(dim, geom, dim).description(), "Add Distance " + fmtLength(25));
+}
+
 // A transactional editStep whose replay fails must restore the model to its
 // last-good state - never leave a half-built body. (The fix for "editing a
 // circle dropped my hollow and fillets and left a broken cube".)

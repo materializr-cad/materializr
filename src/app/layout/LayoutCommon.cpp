@@ -4,6 +4,7 @@
 // dockspace host, the overflow popup, and the shared undo helpers. See
 // LayoutCommon.h for the keep-in-lockstep contract.
 
+#include "platform_defs.h"
 #include "app/Application.h"
 #include "app/Window.h"
 #include "ui/MeasureTool.h"
@@ -225,7 +226,7 @@ void Application::renderTabMenuItems(size_t i) {
     ImGui::Separator();
     if (ImGui::MenuItem(materializr::tr("Close Tab"))) {
         if (activateTabFor(i))
-            guardedOpen([this]() { closeSession(m_activeSession); });
+            guardedOpen([this]() { closeSession(m_activeSession); }, /*closingTab=*/true);
     }
 }
 
@@ -302,7 +303,7 @@ void Application::renderViewportTabBar() {
         if (!open) {
             // The tab's × - same guarded flow as the menu item.
             if (activateTabFor(i))
-                guardedOpen([this]() { closeSession(m_activeSession); });
+                guardedOpen([this]() { closeSession(m_activeSession); }, /*closingTab=*/true);
             closedOne = true;   // indices may have shifted; finish this frame
         }
         ImGui::PopID();
@@ -360,11 +361,22 @@ void Application::renderTouchTabsSheet() {
     ImGui::EndPopup();
 }
 
+// Keyboard-shortcut text beside a menu item. On the touch-first platforms there is
+// no keyboard to press it on, so "Ctrl+S" / "Alt+F4" is noise; desktop keeps it.
+static const char* shortcutHint(const char* s) {
+#if defined(MZ_MOBILE)
+    (void)s;
+    return nullptr;
+#else
+    return s;
+#endif
+}
+
 // The four menu bodies, shared by classic's menu bar and the modern/im-touch
 // overflow popup - one item list each, so the layouts cannot drift.
 void Application::renderFileMenuItems(bool withSettings) {
     if (ImGui::MenuItem(materializr::tr("Home Screen"))) goToHomeScreen();
-    if (ImGui::MenuItem(materializr::tr("Open Project..."), "Ctrl+O")) loadProject();
+    if (ImGui::MenuItem(materializr::tr("Open Project..."), shortcutHint("Ctrl+O"))) loadProject();
     // Open Recent - persisted, most-recent-first. Greyed when empty.
     if (ImGui::BeginMenu(materializr::tr("Open Recent"), !m_recentProjects.empty())) {
         // Snapshot: openRecentProject() mutates m_recentProjects.
@@ -384,7 +396,7 @@ void Application::renderFileMenuItems(bool withSettings) {
         }
         ImGui::EndMenu();
     }
-    if (ImGui::MenuItem(materializr::tr("Save Project"), "Ctrl+S")) saveProjectQuick();
+    if (ImGui::MenuItem(materializr::tr("Save Project"), shortcutHint("Ctrl+S"))) saveProjectQuick();
     if (ImGui::MenuItem(materializr::tr("Save Project As..."))) saveProject();
     // A new project opens in its own tab (non-destructive - the current
     // project keeps its tab); the landing page's New Project tile still
@@ -407,7 +419,7 @@ void Application::renderFileMenuItems(bool withSettings) {
     }
     if (ImGui::MenuItem(materializr::tr("Close Tab"))) {
         // Same prompt-then-act path as every destructive project action.
-        guardedOpen([this]() { closeSession(m_activeSession); });
+        guardedOpen([this]() { closeSession(m_activeSession); }, /*closingTab=*/true);
     }
     ImGui::Separator();
 
@@ -469,8 +481,10 @@ void Application::renderFileMenuItems(bool withSettings) {
             m_settingsRaise = true;
         }
     }
+#if !defined(MZ_IOS)   // iOS apps do not offer their own quit
     ImGui::Separator();
-    if (ImGui::MenuItem(materializr::tr("Exit"), "Alt+F4")) m_window->requestClose(true);
+    if (ImGui::MenuItem(materializr::tr("Exit"), shortcutHint("Alt+F4"))) m_window->requestClose(true);
+#endif
 }
 
 void Application::renderEditMenuItems() {
@@ -481,11 +495,11 @@ void Application::renderEditMenuItems() {
     // the preview pushes over the redo tail. (How "pull, confirm,
     // pull the other way" ate the first body.)
     const bool histLocked = anyInteractivePreviewActive();
-    if (ImGui::MenuItem(materializr::tr("Undo"), "Ctrl+Z", false,
+    if (ImGui::MenuItem(materializr::tr("Undo"), shortcutHint("Ctrl+Z"), false,
                         !histLocked && m_history->canUndo())) {
         undoWithCascade();
     }
-    if (ImGui::MenuItem(materializr::tr("Redo"), "Ctrl+Y", false,
+    if (ImGui::MenuItem(materializr::tr("Redo"), shortcutHint("Ctrl+Y"), false,
                         !histLocked && m_history->canRedo())) {
         redoWithCascade();
     }
@@ -622,7 +636,7 @@ void Application::renderViewMenuItems() {
     // back on toggle. F9 on a keyboard; touch gets edge tabs. This menu
     // item hides/shows BOTH columns at once; the checkmark = both hidden.
     bool bothHidden = m_leftPanelHidden && m_rightPanelHidden;
-    if (ImGui::MenuItem(materializr::tr("Hide Panels"), "F9", bothHidden)) {
+    if (ImGui::MenuItem(materializr::tr("Hide Panels"), shortcutHint("F9"), bothHidden)) {
         bool hide = !bothHidden;
         m_leftPanelHidden = m_rightPanelHidden = hide;
         saveAppSettings();

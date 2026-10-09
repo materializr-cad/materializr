@@ -545,7 +545,9 @@ private:
     // Run `doOpen` now if the document is clean; otherwise route through the
     // unsaved-changes save prompt and run it once that resolves. All project
     // opens (dialog + Open Recent) go through here so none silently discard work.
-    void guardedOpen(std::function<void()> doOpen);
+    // `closingTab`: the deferred action closes a tab rather than opening a project,
+    // which only changes the wording of the unsaved-changes prompt.
+    void guardedOpen(std::function<void()> doOpen, bool closingTab = false);
     // File → Close Project. Prompts to save if dirty (unless autosave is on),
     // then clears the document/history/selection and resets the project path.
     void closeProject();
@@ -2346,6 +2348,7 @@ private:
     // When opening a project (dialog or Open Recent) with unsaved changes, the
     // actual open is deferred here and run after the save prompt resolves.
     std::function<void()> m_pendingOpenAction;
+    bool m_pendingActionClosesTab = false; // wording only; set by guardedOpen
 
     // Settings option: re-open the most recent project on launch (only if it
     // wasn't explicitly closed before quit). The "last open project path" lives
