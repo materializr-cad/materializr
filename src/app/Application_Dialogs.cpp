@@ -1200,7 +1200,7 @@ void Application::renderScalePanel() {
                 // Number pad. Its commit pins the buffer like a keyboard edit
                 // would (focused), or the next frame reseeds it from the
                 // body's current extent and Apply never sees the target.
-                if (materializr::inputNumberText("##mm", edit.buf, sizeof(edit.buf))) {
+                if (materializr::inputNumberText("##extent", edit.buf, sizeof(edit.buf))) {
                     edit.focused = true;
                     edit.bodyId = targetBodyId;
                     edit.initialExtent = userExtents[i];
