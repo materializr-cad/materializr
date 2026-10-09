@@ -1,0 +1,102 @@
+--- a/src/video/uikit/SDL_uikitappdelegate.m	2026-10-08 20:56:36.238575776 -0500
++++ b/src/video/uikit/SDL_uikitappdelegate.m	2026-10-08 20:56:53.183132653 -0500
+@@ -441,7 +441,12 @@
+         vc = [[SDLLaunchScreenController alloc] initWithNibName:screenname bundle:bundle];
+     }
+ 
+-    if (vc.view) {
++    /* Under the UIScene lifecycle no scene exists yet at this point, and a
++     * scene-less UIWindow is exactly what iOS 27 rejects. The system launch
++     * storyboard stays up until the first frame anyway, so just skip ours. */
++    BOOL usesScenes = ([bundle objectForInfoDictionaryKey:@"UIApplicationSceneManifest"] != nil);
++
++    if (vc.view && !usesScenes) {
+         launchWindow = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+ 
+         /* We don't want the launch window immediately hidden when a real SDL
+@@ -521,6 +526,39 @@
+ 
+ @end
+ 
++/* Scene delegate for the UIScene lifecycle (required by iOS 27). Named by
++ * UISceneDelegateClassName in Info.plist's UIApplicationSceneManifest. It lives
++ * in this file so the static-library linker always pulls it in alongside
++ * SDLUIKitDelegate. Windows are attached to the scene in SDL_uikitwindow.m;
++ * app lifecycle still reaches SDL through the UIApplication notifications,
++ * which UIKit keeps posting for scene-based apps. What changes is URL
++ * delivery: application:openURL:options: is no longer called, so documents
++ * opened via "Open in..." arrive here instead. */
++@interface SDLUIKitSceneDelegate : UIResponder <UIWindowSceneDelegate>
++@end
++
++@implementation SDLUIKitSceneDelegate
++
++- (void)forwardURLContexts:(NSSet<UIOpenURLContext *> *)contexts
++{
++    for (UIOpenURLContext *context in contexts) {
++        [[SDLUIKitDelegate sharedAppDelegate] sendDropFileForURL:context.URL];
++    }
++}
++
++- (void)scene:(UIScene *)scene willConnectToSession:(UISceneSession *)session options:(UISceneConnectionOptions *)connectionOptions
++{
++    /* A document that launched the app. */
++    [self forwardURLContexts:connectionOptions.URLContexts];
++}
++
++- (void)scene:(UIScene *)scene openURLContexts:(NSSet<UIOpenURLContext *> *)URLContexts
++{
++    [self forwardURLContexts:URLContexts];
++}
++
++@end
++
+ #endif /* SDL_VIDEO_DRIVER_UIKIT */
+ 
+ /* vi: set ts=4 sw=4 expandtab: */
+--- a/src/video/uikit/SDL_uikitwindow.m	2026-10-08 20:56:36.240415821 -0500
++++ b/src/video/uikit/SDL_uikitwindow.m	2026-10-08 20:56:53.183056941 -0500
+@@ -84,6 +84,28 @@
+ @end
+ 
+ 
++/* iOS 27 terminates apps that don't adopt the UIScene lifecycle, and a window
++ * must be created against a UIWindowScene under it. The scene connects
++ * asynchronously after didFinishLaunching, which can be AFTER SDL_main has
++ * started (SDL runs it from a performSelector:afterDelay:0), so pump the run
++ * loop until one shows up. Returns nil on timeout, in which case the caller
++ * falls back to the legacy scene-less UIWindow. */
++static UIWindowScene *UIKit_WaitForWindowScene(void)
++{
++    const CFAbsoluteTime deadline = CFAbsoluteTimeGetCurrent() + 5.0;
++    for (;;) {
++        for (UIScene *scene in [UIApplication sharedApplication].connectedScenes) {
++            if ([scene isKindOfClass:[UIWindowScene class]]) {
++                return (UIWindowScene *)scene;
++            }
++        }
++        if (CFAbsoluteTimeGetCurrent() >= deadline) {
++            return nil;
++        }
++        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.01, false);
++    }
++}
++
+ static int SetupWindowData(_THIS, SDL_Window *window, UIWindow *uiwindow, SDL_bool created)
+ {
+     SDL_VideoDisplay *display = SDL_GetDisplayForWindow(window);
+@@ -204,7 +226,13 @@
+ 
+         /* ignore the size user requested, and make a fullscreen window */
+         /* !!! FIXME: can we have a smaller view? */
+-        UIWindow *uiwindow = [[SDL_uikitwindow alloc] initWithFrame:data.uiscreen.bounds];
++        UIWindow *uiwindow = nil;
++        UIWindowScene *windowScene = (data.uiscreen == [UIScreen mainScreen]) ? UIKit_WaitForWindowScene() : nil;
++        if (windowScene) {
++            uiwindow = [[SDL_uikitwindow alloc] initWithWindowScene:windowScene];
++        } else {
++            uiwindow = [[SDL_uikitwindow alloc] initWithFrame:data.uiscreen.bounds];
++        }
+ 
+         /* put the window on an external display if appropriate. */
+         if (data.uiscreen != [UIScreen mainScreen]) {

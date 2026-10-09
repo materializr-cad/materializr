@@ -107,7 +107,16 @@ cmake --build "$BUILD/occt-$PLATFORM" --target install -j"$JOBS"
 
 # ── SDL2 (static) ────────────────────────────────────────────────────────────
 fetch "https://github.com/libsdl-org/SDL/releases/download/release-$SDL_VER/SDL2-$SDL_VER.tar.gz" "$DL/sdl2.tar.gz" "$SDL2_SHA256"
-[ -d "$SRC/SDL2-$SDL_VER" ] || tar -xzf "$DL/sdl2.tar.gz" -C "$SRC"
+# Always re-extract so the patch below applies to a pristine tree (re-runs
+# would otherwise stack it).
+rm -rf "$SRC/SDL2-$SDL_VER"
+tar -xzf "$DL/sdl2.tar.gz" -C "$SRC"
+# SDL2's UIKit backend predates the UIScene lifecycle, which iOS 27 enforces for
+# apps built with the iOS 27 SDK (scene-less apps are killed at launch with
+# EXC_BREAKPOINT in UIKit, #129). This adds scene-attached windows and a scene
+# delegate; the matching Info.plist UIApplicationSceneManifest is in
+# ios/Info.plist.in. Drop this once we are on SDL3, which supports scenes natively.
+patch -d "$SRC/SDL2-$SDL_VER" -p1 < "$(cd "$(dirname "$0")/.." && pwd)/patches/sdl2-uikit-scene-lifecycle.patch"
 rm -rf "$BUILD/sdl2-$PLATFORM"
 # Joystick/haptic/sensor/hidapi OFF: a CAD app uses none of them, and their
 # iOS backends reference CoreBluetooth/CoreMotion/CoreHaptics/GameController -

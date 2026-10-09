@@ -24,6 +24,17 @@ runtime *touch mode*.
 | OCCT / deps | shared `.so`, NDK | **static** `.a`, Xcode | `ios/scripts/setup-deps.sh` |
 | Background GL | activity pause handles it | hard gate on `SDL_APP_WILLENTERBACKGROUND` | `src/ios_platform.mm` + `Application.cpp` |
 
+## UIScene lifecycle (iOS 27)
+
+iOS 27 kills apps built with its SDK that don't adopt the UIScene lifecycle
+(`EXC_BREAKPOINT` in `UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption`,
+#129), and SDL2's UIKit backend predates scenes. `setup-deps.sh` therefore applies
+`ios/patches/sdl2-uikit-scene-lifecycle.patch` to the SDL2 source (scene-attached
+windows + an `SDLUIKitSceneDelegate`), and `Info.plist.in` carries the matching
+`UIApplicationSceneManifest`. After pulling this, **re-run `setup-deps.sh`** so the
+static SDL2 is rebuilt with the patch, or the manifest points at a class that
+does not exist. The patch goes away with the move to SDL3.
+
 ## Prerequisites
 
 - macOS with **Xcode 15+** (`xcode-select --install` done, an iOS SDK present)
