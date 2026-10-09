@@ -32,30 +32,40 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include(FetchContent)
 
-# SDL2 - the windowing/input backend on every platform (the Android port
-# unified desktop + touch on SDL2; src/app/Window.cpp is SDL-based, replacing
-# the old GLFW backend). Prefer the system/vcpkg package; fall back to building
-# 2.30.9 from source - the same version android/scripts/setup-deps.sh pins -
-# which on Linux needs the X11 dev headers already required for the GL stack.
-find_package(SDL2 CONFIG QUIET)
-if(NOT SDL2_FOUND)
-    message(STATUS "System SDL2 not found - fetching and building 2.30.9 from source")
+# SDL3 - the windowing/input backend on every platform (desktop and the
+# Android/iOS ports share src/app/Window.cpp). Pinned to ONE exact release, like
+# OCCT and ImGui: prefer a system/vcpkg package only if it is at least the pin,
+# otherwise build the pinned release tarball from source. On Linux that gives
+# both X11 and Wayland backends from whatever dev headers are present (SDL
+# vendors the Wayland protocol XMLs, it only needs wayland-scanner); libdecor
+# is dlopen()ed at runtime, never a hard dependency.
+set(MZ_SDL3_VERSION 3.4.18)
+find_package(SDL3 ${MZ_SDL3_VERSION} CONFIG QUIET)
+if(NOT SDL3_FOUND)
+    message(STATUS "System SDL3 >= ${MZ_SDL3_VERSION} not found - fetching and building it from source")
     FetchContent_Declare(
-        sdl2
-        GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
-        GIT_TAG        release-2.30.9
+        sdl3
+        URL      https://github.com/libsdl-org/SDL/releases/download/release-${MZ_SDL3_VERSION}/SDL3-${MZ_SDL3_VERSION}.tar.gz
+        URL_HASH SHA256=9c75cf16330322c217dedd2e0609f1124f1b54b8633e763467b4684d0f4334a3
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     )
-    set(SDL_TEST OFF CACHE BOOL "" FORCE)
-    set(SDL2_DISABLE_INSTALL ON CACHE BOOL "" FORCE)
-    FetchContent_MakeAvailable(sdl2)
+    set(SDL_TESTS OFF CACHE BOOL "" FORCE)
+    set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
+    set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(SDL_INSTALL OFF CACHE BOOL "" FORCE)
+    # XTEST is only used to fake key events that reset the idle timer while the
+    # screensaver is inhibited - which we never do (Window.cpp allows it) - and
+    # it would make libxtst-dev a hard build dependency.
+    set(SDL_X11_XTEST OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(sdl3)
 endif()
 # Normalise the target name across find_package configs and source builds.
-if(TARGET SDL2::SDL2)
-    set(MZ_SDL2_TARGET SDL2::SDL2)
-elseif(TARGET SDL2)
-    set(MZ_SDL2_TARGET SDL2)
+if(TARGET SDL3::SDL3)
+    set(MZ_SDL_TARGET SDL3::SDL3)
+elseif(TARGET SDL3-shared)
+    set(MZ_SDL_TARGET SDL3-shared)
 else()
-    message(FATAL_ERROR "SDL2 target not found after find_package/FetchContent")
+    message(FATAL_ERROR "SDL3 target not found after find_package/FetchContent")
 endif()
 
 # GLM
@@ -117,14 +127,14 @@ add_library(imgui_lib STATIC
     ${imgui_SOURCE_DIR}/imgui_draw.cpp
     ${imgui_SOURCE_DIR}/imgui_tables.cpp
     ${imgui_SOURCE_DIR}/imgui_widgets.cpp
-    ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl2.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl3.cpp
     ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
 )
 target_include_directories(imgui_lib PUBLIC
     ${imgui_SOURCE_DIR}
     ${imgui_SOURCE_DIR}/backends
 )
-target_link_libraries(imgui_lib PUBLIC ${MZ_SDL2_TARGET})
+target_link_libraries(imgui_lib PUBLIC ${MZ_SDL_TARGET})
 
 # ─── Find system packages ────────────────────────────────────────────────────
 
@@ -441,7 +451,7 @@ target_include_directories(materializr SYSTEM PRIVATE
 
 target_link_libraries(materializr PRIVATE
     imgui_lib
-    ${MZ_SDL2_TARGET}
+    ${MZ_SDL_TARGET}
     OpenGL::GL
     glm::glm
 )

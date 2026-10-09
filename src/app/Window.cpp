@@ -4,8 +4,8 @@
 #include "touch_mode.h"
 #include "platform_sdl.h"
 #include "mobile_files.h" // mobileShow/HideTextInput (no-ops on desktop and iOS)
-#include <SDL.h>
-#include <imgui_impl_sdl2.h>
+#include <SDL3/SDL.h>
+#include <imgui_impl_sdl3.h>
 #include <imgui_internal.h> // g.MovingWindow - let tab-drag (re-dock) beat drag-to-scroll
 #include <stdexcept>
 #include <iostream>
@@ -15,49 +15,82 @@
 #include <cfloat>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#if defined(__linux__) && !defined(__ANDROID__)
+#include <dlfcn.h>
+#endif
 
 namespace materializr {
 
 // Declared in gl_common.h; overwritten on iOS in the constructor below.
 unsigned int g_windowFramebuffer = 0;
 
-#if defined(__linux__) && !defined(__ANDROID__)
-// ─── Linux HiDPI, detected instead of asked ──────────────────────────────────
-// Issue #26 concluded that DPI auto-detection "is unreliable across X11/
-// Xwayland/GNOME/KDE" and made the scale a manual Low/High setting. That was
-// half right, and the half it got wrong is the half that matters:
-//
-//   xdpyinfo  → "3840x2400 pixels (1016x635 millimeters), 96x96 dpi"
-//   xrandr    → "eDP-2 3840x2400  340mm x 220mm"        = 287 dpi, the truth
-//
-// The SCREEN-level size is a fiction XWayland synthesises by assuming 96 dpi
-// (3840px / 96 = 40in = 1016mm), which is where the "unreliable" reputation
-// comes from. But SDL's X11 backend reads the per-OUTPUT RandR physical size,
-// so SDL_GetDisplayDPI returns the real 284 dpi on the same machine. Measured
-// on Steve's Framework 16, 2026-08-18.
-//
-// Deliberately BINARY (1x or 2x), for two reasons. It exactly replaces the
-// setting it removes - which only ever offered Low/High - so nobody loses a
-// choice they had. And the raw ratio is the wrong target anyway: 284/96 = 2.96
-// would give a 3x UI, where the compositor running that panel is at 200%. What
-// makes the app look native is matching the SESSION's scale, not the physics,
-// and on every panel worth scaling the session's answer is 2x.
-//
-// The 150 dpi threshold sits in the empty gap between the two clusters of real
-// hardware: desktop monitors land at 96–110 (24" 1080p, 27" 1440p), while
-// anything that wants scaling starts around 160 (27" 4K) and climbs through
-// 200 (Framework 13) to 290 (Framework 16). Nothing real sits near 150.
-constexpr float kHiDpiThreshold = 150.0f;
+namespace {
 
-float linuxAutoUiScale() {
-    float ddpi = 0.0f, hdpi = 0.0f, vdpi = 0.0f;
-    // Needs SDL_INIT_VIDEO up; every caller runs after the Window constructor's
-    // SDL_Init. A failure here means "no display info", which is the 1x case.
-    if (SDL_GetDisplayDPI(0, &ddpi, &hdpi, &vdpi) != 0 || ddpi <= 0.0f)
-        return 1.0f;
-    return (ddpi >= kHiDpiThreshold) ? 2.0f : 1.0f;
+// Content scale of the primary display (1.0 when unknown). Needs the video
+// subsystem up.
+float primaryDisplayScale() {
+    const float s = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
+    return s > 0.0f ? s : 1.0f;
+}
+
+#if defined(__linux__) && !defined(__ANDROID__)
+// ─── Linux video driver policy ───────────────────────────────────────────────
+// SDL3 prefers native Wayland on a Wayland session and falls back to X11 by
+// itself if Wayland can't start, so by default we just let it choose. The user
+// always has the last word: SDL_VIDEO_DRIVER / SDL_VIDEODRIVER in the
+// environment, or --x11 (main.cpp sets the same variable).
+//
+// One case SDL cannot detect for us: GNOME's compositor (Mutter) does not draw
+// window decorations, so a native Wayland client needs libdecor to get a title
+// bar. Without it the window is undecorated - it cannot be moved or closed.
+// libdecor is dlopen()ed by SDL, so it is optional on the host; when it is
+// missing on GNOME we take XWayland instead (a decorated window), and keep
+// Wayland as the second choice for a session that has no XWayland at all.
+bool libdecorAvailable() {
+    void* h = dlopen("libdecor-0.so.0", RTLD_LAZY | RTLD_LOCAL);
+    if (!h) return false;
+    dlclose(h);
+    return true;
+}
+
+void chooseLinuxVideoDriver() {
+    if (std::getenv("SDL_VIDEO_DRIVER") || std::getenv("SDL_VIDEODRIVER"))
+        return;                                   // explicit choice wins
+    if (!std::getenv("WAYLAND_DISPLAY"))
+        return;                                   // X11 session: SDL's default is right
+    const char* desktop = std::getenv("XDG_CURRENT_DESKTOP");
+    const bool gnome = desktop && std::strstr(desktop, "GNOME") != nullptr;
+    if (gnome && !libdecorAvailable()) {
+        std::fprintf(stderr, "[video] GNOME Wayland without libdecor: using "
+                             "XWayland for window decorations (install "
+                             "libdecor-0-0 for native Wayland)\n");
+        SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "x11,wayland");
+    }
 }
 #endif
+
+// True for drivers whose window coordinates are POINTS with a separate pixel
+// density (macOS, iOS, Wayland); false where coordinates are device pixels and
+// HiDPI is a content scale the app must apply itself (Windows, X11, Android).
+// See SDL's README-highdpi. Decided from the driver, not from the window's
+// pixel density: a Wayland window only learns its scale after its first
+// configure, so the density can still read 1.0 right after creation.
+bool driverUsesPoints(SDL_Window* window) {
+    const char* drv = SDL_GetCurrentVideoDriver();
+    if (drv) {
+        if (!std::strcmp(drv, "wayland") || !std::strcmp(drv, "cocoa") ||
+            !std::strcmp(drv, "uikit"))
+            return true;
+        if (!std::strcmp(drv, "x11") || !std::strcmp(drv, "windows") ||
+            !std::strcmp(drv, "android"))
+            return false;
+    }
+    return SDL_GetWindowPixelDensity(window) > 1.0f;
+}
+
+} // namespace
 
 Window::Window(int width, int height, const std::string& title,
                float uiScaleHint)
@@ -77,35 +110,21 @@ Window::Window(int width, int height, const std::string& title,
         SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
 #endif
 
-#if defined(_WIN32)
-    // Per-monitor-v2 DPI awareness (SDL 2.24+) so Windows renders us at NATIVE
-    // resolution instead of bitmap-upscaling a virtualised low-res desktop -
-    // the upscale is what made the whole UI blurry on a scaled (125–200%)
-    // laptop display. We deliberately do NOT set SDL_HINT_WINDOWS_DPI_SCALING:
-    // that makes SDL report the window in points and hand back a >1
-    // DisplayFramebufferScale, which would double-scale against our own
-    // uiScale(). Instead window + drawable stay in physical pixels (so the 3D
-    // viewport is crisp at native res) and uiScale() sizes the UI up by the
-    // display DPI so fonts/panels stay legible. Must precede SDL_Init.
-    SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitorv2");
-#endif
-
-    // Let the screen blank/lock and the machine idle-suspend normally. SDL
-    // assumes it is running a game and inhibits the screensaver at video init
-    // (on Linux that's a GNOME/freedesktop idle inhibitor literally reasoned
-    // "Playing a game"), which held the idle timer off for as long as the app
-    // was open - laptops left with a model on screen ran their battery flat
-    // instead of suspending. A CAD app is a document editor: it should idle out
-    // like every other one. Must precede SDL_Init - the video subsystem reads
-    // this once as it comes up.
+    // Let the screen blank/lock and the machine idle-suspend normally. A CAD
+    // app is a document editor: it should idle out like every other one, not
+    // hold the idle timer off for as long as it is open (SDL2 inhibited the
+    // screensaver by default - on Linux a GNOME idle inhibitor literally reasoned
+    // "Playing a game" - and laptops left with a model on screen ran their
+    // battery flat). Set before SDL_Init: the video subsystem reads it once.
     SDL_SetHint(SDL_HINT_VIDEO_ALLOW_SCREENSAVER, "1");
 
-    // NOTE: the port uses SDL2 on every platform, so upstream's GLFW-only X11/
-    // Wayland drag-and-drop workaround doesn't apply here (kept the SDL init).
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) != 0) {
+#if defined(__linux__) && !defined(__ANDROID__)
+    chooseLinuxVideoDriver();
+#endif
+
+    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         throw std::runtime_error(std::string("Failed to initialize SDL: ") + SDL_GetError());
     }
-
 
     // Request the right GL context per platform. Desktop: GL 3.3 Core. Android:
     // GL ES 3.0 (same shader/feature subset Materializr uses).
@@ -131,83 +150,84 @@ Window::Window(int width, int height, const std::string& title,
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 
-    Uint32 flags = SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_SHOWN
-                 | SDL_WINDOW_RESIZABLE;
+    SDL_WindowFlags flags = SDL_WINDOW_OPENGL | SDL_WINDOW_HIGH_PIXEL_DENSITY
+                          | SDL_WINDOW_RESIZABLE;
     // Deliberately NOT SDL_WINDOW_FULLSCREEN on Android: SDL turns that into the
     // window-level FLAG_FULLSCREEN, which Lenovo/Samsung "desktop / PC mode" reads
     // as "maximize me and hide the taskbar" (normal apps like Chrome never set
     // it). The bare-tablet edge-to-edge look comes from MaterializrActivity's
     // immersive system-UI flags instead - those hide the bars without that flag,
     // so in a desktop dock the app stays a normal window with the taskbar intact.
-
-    // The window is created in PHYSICAL pixels while the UI inside it is sized
-    // by uiScale(), so the default 1600×900 has to be scaled by the SAME factor
-    // or a HiDPI panel gets a window holding half as much UI as a low-DPI one -
-    // 1600×900 physical at 2x is 800×450 of usable room, which jams every
-    // toolbar against the viewport. Scaling by uiScale() keeps the LOGICAL size
-    // constant: the app opens showing the same amount at any density.
-    //
-    // At scale 1.0 this multiplies by one, so a low-DPI screen keeps exactly
-    // today's 1600×900 and can't be accidentally oversized. The clamp below
-    // then caps the result to the work area on genuinely small panels.
-    {
-        float sc = 1.0f;
-#if defined(_WIN32)
-        // Windows derives it from the display DPI directly (per-monitor-v2
-        // awareness is on, so uiScale() reads the same number).
-        float ddpi = 96.0f, hh = 0.0f, vv = 0.0f;
-        if (SDL_GetDisplayDPI(0, &ddpi, &hh, &vv) == 0 && ddpi > 96.0f)
-            sc = std::min(ddpi / 96.0f, 3.0f);
-#elif defined(__linux__) && !defined(__ANDROID__)
-        // Whatever uiScale() will report - the CLI hint when one was passed
-        // (setUiScaleOverride lands too late to be read here), else detection.
-        sc = (uiScaleHint > 0.0f) ? uiScaleHint : linuxAutoUiScale();
-#endif
-        if (sc > 1.0f) {
-            m_width  = static_cast<int>(m_width  * sc);
-            m_height = static_cast<int>(m_height * sc);
-        }
-        std::fprintf(stderr, "[hidpi] initial window scale=%.2f -> %dx%d "
-                             "(hint=%.2f)\n", sc, m_width, m_height, uiScaleHint);
-    }
-
-    // Clamp the fixed initial size to the display's usable area (the screen minus
-    // the taskbar) BEFORE creating the window. Now that the process is per-monitor
-    // DPI-aware (see the SDL_HINT_WINDOWS_DPI_AWARENESS above), both the create
-    // size and SDL_GetDisplayUsableBounds are in PHYSICAL pixels, so the two are
-    // in the same coordinate space and the clamp is apples-to-apples. On a small
-    // or low-res laptop panel the hardcoded 1600×900 can still exceed the work
-    // area (e.g. a 1366×768 screen), so we clamp + start maximized rather than
-    // spill past the taskbar / title bar / dock panels; roomier screens are
-    // untouched, and Android overrides the size below regardless. (Pre-DPI-aware
-    // this also fixed the *virtualised* small-desktop overflow at 125–150%
-    // scaling; the crisp-rendering fix removed the virtualisation, the clamp still
-    // guards genuinely small panels.) Leave a margin for the window's own borders.
-    SDL_Rect usable;
-    if (SDL_GetDisplayUsableBounds(0, &usable) == 0 && usable.w > 0 && usable.h > 0) {
-        const int marginW = 16;  // left+right borders
-        const int marginH = 64;  // title bar + bottom border
-        const int maxW = usable.w - marginW;
-        const int maxH = usable.h - marginH;
-        bool clamped = false;
-        if (maxW > 0 && m_width  > maxW) { m_width  = maxW; clamped = true; }
-        if (maxH > 0 && m_height > maxH) { m_height = maxH; clamped = true; }
 #if !defined(MZ_MOBILE)
-        // On a screen too small for the default size, also start maximized so the
-        // app fills the work area immediately. The clamped values above become the
-        // window's *restore* size, so un-maximizing - or a minimize→restore - drops
-        // back to a size that still fits the screen instead of overrunning it again.
-        if (clamped) flags |= SDL_WINDOW_MAXIMIZED;
+    // Desktop: create hidden. The right size depends on a display scale we can
+    // only read once the window exists, so size it first and show it after -
+    // no flash of a wrongly-sized window.
+    flags |= SDL_WINDOW_HIDDEN;
 #endif
-    }
 
-    m_window = SDL_CreateWindow(title.c_str(),
-                                SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                                m_width, m_height, flags);
+    m_window = SDL_CreateWindow(title.c_str(), m_width, m_height, flags);
     if (!m_window) {
         SDL_Quit();
         throw std::runtime_error(std::string("Failed to create SDL window: ") + SDL_GetError());
     }
+
+    // Coordinate model + display scale, fixed for the session (the font atlas
+    // and style are baked from uiScale() once, at startup).
+    m_pointsMode = driverUsesPoints(m_window);
+    {
+        float ds = SDL_GetWindowDisplayScale(m_window);
+        m_displayScale = ds > 0.0f ? ds : primaryDisplayScale();
+    }
+
+#if !defined(MZ_MOBILE)
+    // The window is created in the platform's coordinate unit, while the UI
+    // inside it is sized by uiScale(). Where that unit is device pixels
+    // (Windows, X11) a 1600x900 default is half the usable room on a 2x panel
+    // and jams every toolbar against the viewport, so scale it by the SAME
+    // factor as the UI: the app then opens showing the same amount at any
+    // density. Where the unit is points (Wayland, macOS) the compositor has
+    // already done it. At scale 1.0 this changes nothing, so a low-DPI screen
+    // keeps exactly 1600x900.
+    {
+        float sc = 1.0f;
+        if (!m_pointsMode)
+            sc = (uiScaleHint > 0.0f) ? uiScaleHint
+                                      : std::min(std::max(m_displayScale, 1.0f), 3.0f);
+        if (sc > 1.0f) {
+            m_width  = static_cast<int>(m_width  * sc);
+            m_height = static_cast<int>(m_height * sc);
+        }
+        std::fprintf(stderr, "[hidpi] driver=%s points=%d displayScale=%.2f -> "
+                             "initial window scale=%.2f -> %dx%d (hint=%.2f)\n",
+                     SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "?",
+                     m_pointsMode ? 1 : 0, m_displayScale, sc, m_width, m_height,
+                     uiScaleHint);
+    }
+
+    // Clamp the initial size to the display's usable area (the screen minus the
+    // taskbar) before showing: on a small panel (e.g. 1366x768) the default
+    // would spill past the taskbar / title bar / dock, so clamp and start
+    // maximized instead. Roomier screens are untouched. The clamped values
+    // become the window's *restore* size, so un-maximizing drops back to a size
+    // that still fits. Leave a margin for the window's own borders.
+    bool maximize = false;
+    {
+        SDL_Rect usable;
+        if (SDL_GetDisplayUsableBounds(SDL_GetDisplayForWindow(m_window), &usable) &&
+            usable.w > 0 && usable.h > 0) {
+            const int marginW = 16;  // left+right borders
+            const int marginH = 64;  // title bar + bottom border
+            const int maxW = usable.w - marginW;
+            const int maxH = usable.h - marginH;
+            if (maxW > 0 && m_width  > maxW) { m_width  = maxW; maximize = true; }
+            if (maxH > 0 && m_height > maxH) { m_height = maxH; maximize = true; }
+        }
+    }
+    SDL_SetWindowSize(m_window, m_width, m_height);
+    SDL_SetWindowPosition(m_window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+    if (maximize) SDL_MaximizeWindow(m_window);
+    SDL_ShowWindow(m_window);
+#endif
 
     m_glContext = SDL_GL_CreateContext(m_window);
     if (!m_glContext) {
@@ -263,21 +283,21 @@ Window::Window(int width, int height, const std::string& title,
 }
 
 Window::~Window() {
-    if (m_glContext) SDL_GL_DeleteContext(static_cast<SDL_GLContext>(m_glContext));
+    if (m_glContext) SDL_GL_DestroyContext(static_cast<SDL_GLContext>(m_glContext));
     if (m_window) SDL_DestroyWindow(m_window);
     SDL_Quit();
 }
 
 void Window::initImGuiBackend() {
-    ImGui_ImplSDL2_InitForOpenGL(m_window, m_glContext);
+    ImGui_ImplSDL3_InitForOpenGL(m_window, static_cast<SDL_GLContext>(m_glContext));
 }
 
 void Window::newImGuiFrame() {
-    ImGui_ImplSDL2_NewFrame();
+    ImGui_ImplSDL3_NewFrame();
 }
 
 void Window::shutdownImGuiBackend() {
-    ImGui_ImplSDL2_Shutdown();
+    ImGui_ImplSDL3_Shutdown();
 }
 
 void Window::swapBuffers() {
@@ -291,7 +311,7 @@ void Window::swapBuffers() {
 
 bool Window::isForeground() const {
     if (!m_window) return true;
-    Uint32 f = SDL_GetWindowFlags(m_window);
+    const SDL_WindowFlags f = SDL_GetWindowFlags(m_window);
     if (f & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN)) return false;
     return (f & SDL_WINDOW_INPUT_FOCUS) != 0;
 }
@@ -311,35 +331,30 @@ int Window::pollEvents(int waitMs) {
         // Classify the event before handing it to ImGui.
         if (result < 2) {
             switch (e.type) {
-                case SDL_KEYDOWN: case SDL_KEYUP:
-                case SDL_MOUSEBUTTONDOWN: case SDL_MOUSEBUTTONUP:
-                case SDL_MOUSEWHEEL:
-                case SDL_TEXTINPUT: case SDL_TEXTEDITING:
-                case SDL_DROPFILE:
-                case SDL_QUIT:
-                case SDL_FINGERDOWN: case SDL_FINGERUP:
+                case SDL_EVENT_KEY_DOWN: case SDL_EVENT_KEY_UP:
+                case SDL_EVENT_MOUSE_BUTTON_DOWN: case SDL_EVENT_MOUSE_BUTTON_UP:
+                case SDL_EVENT_MOUSE_WHEEL:
+                case SDL_EVENT_TEXT_INPUT: case SDL_EVENT_TEXT_EDITING:
+                case SDL_EVENT_DROP_FILE:
+                case SDL_EVENT_QUIT:
+                case SDL_EVENT_FINGER_DOWN: case SDL_EVENT_FINGER_UP:
+                case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+                case SDL_EVENT_WINDOW_RESIZED:
+                case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+                case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
+                case SDL_EVENT_WINDOW_FOCUS_GAINED:
+                case SDL_EVENT_WINDOW_FOCUS_LOST:
+                case SDL_EVENT_WINDOW_SHOWN:
+                case SDL_EVENT_WINDOW_RESTORED:
+                case SDL_EVENT_WINDOW_MAXIMIZED:
+                case SDL_EVENT_WINDOW_MINIMIZED:
                     result = 2;
                     break;
-                case SDL_WINDOWEVENT:
-                    switch (e.window.event) {
-                        case SDL_WINDOWEVENT_RESIZED:
-                        case SDL_WINDOWEVENT_SIZE_CHANGED:
-                        case SDL_WINDOWEVENT_FOCUS_GAINED:
-                        case SDL_WINDOWEVENT_FOCUS_LOST:
-                        case SDL_WINDOWEVENT_SHOWN:
-                        case SDL_WINDOWEVENT_RESTORED:
-                        case SDL_WINDOWEVENT_MAXIMIZED:
-                        case SDL_WINDOWEVENT_MINIMIZED:
-                            result = 2; break;
-                        default: // EXPOSED and others - need 1 repaint, not 5
-                            if (result < 1) result = 1; break;
-                    }
-                    break;
-                case SDL_MOUSEMOTION:
-                case SDL_FINGERMOTION:
+                case SDL_EVENT_MOUSE_MOTION:
+                case SDL_EVENT_FINGER_MOTION:
                     if (result < 1) result = 1;
                     break;
-                default:
+                default: // EXPOSED and the rest - need 1 repaint, not 5
                     if (result < 1) result = 1;
                     break;
             }
@@ -350,32 +365,27 @@ int Window::pollEvents(int waitMs) {
         // trackpad mode); two fingers pan/pinch-zoom the camera.
         //
         // touchInputActive() is checked FIRST so that on an opted-out desktop
-        // the finger events fall through to ImGui_ImplSDL2_ProcessEvent below
+        // the finger events fall through to ImGui_ImplSDL3_ProcessEvent below
         // and SDL's synthesis keeps working exactly as it did before.
         if (materializr::touchInputActive() &&
-            (e.type == SDL_FINGERDOWN || e.type == SDL_FINGERMOTION || e.type == SDL_FINGERUP)) {
-            handleFingerEvent(e.type, (std::int64_t)e.tfinger.fingerId, e.tfinger.x, e.tfinger.y);
+            (e.type == SDL_EVENT_FINGER_DOWN || e.type == SDL_EVENT_FINGER_MOTION || e.type == SDL_EVENT_FINGER_UP)) {
+            handleFingerEvent(e.type, (std::int64_t)e.tfinger.fingerID, e.tfinger.x, e.tfinger.y);
             continue;   // don't also route finger events through the backend
         }
 #endif
         // Feed every event to ImGui (handles mouse, keyboard, text).
-        ImGui_ImplSDL2_ProcessEvent(&e);
+        ImGui_ImplSDL3_ProcessEvent(&e);
         switch (e.type) {
-            case SDL_QUIT:
+            case SDL_EVENT_QUIT:
                 m_shouldClose = true;
                 break;
-            case SDL_DROPFILE:
-                // SDL hands over an SDL_malloc'd path that we own.
-                if (e.drop.file) {
-                    m_droppedFiles.emplace_back(e.drop.file);
-                    SDL_free(e.drop.file);
-                }
+            case SDL_EVENT_DROP_FILE:
+                // SDL3 owns the path; copy it, never free it.
+                if (e.drop.data) m_droppedFiles.emplace_back(e.drop.data);
                 break;
-            case SDL_WINDOWEVENT:
-                if (e.window.event == SDL_WINDOWEVENT_CLOSE &&
-                    e.window.windowID == SDL_GetWindowID(m_window)) {
+            case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+                if (e.window.windowID == SDL_GetWindowID(m_window))
                     m_shouldClose = true;
-                }
                 break;
             default:
                 break;
@@ -399,7 +409,7 @@ void Window::handleFingerEvent(unsigned type, std::int64_t id, float nx, float n
 
     auto it = std::find_if(m_fingers.begin(), m_fingers.end(),
                            [&](const Finger& f) { return f.id == id; });
-    if (type == SDL_FINGERDOWN) {
+    if (type == SDL_EVENT_FINGER_DOWN) {
         if (m_fingers.empty()) {
             // New touch session (first finger of a fresh contact).
             m_sessionStartTicks = platformTicksMs();
@@ -409,10 +419,10 @@ void Window::handleFingerEvent(unsigned type, std::int64_t id, float nx, float n
         }
         if (it == m_fingers.end()) m_fingers.push_back({id, x, y});
         else { it->x = x; it->y = y; }
-    } else if (type == SDL_FINGERMOTION) {
+    } else if (type == SDL_EVENT_FINGER_MOTION) {
         if (it == m_fingers.end()) return;
         it->x = x; it->y = y;
-    } else { // SDL_FINGERUP
+    } else { // SDL_EVENT_FINGER_UP
         if (it != m_fingers.end()) m_fingers.erase(it);
     }
 
@@ -425,7 +435,7 @@ void Window::handleFingerEvent(unsigned type, std::int64_t id, float nx, float n
         const float sx = m_fingers[0].x - m_fingers[1].x;
         const float sy = m_fingers[0].y - m_fingers[1].y;
         const float dist = std::sqrt(sx * sx + sy * sy);
-        if (m_twoFinger && type == SDL_FINGERUP) {
+        if (m_twoFinger && type == SDL_EVENT_FINGER_UP) {
             // A finger lifted but 2+ remain: the tracked pair changed, so
             // centroid/spacing jumped. Re-anchor instead of accumulating the
             // jump as pan/zoom (which would also veto the multi-finger tap).
@@ -515,7 +525,7 @@ void Window::handleFingerEvent(unsigned type, std::int64_t id, float nx, float n
         // buttons stay clickable; Move mode is enforced at the viewport level
         // (it gates drawing/selection there, not the raw input here).
         io.AddMouseSourceEvent(ImGuiMouseSource_TouchScreen);
-        if (type == SDL_FINGERDOWN && !m_leftDown) {
+        if (type == SDL_EVENT_FINGER_DOWN && !m_leftDown) {
             io.AddMousePosEvent(m_fingers[0].x, m_fingers[0].y);
             io.AddMouseButtonEvent(0, true);
             m_leftDown = true;
@@ -527,7 +537,7 @@ void Window::handleFingerEvent(unsigned type, std::int64_t id, float nx, float n
             m_panelScroll = false;
             m_scrollArmed = false;
             m_lastScrollY = m_fingers[0].y;
-        } else if (type == SDL_FINGERMOTION) {
+        } else if (type == SDL_EVENT_FINGER_MOTION) {
             // Track movement even after the hold arms: a hold that then drags is
             // a box-select; a hold that never moves is a long-press (menu).
             const float dx = m_fingers[0].x - m_downX, dy = m_fingers[0].y - m_downY;
@@ -766,14 +776,14 @@ bool Window::consumeRedoTap() {
 void Window::updateTextInput(bool wantTextInput, bool retapPulse) {
 #if defined(MZ_MOBILE)
     if (wantTextInput && !m_textInputActive) {
-        SDL_StartTextInput();              // enables SDL_TEXTINPUT events
+        SDL_StartTextInput(m_window);      // enables SDL_EVENT_TEXT_INPUT events
         // SDL's own keyboard-raise is gated on SDL_GetFocusWindow() != NULL,
         // which is NULL in our immersive surface, so it no-ops. Raise the IME
         // ourselves via SDLActivity (text still routes through SDL → ImGui).
         mobileShowTextInput();
         m_textInputActive = true;
     } else if (!wantTextInput && m_textInputActive) {
-        SDL_StopTextInput();
+        SDL_StopTextInput(m_window);
         mobileHideTextInput();
         m_textInputActive = false;
     } else if (wantTextInput && m_textInputActive && retapPulse) {
@@ -789,8 +799,8 @@ void Window::updateTextInput(bool wantTextInput, bool retapPulse) {
         //   its hidden UITextField resigns/re-becomes first responder, which
         //   re-presents the keyboard (back-to-back, so no visible flicker
         //   when it was already up).
-        SDL_StopTextInput();
-        SDL_StartTextInput();
+        SDL_StopTextInput(m_window);
+        SDL_StartTextInput(m_window);
         mobileShowTextInput();
     }
 #else
@@ -800,34 +810,34 @@ void Window::updateTextInput(bool wantTextInput, bool retapPulse) {
 }
 
 void Window::framebufferSize(int& w, int& h) const {
-    SDL_GL_GetDrawableSize(m_window, &w, &h);
+    SDL_GetWindowSizeInPixels(m_window, &w, &h);
 }
 
 void Window::applyCursorScale() {
 #if defined(__linux__) && !defined(__ANDROID__)
-    // Cursor size, for the same reason as the UI scale and with the same
-    // answer. We never create a cursor ourselves, but ImGui's SDL backend makes
-    // eight system cursors from the X theme at init - and Xcursor sizes those
-    // from XCURSOR_SIZE as it loads them. A Wayland session exports the
-    // UNSCALED size (24) and scales cursors compositor-side for its OWN
-    // surfaces; our XWayland window gets no such treatment, so the pointer
-    // renders at 24 PHYSICAL pixels and becomes a speck on a HiDPI panel -
-    // which is why it looked fine on the external monitors and vanished on the
-    // Framework's built-in display.
+    // X11/XWayland only: size the X theme cursors to match uiScale(). SDL's X11
+    // backend loads its cursors through Xcursor, which reads XCURSOR_SIZE as
+    // each is created - and never again. A Wayland session exports the UNSCALED
+    // size (24) and scales cursors compositor-side for its OWN surfaces; an
+    // XWayland window gets no such treatment, so the pointer renders at 24
+    // PHYSICAL pixels and becomes a speck on a HiDPI panel. Native Wayland
+    // windows are cursor-scaled by SDL itself, so there is nothing to do there.
     //
     // Call after the UI scale is final (so --ui-scale carries the cursor too)
-    // and BEFORE ImGui_ImplSDL2_Init creates the cursors; nothing re-reads this
-    // afterwards. Only ever RAISES the size - a session that already exported
-    // something larger has a user or a desktop environment behind it, and knows
-    // more than this heuristic does.
+    // and BEFORE the ImGui backend creates its system cursors; nothing re-reads
+    // this afterwards. Only ever RAISES the size - a session that already
+    // exported something larger has a user or a desktop environment behind it,
+    // and knows more than this heuristic does.
+    const char* drv = SDL_GetCurrentVideoDriver();
+    if (!drv || std::strcmp(drv, "x11") != 0) return;
     const int base = 24;   // the X default, and what Wayland sessions export
     const int want = static_cast<int>(base * uiScale() + 0.5f);
-    const char* cur = SDL_getenv("XCURSOR_SIZE");
-    const int have = cur ? SDL_atoi(cur) : 0;
+    const char* cur = std::getenv("XCURSOR_SIZE");
+    const int have = cur ? std::atoi(cur) : 0;
     if (want > have) {
         char buf[16];
-        SDL_snprintf(buf, sizeof(buf), "%d", want);
-        SDL_setenv("XCURSOR_SIZE", buf, 1);
+        std::snprintf(buf, sizeof(buf), "%d", want);
+        setenv("XCURSOR_SIZE", buf, 1);
     }
 #endif
 }
@@ -836,58 +846,43 @@ float Window::uiScale() const {
     if (materializr::touchMode()) {
 #if defined(MZ_IOS)
         // iOS window coords are POINTS - the OS already normalizes density
-        // (the drawable is the 2-3x pixel surface underneath). SDL's reported
-        // display DPI is a synthetic 160·scale, not physical, so no formula:
-        // desktop density is the right size in point space.
+        // (the drawable is the 2-3x pixel surface underneath), so desktop
+        // density is the right size in point space.
         return 1.0f;
 #else
-        // Scale the desktop-density UI up for a touch screen. Use the physical
-        // DPI against a 96-dpi baseline (so a 240-dpi tablet -> 2.5x), clamped.
-        float ddpi = 240.0f, hdpi = 0.0f, vdpi = 0.0f;
-        if (SDL_GetDisplayDPI(0, &ddpi, &hdpi, &vdpi) != 0 || ddpi <= 0.0f) ddpi = 240.0f;
-        float s = ddpi / 120.0f;    // 240-dpi tablet -> 2.0x (was 2.5x, a bit too big)
+        // Scale the desktop-density UI up for a touch screen. SDL's convention
+        // is ~160 dpi per unit of display scale on Android, so a 240-dpi
+        // tablet (1.5) -> 2.0x against a 120-dpi baseline, clamped.
+        float s = (m_displayScale * 160.0f) / 120.0f;
         if (s < 1.4f) s = 1.4f;     // never smaller than 1.4x on a touch device
         if (s > 2.5f) s = 2.5f;
         return s;
 #endif
     }
-#if defined(_WIN32)
-    // Desktop Windows HiDPI: now that the process is per-monitor DPI-aware (see
-    // the SDL_HINT_WINDOWS_DPI_AWARENESS above) the framebuffer is NATIVE-res
-    // and crisp, but window coordinates are physical pixels - so a 15 px font
-    // would render tiny on a 150% display. Scale the UI up by the display's DPI
-    // (96 dpi = 100% = 1.0x, 144 = 150% = 1.5x, …) so it stays the same physical
-    // size the user set in Windows, now sharp instead of bitmap-upscaled. Fonts
-    // are rasterised at 15·scale (crisp) and ImGui sizes scale to match.
-    float ddpi = 96.0f, hdpi = 0.0f, vdpi = 0.0f;
-    if (SDL_GetDisplayDPI(0, &ddpi, &hdpi, &vdpi) != 0 || ddpi <= 0.0f) ddpi = 96.0f;
-    float s = ddpi / 96.0f;
-    if (s < 1.0f) s = 1.0f;     // never shrink below 100%
-    if (s > 3.0f) s = 3.0f;     // 300% cap (Windows tops out ~250% on laptops)
-    return s;
-#elif defined(__ANDROID__)
+#if defined(__ANDROID__)
     // Android only reaches here with touch mode turned OFF - a tablet driven by
-    // a mouse and keyboard, which is a supported setup. It must NOT fall into
-    // the Linux desktop branch below: Android defines __linux__ too, but
-    // linuxAutoUiScale() is guarded desktop-only at its definition, so building
-    // it here is what broke the F-Droid/APK build (the desktop CI never
-    // compiles for Android, so nothing caught it until the release preflight).
-    // 1.0 is what the manual desktop scale defaulted to before it was replaced,
-    // so this is the behaviour that path always had.
+    // a mouse and keyboard, which is a supported setup. 1.0 is what the manual
+    // desktop scale defaulted to before it was replaced.
     return 1.0f;
-#elif defined(__linux__)
-    // Linux desktop: the app is an X11/Xwayland client and no compositor-side
-    // scaling reaches it, so on a HiDPI panel the native-pixel framebuffer
-    // renders the UI tiny. This USED to be a manual Low/High setting because
-    // "auto-detection is unreliable across X11/Xwayland/GNOME/KDE" (issue #26)
-    // - see linuxAutoUiScale() for the measurement that overturned that.
-    // --ui-scale / --hidpi still wins, as the escape hatch.
-    if (m_uiScaleOverride > 0.0f) return m_uiScaleOverride;
-    return materializr::linuxAutoUiScale();
 #else
-    // macOS handles HiDPI through the drawable-size / DisplayFramebufferScale
-    // path (Retina), so the UI is already right at 1.0.
-    return 1.0f;
+#if defined(__linux__)
+    // --ui-scale / --hidpi still wins, as the escape hatch for a display whose
+    // scale is reported wrongly.
+    if (m_uiScaleOverride > 0.0f) return m_uiScaleOverride;
+#endif
+    // Points platforms (macOS Retina, native Wayland): the compositor/OS has
+    // already scaled the coordinate space and the ImGui backend supplies the
+    // framebuffer scale, so the UI is right at 1.0.
+    if (m_pointsMode) return 1.0f;
+    // Pixel platforms (Windows, X11/XWayland): coordinates are device pixels,
+    // so the UI must be scaled up by the session's content scale to keep the
+    // size the user chose (Windows display scaling; X11's Xft.dpi, which GNOME
+    // and KDE set from their own scale for XWayland clients). Fonts are
+    // rasterised at 15*scale (crisp) and ImGui sizes scale to match.
+    float s = m_displayScale;
+    if (s < 1.0f) s = 1.0f;     // never shrink below 100%
+    if (s > 3.0f) s = 3.0f;     // 300% cap
+    return s;
 #endif
 }
 
@@ -896,7 +891,7 @@ bool Window::isCtrlDown() {
     // state is simply all-zero, so this is false on a bare touch tablet (where
     // multi-select uses the on-screen toggle instead); when an Android tablet has
     // a keyboard attached, hardware Ctrl (undo/redo, additive select) just works.
-    const Uint8* state = SDL_GetKeyboardState(nullptr);
+    const bool* state = SDL_GetKeyboardState(nullptr);
 #if defined(__APPLE__)
     // Command counts as the shortcut modifier here, because it already does
     // everywhere else in the app: ImGui turns on ConfigMacOSXBehaviors for

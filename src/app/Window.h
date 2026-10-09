@@ -61,7 +61,7 @@ public:
     void applyCursorScale();
 
     // Raise/lower the soft keyboard to match ImGui's WantTextInput. The
-    // SDL2 backend no longer calls SDL_StartTextInput itself, which is what shows
+    // SDL backend no longer calls SDL_StartTextInput itself, which is what shows
     // the keyboard on Android - so we drive it each frame. No-op on desktop.
     //
     // retapPulse: the user tapped this frame and a text field is STILL focused
@@ -140,6 +140,11 @@ private:
     SDL_Window* m_window = nullptr;
     std::vector<std::string> m_droppedFiles;
     float m_uiScaleOverride = 0.0f;  // desktop UI-scale pref (Linux); 0 = default
+    // Coordinate model, fixed at creation: true where window coordinates are
+    // POINTS with a separate pixel density (macOS, iOS, native Wayland), false
+    // where they are device pixels (Windows, X11, Android).
+    bool  m_pointsMode = false;
+    float m_displayScale = 1.0f;     // SDL window display scale at creation
     void* m_glContext = nullptr;
     bool m_shouldClose = false;
     int m_width;

@@ -1,6 +1,6 @@
 #include "platform_sdl.h"
 
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 namespace materializr {
 
@@ -21,7 +21,7 @@ std::string platformPrefPath() {
 }
 
 bool platformOpenUrl(const std::string& url, std::string* err) {
-    if (SDL_OpenURL(url.c_str()) != 0) {
+    if (!SDL_OpenURL(url.c_str())) {
         if (err) *err = SDL_GetError();
         return false;
     }
@@ -30,7 +30,7 @@ bool platformOpenUrl(const std::string& url, std::string* err) {
 
 #if defined(__ANDROID__)
 std::string platformAndroidExternalStoragePath() {
-    const char* p = SDL_AndroidGetExternalStoragePath();
+    const char* p = SDL_GetAndroidExternalStoragePath();
     return p ? p : std::string();
 }
 #endif

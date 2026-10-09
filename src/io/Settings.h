@@ -29,10 +29,11 @@ struct AppSettings {
     // LEGACY - read and written so an existing settings file round-trips, but
     // NOTHING consumes it any more. The Linux desktop scale used to be a manual
     // Low/High pick here (Settings → Appearance, plus a first-run picker)
-    // because DPI auto-detection was believed unreliable on X11/Xwayland. It
-    // isn't: SDL reads the per-OUTPUT RandR physical size and gets the true DPI
-    // (see Window::linuxAutoUiScale), so the scale is detected and both pickers
-    // are gone. --ui-scale is the escape hatch. Don't wire this back up.
+    // because DPI auto-detection was believed unreliable on X11/Xwayland. The
+    // scale is now taken from the session itself - SDL's display content scale
+    // on X11, the compositor's own scaling on Wayland (see Window::uiScale) - so
+    // both pickers are gone. --ui-scale is the escape hatch. Don't wire this
+    // back up.
     float desktopUiScale    = 1.0f;
     // Touch mode: large UI + touch-gesture interaction. Defaults on for Android,
     // off elsewhere; a saved setting so a tablet with a mouse/keyboard can run

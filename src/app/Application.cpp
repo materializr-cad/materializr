@@ -338,7 +338,7 @@ Application::Application(bool safeMode, float uiScaleOverride)
         // initImGui() below - it's applied at the window level so uiScale()
         // (which fonts + style read) returns it.
         //
-        // Linux HiDPI is DETECTED now, not asked (Window::linuxAutoUiScale);
+        // Linux HiDPI is DETECTED now, not asked (Window::uiScale);
         // the old Low/High setting and its first-run picker are gone. Only
         // --ui-scale / --hidpi still overrides, as the escape hatch for a
         // display whose DPI is reported wrongly.

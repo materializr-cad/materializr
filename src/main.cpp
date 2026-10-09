@@ -64,6 +64,7 @@ struct CliOptions {
     bool verbose  = false;
     const char* logPath = "/tmp/materializr.log";
     float uiScale = 0.0f;   // desktop UI scale override; 0 = use the saved setting
+    bool  forceX11 = false; // Linux: skip native Wayland, use X11/XWayland
 };
 
 CliOptions parseArgs(int argc, char* argv[]) {
@@ -84,6 +85,8 @@ CliOptions parseArgs(int argc, char* argv[]) {
         } else if ((std::strcmp(a, "--ui-scale") == 0 ||
                     std::strcmp(a, "--scale") == 0) && i + 1 < argc) {
             o.uiScale = static_cast<float>(std::atof(argv[++i]));
+        } else if (std::strcmp(a, "--x11") == 0) {
+            o.forceX11 = true;
         } else if (std::strcmp(a, "--hidpi") == 0) {
             o.uiScale = 2.0f;   // shortcut for the common high-DPI case
         }
@@ -123,6 +126,11 @@ void printHelp() {
         "  --hidpi\n"
         "      Shortcut for --ui-scale 2.0.\n"
         "\n"
+        "  --x11\n"
+        "      Linux: use X11 (XWayland on a Wayland session) instead of native\n"
+        "      Wayland. The same as SDL_VIDEO_DRIVER=x11. An escape hatch for a\n"
+        "      compositor or graphics driver that misbehaves natively.\n"
+        "\n"
         "  -h, --help\n"
         "      Print this help and exit.\n";
 }
@@ -156,6 +164,10 @@ int main(int argc, char* argv[]) {
         printHelp();
         return 0;
     }
+#if defined(__linux__)
+    // Read by SDL when the video subsystem starts (Window constructor).
+    if (opts.forceX11) setenv("SDL_VIDEO_DRIVER", "x11", 1);
+#endif
     if (opts.verbose) {
         // Flip the per-op log gate so [Resize], etc. fprintf(stderr, ...)
         // calls actually emit. Without this they're no-ops.
