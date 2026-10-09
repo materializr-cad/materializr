@@ -149,6 +149,18 @@ Window::Window(int width, int height, const std::string& title,
         throw std::runtime_error(std::string("Failed to initialize SDL: ") + SDL_GetError());
     }
 
+#if defined(__ANDROID__)
+    // SDL 3.4.18's Android SDL_WaitEventTimeout busy-spins for its whole timeout:
+    // every SDL_PumpEventsInternal(true) pushes a poll-sentinel event, pushing an
+    // event on Android posts the lifecycle-WAKE semaphore, and the wait is a
+    // semaphore wait - so it returns at once, pumps again, pushes another sentinel,
+    // and so on. The idle loop's 66 ms "sleep" burned 83% of a core (release 1.7.2 on
+    // SDL2: 8%). The sentinel only bounds SDL_PollEvent cycles that keep generating
+    // events; this app drains its queue to empty. Without it the wait blocks for
+    // real and a touch event (pushed from the Java side) still wakes it instantly.
+    SDL_SetEventEnabled(SDL_EVENT_POLL_SENTINEL, false);
+#endif
+
     // Request the right GL context per platform. Desktop: GL 3.3 Core. Android:
     // GL ES 3.0 (same shader/feature subset Materializr uses).
 #if defined(MZ_GLES)
