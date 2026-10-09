@@ -2,6 +2,7 @@
 
 #include "gl_common.h"   // GLEW (Windows) must be included before other GL users
 #include "touch_mode.h"
+#include "platform_sdl.h"
 #include "mobile_files.h" // mobileShow/HideTextInput (no-ops on desktop and iOS)
 #include <SDL.h>
 #include <imgui_impl_sdl2.h>
@@ -267,6 +268,18 @@ Window::~Window() {
     SDL_Quit();
 }
 
+void Window::initImGuiBackend() {
+    ImGui_ImplSDL2_InitForOpenGL(m_window, m_glContext);
+}
+
+void Window::newImGuiFrame() {
+    ImGui_ImplSDL2_NewFrame();
+}
+
+void Window::shutdownImGuiBackend() {
+    ImGui_ImplSDL2_Shutdown();
+}
+
 void Window::swapBuffers() {
 #if defined(MZ_IOS)
     // presentRenderbuffer presents the *currently bound* GL_RENDERBUFFER -
@@ -389,7 +402,7 @@ void Window::handleFingerEvent(unsigned type, std::int64_t id, float nx, float n
     if (type == SDL_FINGERDOWN) {
         if (m_fingers.empty()) {
             // New touch session (first finger of a fresh contact).
-            m_sessionStartTicks = SDL_GetTicks();
+            m_sessionStartTicks = platformTicksMs();
             m_sessionMaxFingers = 0;
             m_sessionPanNet = 0.0f;
             m_sessionZoomNet = 0.0f;
@@ -507,7 +520,7 @@ void Window::handleFingerEvent(unsigned type, std::int64_t id, float nx, float n
             io.AddMouseButtonEvent(0, true);
             m_leftDown = true;
             m_leftReleaseWasGesture = false; // a genuine new press
-            m_downTicks = SDL_GetTicks();   // begin press-and-hold tracking
+            m_downTicks = platformTicksMs();   // begin press-and-hold tracking
             m_downX = m_fingers[0].x; m_downY = m_fingers[0].y;
             m_movedBeyondHold = false;
             m_holdSelect = false;
@@ -616,7 +629,7 @@ void Window::handleFingerEvent(unsigned type, std::int64_t id, float nx, float n
     // flags with the same guards as the Edit menu). Checked before the reset
     // below wipes the session state.
     {
-        const std::uint32_t nowT = SDL_GetTicks();
+        const std::uint32_t nowT = platformTicksMs();
         const bool shortTouch = (nowT - m_sessionStartTicks) < 300u;
         const bool stationary = m_twoFingerMode == 0 &&
                                 m_sessionPanNet < 12.0f && m_sessionZoomNet < 16.0f;
@@ -631,7 +644,7 @@ void Window::handleFingerEvent(unsigned type, std::int64_t id, float nx, float n
     // the double-click time → a touch "double-click" (escalates a face pick to its
     // body, viewport-side). Honors the user's double-click-time setting.
     {
-        const std::uint32_t nowT = SDL_GetTicks();
+        const std::uint32_t nowT = platformTicksMs();
         const bool quickTap = !m_holdSelect && !m_movedBeyondHold && !m_suppressLeft &&
                               (nowT - m_downTicks) < 300u;
         if (quickTap) {
@@ -672,7 +685,7 @@ void Window::updateHoldSelect() {
     // long-press (slow slider drags were popping the context-menu ring).
     if (!m_touchOverViewport) return;
     if (m_fingers.size() != 1 || m_movedBeyondHold || m_suppressLeft || m_twoFinger) return;
-    if (SDL_GetTicks() - m_downTicks > 450u) m_holdSelect = true;  // long-press armed
+    if (platformTicksMs() - m_downTicks > 450u) m_holdSelect = true;  // long-press armed
 }
 
 void Window::pumpSyntheticRightClick() {
@@ -705,7 +718,7 @@ float Window::holdProgress(float& x, float& y) const {
         return 0.0f;
     x = m_downX; y = m_downY;
     if (m_holdSelect) return 1.0f;                 // armed: ring full while held
-    std::uint32_t held = SDL_GetTicks() - m_downTicks;
+    std::uint32_t held = platformTicksMs() - m_downTicks;
     if (held < 120u) return 0.0f;                  // ignore brief taps
     float t = static_cast<float>(held) / 450.0f;
     return t > 1.0f ? 1.0f : t;

@@ -76,8 +76,14 @@ public:
     // queue. Desktop only in practice - mobile never produces drop events.
     std::vector<std::string> takeDroppedFiles();
 
-    SDL_Window* handle() const { return m_window; }
-    void* glContext() const { return m_glContext; }   // SDL_GLContext (opaque)
+    // The ImGui platform backend (SDL) for this window. Owned here so nothing
+    // outside Window needs to know which windowing library is underneath:
+    // init once after the ImGui context exists, newImGuiFrame() each frame
+    // (pairs with the renderer's NewFrame), shutdown before DestroyContext.
+    // Events are fed to the backend inside pollEvents().
+    void initImGuiBackend();
+    void newImGuiFrame();
+    void shutdownImGuiBackend();
     int width() const { return m_width; }
     int height() const { return m_height; }
 
@@ -171,7 +177,7 @@ private:
     bool  m_redoTapPending = false;
 
     // One-finger press-and-hold tracking (-> box/drag-select).
-    std::uint32_t m_downTicks = 0;        // SDL_GetTicks at single-finger down
+    std::uint32_t m_downTicks = 0;        // platformTicksMs at single-finger down
     float m_downX = 0.0f, m_downY = 0.0f; // where it went down
     // Genuine double-tap: two quick taps (each a fast down-UP, not a hold) at the
     // same spot within the double-click time. Fires on the SECOND release, so a

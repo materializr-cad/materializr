@@ -54,7 +54,7 @@
 #include "ui/LandingPage.h"
 #include "app/layout/LayoutCommon.h"  // layoutui::logoTexture for the landing header
 #include "mobile_files.h"             // mobileOpenUri (content: refs on mobile)
-#include <SDL.h>                      // SDL_GetPrefPath: thumbnail cache dir
+#include "platform_sdl.h"             // platformPrefPath: thumbnail cache dir
 #include <cstring>
 #include "modeling/Sketch.h"
 #include "modeling/MeshTraceSetupOp.h"
@@ -117,7 +117,6 @@ static const char* mouseButtonName(int b) {
 }
 
 #include <imgui.h>
-#include <imgui_impl_sdl2.h>
 #include <imgui_impl_opengl3.h>
 #include <BRepPrimAPI_MakeBox.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
@@ -6263,14 +6262,13 @@ void Application::renderUnfoldDialog() {
 // ─── Landing page ────────────────────────────────────────────────────────────
 
 namespace {
-// thumbs/<fnv1a64(ref)>.png under the SDL pref path. The hash keys content://
+// thumbs/<fnv1a64(ref)>.png under the platform pref path. The hash keys content://
 // URIs and filesystem paths alike; collisions are astronomically unlikely and
 // cost only a wrong tile picture.
 std::string thumbCacheFile(const std::string& ref) {
-    char* base = SDL_GetPrefPath("Materializr", "Materializr");
-    if (!base) return {};
-    std::string dir = std::string(base) + "thumbs";
-    SDL_free(base);
+    const std::string base = platformPrefPath();
+    if (base.empty()) return {};
+    std::string dir = base + "thumbs";
     std::error_code ec;
     std::filesystem::create_directories(dir, ec);
     uint64_t h = 1469598103934665603ull;

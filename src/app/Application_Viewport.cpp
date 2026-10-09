@@ -95,7 +95,6 @@ namespace materializr { namespace force_link { void linkAll(); } }
 #include <imgui_internal.h> // FindWindowByName/DockBuilder: viewport re-dock after im-touch
 #include "../i18n.h"
 #include "../i18n.h"
-#include <imgui_impl_sdl2.h>
 #include <imgui_impl_opengl3.h>
 #include <BRepPrimAPI_MakeBox.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>

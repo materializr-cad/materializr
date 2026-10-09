@@ -25,7 +25,7 @@
 #include "../ui_scale.h"
 
 #include <imgui.h>
-#include <SDL.h>
+#include "../platform_sdl.h"
 #include <algorithm>
 #include <cfloat>
 #include <cstdio>
@@ -214,10 +214,8 @@ bool g_firstRunChecked = false;
 // run. SDL_GetPrefPath resolves to the right place on every platform (and
 // creates the directory), including Android's app storage.
 std::string markerPath() {
-    char* base = SDL_GetPrefPath("Materializr", "Materializr");
-    std::string p = base ? std::string(base) + "tutorial_seen" : std::string();
-    if (base) SDL_free(base);
-    return p;
+    const std::string base = materializr::platformPrefPath();
+    return base.empty() ? std::string() : base + "tutorial_seen";
 }
 bool tutorialSeen() {
     std::string p = markerPath();

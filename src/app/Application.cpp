@@ -1,6 +1,6 @@
 #include "ui/UiTheme.h"
 #include "gl_common.h"
-#include <SDL.h>
+#include "platform_sdl.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -136,7 +136,6 @@ namespace materializr { namespace force_link { void linkAll(); } }
 
 #include <imgui.h>
 #include <imgui_internal.h> // dock-node tab-bar policy (per-node LocalFlags)
-#include <imgui_impl_sdl2.h>
 #include <imgui_impl_opengl3.h>
 
 #include "app/Window.h"
@@ -1141,7 +1140,7 @@ void Application::initImGui() {
         }
     }
 
-    ImGui_ImplSDL2_InitForOpenGL(m_window->handle(), m_window->glContext());
+    m_window->initImGuiBackend();
 #if defined(MZ_GLES)
     ImGui_ImplOpenGL3_Init("#version 300 es");
 #else
@@ -1151,7 +1150,7 @@ void Application::initImGui() {
 
 void Application::shutdownImGui() {
     ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplSDL2_Shutdown();
+    m_window->shutdownImGuiBackend();
     ImGui::DestroyContext();
 }
 
@@ -1440,7 +1439,7 @@ void Application::beginFrame() {
     // one.
     m_imguiFrameOpen = true;
     ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplSDL2_NewFrame();
+    m_window->newImGuiFrame();
     // Touch tooltip timeout. A finger lift leaves io.MousePos parked on the last
     // tapped widget, so its tooltip hangs forever (no hover-out on touch). If the
     // pointer hasn't moved for 15 s with no button down, blank MousePos for this
@@ -1854,11 +1853,9 @@ void Application::loadAppSettings() {
     // starts recurring from the second launch. Same marker the tutorial
     // plugin writes.
     const bool firstRun = [] {
-        char* base = SDL_GetPrefPath("Materializr", "Materializr");
-        if (!base) return false;
-        std::string p = std::string(base) + "tutorial_seen";
-        SDL_free(base);
-        std::ifstream f(p);
+        const std::string base = platformPrefPath();
+        if (base.empty()) return false;
+        std::ifstream f(base + "tutorial_seen");
         return !f.good();
     }();
     if (!m_supporter && !m_safeMode && !firstRun)
@@ -3573,7 +3570,7 @@ void Application::rebuildMeshes() {
 
     // Diagnostic: a full rebuild that takes seconds on the MAIN thread is a
     // freeze - say so, with the trigger state.
-    const uint32_t rmStart = m_meshesDirty ? SDL_GetTicks() : 0;
+    const uint32_t rmStart = m_meshesDirty ? platformTicksMs() : 0;
     const bool rmWasFull = m_meshesDirty;
     // A full rebuild (body add/remove/reload) or any partial one (a per-body
     // edit routed through markBodyDirty, which covers visibility toggles
@@ -3657,7 +3654,7 @@ void Application::rebuildMeshes() {
         m_shapeRenderer->freeRetired();
         m_edgeRenderer->freeRetired();
         if (rmWasFull) {
-            const uint32_t took = SDL_GetTicks() - rmStart;
+            const uint32_t took = platformTicksMs() - rmStart;
             // Every full rebuild reports itself: this is how the load routes
             // without a [load-timing] line (Open Recent, the open dialog,
             // recovery) are measured, and where a per-body draw count would
@@ -4893,7 +4890,7 @@ void Application::markDirty() {
     // Recovery debounce: remember WHEN the newest change landed so the
     // crash-recovery writer can snapshot once things settle (see
     // writeProjectRecoveryIfDue), instead of re-gzipping on a timer.
-    m_lastChangeSeenAt = SDL_GetTicks() / 1000.0;
+    m_lastChangeSeenAt = platformTicksMs() / 1000.0;
 }
 
 void Application::markSaved() {
@@ -7374,7 +7371,7 @@ void Application::writeProjectRecoveryIfDue() {
         m_document->planeCount() == 0)
         return;                                // empty new document: nothing to lose
 
-    const double now = SDL_GetTicks() / 1000.0;
+    const double now = platformTicksMs() / 1000.0;
 
     // Debounce, not a metronome (Steve's call, #48): snapshot once ~5 s AFTER
     // the last committed change settles - "time to save a good copy in case
@@ -7598,12 +7595,12 @@ void Application::run() {
     // "active work" state forced rendering. Lets us see e.g. "in-sketch idle =
     // 60 rendered/s" (a wasteful continuous-render state) vs "true idle = ~0".
     const bool kPerf = std::getenv("MZR_PERF") != nullptr;
-    uint32_t perfLastMs = SDL_GetTicks();
+    uint32_t perfLastMs = platformTicksMs();
     int perfRendered = 0, perfIters = 0;
     // Startup render-grace: keep drawing for the first few seconds regardless of
     // reported window focus, so the UI always appears after the loading screen
     // even if the WM is slow to hand the new window focus. See foreground below.
-    const uint32_t runStartMs = SDL_GetTicks();
+    const uint32_t runStartMs = platformTicksMs();
 
     // FRAME-LEVEL EXCEPTION FIREWALL.
     //
@@ -7634,7 +7631,7 @@ void Application::run() {
         // stall instead of us guessing which subsystem blocked.
         {
             static uint32_t lastIterMs = 0;
-            const uint32_t nowMs = SDL_GetTicks();
+            const uint32_t nowMs = platformTicksMs();
             if (lastIterMs != 0 && nowMs - lastIterMs > 1000) {
                 // A heavy task deliberately owns the loop for as long as it
                 // takes; that is not the freeze this watchdog hunts for, as
@@ -7695,14 +7692,14 @@ void Application::run() {
                 m_revolveActive;
             if (!interactive)
                 for (auto* c : m_iops) if (c && c->active()) { interactive = true; break; }
-            if (interactive && SDL_GetTicks() / 1000.0 < m_interactiveGraceUntil)
+            if (interactive && platformTicksMs() / 1000.0 < m_interactiveGraceUntil)
                 return true;
             return false;
         };
 
         ++perfIters;
         if (kPerf) {
-            uint32_t nowMs = SDL_GetTicks();
+            uint32_t nowMs = platformTicksMs();
             if (nowMs - perfLastMs >= 1000) {
                 std::string st;
                 if (m_inSketchMode)            st += "sketch ";
@@ -7739,7 +7736,7 @@ void Application::run() {
         // This is a hard override of BOTH the focus gate and the idle-skip - the
         // earlier "foreground for 3 s" only neutralised the focus term, leaving
         // the idle term to still skip (the splash-hang regression).
-        const bool launchGrace = (SDL_GetTicks() - runStartMs < 3000u);
+        const bool launchGrace = (platformTicksMs() - runStartMs < 3000u);
 #if defined(MZ_IOS)
         // iOS: the OS pauses a backgrounded app too, but there is a window
         // around WILLENTERBACKGROUND where GL calls get the app terminated by
@@ -7787,7 +7784,7 @@ void Application::run() {
         // Start of this iteration's frame budget - read by the frame-rate cap
         // at the bottom of the loop (measured after the event wait so the
         // idle floor's own sleep doesn't count against the budget).
-        const Uint32 frameLoopStartMs = SDL_GetTicks();
+        const uint32_t frameLoopStartMs = platformTicksMs();
         // Significant events (click, key, scroll, resize, focus): 5 frames.
         // Trivial events (mouse motion, expose): 25 frames - at 60 fps that is
         // ~416 ms, enough for ImGui's default 300 ms hover-tooltip delay to fire
@@ -7826,7 +7823,7 @@ void Application::run() {
         // instantly on the next event.
         if (eventLevel > 0) {
             constexpr double kGraceSec = 1.0;
-            m_interactiveGraceUntil = SDL_GetTicks() / 1000.0 + kGraceSec;
+            m_interactiveGraceUntil = platformTicksMs() / 1000.0 + kGraceSec;
         }
 
         // Last frame's GL (driver/ImGui render) can leave the SSE FPU in
@@ -8521,9 +8518,9 @@ void Application::run() {
         // thread to the OS every frame; where vsync already paces us the
         // remainder is ~0 and this is a no-op.
         {
-            constexpr Uint32 kMinFrameMs = 16;
-            const Uint32 spent = SDL_GetTicks() - frameLoopStartMs;
-            if (spent < kMinFrameMs) SDL_Delay(kMinFrameMs - spent);
+            constexpr uint32_t kMinFrameMs = 16;
+            const uint32_t spent = platformTicksMs() - frameLoopStartMs;
+            if (spent < kMinFrameMs) platformSleepMs(kMinFrameMs - spent);
         }
         }
         break;   // the inner loop's own break/exit conditions reached: done

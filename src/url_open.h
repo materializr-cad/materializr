@@ -1,6 +1,6 @@
 #pragma once
 
-// Safe URL opener. Hands the URL to the OS via SDL_OpenURL, which does NOT run a
+// Safe URL opener. Hands the URL to the OS via platformOpenUrl (SDL_OpenURL), which does NOT run a
 // shell - unlike the old `std::system("xdg-open \"" + url + "\" ...")` path, where
 // a server-controlled release URL (the GitHub API's html_url) was an OS
 // command-injection vector ($(...), backticks, and quote-breakout all executed).
@@ -9,7 +9,7 @@
 // MUST pass the expected host prefix, e.g. openUrl(url, "https://github.com/"),
 // so a tampered response can't redirect the user to an arbitrary destination.
 
-#include <SDL.h>
+#include "platform_sdl.h"
 #include <string>
 #include <cstdio>
 
@@ -28,7 +28,7 @@ inline bool openUrl(const std::string& url, const char* requiredPrefix = nullptr
     }
     // Defense in depth: a valid URI never contains these unencoded (RFC 3986
     // controls + "unsafe" set), and they are exactly what an injection payload
-    // needs. SDL_OpenURL never invokes a shell, so this is belt-and-suspenders.
+    // needs. platformOpenUrl never invokes a shell, so this is belt-and-suspenders.
     for (unsigned char c : url) {
         if (c < 0x20 || c >= 0x7f || c == ' ' || c == '"' || c == '<' ||
             c == '>' || c == '\\' || c == '^' || c == '`' || c == '{' ||
@@ -37,8 +37,9 @@ inline bool openUrl(const std::string& url, const char* requiredPrefix = nullptr
             return false;
         }
     }
-    if (SDL_OpenURL(url.c_str()) != 0) {
-        std::fprintf(stderr, "openUrl: SDL_OpenURL failed: %s\n", SDL_GetError());
+    std::string err;
+    if (!platformOpenUrl(url, &err)) {
+        std::fprintf(stderr, "openUrl: failed to open URL: %s\n", err.c_str());
         return false;
     }
     return true;

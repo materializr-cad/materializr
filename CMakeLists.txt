@@ -240,6 +240,7 @@ add_executable(materializr
     src/app/layout/imtouch/ImTouchLayout.cpp
     src/app/Application_Viewport.cpp
     src/app/Window.cpp
+    src/platform_sdl.cpp
     src/plugin/PluginContext.cpp
     src/plugin/InteractiveOp.cpp
     src/app/CylindricalPick.cpp

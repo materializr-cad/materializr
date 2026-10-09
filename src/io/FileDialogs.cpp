@@ -11,7 +11,7 @@
 // Mobile (Android + iOS) has no zenity/kdialog/WinAPI helper, so pfd is
 // excluded; openFile/saveFile drive the system document picker
 // (via mobile_files.h), and export adds a Share / Save-to-device sheet.
-#include <SDL.h>   // SDL_AndroidGetExternalStoragePath (Android browser root)
+#include "../platform_sdl.h"   // platformAndroidExternalStoragePath (Android browser root)
 #include "../mobile_files.h"
 #include <sys/stat.h>
 #include <cstdlib>
@@ -328,8 +328,8 @@ static void launchInAppBrowser(const std::string& title, bool isSave,
         if (dlgCanList("/storage/emulated/0")) {
             start = "/storage/emulated/0";
         } else {
-            const char* ext = SDL_AndroidGetExternalStoragePath();
-            start = (ext && dlgIsDir(ext)) ? ext : "/";
+            const std::string ext = platformAndroidExternalStoragePath();
+            start = (!ext.empty() && dlgIsDir(ext)) ? ext : "/";
         }
 #else
         // iOS: the sandboxed Documents directory - user-visible in the Files
