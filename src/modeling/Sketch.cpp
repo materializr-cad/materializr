@@ -1697,7 +1697,7 @@ bool pointInPolygon2D(const std::vector<glm::vec2>& poly, glm::vec2 p) {
 std::vector<Sketch::Region> Sketch::buildRegions() const {
     const uint64_t h = geometryHash();
     if (m_regionCacheValid && h == m_regionHash) return m_regionCache;
-    m_regionCache = buildRegionsUncached();
+    m_regionCache = buildRegionsUncached(Message_ProgressRange());
     m_regionHash = h;
     m_regionCacheValid = true;
     return m_regionCache;

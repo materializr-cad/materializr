@@ -9,7 +9,11 @@
 #include <TopoDS_Face.hxx>
 #include <gp_Pln.hxx>
 #include <gp_Pnt.hxx>
-#include <Message_ProgressRange.hxx>
+
+// Forward-declared on purpose. Message_ProgressRange.hxx reaches Standard_Mutex.hxx
+// and from there <windows.h>, whose far/near macros break any translation unit
+// that has a variable of that name (the tests do).
+class Message_ProgressRange;
 
 namespace materializr {
 
@@ -413,8 +417,7 @@ private:
     mutable uint64_t m_regionHash = 0;
     mutable bool m_regionCacheValid = false;
     uint64_t geometryHash() const;
-    std::vector<Region> buildRegionsUncached(
-        const Message_ProgressRange& range = Message_ProgressRange()) const;
+    std::vector<Region> buildRegionsUncached(const Message_ProgressRange& range) const;
 
     int nextId() { return m_nextId++; }
     SketchPoint* findPoint(int id);
