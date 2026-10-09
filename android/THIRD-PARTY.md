@@ -1,13 +1,13 @@
 # Third-party components (Android build)
 
 The Android port links the same core dependencies as desktop Materializr, plus
-SDL2 in place of GLFW. None are vendored in this repo; `scripts/setup-deps.sh`
+SDL3 in place of GLFW. None are vendored in this repo; `scripts/setup-deps.sh`
 fetches and (where needed) cross-compiles them.
 
 | Component | Version | License | Role |
 |---|---|---|---|
 | [OpenCASCADE Technology](https://github.com/Open-Cascade-SAS/OCCT) | 7.8.1 | LGPL-2.1 (with exception) | CAD geometry kernel |
-| [SDL2](https://github.com/libsdl-org/SDL) | 2.30.9 | Zlib | Windowing, input, GL context (desktop + Android) |
+| [SDL3](https://github.com/libsdl-org/SDL) | 3.4.18 | Zlib | Windowing, input, GL context (desktop + Android) |
 | [Dear ImGui](https://github.com/ocornut/imgui) | docking | MIT | UI |
 | [GLM](https://github.com/g-truc/glm) | 1.0.1 | MIT | Vector/matrix math |
 | [FreeType](https://freetype.org/) | 2.13.3 | FTL / GPL-2.0 | TrueType outlines (linked into OCCT TKService) |
@@ -30,3 +30,13 @@ which are *metric-compatible* stand-ins for the proprietary Microsoft fonts - th
 real Times New Roman / Arial are NOT bundled.
 
 Materializr's own source is under the license in the repository root `LICENSE`.
+
+## Vendored SDL Java (org.libsdl.app)
+
+`app/src/main/java/org/libsdl/app/*.java` is SDL 3.4.18's own Android Java half,
+copied unmodified from the release tarball's `android-project/` EXCEPT one edit:
+`SDLActivity.ShowTextInputTask.run()` calls `showSoftInput(mTextEdit,
+InputMethodManager.SHOW_FORCED)` instead of flag `0`, because Android ignores `0`
+in our immersive window and the soft keyboard never appeared. It must stay in
+step with the native SDL version `scripts/setup-deps.sh` links (JNI names are
+matched by exact signature); re-apply that edit when bumping.

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Reproduce the native prerequisites for the Materializr Android build:
-#   * SDL2 source placed at android/app/jni/SDL
+#   * SDL3 source placed at android/app/jni/SDL
 #   * FreeType (static) + OpenCASCADE 7.9.3 (shared) cross-compiled for
 #     arm64-v8a into $PREFIX
 #   * the OCCT .so set copied into the APK's jniLibs
@@ -19,7 +19,7 @@ API=24
 # defaults to this; on r26 pass the flag explicitly.
 LDFLAGS_16K="-Wl,-z,max-page-size=16384"
 JOBS="${JOBS:-4}"                       # keep low on RAM-constrained machines
-SDL_VER="2.30.9"
+SDL_VER="3.4.18"
 FT_VER="2.13.3"
 OCCT_TAG="V7_9_3"
 
@@ -48,7 +48,7 @@ echo "REPO:   $REPO"
 # Expected SHA-256 of each pinned source tarball - verified after download so a
 # corrupted mirror or tampered upstream can't slip in (supply-chain integrity;
 # also what F-Droid wants for a reproducible build from source).
-SDL2_SHA256="24b574f71c87a763f50704bbb630cbe38298d544a1f890f099a4696b1d6beba4"
+SDL3_SHA256="9c75cf16330322c217dedd2e0609f1124f1b54b8633e763467b4684d0f4334a3"
 FT_SHA256="5c3a8e78f7b24c20b25b54ee575d6daa40007a5f4eea2845861c3409b3021747"
 OCCT_SHA256="5ecf094ec6b12d5413dfb851d8c3590c354058aee556e32e408bdfbf8c357d57"
 
@@ -62,11 +62,17 @@ fetch() { # url dest sha256
     fi
 }
 
-# ── SDL2 source -> android/app/jni/SDL ───────────────────────────────────────
-fetch "https://github.com/libsdl-org/SDL/releases/download/release-$SDL_VER/SDL2-$SDL_VER.tar.gz" "$DL/sdl2.tar.gz" "$SDL2_SHA256"
-[ -d "$SRC/SDL2-$SDL_VER" ] || tar -xzf "$DL/sdl2.tar.gz" -C "$SRC"
-ln -sfn "$SRC/SDL2-$SDL_VER" "$REPO/android/app/jni/SDL"
-echo "SDL2 linked at android/app/jni/SDL"
+# ── SDL3 source -> android/app/jni/SDL ───────────────────────────────────────
+# The native half is built from this tree by the app's CMake. Its Java half is
+# vendored in android/app/src/main/java/org/libsdl/app and MUST be the same
+# release (the JNI entry points are matched by name) - when bumping SDL_VER,
+# re-copy android-project/app/src/main/java/org/libsdl/app/*.java from the tarball
+# and re-apply the SHOW_FORCED edit in SDLActivity.ShowTextInputTask (see
+# android/THIRD-PARTY.md).
+fetch "https://github.com/libsdl-org/SDL/releases/download/release-$SDL_VER/SDL3-$SDL_VER.tar.gz" "$DL/sdl3.tar.gz" "$SDL3_SHA256"
+[ -d "$SRC/SDL3-$SDL_VER" ] || tar -xzf "$DL/sdl3.tar.gz" -C "$SRC"
+ln -sfn "$SRC/SDL3-$SDL_VER" "$REPO/android/app/jni/SDL"
+echo "SDL3 linked at android/app/jni/SDL"
 
 # ── FreeType (static) ────────────────────────────────────────────────────────
 fetch "https://download.savannah.gnu.org/releases/freetype/freetype-$FT_VER.tar.gz" "$DL/freetype.tar.gz" "$FT_SHA256"
@@ -123,6 +129,6 @@ bash "$REPO/android/copy-occt-libs.sh" "$ABI"
 echo
 echo "Done. Native prerequisites are ready:"
 echo "  OCCT/FreeType prefix : $PREFIX"
-echo "  SDL2 source          : android/app/jni/SDL -> $SRC/SDL2-$SDL_VER"
+echo "  SDL3 source          : android/app/jni/SDL -> $SRC/SDL3-$SDL_VER"
 echo "  OCCT .so staged into  : android/app/src/main/jniLibs/$ABI"
 echo "Now build the APK:  cd android && ./gradlew assembleDebug"

@@ -2,7 +2,7 @@
 
 #if defined(__ANDROID__)
 
-#include <SDL.h>
+#include <SDL3/SDL.h>
 #include <android/log.h>
 
 #include <cstdio>
@@ -47,18 +47,18 @@ void redirectStdioToLogcat() {
     pthread_detach(t);
 }
 
-// Copy a file bundled in the APK's assets/ (read via SDL's asset-aware RWops)
+// Copy a file bundled in the APK's assets/ (read via SDL's asset-aware IOStream)
 // to an absolute path in writable storage. Idempotent - skips if dest exists.
 bool extractAsset(const std::string& assetPath, const std::string& destPath) {
     std::error_code ec;
     if (fs::exists(destPath, ec)) return true;
 
-    SDL_RWops* in = SDL_RWFromFile(assetPath.c_str(), "rb"); // reads from APK assets
+    SDL_IOStream* in = SDL_IOFromFile(assetPath.c_str(), "rb"); // reads from APK assets
     if (!in) { logi("missing asset: " + assetPath); return false; }
-    Sint64 size = SDL_RWsize(in);
+    Sint64 size = SDL_GetIOSize(in);
     std::vector<char> buf(size > 0 ? static_cast<size_t>(size) : 0);
-    Sint64 rd = (size > 0) ? SDL_RWread(in, buf.data(), 1, static_cast<size_t>(size)) : 0;
-    SDL_RWclose(in);
+    size_t rd = (size > 0) ? SDL_ReadIO(in, buf.data(), static_cast<size_t>(size)) : 0;
+    SDL_CloseIO(in);
 
     fs::create_directories(fs::path(destPath).parent_path(), ec);
     std::FILE* out = std::fopen(destPath.c_str(), "wb");
@@ -73,7 +73,7 @@ bool extractAsset(const std::string& assetPath, const std::string& destPath) {
 void androidInitRuntime() {
     redirectStdioToLogcat();   // make fprintf(stderr) diagnostics visible in logcat
 
-    const char* internalC = SDL_AndroidGetInternalStoragePath();
+    const char* internalC = SDL_GetAndroidInternalStoragePath();
     const std::string internal = internalC ? internalC : ".";
 
     // (1) Settings: SettingsIO::defaultPath() uses $HOME/.config/materializr.
@@ -83,7 +83,7 @@ void androidInitRuntime() {
     //     cwd-relative "assets/fonts/<name>" candidate resolves.
     if (chdir(internal.c_str()) != 0) logi("chdir to internal storage failed");
     // MUST list every font the Text-tool picker offers (kFontFiles in
-    // Application_Dialogs.cpp) - SDL's asset RWops can't enumerate a directory,
+    // Application_Dialogs.cpp) - SDL's asset IOStream can't enumerate a directory,
     // so any font missing here is bundled in the APK but never extracted and
     // shows "font file not found".
     const char* fonts[] = {
@@ -100,11 +100,11 @@ void androidInitRuntime() {
     // (3) OpenCASCADE resources: extract every file listed in the bundled
     //     manifest, then point the CSF_* env vars at the extracted tree.
     const std::string resRoot = internal + "/occt-resources";
-    if (SDL_RWops* list = SDL_RWFromFile("occt-resources.list", "rb")) {
-        Sint64 sz = SDL_RWsize(list);
+    if (SDL_IOStream* list = SDL_IOFromFile("occt-resources.list", "rb")) {
+        Sint64 sz = SDL_GetIOSize(list);
         std::string text(sz > 0 ? static_cast<size_t>(sz) : 0, '\0');
-        if (sz > 0) SDL_RWread(list, text.data(), 1, static_cast<size_t>(sz));
-        SDL_RWclose(list);
+        if (sz > 0) SDL_ReadIO(list, text.data(), static_cast<size_t>(sz));
+        SDL_CloseIO(list);
         size_t pos = 0, extracted = 0;
         while (pos < text.size()) {
             size_t nl = text.find('\n', pos);

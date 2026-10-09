@@ -1,4 +1,4 @@
-// Android entry point. SDL2 owns the real platform main on Android (it runs an
+// Android entry point. SDL owns the real platform main on Android (it runs an
 // activity that loads this shared library and calls SDL_main); including
 // SDL_main.h renames the function below to SDL_main. The body mirrors the
 // desktop main() minus the CLI parsing - a phone passes no arguments.
@@ -7,7 +7,7 @@
 #include "android_platform.h"
 
 #include <OSD.hxx>
-#include <SDL_main.h>
+#include <SDL3/SDL_main.h>
 
 #include <iostream>
 #include <dlfcn.h>

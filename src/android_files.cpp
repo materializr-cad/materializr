@@ -2,7 +2,7 @@
 
 #if defined(__ANDROID__)
 
-#include <SDL.h>
+#include <SDL3/SDL.h>
 #include <jni.h>
 
 namespace materializr {
@@ -11,8 +11,8 @@ namespace {
 // Resolve (env, activity, MaterializrActivity class). Returns false if anything
 // is missing. Caller must DeleteLocalRef(activity) and DeleteLocalRef(clazz).
 bool jniActivity(JNIEnv*& env, jobject& activity, jclass& clazz) {
-    env = static_cast<JNIEnv*>(SDL_AndroidGetJNIEnv());
-    activity = static_cast<jobject>(SDL_AndroidGetActivity());
+    env = static_cast<JNIEnv*>(SDL_GetAndroidJNIEnv());
+    activity = static_cast<jobject>(SDL_GetAndroidActivity());
     if (!env || !activity) return false;
     clazz = env->GetObjectClass(activity);
     if (!clazz) { env->DeleteLocalRef(activity); return false; }

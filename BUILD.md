@@ -131,7 +131,7 @@ in-tree (nothing FreeBSD-specific needed at the command line beyond the
 Prerequisites: JDK 17, Android SDK + NDK r26.x, cmake, curl on the host.
 
 ```sh
-# one-time: fetch + cross-compile SDL2 / FreeType / OpenCASCADE 7.8.1
+# one-time: fetch + cross-compile SDL3 / FreeType / OpenCASCADE 7.8.1
 # (sources are SHA-256 verified; ~30+ min for OCCT)
 ANDROID_HOME=~/Android/Sdk ./android/scripts/setup-deps.sh
 

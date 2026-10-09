@@ -9,8 +9,8 @@ builds both targets.
 
 | Concern | Desktop | Android | Where |
 |---|---|---|---|
-| Windowing / input | GLFW | **SDL2** (unified - both platforms now use SDL2) | `src/app/Window.{h,cpp}` |
-| ImGui backend | `imgui_impl_glfw` | `imgui_impl_sdl2` | `src/app/Application*.cpp` |
+| Windowing / input | GLFW | **SDL3** (unified - both platforms use SDL3) | `src/app/Window.{h,cpp}` |
+| ImGui backend | `imgui_impl_glfw` | `imgui_impl_sdl3` | `src/app/Application*.cpp` |
 | GL | OpenGL 3.3 Core | **OpenGL ES 3.0** | `src/gl_common.h` |
 | Shaders | GLSL 330 core | rewritten to GLSL ES 3.00 at upload | `src/gl_shader.cpp` |
 | Entry point | `main()` + CLI | `SDL_main` | `src/android_main.cpp` |
@@ -30,7 +30,7 @@ The shader and window changes are **no-ops on desktop** - they're guarded by
 
 ## Build from scratch
 
-One command reproduces every native prerequisite (SDL2 source, cross-compiled
+One command reproduces every native prerequisite (SDL3 source, cross-compiled
 FreeType + OpenCASCADE, the OCCT `.so` set + resources staged into the app):
 
 ```bash
@@ -70,13 +70,13 @@ storage and sets `HOME`/`CSF_*` accordingly (see `src/android_platform.cpp`).
 
 ## How the native build is wired
 
-- `app/jni/CMakeLists.txt` → `add_subdirectory(SDL)` (symlink to the SDL2
+- `app/jni/CMakeLists.txt` → `add_subdirectory(SDL)` (symlink to the SDL3
   source) + `add_subdirectory(src)`.
 - `app/jni/src/CMakeLists.txt` globs the whole `src/` tree (excluding the
   desktop-only `main.cpp`, `UpdateChecker.cpp`, `FileDialogs.cpp`), fetches
   ImGui (docking) + GLM, and links the cross-built OCCT toolkits as imported
   `.so` targets plus the NDK's GLESv3/EGL/z/log.
-- `MaterializrActivity` (extends `SDLActivity`) loads `libSDL2.so` + `libmain.so`;
+- `MaterializrActivity` (extends `SDLActivity`) loads `libSDL3.so` + `libmain.so`;
   the OCCT toolkits load transitively via `DT_NEEDED`.
 
 ## Remaining work (tracked)

@@ -178,7 +178,11 @@ public class MaterializrActivity extends SDLActivity {
     // SDLActivity) ourselves sets up SDL's text-routing DummyEdit and the
     // SHOW_FORCED patch raises the keyboard. Typed text still flows to SDL/ImGui.
     public static void nativeShowKeyboard() {
-        try { showTextInput(0, 0, 1, 1); } catch (Exception ignored) {}
+        // SDL3 takes the Android InputType first. Plain text, no suggestion strip:
+        // the fields are numeric/name entry in a CAD app, not prose.
+        int type = android.text.InputType.TYPE_CLASS_TEXT
+                 | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS;
+        try { showTextInput(type, 0, 0, 1, 1); } catch (Exception ignored) {}
     }
 
     // Dismiss the soft keyboard (best-effort; paired with SDL_StopTextInput).
@@ -483,7 +487,7 @@ public class MaterializrActivity extends SDLActivity {
         // libmain.so links the OCCT toolkits via DT_NEEDED, so the dynamic
         // loader pulls them (and libc++_shared) from the APK automatically.
         return new String[] {
-            "SDL2",
+            "SDL3",
             "main"
         };
     }

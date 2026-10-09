@@ -46,13 +46,13 @@ add_library(imgui_lib STATIC
     ${imgui_SOURCE_DIR}/imgui_draw.cpp
     ${imgui_SOURCE_DIR}/imgui_tables.cpp
     ${imgui_SOURCE_DIR}/imgui_widgets.cpp
-    ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl2.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl3.cpp
     ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp)
 target_include_directories(imgui_lib PUBLIC
     ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
 # imgui_impl_opengl3 auto-selects the GLES3 loader when it sees __ANDROID__.
 target_compile_definitions(imgui_lib PUBLIC IMGUI_IMPL_OPENGL_ES3)
-target_link_libraries(imgui_lib PUBLIC SDL2)
+target_link_libraries(imgui_lib PUBLIC SDL3::SDL3)
 
 # ── App sources ──────────────────────────────────────────────────────────────
 # Glob the whole tree, then drop translation units that are desktop-only.
@@ -75,8 +75,9 @@ add_library(main SHARED ${MZ_SOURCES})
 target_include_directories(main PRIVATE "${MZ_SRC}")
 target_include_directories(main SYSTEM PRIVATE "${OCCT_INC}")
 
-# SDL2 (built by the sibling add_subdirectory(SDL)) provides the headers/target.
-target_link_libraries(main PRIVATE SDL2 SDL2main imgui_lib glm::glm)
+# SDL3 (built by the sibling add_subdirectory(SDL)) provides the headers/target.
+# No SDL3main on Android: SDLActivity.java calls the exported SDL_main directly.
+target_link_libraries(main PRIVATE SDL3::SDL3 imgui_lib glm::glm)
 
 # OpenCASCADE. The desktop build lists ~21 toolkits and relies on the system
 # OCCT's DT_NEEDED to pull the rest transitively (TKG2d, etc.). Under Android's
