@@ -53,10 +53,12 @@ if(NOT SDL3_FOUND)
     set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
     set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
     set(SDL_INSTALL OFF CACHE BOOL "" FORCE)
-    # XTEST is only used to fake key events that reset the idle timer while the
-    # screensaver is inhibited - which we never do (Window.cpp allows it) - and
-    # it would make libxtst-dev a hard build dependency.
+    # XTEST (fake key events) and XSCRNSAVER (XScreenSaverSuspend) exist only to
+    # keep the idle timer from firing while the screensaver is inhibited - which
+    # we never do (Window.cpp allows it) - and each would make another -dev
+    # package a hard build dependency.
     set(SDL_X11_XTEST OFF CACHE BOOL "" FORCE)
+    set(SDL_X11_XSCRNSAVER OFF CACHE BOOL "" FORCE)
     if(WIN32)
         # Link SDL statically on Windows: no SDL3.dll to stage next to the exe
         # (the portable zip, the NSIS installer and the CI smoke test all just
