@@ -313,7 +313,15 @@ bool Window::isForeground() const {
     if (!m_window) return true;
     const SDL_WindowFlags f = SDL_GetWindowFlags(m_window);
     if (f & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_HIDDEN)) return false;
-    return (f & SDL_WINDOW_INPUT_FOCUS) != 0;
+    if (f & SDL_WINDOW_INPUT_FOCUS) return true;
+    // No input focus, but the compositor is still resizing/exposing us: an
+    // interactive resize or move on native Wayland drops focus for the whole
+    // drag and then streams RESIZED/EXPOSED events (~100 Hz). Treating that as
+    // "backgrounded" parked the render loop, so the content stayed at the old
+    // size until the button was released. Recent events keep us foreground; a
+    // window that is genuinely just unfocused sees none and still parks.
+    return m_lastExposeTicks != 0 &&
+           (platformTicksMs() - m_lastExposeTicks) < 300u;
 }
 
 std::vector<std::string> Window::takeDroppedFiles() {
@@ -373,6 +381,12 @@ int Window::pollEvents(int waitMs) {
             continue;   // don't also route finger events through the backend
         }
 #endif
+        if (e.type == SDL_EVENT_WINDOW_RESIZED ||
+            e.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED ||
+            e.type == SDL_EVENT_WINDOW_EXPOSED ||
+            e.type == SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED) {
+            m_lastExposeTicks = platformTicksMs() | 1u;   // never 0 ("none yet")
+        }
         // Feed every event to ImGui (handles mouse, keyboard, text).
         ImGui_ImplSDL3_ProcessEvent(&e);
         switch (e.type) {

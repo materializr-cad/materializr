@@ -145,6 +145,11 @@ private:
     // where they are device pixels (Windows, X11, Android).
     bool  m_pointsMode = false;
     float m_displayScale = 1.0f;     // SDL window display scale at creation
+    // platformTicksMs() of the last resize/expose event, or 0 if none yet.
+    // isForeground() uses it: a compositor-driven interactive move/resize takes
+    // input focus away from the window for the whole drag (native Wayland on
+    // GNOME), but the window is plainly on screen and must keep redrawing.
+    std::uint32_t m_lastExposeTicks = 0;
     void* m_glContext = nullptr;
     bool m_shouldClose = false;
     int m_width;
