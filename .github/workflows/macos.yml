@@ -1,6 +1,6 @@
 name: macOS Build
 
-# Builds a native macOS (Apple Silicon / arm64) build with OpenCASCADE + SDL2
+# Builds a native macOS (Apple Silicon / arm64) build with OpenCASCADE + SDL3
 # from Homebrew, packages a self-contained Materializr.app into a .dmg via
 # packaging/macos/build-dmg.sh, and uploads it as a workflow artifact. On a
 # published GitHub Release it also attaches the .dmg. The Linux/Windows/Android
@@ -41,7 +41,7 @@ concurrency:
 jobs:
   macos:
     name: macOS (arm64)
-    # Apple Silicon runner. TRACK THE LATEST image: the bundled Homebrew SDL2
+    # Apple Silicon runner. TRACK THE LATEST image: the bundled Homebrew SDL
     # bottle is compiled for the RUNNER's macOS - a macos-14 bottle's dylib
     # initializer aborts before main() on much newer systems (issue #12,
     # macOS 26.5.2: SIGABRT in libSDL2 dllinit during dyld init). Building on
@@ -61,36 +61,37 @@ jobs:
       - name: Install dependencies
         run: brew install opencascade dylibbundler
 
-      # SDL2 from SOURCE, not the Homebrew bottle. Bottles are compiled for
+      # SDL3 from SOURCE, not the Homebrew bottle. Bottles are compiled for
       # the runner's OS with no deployment-target control, which caused BOTH
       # sides of issue #12: the old macos-14 bottle's dylib initializer aborts
       # on macOS 26.5.2, and the macos-26 bottle carries minos 26.0 so the
       # bundle refuses to load on macOS 14-15 at all. Building here against
       # the CURRENT SDK with MACOSX_DEPLOYMENT_TARGET pinned to 14.0 gives
       # both: modern-SDK initialisation and the old support floor. Version
-      # matches the Android build's pin (2.30.9).
-      - name: Cache SDL2 (source-built, deployment target 14.0)
-        id: sdl2cache
+      # is the repo-wide pin (MZ_SDL3_VERSION in CMakeLists.txt).
+      - name: Cache SDL3 (source-built, deployment target 14.0)
+        id: sdl3cache
         uses: actions/cache@v4
         with:
-          path: ~/sdl2-prefix
-          key: sdl2-2.30.9-macostarget14-${{ runner.os }}-${{ runner.arch }}-v1
+          path: ~/sdl3-prefix
+          key: sdl3-3.4.18-macostarget14-${{ runner.os }}-${{ runner.arch }}-v1
 
-      - name: Build SDL2 from source (MACOSX_DEPLOYMENT_TARGET=14.0)
-        if: steps.sdl2cache.outputs.cache-hit != 'true'
+      - name: Build SDL3 from source (MACOSX_DEPLOYMENT_TARGET=14.0)
+        if: steps.sdl3cache.outputs.cache-hit != 'true'
         env:
           MACOSX_DEPLOYMENT_TARGET: "14.0"
         run: |
-          curl -L --fail --retry 3 -o /tmp/sdl2.tar.gz \
-            https://github.com/libsdl-org/SDL/releases/download/release-2.30.9/SDL2-2.30.9.tar.gz
-          echo "24b574f71c87a763f50704bbb630cbe38298d544a1f890f099a4696b1d6beba4  /tmp/sdl2.tar.gz" | shasum -a 256 -c -
-          tar -xzf /tmp/sdl2.tar.gz -C /tmp
-          cmake -S /tmp/SDL2-2.30.9 -B /tmp/sdl2-build \
+          curl -L --fail --retry 3 -o /tmp/sdl3.tar.gz \
+            https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/SDL3-3.4.18.tar.gz
+          echo "9c75cf16330322c217dedd2e0609f1124f1b54b8633e763467b4684d0f4334a3  /tmp/sdl3.tar.gz" | shasum -a 256 -c -
+          tar -xzf /tmp/sdl3.tar.gz -C /tmp
+          cmake -S /tmp/SDL3-3.4.18 -B /tmp/sdl3-build \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
-            -DCMAKE_INSTALL_PREFIX="$HOME/sdl2-prefix"
-          cmake --build /tmp/sdl2-build -j"$(sysctl -n hw.ncpu)"
-          cmake --install /tmp/sdl2-build
+            -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF \
+            -DCMAKE_INSTALL_PREFIX="$HOME/sdl3-prefix"
+          cmake --build /tmp/sdl3-build -j"$(sysctl -n hw.ncpu)"
+          cmake --install /tmp/sdl3-build
 
       # Kernel-version guard. Every platform is pinned to OCCT 7.9.x (Android/
       # Linux/Windows do it explicitly; macOS rides Homebrew's stable, which is
@@ -108,7 +109,7 @@ jobs:
           esac
 
       - name: Configure
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$HOME/sdl2-prefix;$(brew --prefix)"
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$HOME/sdl3-prefix;$(brew --prefix)"
 
       - name: Build
         run: cmake --build build -j$(sysctl -n hw.ncpu)
@@ -117,11 +118,11 @@ jobs:
         run: ctest --test-dir build --output-on-failure
 
       - name: Package .app + .dmg
-        run: SDL2_PREFIX="$HOME/sdl2-prefix" ./packaging/macos/build-dmg.sh
+        run: SDL3_PREFIX="$HOME/sdl3-prefix" ./packaging/macos/build-dmg.sh
 
       # Deployment-target audit: we have NO Apple hardware, so CI is the only
       # place to SEE what the bundle actually requires. Print minos/sdk for the
-      # main binary and every bundled dylib, and fail if the SDL2 we ship
+      # main binary and every bundled dylib, and fail if the SDL3 we ship
       # regressed past the 14.0 floor (the exact regression a contributor
       # caught in the first #12 fix artifact). The other dylibs (OCCT bottles)
       # are reported informationally - if they carry a high minos the bundle's
@@ -135,11 +136,11 @@ jobs:
             line=$(otool -l "$f" | awk '/LC_BUILD_VERSION/{f=1} f&&/minos/{m=$2} f&&/sdk/{print m, $2; exit}')
             printf '%s | %s\n' "$(basename "$f")" "${line:-<none>}"
             case "$(basename "$f")" in
-              libSDL2*)
+              libSDL3*)
                 minos=$(echo "$line" | awk '{print $1}')
                 case "$minos" in
                   14.*|13.*|12.*|11.*|10.*) : ;;
-                  *) echo "::error::bundled SDL2 minos=$minos - must stay at the 14.0 floor (issue #12 regression guard)"; fail=1 ;;
+                  *) echo "::error::bundled SDL3 minos=$minos - must stay at the 14.0 floor (issue #12 regression guard)"; fail=1 ;;
                 esac ;;
             esac
           done

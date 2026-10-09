@@ -57,6 +57,14 @@ if(NOT SDL3_FOUND)
     # screensaver is inhibited - which we never do (Window.cpp allows it) - and
     # it would make libxtst-dev a hard build dependency.
     set(SDL_X11_XTEST OFF CACHE BOOL "" FORCE)
+    if(WIN32)
+        # Link SDL statically on Windows: no SDL3.dll to stage next to the exe
+        # (the portable zip, the NSIS installer and the CI smoke test all just
+        # copy the exe and its vcpkg DLLs), and nothing for a stale copy to
+        # shadow. SDL is zlib-licensed, so static linking carries no obligation.
+        set(SDL_SHARED OFF CACHE BOOL "" FORCE)
+        set(SDL_STATIC ON CACHE BOOL "" FORCE)
+    endif()
     FetchContent_MakeAvailable(sdl3)
 endif()
 # Normalise the target name across find_package configs and source builds.

@@ -79,7 +79,7 @@ jobs:
             -Password "${{ secrets.GITHUB_TOKEN }}"
           & $nuget setapikey "${{ secrets.GITHUB_TOKEN }}" -Source "$env:NUGET_FEED_URL"
 
-      - name: Install dependencies (OpenCASCADE 7.9.3 pinned + GLEW + SDL2) via vcpkg
+      - name: Install dependencies (OpenCASCADE 7.9.3 pinned + GLEW + curl) via vcpkg; SDL3 is built by CMake
         shell: pwsh
         run: |
           # Manifest mode (vcpkg.json at the repo root) pins opencascade to

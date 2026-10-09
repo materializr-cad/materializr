@@ -1,13 +1,16 @@
 # Building Materializr
 
-One repo, four targets. The windowing/input backend is SDL2 on every platform;
+One repo, four targets. The windowing/input backend is SDL3 (pinned to 3.4.18, `MZ_SDL3_VERSION` in
+`CMakeLists.txt`) on every platform;
 the touch interface is a **runtime setting** (Settings ▸ General ▸ Touch mode,
 default on for Android, off on desktop) - not a separate build.
 
 ## Linux (desktop)
 
 ```sh
-sudo apt install build-essential cmake git libsdl2-dev libgl-dev \
+sudo apt install build-essential cmake git libgl-dev \
+    libx11-dev libxext-dev libxcursor-dev libxi-dev libxrandr-dev libxfixes-dev \
+    libwayland-dev libxkbcommon-dev libdecor-0-dev libegl-dev \
     libocct-data-exchange-dev libocct-draw-dev libocct-foundation-dev \
     libocct-modeling-algorithms-dev libocct-modeling-data-dev \
     libocct-visualization-dev libcurl4-openssl-dev zlib1g-dev
@@ -16,8 +19,15 @@ cmake --build build -j$(nproc)
 ./build/materializr
 ```
 
-If `libsdl2-dev` is absent, CMake builds SDL 2.30.9 from source (needs the X11
-dev headers). GLM and Dear ImGui are always fetched by CMake.
+CMake uses a system SDL3 only if it is at least 3.4.18; otherwise it downloads
+and builds the pinned release (the X11/Wayland headers above are what it needs;
+Wayland needs `wayland-scanner` too). `libdecor` is loaded at runtime and is
+optional on the machine that runs the app. GLM and Dear ImGui are always fetched
+by CMake.
+
+On a Wayland session the app runs natively on Wayland. `--x11` (or
+`SDL_VIDEO_DRIVER=x11`) forces X11/XWayland instead; on GNOME without `libdecor`
+installed it falls back to XWayland by itself so the window keeps a title bar.
 
 The release AppImage is built in Docker: `./scripts/build-appimage.sh`
 (see `Dockerfile`; CI runs this on x86_64 and aarch64 via
@@ -26,33 +36,35 @@ The release AppImage is built in Docker: `./scripts/build-appimage.sh`
 ## Windows
 
 CI (`.github/workflows/windows.yml`) is the reference: vcpkg provides
-`opencascade glew curl sdl2` (x64-windows), then a standard CMake/MSVC build
-with `-DCMAKE_TOOLCHAIN_FILE=<vcpkg>/scripts/buildsystems/vcpkg.cmake`.
+`opencascade glew curl` (x64-windows), then a standard CMake/MSVC build
+with `-DCMAKE_TOOLCHAIN_FILE=<vcpkg>/scripts/buildsystems/vcpkg.cmake`. SDL3 is not a
+vcpkg dependency: CMake downloads the pinned release and links it statically.
 
 ## macOS (Apple Silicon)
 
-Do **not** `brew install sdl2`: Homebrew's `sdl2` formula is now an alias for
-[`sdl2-compat`](https://github.com/libsdl-org/sdl2-compat), an SDL3-backed shim
-whose dylib initializer aborts before `main()` when bundled into the `.app`
-(issue #12). Build real SDL2 from source instead, the same way CI does:
+Do **not** `brew install sdl3` for packaging: a Homebrew bottle is compiled for the
+runner's own macOS with no deployment-target control, which is what broke
+issue #12 (bottle initializer aborting on newer macOS, or a minos too high for
+older ones). Build SDL3 from source, the same way CI does:
 
 ```sh
 brew install cmake opencascade
 
-# SDL 2.30.9 from source (matches .github/workflows/macos.yml and the Android
-# pin). MACOSX_DEPLOYMENT_TARGET=14.0 keeps a packaged .dmg loadable on
-# macOS 14+ while still compiling against the current SDK.
-curl -L --fail -o /tmp/sdl2.tar.gz \
-  https://github.com/libsdl-org/SDL/releases/download/release-2.30.9/SDL2-2.30.9.tar.gz
-echo "24b574f71c87a763f50704bbb630cbe38298d544a1f890f099a4696b1d6beba4  /tmp/sdl2.tar.gz" | shasum -a 256 -c -
-tar -xzf /tmp/sdl2.tar.gz -C /tmp
-cmake -S /tmp/SDL2-2.30.9 -B /tmp/sdl2-build -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 -DCMAKE_INSTALL_PREFIX="$HOME/sdl2-prefix"
-cmake --build /tmp/sdl2-build -j$(sysctl -n hw.ncpu)
-cmake --install /tmp/sdl2-build
+# SDL 3.4.18 from source (matches .github/workflows/macos.yml and MZ_SDL3_VERSION).
+# MACOSX_DEPLOYMENT_TARGET=14.0 keeps a packaged .dmg loadable on macOS 14+
+# while still compiling against the current SDK.
+curl -L --fail -o /tmp/sdl3.tar.gz \
+  https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/SDL3-3.4.18.tar.gz
+echo "9c75cf16330322c217dedd2e0609f1124f1b54b8633e763467b4684d0f4334a3  /tmp/sdl3.tar.gz" | shasum -a 256 -c -
+tar -xzf /tmp/sdl3.tar.gz -C /tmp
+cmake -S /tmp/SDL3-3.4.18 -B /tmp/sdl3-build -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF \
+  -DCMAKE_INSTALL_PREFIX="$HOME/sdl3-prefix"
+cmake --build /tmp/sdl3-build -j$(sysctl -n hw.ncpu)
+cmake --install /tmp/sdl3-build
 
 cmake -B build -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_PREFIX_PATH="$HOME/sdl2-prefix;$(brew --prefix)"
+  -DCMAKE_PREFIX_PATH="$HOME/sdl3-prefix;$(brew --prefix)"
 cmake --build build -j$(sysctl -n hw.ncpu)
 ./build/materializr
 ```
@@ -90,7 +102,7 @@ published, just a community build path. Builds clean on FreeBSD 15 with
 system packages:
 
 ```sh
-pkg install cmake sdl2 opencascade curl git
+pkg install cmake sdl3 opencascade curl git
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j$(sysctl -n hw.ncpu)
 ./build/materializr
