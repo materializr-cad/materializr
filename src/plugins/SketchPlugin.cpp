@@ -124,8 +124,11 @@ public:
             ImGui::Begin("##SketchDim", nullptr,
                 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
-            if (ImGui::InputText(materializr::unitSuffix(), m_dimBuf, sizeof(m_dimBuf),
-                                 ImGuiInputTextFlags_EnterReturnsTrue)) {
+            // Enter here only means "use this value", so the touch pad's
+            // Enter applies it too.
+            if (materializr::inputNumberText(materializr::unitSuffix(), m_dimBuf, sizeof(m_dimBuf),
+                                 ImGuiInputTextFlags_EnterReturnsTrue,
+                                 /*padEnterCommits=*/true)) {
                 float v = 0.0f;
                 // Only a LENGTH is converted. An arc's sweep is degrees and a
                 // polygon's first value is a side count; running those through

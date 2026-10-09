@@ -4177,6 +4177,7 @@ void Application::rebuildHistoryFromProject(const ProjectHistory& hist,
     size_t stepNo = 0;
     for (const auto& st : hist.steps) {
         ++stepNo;
+        const auto stepT0 = std::chrono::steady_clock::now();
         if (totalSteps > 1) {
             char lbl[96];
             std::snprintf(lbl, sizeof(lbl), "Rebuilding history - step %d of %d",
@@ -4313,6 +4314,16 @@ void Application::rebuildHistoryFromProject(const ProjectHistory& hist,
                              std::chrono::hours{24});
         }
         m_history->pushExecuted(std::move(op), *m_document);
+        // Which steps a slow load spends its time in (a 52-step project took
+        // 12 s on desktop and ~32 s on a tablet, almost all of it here).
+        if (materializr::isVerbose()) {
+            const auto stepMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - stepT0).count();
+            if (stepMs >= 50)
+                std::fprintf(stderr, "[Reload] step %d '%s' (%s) took %lld ms\n",
+                             static_cast<int>(stepNo), st.name.c_str(), st.typeId.c_str(),
+                             static_cast<long long>(stepMs));
+        }
     }
 
     // After all ops are rehydrated, the document bodies reflect their final state
@@ -4544,14 +4555,26 @@ bool Application::loadProjectAt(const std::string& path) {
     // harmless, but the GPU memory belongs to dead sketches).
     if (m_sketchRenderer) m_sketchRenderer->clearCache();
     ProjectHistory hist;
+    const auto tParse = std::chrono::steady_clock::now();
     auto result = ProjectIO::load(path, *m_document, &hist);
     if (!result.success) {
         std::fprintf(stderr, "Load failed: %s\n", result.errorMessage.c_str());
         return false;
     }
+    const auto tPrewarm = std::chrono::steady_clock::now();
     prewarmMeshPool([this]{ return m_document->getAllBodyIds(); },
                     "Preparing view\xE2\x80\xA6", "load-parmesh");
+    const auto tRebuild = std::chrono::steady_clock::now();
     rebuildHistoryFromProject(hist, result.savedByVersion);
+    if (materializr::isVerbose()) {
+        auto ms = [](std::chrono::steady_clock::duration d) {
+            return static_cast<long long>(
+                std::chrono::duration_cast<std::chrono::milliseconds>(d).count());
+        };
+        std::fprintf(stderr, "[load-timing] read=%lld ms  mesh-prewarm=%lld ms  history=%lld ms\n",
+                     ms(tPrewarm - tParse), ms(tRebuild - tPrewarm),
+                     ms(std::chrono::steady_clock::now() - tRebuild));
+    }
     // A reopened project should sit at the history tip with no redo stack - a
     // phantom redo tail would, e.g., block autosave (which won't save below-tip).
     m_history->dropRedoTail();
@@ -4586,7 +4609,7 @@ bool Application::loadProjectAt(const std::string& path) {
     return true;
 }
 
-void Application::loadProjectWithProgress(const std::string& path) {
+bool Application::loadProjectWithProgress(const std::string& path) {
     using clock = std::chrono::steady_clock;
     auto ms = [](clock::duration d) {
         return std::chrono::duration_cast<std::chrono::milliseconds>(d).count();
@@ -4626,6 +4649,7 @@ void Application::loadProjectWithProgress(const std::string& path) {
                  static_cast<long long>(ms(t1 - t0)),
                  static_cast<long long>(ms(t2 - t1)),
                  static_cast<long long>(ms(t2 - tTotal)));
+    return ok;
 }
 
 void Application::addRecentProject(const std::string& ref, const std::string& name) {
@@ -4672,7 +4696,12 @@ void Application::openRecentProject(const AppSettings::RecentProject& r) {
     // screen's tiles, the "+" dropdown, the File menu - so the guard sits here
     // rather than at each of them.
     if (focusExistingProject(ref)) return;
-    guardedOpen([this, ref, name]() {
+    // The load itself runs between frames (m_deferredHeavy), through the same
+    // progress path as the startup auto-open: a loading bar, frames pumped
+    // while history rebuilds, and the disk mesh cache consulted. Loaded inline
+    // here it froze the window for the whole open - most of a minute for a
+    // 52-step project on a tablet - with no sign it was working.
+    guardedOpen([this, ref, name]() { m_deferredHeavy.queue([this, ref, name]() {
 #if defined(MZ_MOBILE)
         // ref is a persisted SAF content:// URI - resolve to a temp file, no picker.
         std::string tmp = materializr::mobileOpenUri(ref);
@@ -4687,7 +4716,7 @@ void Application::openRecentProject(const AppSettings::RecentProject& r) {
         // we never read (or recreate one the user deliberately deleted), so
         // the project comes back UNLINKED: saving prompts for a destination.
         const bool viaFallback = materializr::mobileLastOpenWasFallback();
-        if (loadProjectAt(tmp)) {
+        if (loadProjectWithProgress(tmp)) {
             addRecentProject(ref, name);  // bump to front
             // The resolved temp is peekable even though the content: ref is
             // not - harvest the embedded thumbnail into the cache so this
@@ -4715,13 +4744,13 @@ void Application::openRecentProject(const AppSettings::RecentProject& r) {
         }
         else { showToast(materializr::trFormat("Failed to open \"%s\".", name)); removeRecentProject(ref); }
 #else
-        if (loadProjectAt(ref)) addRecentProject(ref, name);  // bump to front
+        if (loadProjectWithProgress(ref)) addRecentProject(ref, name);  // bump to front
         else {
             showToast(materializr::trFormat("Couldn't open \"%s\" - the file may have moved or been deleted.", name));
             removeRecentProject(ref);
         }
 #endif
-    });
+    }); });
 }
 
 void Application::loadProject() {
@@ -4752,8 +4781,9 @@ void Application::openProjectPath(const std::string& path) {
     if (focusExistingProject(ident)) return;
     // Guard unsaved changes (the picked path is captured for after the
     // save prompt resolves), then load + record in Open Recent.
-    guardedOpen([this, path]() {
-        if (!loadProjectAt(path)) return;
+    // Between frames with a progress bar - see openRecentProject.
+    guardedOpen([this, path]() { m_deferredHeavy.queue([this, path]() {
+        if (!loadProjectWithProgress(path)) return;
         // Record with a *persistable* ref: the SAF content:// URI on
         // Android (the `path` is a throwaway temp there), the real path
         // on desktop.
@@ -4779,7 +4809,7 @@ void Application::openProjectPath(const std::string& path) {
 #endif
         if (name.empty()) name = std::filesystem::path(path).filename().string();
         addRecentProject(ref, name);
-    });
+    }); });
 }
 
 void Application::openProjectInNewTab(const std::string& path) {

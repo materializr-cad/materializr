@@ -142,7 +142,9 @@ inline bool lengthStepperRow(const char* id, float* mm, bool allowNegative,
 }
 
 inline bool lengthBufferIsActive(const char* label) {
-    return ImGui::GetActiveID() == ImGui::GetID(label);
+    const ImGuiID id = ImGui::GetID(label);
+    // inputNumberText's pad commit counts as an edit for the frame it lands in.
+    return ImGui::GetActiveID() == id || numberTextCommittedThisFrame(id);
 }
 inline void reseedLengthBufferIfIdle(const char* label, char* buf, size_t n, double mm) {
     if (!lengthBufferIsActive(label)) formatLengthDigits(buf, n, mm);

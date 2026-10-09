@@ -139,7 +139,7 @@ void ShellController::panelBody(const IopContext& ctx, bool& changed) {
     // than feeding inf into MakeThickSolid.
     // The member is the truth; the buffer follows it unless being typed in.
     materializr::reseedLengthBufferIfIdle("##shellThickness", m_inputBuf, sizeof(m_inputBuf), m_thickness);
-    if (ImGui::InputText("##shellThickness", m_inputBuf, sizeof(m_inputBuf),
+    if (materializr::inputNumberText("##shellThickness", m_inputBuf, sizeof(m_inputBuf),
                          ImGuiInputTextFlags_EnterReturnsTrue)) {
         (void)materializr::parseLength(m_inputBuf, m_thickness);
         requestCommit();
@@ -990,7 +990,7 @@ void ResizeCylindricalController::panelBody(const IopContext& ctx,
         ImGui::SetNextItemWidth(140);
         // The member is the truth; the buffer follows unless being typed in.
         materializr::reseedLengthBufferIfIdle("##rcyldia", buf, 32, *val);
-        if (ImGui::InputText("##rcyldia", buf, 32,
+        if (materializr::inputNumberText("##rcyldia", buf, 32,
                              ImGuiInputTextFlags_EnterReturnsTrue))
             requestCommit();   // Enter in the field = Confirm
         // Only re-read while typing: an idle re-parse rewrote the model from

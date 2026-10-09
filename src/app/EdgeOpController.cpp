@@ -830,7 +830,7 @@ void EdgeOpController::renderEdgeOpPanel(const IopContext& ctx) {
     } else {
         // The member is the truth; the buffer follows it unless being typed in.
         materializr::reseedLengthBufferIfIdle("##val", m_inputBuf, sizeof(m_inputBuf), m_value);
-        if (ImGui::InputText("##val", m_inputBuf, sizeof(m_inputBuf),
+        if (materializr::inputNumberText("##val", m_inputBuf, sizeof(m_inputBuf),
                              ImGuiInputTextFlags_EnterReturnsTrue)) {
             (void)materializr::parseLength(m_inputBuf, m_value);
             update(ctx);
@@ -884,7 +884,7 @@ void EdgeOpController::renderEdgeOpPanel(const IopContext& ctx) {
             } else {
                 // The member is the truth; the buffer follows it unless being typed in.
                 materializr::reseedLengthBufferIfIdle("##val2", m_inputBuf2, sizeof(m_inputBuf2), m_value2);
-                if (ImGui::InputText("##val2", m_inputBuf2, sizeof(m_inputBuf2),
+                if (materializr::inputNumberText("##val2", m_inputBuf2, sizeof(m_inputBuf2),
                                      ImGuiInputTextFlags_EnterReturnsTrue)) {
                     (void)materializr::parseLength(m_inputBuf2, m_value2);
                     update(ctx);

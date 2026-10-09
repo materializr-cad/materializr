@@ -441,7 +441,7 @@ void ExtrudeController::renderExtrudePanel(const IopContext& ctx) {
     } else {
         // The member is the truth; the buffer follows it unless being typed in.
         materializr::reseedLengthBufferIfIdle("##dist", m_inputBuf, sizeof(m_inputBuf), m_distance);
-        if (ImGui::InputText("##dist", m_inputBuf, sizeof(m_inputBuf),
+        if (materializr::inputNumberText("##dist", m_inputBuf, sizeof(m_inputBuf),
                              ImGuiInputTextFlags_EnterReturnsTrue)) {
             // Enter pressed - commit (parseFinite: keep last on garbage)
             (void)materializr::parseLength(m_inputBuf, m_distance);

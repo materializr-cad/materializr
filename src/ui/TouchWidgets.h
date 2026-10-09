@@ -130,9 +130,12 @@ bool amountField(const char* id, const char* label, double* v,
 // *v <= 0 the collapsed well shows the hint dimmed instead of "0", and the
 // pad unfolds with an EMPTY entry - Enter with nothing typed commits nothing
 // and just folds, preserving the "keep the drag" contract.
+// `wellW`, when > 0, sizes the collapsed well instead of the full row - for a
+// field that shares its line with a unit suffix (the pad still unfolds at the
+// panel's width beneath it).
 bool numberField(const char* id, const char* label, double* v,
                  const char* fmt = "%g", bool* opened = nullptr,
-                 const char* hint = nullptr);
+                 const char* hint = nullptr, float wellW = 0.0f);
 bool amountField(const char* id, const char* label, float* v,
                  const char* suffix = "mm", int decimals = 1,
                  bool allowSign = false, float minV = 0.0f, float maxV = 0.0f,

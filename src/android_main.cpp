@@ -12,6 +12,8 @@
 #include <iostream>
 #include <dlfcn.h>
 #include <cstdint>
+#include <cstdlib>
+#include <sys/system_properties.h>
 
 int main(int /*argc*/, char* /*argv*/[]) {
     // OpenCASCADE's OSD_File / Resource_Manager closes a resource-file descriptor
@@ -31,6 +33,15 @@ int main(int /*argc*/, char* /*argv*/[]) {
     // HOME/CWD/CSF_* so settings, fonts and OpenCASCADE find their data. Must
     // run before constructing Application (which loads settings and touches OCCT).
     materializr::androidInitRuntime();
+
+    // Android's stand-in for the desktop --verbose flag (there is no command
+    // line): `adb shell setprop debug.materializr.verbose 1`, then relaunch.
+    // The per-op traces go to logcat (Materializr-io) like everything else.
+    {
+        char v[PROP_VALUE_MAX] = {};
+        if (__system_property_get("debug.materializr.verbose", v) > 0 && std::atoi(v) != 0)
+            materializr::setVerbose(true);
+    }
 
     // Convert OCCT internal faults (SIGSEGV/SIGFPE inside the kernel) into
     // catchable Standard_Failure exceptions, matching the desktop build.

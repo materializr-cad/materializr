@@ -529,8 +529,10 @@ private:
     // Like loadProjectAt but shows a loading bar and tessellates up front,
     // pumping frames so the window stays responsive (no OS "not responding").
     // Must run from the deferred-heavy-task slot (between frames), never inside
-    // a live ImGui frame. Used for the auto-open-on-launch path.
-    void loadProjectWithProgress(const std::string& path);
+    // a live ImGui frame. Used for the auto-open-on-launch path, and (queued
+    // onto m_deferredHeavy) by Open and Open Recent. Returns loadProjectAt's
+    // result.
+    bool loadProjectWithProgress(const std::string& path);
 
     // Open Recent: a persisted, most-recent-first list of projects. `ref` is a
     // filesystem path (desktop) or a SAF content:// URI (Android); `name` is the

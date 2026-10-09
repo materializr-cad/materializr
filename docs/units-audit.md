@@ -262,6 +262,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 ## `mm` literals by class
 
 - CONVERTED: 1
+- READOUT-LITERAL: 1
 - allowed-by-hand: 92
 - comment: 283
 - diagnostic: 11
@@ -269,6 +270,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 
 | class | file | code |
 |---|---|---|
+| READOUT-LITERAL | src/app/Application_Dialogs.cpp | `if (materializr::inputNumberText("##mm", edit.buf, sizeof(edit.buf))) {` |
 | comment | src/ai/AiToolDispatcher.cpp | `// mm value formatted with up to 2 decimals, trailing zeros trimmed` |
 | allowed-by-hand | src/ai/AiToolDispatcher.cpp | `"centered at (x=%.1f, y=%.1f, z=%.1f)mm, size (width=%.1f, depth=%.1f, height=%.1f)mm",` |
 | allowed-by-hand | src/ai/AiToolDispatcher.cpp | `" at radius " + std::to_string(radius) + "mm"};` |

@@ -1196,6 +1196,16 @@ void Application::renderScalePanel() {
             ImGui::TextColored(axisColors[i], "%s", axisLabels[i]);
             ImGui::SameLine(28);
             ImGui::SetNextItemWidth(95.0f);
+            if (materializr::touchMode()) {
+                // Number pad. Its commit pins the buffer like a keyboard edit
+                // would (focused), or the next frame reseeds it from the
+                // body's current extent and Apply never sees the target.
+                if (materializr::inputNumberText("##mm", edit.buf, sizeof(edit.buf))) {
+                    edit.focused = true;
+                    edit.bodyId = targetBodyId;
+                    edit.initialExtent = userExtents[i];
+                }
+            } else {
             ImGui::InputText("##mm", edit.buf, sizeof(edit.buf),
                              ImGuiInputTextFlags_AutoSelectAll);   // letters: "2in"
             if (ImGui::IsItemActivated()) {
@@ -1204,6 +1214,7 @@ void Application::renderScalePanel() {
                 edit.initialExtent = userExtents[i];
             }
             if (ImGui::IsItemDeactivatedAfterEdit()) edit.focused = false;
+            }
             ImGui::SameLine(); ImGui::Text("%s", materializr::unitSuffix());
             ImGui::PopID();
         }
@@ -1408,7 +1419,7 @@ void Application::renderSketchPatternPopup() {
     bool changed = false;
     ImGui::Text("%s", materializr::tr("Copies")); ImGui::SameLine();
     ImGui::SetNextItemWidth(80);
-    ImGui::InputText("##spcount", m_sketchPatternCountBuf,
+    materializr::inputNumberText("##spcount", m_sketchPatternCountBuf,
                      sizeof(m_sketchPatternCountBuf),
                      ImGuiInputTextFlags_CharsDecimal);
     // Clamp: atoi has no overflow guard, so a pasted/typed huge integer
@@ -1420,7 +1431,7 @@ void Application::renderSketchPatternPopup() {
     if (m_sketchPatternKind == PatternKind::Linear) {
         ImGui::Text("%s", materializr::tr("Spacing")); ImGui::SameLine();
         ImGui::SetNextItemWidth(100);
-        ImGui::InputText("##spdist", m_sketchPatternDistanceBuf,
+        materializr::inputNumberText("##spdist", m_sketchPatternDistanceBuf,
                          sizeof(m_sketchPatternDistanceBuf),
                          0 /* letters allowed: parseLength accepts a typed "2in" */);
         ImGui::SameLine(); ImGui::Text("%s", materializr::unitSuffix());
@@ -1450,7 +1461,7 @@ void Application::renderSketchPatternPopup() {
     } else {
         ImGui::Text("%s", materializr::tr("Sweep")); ImGui::SameLine();
         ImGui::SetNextItemWidth(100);
-        ImGui::InputText("##spangle", m_sketchPatternAngleBuf,
+        materializr::inputNumberText("##spangle", m_sketchPatternAngleBuf,
                          sizeof(m_sketchPatternAngleBuf),
                          ImGuiInputTextFlags_CharsDecimal);
         ImGui::SameLine(); ImGui::Text("°");
@@ -1582,7 +1593,7 @@ void Application::renderPatternPanel() {
         ImGui::SetKeyboardFocusHere();
         m_patternInputFocus = false;
     }
-    bool countEnter = ImGui::InputText("##patcount", m_patternCountBuf,
+    bool countEnter = materializr::inputNumberText("##patcount", m_patternCountBuf,
                                        sizeof(m_patternCountBuf),
                                        ImGuiInputTextFlags_EnterReturnsTrue |
                                        ImGuiInputTextFlags_CharsDecimal);
@@ -1596,7 +1607,7 @@ void Application::renderPatternPanel() {
     if (m_patternKind == PatternKind::Linear) {
         ImGui::Text("%s", materializr::tr("Spacing")); ImGui::SameLine();
         ImGui::SetNextItemWidth(100);
-        ImGui::InputText("##patdist", m_patternDistanceBuf,
+        materializr::inputNumberText("##patdist", m_patternDistanceBuf,
                          sizeof(m_patternDistanceBuf),
                          0 /* letters allowed: parseLength accepts a typed "2in" */);
         ImGui::SameLine(); ImGui::Text("%s", materializr::unitSuffix());
@@ -1623,7 +1634,7 @@ void Application::renderPatternPanel() {
     } else {
         ImGui::Text("%s", materializr::tr("Sweep")); ImGui::SameLine();
         ImGui::SetNextItemWidth(100);
-        ImGui::InputText("##patangle", m_patternAngleBuf,
+        materializr::inputNumberText("##patangle", m_patternAngleBuf,
                          sizeof(m_patternAngleBuf),
                          ImGuiInputTextFlags_CharsDecimal);
         ImGui::SameLine(); ImGui::Text("°");
@@ -1809,7 +1820,7 @@ void Application::renderThreadPanel() {
     } else {
     ImGui::Text("%s", materializr::tr("Pitch")); ImGui::SameLine();
     ImGui::SetNextItemWidth(90);
-    if (ImGui::InputText("##thrPitch", m_threadPitchBuf, sizeof(m_threadPitchBuf),
+    if (materializr::inputNumberText("##thrPitch", m_threadPitchBuf, sizeof(m_threadPitchBuf),
                          0 /* letters allowed: parseLength accepts a typed "2in" */)) {
         float v = 0.0f; // parseFinite: inf would pass the >= 0.1 guard
         if (materializr::parseLength(m_threadPitchBuf, v) && v >= 0.1f)
@@ -1824,7 +1835,7 @@ void Application::renderThreadPanel() {
     } else {
     ImGui::Text("%s", materializr::tr("Depth")); ImGui::SameLine();
     ImGui::SetNextItemWidth(90);
-    if (ImGui::InputText("##thrDepth", m_threadDepthBuf, sizeof(m_threadDepthBuf),
+    if (materializr::inputNumberText("##thrDepth", m_threadDepthBuf, sizeof(m_threadDepthBuf),
                          0 /* letters allowed: parseLength accepts a typed "2in" */)) {
         float v = 0.0f;
         if (materializr::parseLength(m_threadDepthBuf, v) && v >= 0.05f)
@@ -2821,7 +2832,7 @@ void Application::renderRefImageCalibrationPopup(int planeId) {
     if (ImGui::SmallButton(materializr::tr("Reset points"))) m_refImgPickCount = 0;
 
     ImGui::SetNextItemWidth(uiSz(120, 0).x);
-    ImGui::InputText(materializr::trFormat("Distance between points (%s)", materializr::unitSuffix()).c_str(),
+    materializr::inputNumberText(materializr::trFormat("Distance between points (%s)", materializr::unitSuffix()).c_str(),
                      m_refImgDistBuf, sizeof(m_refImgDistBuf), 0);   // letters: "2in"
 
     // Typed in the display unit (or with its own suffix); the model wants mm.
@@ -3139,7 +3150,7 @@ void Application::renderSketchMovePanel() {
         ImGui::TextColored(axisColors[i], "%s", axisLabels[i]);
         ImGui::SameLine();
         ImGui::SetNextItemWidth(110);
-        ImGui::InputText("##input", m_sketchMoveBuf[i], sizeof(m_sketchMoveBuf[i]),
+        materializr::inputNumberText("##input", m_sketchMoveBuf[i], sizeof(m_sketchMoveBuf[i]),
                          0 |
                          ImGuiInputTextFlags_CharsNoBlank |
                          ImGuiInputTextFlags_AutoSelectAll);
@@ -3485,7 +3496,7 @@ void Application::renderConstructionPlanePanel() {
     ImGui::Text("%s", materializr::tr("Distance")); ImGui::SameLine();
     ImGui::SetNextItemWidth(100);
     bool offsetChanged = false;
-    if (ImGui::InputText("##planeoffset", m_planeOpOffsetBuf, sizeof(m_planeOpOffsetBuf),
+    if (materializr::inputNumberText("##planeoffset", m_planeOpOffsetBuf, sizeof(m_planeOpOffsetBuf),
                          0 /* letters allowed: parseLength accepts a typed "2in" */)) {
         double parsed = m_planeOpOffset;
         if (materializr::parseLength(m_planeOpOffsetBuf, parsed) &&
@@ -3528,19 +3539,22 @@ void Application::renderConstructionPlanePanel() {
     auto rotField = [&](const char* id, const char* label, char* buf,
                         std::size_t bufSz) {
         ImGui::SetNextItemWidth(rotW);
-        const bool entered = ImGui::InputText(id, buf, bufSz,
+        const bool entered = materializr::inputNumberText(id, buf, bufSz,
                                               ImGuiInputTextFlags_CharsDecimal |
                                               ImGuiInputTextFlags_EnterReturnsTrue);
         ImGui::SameLine(0.0f, 4.0f);
         ImGui::Text("%s", label);
         return entered;
     };
+    // Touch mode stacks the three: each number pad unfolds under its own well,
+    // and a SameLine would hang the next field off the pad's last row.
+    const bool rotRow = !materializr::touchMode();
     bool rotEnter = rotField("##planeRotX", "X", m_planeOpRotBufX, sizeof(m_planeOpRotBufX));
-    ImGui::SameLine();
+    if (rotRow) ImGui::SameLine();
     rotEnter |= rotField("##planeRotY", "Y", m_planeOpRotBufY, sizeof(m_planeOpRotBufY));
-    ImGui::SameLine();
+    if (rotRow) ImGui::SameLine();
     rotEnter |= rotField("##planeRotZ", "Z", m_planeOpRotBufZ, sizeof(m_planeOpRotBufZ));
-    ImGui::SameLine();
+    if (rotRow) ImGui::SameLine();
     const bool rotApply = ImGui::SmallButton(materializr::tr("Apply##planeRotApply"));
     ImGui::SameLine();
     const bool rotReset = ImGui::SmallButton(materializr::tr("Reset##planeRotReset"));
@@ -3773,7 +3787,7 @@ void Application::renderRevolvePopup() {
     ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Angle"));
     ImGui::SetNextItemWidth(100);
     bool angleChanged = false;
-    if (ImGui::InputText("##revAng", m_revolveAngleBuf, sizeof(m_revolveAngleBuf),
+    if (materializr::inputNumberText("##revAng", m_revolveAngleBuf, sizeof(m_revolveAngleBuf),
                          ImGuiInputTextFlags_CharsDecimal)) {
         { float a = m_revolveAngle;
           if (materializr::parseFinite(m_revolveAngleBuf, a)) m_revolveAngle = a; }
@@ -4084,7 +4098,7 @@ void Application::renderAlignFacePopup() {
     ImGui::Separator();
     ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Offset from plane"));
     ImGui::SetNextItemWidth(100);
-    if (ImGui::InputText("##alignOff", m_alignOffsetBuf, sizeof(m_alignOffsetBuf),
+    if (materializr::inputNumberText("##alignOff", m_alignOffsetBuf, sizeof(m_alignOffsetBuf),
                          0 /* letters allowed: parseLength accepts a typed "2in" */)) {
         float a = m_alignOffset;
         if (materializr::parseLength(m_alignOffsetBuf, a)) m_alignOffset = a;
@@ -4113,15 +4127,15 @@ void Application::renderAlignFacePopup() {
     if (m_alignSetPos) {
         ImGui::TextDisabled("%s", materializr::tr("Face centre, along the plane's own axes"));
         ImGui::SetNextItemWidth(90);
-        if (ImGui::InputText("U##alignU", m_alignUBuf, sizeof(m_alignUBuf),
+        if (materializr::inputNumberText("U##alignU", m_alignUBuf, sizeof(m_alignUBuf),
                              0 /* letters allowed: parseLength accepts a typed "2in" */)) {
             float a = m_alignU;
             if (materializr::parseLength(m_alignUBuf, a)) m_alignU = a;
             changed = true;
         }
-        ImGui::SameLine();
+        if (!materializr::touchMode()) ImGui::SameLine();   // touch: stacked, like the axis origin
         ImGui::SetNextItemWidth(90);
-        if (ImGui::InputText("V##alignV", m_alignVBuf, sizeof(m_alignVBuf),
+        if (materializr::inputNumberText("V##alignV", m_alignVBuf, sizeof(m_alignVBuf),
                              0 /* letters allowed: parseLength accepts a typed "2in" */)) {
             float a = m_alignV;
             if (materializr::parseLength(m_alignVBuf, a)) m_alignV = a;
@@ -4240,7 +4254,7 @@ void Application::renderRotatePlaneAboutAxisPopup() {
     ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Angle"));
     ImGui::SetNextItemWidth(100);
     bool angleChanged = false;
-    if (ImGui::InputText("##rotPlaneAng", m_rotPlaneAngleBuf, sizeof(m_rotPlaneAngleBuf),
+    if (materializr::inputNumberText("##rotPlaneAng", m_rotPlaneAngleBuf, sizeof(m_rotPlaneAngleBuf),
                          ImGuiInputTextFlags_CharsDecimal)) {
         { float a = m_rotPlaneAngle;
           if (materializr::parseFinite(m_rotPlaneAngleBuf, a)) m_rotPlaneAngle = a; }
@@ -4593,7 +4607,7 @@ void Application::renderConstructionAxisPanel() {
         ImGui::PushID(i);
         ImGui::Text("%s", axisLetters[i]); ImGui::SameLine();
         ImGui::SetNextItemWidth(80);
-        if (ImGui::InputText("##axisOrig", m_axisOpOriginBuf[i],
+        if (materializr::inputNumberText("##axisOrig", m_axisOpOriginBuf[i],
                              sizeof(m_axisOpOriginBuf[i]), 0)) {   // letters: "2in"
             double parsed = m_axisOpOrigin[i];
             if (materializr::parseLength(m_axisOpOriginBuf[i], parsed) &&
@@ -4603,7 +4617,8 @@ void Application::renderConstructionAxisPanel() {
             }
         }
         ImGui::PopID();
-        if (i < 2) ImGui::SameLine();
+        // Stacked in touch mode: each number pad unfolds under its own well.
+        if (i < 2 && !materializr::touchMode()) ImGui::SameLine();
     }
     ImGui::TextDisabled("%s", materializr::tr("Point the axis passes through. Drag the gizmo later (after Apply) to fine-tune."));
 
@@ -5202,6 +5217,11 @@ void Application::renderOffsetToolPanel() {
     if (ImGui::Begin("Offset", &open,
                      ImGuiWindowFlags_AlwaysAutoResize |
                      ImGuiWindowFlags_NoSavedSettings)) {
+        // Wrap the hints at a fixed width. Auto-resize otherwise sizes the
+        // window to the longest unwrapped line, which at touch scale is wider
+        // than a tablet - and since the position is only set on first use, the
+        // longer second hint grew the window off the right edge.
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * 22.0f);
         if (!picked) {
             ImGui::TextDisabled("%s", materializr::tr(
                 "Hover a line, arc or circle - the whole connected chain "
@@ -5243,6 +5263,7 @@ void Application::renderOffsetToolPanel() {
             }
         }
 
+        ImGui::PopTextWrapPos();
         ImGui::Separator();
         ImGui::BeginDisabled(!m_sketchTool->offsetReady());
         if (ImGui::Button(materializr::tr("Offset"))) commitOffsetNow();

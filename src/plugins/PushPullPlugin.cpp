@@ -134,7 +134,7 @@ public:
         // used to flow straight into the extrude) - the previous value stays.
         // The member is the truth; the buffer follows unless being typed in.
         materializr::reseedLengthBufferIfIdle("##dist", m_inputBuf, sizeof(m_inputBuf), m_distance);
-        if (ImGui::InputText("##dist", m_inputBuf, sizeof(m_inputBuf),
+        if (materializr::inputNumberText("##dist", m_inputBuf, sizeof(m_inputBuf),
                              ImGuiInputTextFlags_EnterReturnsTrue)) {
             (void)materializr::parseLength(m_inputBuf, m_distance);
             updatePreview(ctx);

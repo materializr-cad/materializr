@@ -565,7 +565,7 @@ bool amountField(const char* id, const char* label, double* v,
 }
 
 bool numberField(const char* id, const char* label, double* v, const char* fmt,
-                 bool* opened, const char* hint) {
+                 bool* opened, const char* hint, float wellW) {
     const float s = uiScale();
     bool committed = false;
 
@@ -640,7 +640,7 @@ bool numberField(const char* id, const char* label, double* v, const char* fmt,
         ImGui::PushStyleColor(ImGuiCol_Text, accentFill());
     else if (hintState)
         ImGui::PushStyleColor(ImGuiCol_Text, textDim());
-    if (ImGui::Button(shown, ImVec2(avail, 0.0f))) {
+    if (ImGui::Button(shown, ImVec2(wellW > 0.0f ? std::min(wellW, avail) : avail, 0.0f))) {
         if (openHere) {
             s_open = 0;               // tapping the open field folds it again
         } else {
