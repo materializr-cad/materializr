@@ -17,6 +17,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
+#include <system_error>
+#include <vector>
 #if defined(__linux__) && !defined(__ANDROID__)
 #include <dlfcn.h>
 #endif
@@ -48,11 +51,31 @@ float primaryDisplayScale() {
 // libdecor is dlopen()ed by SDL, so it is optional on the host; when it is
 // missing on GNOME we take XWayland instead (a decorated window), and keep
 // Wayland as the second choice for a session that has no XWayland at all.
+// "Available" means it can actually draw a title bar: the library loads AND at
+// least one plugin is installed. libdecor is only a loader; the title bar comes
+// from a plugin (GTK or cairo), and with the library present but no plugin SDL
+// ends up with an undecorated window just the same.
 bool libdecorAvailable() {
     void* h = dlopen("libdecor-0.so.0", RTLD_LAZY | RTLD_LOCAL);
     if (!h) return false;
     dlclose(h);
-    return true;
+
+    std::vector<std::string> dirs;
+    if (const char* env = std::getenv("LIBDECOR_PLUGIN_DIR")) dirs.emplace_back(env);
+#if defined(__x86_64__)
+    dirs.emplace_back("/usr/lib/x86_64-linux-gnu/libdecor/plugins-1");
+#elif defined(__aarch64__)
+    dirs.emplace_back("/usr/lib/aarch64-linux-gnu/libdecor/plugins-1");
+#endif
+    dirs.emplace_back("/usr/lib64/libdecor/plugins-1");   // Fedora, openSUSE
+    dirs.emplace_back("/usr/lib/libdecor/plugins-1");     // Arch, Alpine
+    for (const std::string& d : dirs) {
+        std::error_code ec;
+        for (const auto& e : std::filesystem::directory_iterator(d, ec)) {
+            if (e.path().extension() == ".so") return true;
+        }
+    }
+    return false;
 }
 
 void chooseLinuxVideoDriver() {

@@ -7,6 +7,14 @@ ENV DEBIAN_FRONTEND=noninteractive
 # matching Android/macOS and pulling Windows off vcpkg's 8.0 (which hangs long-
 # rod thread generation). fontconfig + the X11 dev headers are OCCT build-deps
 # (Font_FontMgr includes fontconfig unconditionally).
+#
+# SDL3 is not an apt package here (24.04 has none): the app's CMake downloads the
+# pinned release (MZ_SDL3_VERSION, tarball + sha256) and builds it as part of the
+# app build below, so the version lives in ONE place. The dev packages in this
+# list are what that build needs for its X11 and Wayland backends (SDL vendors
+# the Wayland protocol XMLs and only needs wayland-scanner, from libwayland-bin).
+# SDL dlopen()s libX11/libwayland-client/libxkbcommon/libdecor at runtime, so
+# none of them become link-time dependencies of the AppImage.
 RUN apt-get update && apt-get install -y \
     build-essential cmake git wget ca-certificates \
     libfreetype-dev libfontconfig1-dev \
@@ -14,7 +22,8 @@ RUN apt-get update && apt-get install -y \
     libx11-dev libxext-dev libxmu-dev libxt-dev \
     libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
     libxkbcommon-dev libwayland-dev pkg-config \
-    libsdl2-dev \
+    libxfixes-dev libegl-dev libudev-dev libdbus-1-dev \
+    libwayland-bin libdecor-0-dev \
     libcurl4-openssl-dev \
     zlib1g-dev \
     file patchelf fuse libfuse2 \
@@ -99,6 +108,12 @@ RUN find /usr/lib /usr/local/lib -name "libTK*.so*" -o -name "libtbb*.so*" -o -n
 
 # Bundle the binary's FULL shared-lib closure, minus the system layer that
 # must come from the host (glibc, GL stack, X11/xcb, fontconfig, wayland).
+# libSDL3 itself IS bundled (it is built in-tree, so ldd resolves it to the
+# build directory). libdecor is deliberately NOT bundled: it is useless without
+# a plugin that draws the title bar, the GTK plugin drags in GTK, and a bundled
+# libdecor with no working plugin would defeat the GNOME safeguard in
+# Window.cpp (it would look "installed" and then draw nothing). Hosts without a
+# usable libdecor run through XWayland on GNOME instead.
 # The hand-list above stopped sufficing when TKService arrived (Text tool's
 # Font_BRepFont): it drags in FreeImage and its whole codec tree - jpeg,
 # png, tiff, webp, OpenEXR, raw - which no hand-list should chase.
