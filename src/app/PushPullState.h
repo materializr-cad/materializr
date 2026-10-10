@@ -20,6 +20,10 @@ struct PushPullState {
         int regionIndex;
         int sourceBodyId;   // -1 for floating (NewBody)
         TopoDS_Face profile;
+        // The sketch region's representative point, so the saved op can find the
+        // region again when region numbering changes (see Sketch::regionAtAnchor).
+        glm::vec2 anchor{0.0f};
+        bool hasAnchor = false;
     };
 
     bool symmetric = false;   // panel checkbox (plane-sketch targets)

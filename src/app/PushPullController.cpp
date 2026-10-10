@@ -135,6 +135,8 @@ int PushPullController::onBegin(const IopContext& ctx) {
                                  : sketch->getSourceBody();
             t.profile = regions[e.subShapeIndex].face;
             if (t.profile.IsNull()) continue;
+            t.anchor = regions[e.subShapeIndex].representativePoint;
+            t.hasAnchor = true;
             // PUSH/PULL adopts the body the sketch sits flat ON. A sketch with
             // no body link (e.g. drawn on a construction plane and used to cut
             // a hole) that lies coplanar-and-over a visible body's face should
@@ -188,6 +190,8 @@ int PushPullController::onBegin(const IopContext& ctx) {
                                      ? -1
                                      : sketch->getSourceBody();
                 t.profile = regions[ri].face;
+                t.anchor = regions[ri].representativePoint;
+                t.hasAnchor = true;
                 if (t.sourceBodyId < 0 && !sketch->isDetachedFromBody() &&
                     ctx.findBodyUnderRegion) {
                     int host = ctx.findBodyUnderRegion(t.profile,
@@ -359,7 +363,10 @@ std::unique_ptr<PushPullOp> PushPullController::makeOp() const {
     // pushpulls (sourceBodyId-driven, no sketch) keep -1.
     for (size_t i = 0; i < m_st.targets.size(); ++i) {
         const auto& t = m_st.targets[i];
-        if (t.sketchId >= 0)
+        if (t.sketchId < 0) continue;
+        if (t.hasAnchor)
+            op->setSketchSource(static_cast<int>(i), t.sketchId, t.regionIndex, t.anchor);
+        else
             op->setSketchSource(static_cast<int>(i), t.sketchId, t.regionIndex);
     }
     return op;

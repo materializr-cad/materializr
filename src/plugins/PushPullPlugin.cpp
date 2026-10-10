@@ -27,6 +27,8 @@ struct PushPullTarget {
     int regionIndex;
     int sourceBodyId;
     TopoDS_Face profile;
+    glm::vec2 anchor{0.0f};   // region representative point (see Sketch::regionAtAnchor)
+    bool hasAnchor = false;
 };
 
 class PushPullTool : public materializr::InteractiveTool {
@@ -56,6 +58,8 @@ public:
                 t.sourceBodyId = host;
                 t.profile = regions[e.subShapeIndex].face;
                 if (t.profile.IsNull()) continue;
+                t.anchor = regions[e.subShapeIndex].representativePoint;
+                t.hasAnchor = true;
                 m_targets.push_back(t);
             } else if (e.type == SelectionType::Face && !e.shape.IsNull()) {
                 PushPullTarget t;
@@ -189,9 +193,12 @@ private:
         // updated sketch. Face-driven targets keep -1 (no cascade).
         for (size_t i = 0; i < m_targets.size(); ++i) {
             if (m_targets[i].sketchId >= 0) {
-                op->setSketchSource(static_cast<int>(i),
-                                    m_targets[i].sketchId,
-                                    m_targets[i].regionIndex);
+                if (m_targets[i].hasAnchor)
+                    op->setSketchSource(static_cast<int>(i), m_targets[i].sketchId,
+                                        m_targets[i].regionIndex, m_targets[i].anchor);
+                else
+                    op->setSketchSource(static_cast<int>(i), m_targets[i].sketchId,
+                                        m_targets[i].regionIndex);
             }
         }
         if (ctx.history().pushOperation(std::move(op), ctx.document())) {

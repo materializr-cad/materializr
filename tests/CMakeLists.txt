@@ -647,6 +647,11 @@ add_executable(test_sketch_regions test_sketch_regions.cpp)
 target_link_libraries(test_sketch_regions PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_sketch_regions COMMAND test_sketch_regions)
 
+# test_region_anchor - fuzzy region build + region identity across renumbering
+add_executable(test_region_anchor test_region_anchor.cpp)
+target_link_libraries(test_region_anchor PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_region_anchor COMMAND test_region_anchor)
+
 # test_sketch_region_worker - off-thread region builds for picking (#130)
 add_executable(test_sketch_region_worker test_sketch_region_worker.cpp)
 target_link_libraries(test_sketch_region_worker PRIVATE materializr_core gtest gtest_main)

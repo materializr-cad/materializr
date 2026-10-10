@@ -199,6 +199,13 @@ public:
     // remember an invalidate call.
     std::vector<Region> buildRegions() const;
 
+    // The region containing sketch-plane point `anchor`, or -1. This is a region's
+    // identity that survives renumbering: region INDICES change whenever the
+    // build changes (a fuzzier tolerance turned 199 regions into 5 on one part),
+    // but a region's representativePoint stays inside it. Ops that persist a
+    // region store the point next to the index and resolve through this first.
+    int regionAtAnchor(const std::vector<Region>& regions, glm::vec2 anchor) const;
+
     // True when buildRegions() would be a cache HIT (valid cache + current
     // geometry hash). Lets the per-frame hover pick skip sketches whose
     // regions would need the heavy OCCT fuse - a freshly-unhidden complex

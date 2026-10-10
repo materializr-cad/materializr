@@ -1,4 +1,5 @@
 #pragma once
+#include <glm/glm.hpp>
 #include "../core/Operation.h"
 #include "../core/Document.h"
 #include "TopoName.h"
@@ -25,6 +26,10 @@ public:
     void setTargetFace(const TopoDS_Face& f);
     void setSketchId(int id);
     void setRegionFilter(std::vector<int> indices); // empty = all regions
+    // Same, with each region's representative point (parallel to `indices`), so
+    // the filter keeps selecting the same regions when region numbering changes
+    // (see Sketch::regionAtAnchor). Without points only the indices are used.
+    void setRegionFilter(std::vector<int> indices, std::vector<glm::vec2> anchors);
     void setDepth(double d);
     void setMode(Mode m);
 
@@ -54,6 +59,7 @@ private:
     // edit rebuilt/moved the face - a stale handle stamps at the OLD plane.
     materializr::topo::Ref m_targetRef;
     std::vector<int> m_regionFilter; // region indices; empty = all
+    std::vector<glm::vec2> m_regionAnchors; // parallel to m_regionFilter, or empty (legacy)
     double m_depth = 1.0;
     Mode m_mode = Mode::Engrave;
     TopoDS_Shape m_previousShape;   // for undo

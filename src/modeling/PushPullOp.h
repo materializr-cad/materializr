@@ -1,4 +1,5 @@
 #pragma once
+#include <glm/glm.hpp>
 #include "../core/Operation.h"
 #include "../core/Document.h"
 #include "TopoName.h"
@@ -72,6 +73,10 @@ public:
     // -1 sketch id means a face-driven Push/Pull (no source sketch; that
     // target stays as-is during cascade).
     void setSketchSource(int targetIndex, int sketchId, int regionIndex = -1);
+    // Same, plus the region's representative point (sketch-plane 2D). The index
+    // alone is only valid for the numbering it was taken from; the point finds
+    // the same region after the numbering changes (see Sketch::regionAtAnchor).
+    void setSketchSource(int targetIndex, int sketchId, int regionIndex, glm::vec2 anchor);
     bool hasAnySketchSource() const;
     int getSketchIdAt(int targetIndex) const;
     int targetCount() const { return static_cast<int>(m_targets.size()); }
@@ -129,6 +134,11 @@ private:
     // Cascade plumbing - see setSketchSource() in the public section.
     std::vector<int> m_sketchSourceIds;     // sketch id per target (-1 = none)
     std::vector<int> m_sketchSourceRegions; // region index per target (-1 = first)
+    // Region identity that survives renumbering: the region's representative
+    // point per target. Only meaningful where m_hasAnchor[i]; files from before
+    // this existed have none and fall back to the index alone. Serialized as `a<i>=`.
+    std::vector<glm::vec2> m_sketchSourceAnchors;
+    std::vector<char> m_hasAnchor;
     // Reload support for FACE-driven targets: per-target ordinal index of the
     // profile face within the source body's pre-op shape (see
     // SubShapeIndex.h). 0 = not a face target / not resolvable.

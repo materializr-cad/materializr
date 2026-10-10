@@ -129,6 +129,8 @@ void PushPullOp::setTargets(std::vector<Target> targets) {
     // to the cascade walker.
     m_sketchSourceIds.assign(m_targets.size(), -1);
     m_sketchSourceRegions.assign(m_targets.size(), -1);
+    m_sketchSourceAnchors.assign(m_targets.size(), glm::vec2(0.0f));
+    m_hasAnchor.assign(m_targets.size(), 0);
 }
 
 void PushPullOp::setPrecomputed(Precomputed p) {
@@ -145,6 +147,14 @@ void PushPullOp::setSketchSource(int targetIndex, int sketchId, int regionIndex)
         targetIndex >= static_cast<int>(m_sketchSourceIds.size())) return;
     m_sketchSourceIds[targetIndex]     = sketchId;
     m_sketchSourceRegions[targetIndex] = regionIndex;
+}
+
+void PushPullOp::setSketchSource(int targetIndex, int sketchId, int regionIndex,
+                                 glm::vec2 anchor) {
+    setSketchSource(targetIndex, sketchId, regionIndex);
+    if (targetIndex < 0 || targetIndex >= static_cast<int>(m_hasAnchor.size())) return;
+    m_sketchSourceAnchors[targetIndex] = anchor;
+    m_hasAnchor[targetIndex] = 1;
 }
 
 bool PushPullOp::hasAnySketchSource() const {
@@ -174,9 +184,23 @@ bool PushPullOp::rebuildProfileFromSketch(Document& doc, int sketchId) {
             m_sketchSourceIds[i] != sketchId) continue;
         int idx = (i < m_sketchSourceRegions.size())
                       ? m_sketchSourceRegions[i] : -1;
+        // The saved point finds the region whatever the numbering did since.
+        // A point that no longer lands in any region (the sketch was edited
+        // away from it) falls back to the index, as before.
+        if (i < m_hasAnchor.size() && m_hasAnchor[i]) {
+            const int byPoint = sk->regionAtAnchor(regions, m_sketchSourceAnchors[i]);
+            if (byPoint >= 0) idx = byPoint;
+        }
         if (idx < 0 || idx >= static_cast<int>(regions.size())) idx = 0;
         if (regions[idx].face.IsNull()) continue;
         m_targets[i].profile = regions[idx].face;
+        // Keep the identity current, so a file saved from here carries the
+        // point even if it was loaded from one that only had the index.
+        if (i < m_sketchSourceRegions.size()) m_sketchSourceRegions[i] = idx;
+        if (i < m_hasAnchor.size()) {
+            m_sketchSourceAnchors[i] = regions[idx].representativePoint;
+            m_hasAnchor[i] = 1;
+        }
         any = true;
     }
     return any;
@@ -786,6 +810,11 @@ std::string PushPullOp::serializeParams() const {
         std::snprintf(buf, sizeof(buf), ";s%zu=%d;r%zu=%d;b%zu=%d",
                       i, sk, i, rg, i, m_targets[i].sourceBodyId);
         blob += buf;
+        if (sk >= 0 && i < m_hasAnchor.size() && m_hasAnchor[i]) {
+            std::snprintf(buf, sizeof(buf), ";a%zu=%.6f:%.6f", i,
+                          m_sketchSourceAnchors[i].x, m_sketchSourceAnchors[i].y);
+            blob += buf;
+        }
         // Face-driven target (no sketch source): persist the profile face as
         // an ordinal index into the source body's PRE-OP shape (the face was
         // picked off the body before this op mutated it).
@@ -839,6 +868,8 @@ bool PushPullOp::deserializeParams(const std::string& blob) {
     m_targets.assign(count, Target{});          // profiles rebuilt on rehydrate
     m_sketchSourceIds.assign(count, -1);
     m_sketchSourceRegions.assign(count, -1);
+    m_sketchSourceAnchors.assign(count, glm::vec2(0.0f));
+    m_hasAnchor.assign(count, 0);
     m_faceIndices.assign(count, 0);
     m_targetRefs.assign(count, materializr::topo::Ref{});
     pos = 0;
@@ -854,6 +885,18 @@ bool PushPullOp::deserializeParams(const std::string& blob) {
             if (idx >= 0 && idx < count)
                 m_targetRefs[idx] = materializr::topo::Ref::parse(val);
             any = true;
+        }
+        else if (key.size() >= 2 && key[0] == 'a') {
+            // Region anchor: "<x>:<y>" in sketch-plane mm.
+            int idx = std::atoi(key.c_str() + 1);
+            const size_t colon = val.find(':');
+            if (idx >= 0 && idx < count && colon != std::string::npos) {
+                m_sketchSourceAnchors[idx] = glm::vec2(
+                    static_cast<float>(std::atof(val.c_str())),
+                    static_cast<float>(std::atof(val.c_str() + colon + 1)));
+                m_hasAnchor[idx] = 1;
+                any = true;
+            }
         }
         else if (key.size() >= 2 && (key[0] == 's' || key[0] == 'r' ||
                                 key[0] == 'b' || key[0] == 'f')) {

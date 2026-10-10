@@ -445,14 +445,28 @@ int ProjectSketchController::onBegin(const IopContext& ctx) {
 }
 
 std::unique_ptr<Operation> ProjectSketchController::buildOp(
-    const IopContext&) {
+    const IopContext& ctx) {
     if (m_face.IsNull() || m_sketchIds.empty() || m_depth < 0.01f)
         return nullptr;
     auto op = std::make_unique<ProjectSketchOp>();
     op->setBody(bodyId());
     op->setTargetFace(m_face);
     op->setSketchId(m_sketchIds[m_sketchPick]);
-    op->setRegionFilter(m_regionFilter);
+    // Name each filtered region by its representative point as well as its index,
+    // so the saved filter survives a change in region numbering. Only from the
+    // regions the picks were made against (cached); never builds them here.
+    std::vector<glm::vec2> anchors;
+    if (!m_regionFilter.empty()) {
+        if (auto sk = ctx.doc.getSketch(m_sketchIds[m_sketchPick]);
+            sk && sk->regionsCached()) {
+            const auto regions = sk->buildRegions();
+            for (int idx : m_regionFilter) {
+                if (idx < 0 || idx >= static_cast<int>(regions.size())) { anchors.clear(); break; }
+                anchors.push_back(regions[idx].representativePoint);
+            }
+        }
+    }
+    op->setRegionFilter(m_regionFilter, std::move(anchors));
     op->setDepth(static_cast<double>(m_depth));
     op->setMode(m_mode == 1 ? ProjectSketchOp::Mode::Emboss
                             : ProjectSketchOp::Mode::Engrave);

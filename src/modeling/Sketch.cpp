@@ -1678,6 +1678,17 @@ void densifyWire2D(const TopoDS_Wire& wire, const gp_Pln& plane,
 }
 
 // Standard ray-cast point-in-polygon (winding-independent, counts crossings).
+// Tolerance (mm) the region build treats two edges as coincident at. Sketch
+// points are float32, so a sketch line drawn along a host-face edge lands a
+// few 1e-6 mm to 1e-4 mm off it - not exactly on it, which is the one case
+// OCCT's edge-edge intersection handles badly. On a lofted B-spline plate
+// that cost 25 s of intersection recursion (minutes on a tablet), produced
+// 194 sliver regions (< 0.01 mm^2) beside the 5 real ones, and made a Push/Pull
+// cut through the plate remove 3.5 mm^3 instead of ~1138 mm^3. 1e-3 mm is
+// ~16x float32 resolution at 1000 mm, and far below anything a print or a
+// drawing resolves. 2e-4 left 29 regions on that part; 5e-4 and up gave the 5.
+constexpr double kRegionFuzzMm = 1.0e-3;
+
 bool pointInPolygon2D(const std::vector<glm::vec2>& poly, glm::vec2 p) {
     bool inside = false;
     size_t n = poly.size();
@@ -1708,6 +1719,22 @@ bool Sketch::regionBuildIsHeavy() const {
     for (const auto& sp : m_splines)
         if (sp.controlPointIds.size() > kHeavySplinePoints) return true;
     return false;
+}
+
+int Sketch::regionAtAnchor(const std::vector<Region>& regions, glm::vec2 anchor) const {
+    // Regions partition the plane, so a point inside one is inside only it.
+    for (size_t i = 0; i < regions.size(); ++i)
+        if (isPointInRegion(regions[i], anchor)) return static_cast<int>(i);
+    // A representative point that had to sit ON the outer wire (an annulus whose
+    // centroid is in the hole) is not strictly inside: accept a hair of slack,
+    // but only when exactly one region claims it.
+    int hit = -1;
+    for (size_t i = 0; i < regions.size(); ++i) {
+        if (!isPointInOrNearRegion(regions[i], anchor, 1.0e-3f)) continue;
+        if (hit >= 0) return -1;
+        hit = static_cast<int>(i);
+    }
+    return hit;
 }
 
 bool Sketch::regionsCached() const {
@@ -1982,6 +2009,7 @@ std::vector<Sketch::Region> Sketch::buildRegionsUncached(
         try {
             BOPAlgo_Builder gf;
             for (const auto& f : faces) gf.AddArgument(f);
+            gf.SetFuzzyValue(kRegionFuzzMm);
             gf.Perform(steps.Next());
             if (!gf.HasErrors()) {
                 for (TopExp_Explorer ex(gf.Shape(), TopAbs_FACE); ex.More(); ex.Next())
@@ -2101,6 +2129,7 @@ std::vector<Sketch::Region> Sketch::buildRegionsUncached(
                 for (const auto& f : atomic) args.Append(f);
                 sp.SetArguments(args);
                 sp.SetTools(toolEdges);
+                sp.SetFuzzyValue(kRegionFuzzMm);
                 sp.Build(steps.Next());
                 if (!sp.HasErrors()) {
                     std::vector<TopoDS_Face> split;

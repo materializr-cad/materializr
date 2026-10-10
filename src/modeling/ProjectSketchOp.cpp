@@ -234,6 +234,13 @@ void ProjectSketchOp::setTargetFace(const TopoDS_Face& f) { m_targetFace = f; }
 void ProjectSketchOp::setSketchId(int id) { m_sketchId = id; }
 void ProjectSketchOp::setRegionFilter(std::vector<int> indices) {
     m_regionFilter = std::move(indices);
+    m_regionAnchors.clear();
+}
+void ProjectSketchOp::setRegionFilter(std::vector<int> indices,
+                                      std::vector<glm::vec2> anchors) {
+    m_regionFilter = std::move(indices);
+    m_regionAnchors = anchors.size() == m_regionFilter.size() ? std::move(anchors)
+                                                              : std::vector<glm::vec2>{};
 }
 void ProjectSketchOp::setDepth(double d) { m_depth = d; }
 void ProjectSketchOp::setMode(Mode m) { m_mode = m; }
@@ -346,10 +353,22 @@ bool ProjectSketchOp::execute(Document& doc) {
         double toolVolume = 0.0;
         int skipped = 0;
         reportProgress(0.0f, "Projecting sketch onto face\xE2\x80\xA6");
+        // Which regions the filter names. A saved point finds its region
+        // whatever the numbering did since; a point that lands in no region
+        // (the sketch was edited away from it) keeps its index.
+        std::vector<int> wantedRegions;
+        for (size_t k = 0; k < m_regionFilter.size(); ++k) {
+            int idx = m_regionFilter[k];
+            if (k < m_regionAnchors.size()) {
+                const int byPoint = sketch->regionAtAnchor(regions, m_regionAnchors[k]);
+                if (byPoint >= 0) idx = byPoint;
+            }
+            wantedRegions.push_back(idx);
+        }
         for (size_t ri = 0; ri < regions.size(); ++ri) {
             if (!m_regionFilter.empty()) {
                 bool wanted = false;
-                for (int idx : m_regionFilter)
+                for (int idx : wantedRegions)
                     if (idx == static_cast<int>(ri)) { wanted = true; break; }
                 if (!wanted) continue;
             }
@@ -551,6 +570,15 @@ std::string ProjectSketchOp::serializeParams() const {
             if (i) blob += ',';
             blob += std::to_string(m_regionFilter[i]);
         }
+        if (m_regionAnchors.size() == m_regionFilter.size()) {
+            blob += ";ranch=";
+            char pb[64];
+            for (size_t i = 0; i < m_regionAnchors.size(); ++i) {
+                std::snprintf(pb, sizeof(pb), "%s%.6f:%.6f", i ? "," : "",
+                              m_regionAnchors[i].x, m_regionAnchors[i].y);
+                blob += pb;
+            }
+        }
     }
     if (!m_previousShape.IsNull() && !m_targetFace.IsNull()) {
         std::string idx = SubShapeIndex::serialize(
@@ -605,6 +633,22 @@ bool ProjectSketchOp::deserializeParams(const std::string& blob) {
                 if (c == std::string::npos) c = val.size();
                 m_regionFilter.push_back(
                     std::atoi(val.substr(p, c - p).c_str()));
+                p = c + 1;
+            }
+            any = true;
+        }
+        else if (key == "ranch") {
+            m_regionAnchors.clear();
+            size_t p = 0;
+            while (p < val.size()) {
+                size_t c = val.find(',', p);
+                if (c == std::string::npos) c = val.size();
+                const std::string pair = val.substr(p, c - p);
+                const size_t colon = pair.find(':');
+                if (colon != std::string::npos)
+                    m_regionAnchors.emplace_back(
+                        static_cast<float>(std::atof(pair.c_str())),
+                        static_cast<float>(std::atof(pair.c_str() + colon + 1)));
                 p = c + 1;
             }
             any = true;

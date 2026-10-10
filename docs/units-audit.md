@@ -263,7 +263,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 
 - CONVERTED: 1
 - allowed-by-hand: 92
-- comment: 282
+- comment: 288
 - diagnostic: 11
 - identifier/other: 9
 
@@ -531,6 +531,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | comment | src/modeling/PrimitiveOp.h | `// Box: XYZ extents in mm.` |
 | comment | src/modeling/PushPullOp.cpp | `// BRepAlgoAPI_Cut of coincident faces yields ~1e-3 mm³ of noise). Such` |
 | comment | src/modeling/PushPullOp.cpp | `// leave ~1e-3 mm³ slivers, and the plug/hole pair can` |
+| comment | src/modeling/PushPullOp.cpp | `// Region anchor: "<x>:<y>" in sketch-plane mm.` |
 | allowed-by-hand | src/modeling/ResizeCylindricalOp.cpp | `"[Resize] cap-following fill built (final vol=%.3f mm³)\n",` |
 | allowed-by-hand | src/modeling/ResizeCylindricalOp.cpp | `"[Resize] fuse: bodyVol %.3f → %.3f mm³ (delta=%+.3f)\n",` |
 | comment | src/modeling/ScaleFaceOp.cpp | `// they were converted display->mm on commit, so typing 100 under inches` |
@@ -540,6 +541,11 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | comment | src/modeling/Sketch.cpp | `// these a later dimension (e.g. a 2 mm gap to another edge) lets the naive` |
 | comment | src/modeling/Sketch.cpp | `// point pair a handful of mm apart (anywhere someone clicks close` |
 | comment | src/modeling/Sketch.cpp | `// so a gently curving stretch of a real part's outline can go many mm` |
+| comment | src/modeling/Sketch.cpp | `// Tolerance (mm) the region build treats two edges as coincident at. Sketch` |
+| comment | src/modeling/Sketch.cpp | `// few 1e-6 mm to 1e-4 mm off it - not exactly on it, which is the one case` |
+| comment | src/modeling/Sketch.cpp | `// 194 sliver regions (< 0.01 mm^2) beside the 5 real ones, and made a Push/Pull` |
+| comment | src/modeling/Sketch.cpp | `// cut through the plate remove 3.5 mm^3 instead of ~1138 mm^3. 1e-3 mm is` |
+| comment | src/modeling/Sketch.cpp | `// ~16x float32 resolution at 1000 mm, and far below anything a print or a` |
 | comment | src/modeling/SketchConstraints.h | `// dimension label rather than clicking it. Pixels rather than sketch mm because` |
 | comment | src/modeling/SketchOffset.cpp | `// comfortably more than 1e-3 mm - so an analytic epsilon condemns perfectly` |
 | comment | src/modeling/SketchOffset.cpp | `// accept the (sub-0.1 mm) deviation that comes with it.` |
