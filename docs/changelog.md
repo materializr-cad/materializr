@@ -5,6 +5,63 @@ All notable changes to Materializr are documented here. Format loosely follows
 
 ## [Unreleased]
 
+## [1.7.3] - 2026-10-10
+
+A smoothness release: fewer freezes, a friendlier touch interface, and a new
+windowing layer underneath on every platform.
+
+### Added
+
+- **Drag and drop (desktop).** Drop a project file on the window to open it in
+  its own tab. STEP, IGES, BREP, SVG and DXF files import into the current
+  project, STL opens its options dialog, and PNG / JPG / BMP images become
+  reference images. In sketch mode only SVG is accepted.
+- **Deleting a sketch can be undone.**
+- **Redo button** next to Undo in the touch layout.
+
+### Changed
+
+- **New windowing layer.** Materializr now runs on SDL3 on every platform. You
+  shouldn't notice anything except that window resizing is smoother and iOS 27
+  devices launch the app again.
+- **Number pad on every numeric field in touch mode.** Extrude, Push/Pull,
+  Fillet, Chamfer, Shell, patterns, threads, planes, Revolve, Scale and more
+  now use the in-app pad instead of the full keyboard, and a typed leading
+  zero no longer applies a live zero-distance operation. The pad gained an AC
+  key, and floating dialogs keep themselves on screen so the pad is reachable.
+- **Open shows progress.** Opening a project from File or Open Recent now has
+  a progress bar and no longer locks up the window while the history rebuilds.
+- **Cleaner menus and history on touch.** Desktop shortcut hints (Ctrl+S,
+  Alt+F4) no longer appear on touch devices, and long History rows end in an
+  ellipsis with the full text in the tooltip.
+- A new rectangle's History step now reads "Rectangle 25.00 x 22.00 mm"
+  instead of naming its first automatic constraint.
+
+### Fixed
+
+- **Push/Pull on complex sketches no longer freezes.** The first preview runs
+  in the background, so a sketch along a curved face no longer stalls the app
+  for tens of seconds. A very large cut (a multi-body model with hundreds of
+  small regions) dropped from over five minutes to about a second, and now
+  produces the correct result.
+- **The first click in a sketch no longer freezes the app.** Region
+  detection is done off the main thread.
+- **Extrude with a near-zero distance** is refused instead of building a
+  degenerate solid that took about 40 seconds to display.
+- **Slow Extrude drags** no longer stall.
+- **STL export** no longer produces cracked meshes where bodies touch or on
+  extruded splines.
+- **Sketch Offset** no longer leaves tiny slivers at near-tangent junctions.
+- **Picking** ignores edges hidden behind a nearer face.
+- **Window resize on Wayland** keeps redrawing while you drag, instead of
+  freezing until you let go.
+- **Android** idles at about 10% CPU instead of 83%.
+- The Fillet / Chamfer panel showed a literal "Radius (%s)"; it now shows
+  the unit.
+- Closing a tab with unsaved changes no longer asks about "opening another
+  project".
+- Windows: fixed a build break caused by a stray system header.
+
 ## [1.7.2] - 2026-10-03
 
 ### Added
