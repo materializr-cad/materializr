@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.12.0.schema.json
 
 PackageIdentifier: Materializr.Materializr
-PackageVersion: 1.7.2
+PackageVersion: 1.7.3
 PackageLocale: en-US
 Publisher: Materializr
 PublisherUrl: https://github.com/materializr-cad
@@ -33,23 +33,21 @@ Tags:
 - opencascade
 - svg
 ReleaseNotes: |-
-  Materializr 1.7.2
+  Materializr 1.7.3
+  A smoothness release: fewer freezes, a friendlier touch interface, and a new windowing layer (SDL3) underneath on every platform.
   Added
-  - Move type-in panel: type an exact X / Y / Z offset for the Translate gizmo in your display unit
-  - The Rotate type-in panel now appears for any body, sketch or sketch plus body, with persistent fields and an Undo for the last Apply
-  - Optional measurements on selection in sketches (Settings > Sketch): lengths, diameters, radii, arc sweep and a running total
+  - Drag and drop: drop a project file on the window to open it in its own tab, or drop STEP, IGES, BREP, SVG, DXF, STL and image files to import them
+  - Deleting a sketch can be undone
   Changed
-  - History and Lay Flat report axes Z-up, matching the ViewCube
-  - Interface translations grew from 1192 to 1436 strings in all five languages
+  - Opening a project shows a progress bar instead of locking up the window
+  - Smoother window resizing
   Fixed
-  - Long traced outlines (a single spline with hundreds of control points) no longer freeze Extrude, orbit clicks or project load
-  - A committed sketch is recovered after a crash
-  - Much faster meshing of extruded and boolean-trimmed walls: STL export of a lettering-heavy part went from 82 s to 0.1 s
-  - A valid union is no longer refused with "an operand was lost" on bodies with large B-spline faces
-  - Error toasts raised after a long operation stay on screen
-  - Sketch inference follows edges past the first point of a chain, and snap ranges follow the visible grid
-  - ViewCube phantom click, a duplicate Lathe button, and swapped Y/Z panel colours
-  Also rolls up 1.7.0 (Assembly Mates, AI Assistant, display units) and 1.7.1 (Items panel drag-and-drop), which were not submitted to winget.
-ReleaseNotesUrl: https://github.com/materializr-cad/materializr/releases/tag/v1.7.2
+  - Push/Pull on complex sketches no longer freezes, and a large cut that took over five minutes now takes about a second and gives the correct result
+  - The first click in a sketch no longer freezes the app
+  - Extrude refuses a near-zero distance instead of building a degenerate solid, and slow Extrude drags no longer stall
+  - STL export no longer produces cracked meshes where bodies touch or on extruded splines
+  - Sketch Offset no longer leaves tiny slivers at near-tangent junctions
+  - Edges hidden behind a nearer face are no longer picked
+ReleaseNotesUrl: https://github.com/materializr-cad/materializr/releases/tag/v1.7.3
 ManifestType: defaultLocale
 ManifestVersion: 1.12.0
