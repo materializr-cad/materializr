@@ -1,5 +1,10 @@
 # iPad port - implementation plan
 
+> **Status:** the port shipped. This plan was written against SDL2 2.30.9 and is
+> kept as history. The app now builds against SDL3 3.4.18 on every platform, and
+> iOS uses SDL3's own UIScene lifecycle (needed to launch on iOS 27), so read the
+> SDL2 references below as SDL3. See `BUILD.md` for the current build.
+
 Goal: Materializr running natively on iPad, reusing the entire `core/` +
 `modeling/` geometry codebase the same way the Android port does - SDL2 +
 OpenGL ES 3.0 + cross-compiled OpenCASCADE, with the existing runtime *touch
