@@ -316,9 +316,27 @@ TEST(SketchTrimSpline, RegionsFromATrimmedSplineExtrude) {
     // right overhang remain. The right overhang has nothing left to cut at, so
     // a click takes it whole.
     ASSERT_EQ(sk->getSplines().size(), 2u);
+    auto dumpSplines = [&](const char* tag) {
+        for (const auto& sp : sk->getSplines()) {
+            std::printf("[dbg] %s spline %d:", tag, sp.id);
+            for (int pid : sp.controlPointIds) {
+                auto q = sk->getPoint(pid)->pos;
+                std::printf(" #%d(%.6f,%.6f)", pid, q.x, q.y);
+            }
+            std::printf("\n");
+        }
+        std::printf("[dbg] %s points=%zu lines=%zu\n", tag, sk->getPoints().size(), sk->getLines().size());
+    };
+    dumpSplines("after-first-click");
     for (const auto& sp : sk->getSplines()) {
-        if (firstPt(*sk, sp).x > 9.9f) { tool.onMouseDown(onCurve(*sk, sp, 0.5f)); break; }
+        if (firstPt(*sk, sp).x > 9.9f) {
+            auto click = onCurve(*sk, sp, 0.5f);
+            std::printf("[dbg] second click on spline %d at (%.6f,%.6f)\n", sp.id, click.x, click.y);
+            tool.onMouseDown(click);
+            break;
+        }
     }
+    dumpSplines("after-second-click");
     ASSERT_EQ(sk->getSplines().size(), 1u);
     const SketchSpline& cut = sk->getSplines().front();
     EXPECT_NEAR(firstPt(*sk, cut).x, 0.0f, 0.05f);
