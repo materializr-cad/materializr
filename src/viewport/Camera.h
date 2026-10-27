@@ -60,7 +60,9 @@ public:
     /// Vertical field of view in degrees. Picker uses this to convert a
     /// pixel-pickability radius into a depth-scaled world distance for
     /// thin geometry (construction axes).
-    float getFov() const { return m_fov; }
+    /// The field of view the projection is using right now - differs from the
+    /// resting FOV only during the ortho->perspective blend (see leaveOrthographic).
+    float getFov() const { return m_fovEff; }
 
     /// Get the current up vector.
     glm::vec3 getUp() const { return m_up; }
@@ -99,12 +101,12 @@ public:
     /// Advance by `dtSeconds`. Returns true while the view moved this call, i.e.
     /// the caller must render this frame and keep ticking.
     bool tick(float dtSeconds);
-    bool isAnimating() const { return m_anim.active; }
+    bool isAnimating() const { return m_anim.active || m_blendActive; }
     /// Jump to the end of a running animation (no-op when idle).
     void finishAnimation();
 
     /// Toggle orthographic projection. Pan and zoom preserve this mode; orbit clears it.
-    void setOrthographic(bool ortho) { m_orthographic = ortho; }
+    void setOrthographic(bool ortho) { finishBlend(); m_orthographic = ortho; }
     bool isOrthographic() const { return m_orthographic; }
 
 private:
@@ -112,14 +114,19 @@ private:
     /// changes elevation, clamped short of the poles. The up vector is held level
     /// with the ground (never rolls), so the horizon stays flat.
     void orbitLevel(float yawDelta, float pitchDelta);
-    /// Drop orthographic projection WITHOUT changing the picture: re-seat the
-    /// camera on its view ray at the distance where perspective frames the same
-    /// half-height as the ortho box. (Ortho ignores camera distance, so the
-    /// stored position can be anywhere along the ray; keeping it put and just
-    /// flipping the flag made the first orbit out of a sketch jump in scale.)
+    /// Drop orthographic projection WITHOUT a visible pop. Perspective is eased
+    /// in as a dolly-zoom: it starts at a tiny FOV (practically orthographic) with
+    /// the camera far back on its view ray, then widens to the resting FOV over
+    /// ~0.3 s while the camera glides in so the target plane keeps the ortho box's
+    /// framing throughout. (Flipping the flag outright made the first orbit out
+    /// of a sketch snap in scale and parallax; tick() drives the blend.)
     void leaveOrthographic();
+    /// World-up mixed in by the blend's progress, perpendicular to `dir`.
+    glm::vec3 blendedUp(const glm::vec3& dir);
 
 public:
+    /// Settle a running ortho->perspective blend at its end state (no-op idle).
+    void finishBlend();
 
     /// Half-height (world units) of the ortho view box. Width is derived from aspect.
     void setOrthoSize(float halfHeight) { m_orthoSize = halfHeight; }
@@ -170,6 +177,15 @@ private:
     glm::vec3 m_up;
 
     float m_fov;
+    float m_fovEff;              // FOV actually projected (== m_fov except mid-blend)
+    bool  m_blendActive = false; // ortho->perspective dolly-zoom running
+    float m_blendT = 0.0f;
+    float m_blendOrthoSize = 10.0f; // the ortho half-height being preserved
+    bool  m_blendRollSet = false;   // m_blendRollAngle holds a previous value
+    float m_blendRollAngle = 0.0f;  // last roll-to-level angle (keeps its sign)
+    float m_levelSign = 1.0f;       // +1 upright, -1 upside-down turntable (level orbit)
+    bool  m_blendLevel = false;  // level orbit is also rolling the view upright
+    glm::vec3 m_blendUp0 = glm::vec3(0.0f, 1.0f, 0.0f); // up when the blend began
     float m_nearPlane;
     float m_farPlane;
     float m_aspect;

@@ -11,6 +11,7 @@ Camera::Camera()
     , m_target(0.0f, 0.0f, 0.0f)
     , m_up(0.0f, 1.0f, 0.0f)
     , m_fov(45.0f)
+    , m_fovEff(45.0f)
     , m_nearPlane(0.01f)
     , m_farPlane(1000.0f)
     , m_aspect(16.0f / 9.0f)
@@ -59,11 +60,21 @@ void Camera::orbitLevel(float yawDelta, float pitchDelta)
     // may be -X, +Z, etc.) sticks around and orbiting looks rotated / twisted. The
     // target is left as-is so an orbit out of a sketch ortho view pivots around
     // the world-grid-aligned anchor alignCameraToActiveSketch set near the face.
-    const glm::vec3 worldUp(0.0f, 1.0f, 0.0f);
-    const glm::vec3 prevUp = m_up;
-    m_up = worldUp;
+    // Mid-blend the entering up is the one the blend started from, not the
+    // partly-levelled value this function wrote on the previous call.
+    const glm::vec3 enterUp = (m_blendActive && m_blendLevel) ? m_blendUp0 : m_up;
+    // Keep the horizon level the way the view is FACING: an upside-down view
+    // orbits upside-down rather than rolling through half a turn to get upright.
+    // (Near the poles the up vector says nothing about it, so the last sign holds.)
+    if (std::abs(enterUp.y) > 0.005f) m_levelSign = enterUp.y < 0.0f ? -1.0f : 1.0f;
+    // Everything below is turntable maths about +Y. For an upside-down view run
+    // it in the frame rotated 180 degrees about X (its own inverse).
+    const float sg = m_levelSign;
+    const auto R = [sg](const glm::vec3& v) { return glm::vec3(v.x, sg * v.y, sg * v.z); };
+    const glm::vec3 prevUp = R(enterUp);
+    m_up = glm::vec3(0.0f, sg, 0.0f);
 
-    glm::vec3 offset = m_position - m_target; // target -> camera
+    glm::vec3 offset = R(m_position - m_target); // target -> camera
     float radius = glm::length(offset);
     if (radius < 1e-6f) return;
     glm::vec3 dir = offset / radius;
@@ -98,8 +109,15 @@ void Camera::orbitLevel(float yawDelta, float pitchDelta)
     glm::vec3 newDir(std::cos(pitch) * std::cos(yaw),
                      std::sin(pitch),
                      std::cos(pitch) * std::sin(yaw));
-    m_position = m_target + newDir * radius;
-    m_up = worldUp;
+    m_position = m_target + R(newDir * radius);
+    m_up = glm::vec3(0.0f, sg, 0.0f);
+    if (m_blendActive) {
+        // Level the roll over the blend instead of in one step: a sketch view
+        // that was turned sideways (Look At, ViewCube) would otherwise snap
+        // upright on the first orbit.
+        m_blendLevel = true;
+        m_up = blendedUp(R(newDir));
+    }
 }
 
 void Camera::orbit(float deltaX, float deltaY)
@@ -150,7 +168,7 @@ void Camera::pan(float deltaX, float deltaY)
             float ref = (m_panRefDist > 0.0f)
                             ? m_panRefDist
                             : glm::length(m_target - m_position);
-            panScale = (2.0f * ref * std::tan(glm::radians(m_fov) * 0.5f)) /
+            panScale = (2.0f * ref * std::tan(glm::radians(m_fovEff) * 0.5f)) /
                        m_viewHeightPx;
         }
         panScale *= m_mouseSensitivity;
@@ -244,7 +262,7 @@ glm::mat4 Camera::getProjectionMatrix() const
         float w = h * m_aspect;
         return glm::ortho(-w, w, -h, h, n, f);
     }
-    return glm::perspective(glm::radians(m_fov), m_aspect, n, f);
+    return glm::perspective(glm::radians(m_fovEff), m_aspect, n, f);
 }
 
 void Camera::setAspect(float aspect)
@@ -255,6 +273,8 @@ void Camera::setAspect(float aspect)
 void Camera::reset()
 {
     finishAnimation();
+    m_blendActive = false;
+    m_fovEff = 45.0f;
     m_position = glm::vec3(5.0f, 5.0f, 5.0f);
     m_target = glm::vec3(0.0f, 0.0f, 0.0f);
     m_up = glm::vec3(0.0f, 1.0f, 0.0f);
@@ -265,6 +285,7 @@ void Camera::reset()
 void Camera::zoomToFit(glm::vec3 min, glm::vec3 max)
 {
     finishAnimation();
+    finishBlend();
     glm::vec3 center = (min + max) * 0.5f;
     glm::vec3 extents = max - min;
     float radius = glm::length(extents) * 0.5f;
@@ -293,18 +314,21 @@ void Camera::zoomToFit(glm::vec3 min, glm::vec3 max)
 void Camera::setPosition(glm::vec3 pos)
 {
     finishAnimation();
+    finishBlend();
     m_position = pos;
 }
 
 void Camera::setTarget(glm::vec3 target)
 {
     finishAnimation();
+    finishBlend();
     m_target = target;
 }
 
 void Camera::setUp(glm::vec3 up)
 {
     finishAnimation();
+    finishBlend();
     m_up = up;
 }
 
@@ -313,6 +337,11 @@ void Camera::setUp(glm::vec3 up)
 // Animated view changes (see Camera.h)
 
 namespace {
+
+// Ortho->perspective blend (Camera::leaveOrthographic): starting FOV, near enough
+// to orthographic that the switch is invisible, and how long it takes to open up.
+constexpr float kBlendStartFov = 4.0f;
+constexpr float kBlendSeconds  = 0.3f;
 
 // Distance at which a perspective camera sees a half-height of `orthoSize`:
 // the perspective view that frames a flat subject exactly like the ortho box.
@@ -343,6 +372,7 @@ void Camera::animateTo(glm::vec3 position, glm::vec3 target, glm::vec3 up,
                        bool orthographic, float orthoSize, float seconds)
 {
     finishAnimation();   // settle any move in flight; start from where we truly are
+    finishBlend();
 
     const glm::vec3 fallbackDir(0.0f, 0.0f, 1.0f);
     const glm::vec3 dir1 = safeDirection(position, target, fallbackDir);
@@ -385,13 +415,75 @@ void Camera::leaveOrthographic()
 {
     if (!m_orthographic) return;
     const glm::vec3 dir = safeDirection(m_position, m_target, glm::vec3(0.0f, 0.0f, 1.0f));
-    m_position = m_target + dir * equivalentDistance(m_orthoSize, m_fov);
+    m_blendOrthoSize = m_orthoSize;
+    m_blendT = 0.0f;
+    m_blendActive = true;
+    m_blendLevel = false;
+    m_blendRollSet = false;
+    m_blendUp0 = m_up;
+    m_fovEff = kBlendStartFov;
+    m_position = m_target + dir * equivalentDistance(m_orthoSize, m_fovEff);
     m_orthographic = false;
+}
+
+void Camera::finishBlend()
+{
+    if (!m_blendActive) return;
+    m_blendActive = false;
+    m_fovEff = m_fov;
+    const glm::vec3 dir = safeDirection(m_position, m_target, glm::vec3(0.0f, 0.0f, 1.0f));
+    m_position = m_target + dir * equivalentDistance(m_blendOrthoSize, m_fov);
+    if (m_blendLevel) {
+        m_blendT = 1.0f;
+        m_up = blendedUp(dir);
+    }
+}
+
+glm::vec3 Camera::blendedUp(const glm::vec3& dir)
+{
+    // Roll from the blend's starting up to world-up (level horizon) as a real
+    // rotation about the view axis, eased by the blend's progress. A straight
+    // mix of the two vectors passes through zero when they are opposite - an
+    // upside-down view (X reversed) flipped 180 degrees in one frame.
+    const glm::vec3 worldUp(0.0f, m_levelSign, 0.0f);   // the level up this view keeps
+    glm::vec3 a = m_blendUp0 - dir * glm::dot(m_blendUp0, dir);
+    glm::vec3 b = worldUp - dir * glm::dot(worldUp, dir);
+    if (glm::length(a) < 1e-4f || glm::length(b) < 1e-4f) return m_up;   // along the pole
+    a = glm::normalize(a);
+    b = glm::normalize(b);
+    float ang = std::atan2(glm::dot(dir, glm::cross(a, b)), glm::dot(a, b));
+    // Near 180 degrees the sign is a coin toss that can change as the camera
+    // moves; stay on the side the roll already took.
+    const float pi = 3.14159265f;
+    if (m_blendRollSet && std::abs(ang - m_blendRollAngle) > pi)
+        ang += (m_blendRollAngle > ang) ? 2.0f * pi : -2.0f * pi;
+    m_blendRollAngle = ang;
+    m_blendRollSet = true;
+    const float r = ang * ease(m_blendT);
+    return glm::normalize(a * std::cos(r) + glm::cross(dir, a) * std::sin(r));
 }
 
 bool Camera::tick(float dtSeconds)
 {
-    if (!m_anim.active) return false;
+    bool moved = false;
+    if (m_blendActive) {
+        // Dolly-zoom: tan(fov/2) eases from the near-ortho start to the resting
+        // FOV, and the distance follows (d = halfHeight / tan(fov/2)) so the
+        // plane the ortho box framed keeps its size. Re-seated along the CURRENT
+        // view ray, so an orbit in progress just carries on.
+        m_blendT = std::min(m_blendT + dtSeconds / kBlendSeconds, 1.0f);
+        const float e = ease(m_blendT);
+        const float t0 = std::tan(glm::radians(kBlendStartFov) * 0.5f);
+        const float t1 = std::tan(glm::radians(m_fov) * 0.5f);
+        const float th = glm::mix(t0, t1, e);
+        m_fovEff = m_blendT >= 1.0f ? m_fov : glm::degrees(2.0f * std::atan(th));
+        const glm::vec3 dir = safeDirection(m_position, m_target, glm::vec3(0.0f, 0.0f, 1.0f));
+        m_position = m_target + dir * std::max(m_blendOrthoSize / th, 1e-3f);
+        if (m_blendLevel) m_up = blendedUp(dir);
+        if (m_blendT >= 1.0f) m_blendActive = false;
+        moved = true;
+    }
+    if (!m_anim.active) return moved;
     Animation& a = m_anim;
     a.t += dtSeconds / std::max(a.duration, 1e-3f);
     if (a.t >= 1.0f) {

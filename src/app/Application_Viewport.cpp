@@ -6972,6 +6972,7 @@ void Application::renderViewport() {
             vcCam.finishAnimation();
             const Camera before = vcCam;
             handleViewCubeAction(static_cast<int>(vcAction));
+            vcCam.finishBlend();   // arrows orbit out of ortho: take the settled pose
             const Camera after = vcCam;
             vcCam = before;
             vcCam.animateTo(after.getPosition(), after.getTarget(), after.getUp(),
