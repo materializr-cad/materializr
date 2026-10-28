@@ -22,6 +22,12 @@ std::uint32_t platformTicksMs();
 // Block the calling thread for at least `ms` milliseconds.
 void platformSleepMs(std::uint32_t ms);
 
+// Nanoseconds since SDL initialised (64-bit, no practical wrap) and a sleep that
+// is accurate to well under a millisecond. For frame pacing finer than 1 ms,
+// where a whole-millisecond sleep overshoots a 240 fps budget (~4.17 ms).
+std::uint64_t platformTicksNs();
+void platformSleepPreciseNs(std::uint64_t ns);
+
 // Per-user writable data directory for Materializr, created if missing, with a
 // trailing path separator ("" if the platform can't provide one). Resolves to
 // the right place everywhere, including Android app storage and the iOS

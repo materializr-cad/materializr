@@ -8028,6 +8028,7 @@ void Application::run() {
         // at the bottom of the loop (measured after the event wait so the
         // idle floor's own sleep doesn't count against the budget).
         const uint32_t frameLoopStartMs = platformTicksMs();
+        const uint64_t frameLoopStartNs = platformTicksNs();
         // Significant events (click, key, scroll, resize, focus): 5 frames.
         // Trivial events (mouse motion, expose): 25 frames - at 60 fps that is
         // ~416 ms, enough for ImGui's default 300 ms hover-tooltip delay to fire
@@ -8770,12 +8771,17 @@ void Application::run() {
         // Sleeping out the remainder of a 60 Hz budget yields the main
         // thread to the OS every frame; where vsync already paces us the
         // remainder is ~0 and this is a no-op.
-        // Skipped when the user turned VSync off (desktop only; mobile has no
-        // such setting and keeps the cap).
+        // With VSync off (desktop only; mobile has no such setting and keeps the
+        // 60 Hz cap) the loop still stops at 240 fps, an absolute ceiling so a
+        // light scene can't spin a core and the GPU flat out.
         if (m_vsync) {
             constexpr uint32_t kMinFrameMs = 16;
             const uint32_t spent = platformTicksMs() - frameLoopStartMs;
             if (spent < kMinFrameMs) platformSleepMs(kMinFrameMs - spent);
+        } else {
+            constexpr uint64_t kMinFrameNs = 1000000000ull / 240;
+            const uint64_t spent = platformTicksNs() - frameLoopStartNs;
+            if (spent < kMinFrameNs) platformSleepPreciseNs(kMinFrameNs - spent);
         }
         }
         break;   // the inner loop's own break/exit conditions reached: done

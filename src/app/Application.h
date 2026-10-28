@@ -2180,6 +2180,7 @@ private:
     int  m_revolveWorldAxisIdx = 2;       // 0=X, 1=Y(user)=worldZ, 2=Z(user)=worldY
     int  m_revolveBodyId   = -1;          // primary body - first one in the selection
     std::vector<int> m_revolveBodyIds;    // all selected bodies (>=1); Rotate Body iterates this
+    unsigned m_revolveSelRev = 0;         // selection revision the Lathe popup last synced to
     int  m_revolveModeIdx  = 0;           // 0=NewBody 1=Union 2=Cut 3=Intersect (Sweep mode)
     float m_revolveAngle   = 360.0f;
     char  m_revolveAngleBuf[24] = "360.0";

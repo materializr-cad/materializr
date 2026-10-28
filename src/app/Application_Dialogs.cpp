@@ -519,13 +519,6 @@ void Application::renderSettings() {
                         changed = true;
                     }
                     ImGui::TextWrapped("%s", materializr::tr("Glide to the sketch plane so you can follow where the view went. Off: cut straight to it."));
-#if !defined(MZ_MOBILE)
-                    if (ImGui::Checkbox(materializr::tr("VSync (cap frame rate to the display)"), &m_vsync)) {
-                        if (m_window) m_window->setVSync(m_vsync);
-                        changed = true;
-                    }
-                    ImGui::TextWrapped("%s", materializr::tr("Off: render as fast as the machine allows. Uses more GPU/CPU and can tear."));
-#endif
 
                     // Invert the cube-drag → orbit direction.
                     if (ImGui::Checkbox(materializr::tr("Invert ViewCube drag direction"), &m_invertCubeDrag)) {
@@ -604,6 +597,14 @@ void Application::renderSettings() {
                         changed = true;
                     }
                     ImGui::SetItemTooltip("%s", materializr::tr("Higher quality uses more polygons, smoothing curves and holes."));
+
+#if !defined(MZ_MOBILE)
+                    if (ImGui::Checkbox(materializr::tr("VSync (cap frame rate to the display)"), &m_vsync)) {
+                        if (m_window) m_window->setVSync(m_vsync);
+                        changed = true;
+                    }
+                    ImGui::TextWrapped("%s", materializr::tr("Off: render as fast as the machine allows, up to 240 fps. Uses more GPU/CPU and can tear."));
+#endif
 
                     ImGui::Spacing();
                     ImGui::SeparatorText(materializr::tr("Imported meshes (STL)"));
@@ -3883,6 +3884,7 @@ void Application::beginRevolve() {
     // so revolving a selected profile silently committed a rotate-snapshot
     // step ("Batched transform") instead of a real, re-editable RevolveOp.
     m_revolveWhatIdx = (m_revolveSketchId >= 0) ? 1 : 0;
+    m_revolveSelRev = m_selection->revision();
     // Reset to a neutral start angle every time the popup opens so the
     // user isn't surprised by the last session's value sticking around
     // (and so live preview begins at "no rotation" and tracks the slider
@@ -3915,6 +3917,33 @@ void Application::renderRevolvePopup() {
     // beginRevolve(); the window title reflects it. No in-popup mode switch -
     // to change mode you change the selection.
     const bool lathe = (m_revolveWhatIdx == 1);
+    // Lathe: the sketch, axis and target body can be picked in either order,
+    // including after the popup is open. The popup only captured the selection
+    // when it opened, so a body clicked afterwards was ignored (Lathe > Cut with
+    // the sketch selected first). Follow later picks; a plain click replaces the
+    // selection, so anything the new selection doesn't mention stays as it was.
+    // Rotate Body (what 0) is left alone - its bodies are mid-preview.
+    if (lathe && m_selection->revision() != m_revolveSelRev) {
+        m_revolveSelRev = m_selection->revision();
+        std::vector<int> bodies;
+        for (const auto& e : m_selection->getSelection()) {
+            if ((e.type == SelectionType::Sketch ||
+                 e.type == SelectionType::SketchRegion) && e.sketchId >= 0) {
+                m_revolveSketchId = e.sketchId;
+            } else if (e.type == SelectionType::Axis && e.axisId >= 0) {
+                m_revolveAxisId = e.axisId;
+            } else if (e.bodyId >= 0 &&
+                       (e.type == SelectionType::Body || e.type == SelectionType::Face ||
+                        e.type == SelectionType::Edge || e.type == SelectionType::Vertex) &&
+                       std::find(bodies.begin(), bodies.end(), e.bodyId) == bodies.end()) {
+                bodies.push_back(e.bodyId);
+            }
+        }
+        if (!bodies.empty()) {
+            m_revolveBodyIds = bodies;
+            m_revolveBodyId = bodies.front();
+        }
+    }
     ImGui::Begin(lathe ? "Lathe###RevolvePopup" : "Revolve###RevolvePopup", nullptr,
         ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoSavedSettings |
