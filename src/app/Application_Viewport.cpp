@@ -4,6 +4,7 @@
 #include "touch_mode.h"
 #include "gl_common.h"
 #include "viewport/GridScale.h"
+#include <algorithm>
 #include <cmath>
 #include <chrono>
 #include <cstdio>
@@ -3944,6 +3945,19 @@ void Application::renderViewport() {
                                     }
                                     if (n > 0) { pivot = sum / float(n); got = true; break; }
                                 }
+                            }
+                            if (got && cam.isOrthographic()) {
+                                // Orbiting out of an orthographic view (a sketch):
+                                // take only the pick's DEPTH. A sideways move of the
+                                // target would tilt the picture off its exact
+                                // view direction on the first frame of the drag.
+                                const glm::vec3 d = cam.getTarget() - cam.getPosition();
+                                const float dist = glm::length(d);
+                                if (dist > 1e-4f) {
+                                    const glm::vec3 vd = d / dist;
+                                    const float along = glm::dot(pivot - cam.getTarget(), vd);
+                                    pivot = cam.getTarget() + vd * std::min(along, 0.9f * dist);
+                                } else got = false;
                             }
                             if (got) cam.setTarget(pivot);
                         }

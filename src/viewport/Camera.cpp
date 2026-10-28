@@ -47,55 +47,83 @@ static void trackballRotate(glm::vec3& position, const glm::vec3& target, glm::v
     upInOut = glm::normalize(glm::vec3(rot * glm::vec4(up, 0.0f)));
 }
 
+// A view this close to straight along the turntable axis (within ~10 degrees) is
+// a "pole" view: Top/Bottom. The orbit pivot re-anchor can leave an ortho Top view
+// a few degrees off exact, so exactness cannot be the test.
+constexpr float kPoleCos = 0.985f;
+
+// Turntable frame: the rotation that carries `axis` onto +Y (identity for +Y,
+// a half turn about X for -Y). Orthonormal, so its inverse is its transpose.
+static glm::mat3 frameWithYAlong(const glm::vec3& axis)
+{
+    const glm::vec3 ref = std::abs(axis.x) < 0.9f ? glm::vec3(1, 0, 0) : glm::vec3(0, 0, 1);
+    const glm::vec3 e1 = glm::normalize(ref - axis * glm::dot(ref, axis));
+    const glm::vec3 e3 = glm::cross(e1, axis);
+    return glm::transpose(glm::mat3(e1, axis, e3));   // rows e1, axis, e3
+}
+
+// The axis a level orbit pivots about after leaving an orthographic view looking
+// along `dir` with screen-up `up`: that up itself, so the picture is not rolled.
+// Top/Bottom views (looking along the pole) keep the world axis - their up is just
+// a screen azimuth and the orbit tips off the pole into a normal horizon.
+static glm::vec3 levelAxisFor(const glm::vec3& dir, const glm::vec3& up, const glm::vec3& prev)
+{
+    if (std::abs(dir.y) > kPoleCos)
+        return glm::vec3(0.0f, prev.y < 0.0f ? -1.0f : 1.0f, 0.0f);
+    glm::vec3 u = up - dir * glm::dot(up, dir);
+    if (glm::length(u) < 1e-4f) return prev;
+    u = glm::normalize(u);
+    for (int i = 0; i < 3; ++i)          // an axis-aligned view stays exactly aligned
+        for (float sg : {-1.0f, 1.0f}) {
+            glm::vec3 a(0.0f);
+            a[i] = sg;
+            if (glm::dot(u, a) > 0.9995f) return a;
+        }
+    return u;
+}
+
 void Camera::orbitLevel(float yawDelta, float pitchDelta)
 {
     // Orbiting implies free 3D rotation, so drop the ortho lock if it was set
     // by entering a sketch. Pan and zoom intentionally keep ortho mode on.
     leaveOrthographic();
 
-    // Capture the view's CURRENT up before we reset it - a Top/Bottom ortho snap
-    // stored the screen orientation there, and we need it to recover the azimuth
-    // at the pole (below). Then reset up to world-up so a turntable orbit always
-    // shows a level horizon. Without the reset, a sketch's chosen up vector (which
-    // may be -X, +Z, etc.) sticks around and orbiting looks rotated / twisted. The
-    // target is left as-is so an orbit out of a sketch ortho view pivots around
-    // the world-grid-aligned anchor alignCameraToActiveSketch set near the face.
-    // Mid-blend the entering up is the one the blend started from, not the
-    // partly-levelled value this function wrote on the previous call.
-    const glm::vec3 enterUp = (m_blendActive && m_blendLevel) ? m_blendUp0 : m_up;
-    // Keep the horizon level the way the view is FACING: an upside-down view
-    // orbits upside-down rather than rolling through half a turn to get upright.
-    // (Near the poles the up vector says nothing about it, so the last sign holds.)
-    if (std::abs(enterUp.y) > 0.005f) m_levelSign = enterUp.y < 0.0f ? -1.0f : 1.0f;
-    // Everything below is turntable maths about +Y. For an upside-down view run
-    // it in the frame rotated 180 degrees about X (its own inverse).
-    const float sg = m_levelSign;
-    const auto R = [sg](const glm::vec3& v) { return glm::vec3(v.x, sg * v.y, sg * v.z); };
-    const glm::vec3 prevUp = R(enterUp);
-    m_up = glm::vec3(0.0f, sg, 0.0f);
+    // The turntable pivots about m_levelAxis: world up (+Y, or -Y for an
+    // upside-down view), except right after leaving an orthographic view whose
+    // screen-up is something else (a sketch on a side face, Look At, ViewCube) -
+    // there it is that view's own up, so the first orbit does not roll the picture.
+    // Everything below is turntable maths about +Y, run in the frame that rotates
+    // the axis onto +Y (Q) and mapped back at the end.
+    const glm::vec3 axis = m_levelAxis;
+    const glm::mat3 Q = frameWithYAlong(axis);
+    const glm::mat3 Qi = glm::transpose(Q);
+    const glm::vec3 prevUp = Q * m_up;   // a Top/Bottom snap stores its screen azimuth here
+    m_up = axis;
 
-    glm::vec3 offset = R(m_position - m_target); // target -> camera
+    glm::vec3 offset = Q * (m_position - m_target); // target -> camera
     float radius = glm::length(offset);
     if (radius < 1e-6f) return;
     glm::vec3 dir = offset / radius;
 
-    // Decompose into yaw (around world Y) and pitch (elevation above the ground
+    // Decompose into yaw (around the axis) and pitch (elevation above the ground
     // plane). Rebuilding the offset from these keeps the view level - there is
     // no roll term, so the horizon stays flat no matter how far we orbit.
     float pitch = std::asin(glm::clamp(dir.y, -1.0f, 1.0f));
-    float yaw;
-    const glm::vec2 upH(prevUp.x, prevUp.z); // horizontal part of the entering up
-    if (std::abs(dir.y) > 0.9999f && glm::length(upH) > 1e-4f) {
-        // Looking straight down/up (an ortho Top/Bottom view): yaw is indeterminate
-        // from `dir` alone - atan2(0,0) collapses to 0, snapping the first orbit to
-        // the +X "Right" side. Recover the azimuth from the view's up vector, which
-        // the ortho snap set to a horizontal direction, so the orbit tips off the
-        // pole the way the screen is already oriented instead of jumping to Right.
-        const glm::vec2 h = glm::normalize(upH);
-        yaw = (dir.y > 0.0f) ? std::atan2(-h.y, -h.x)   // top:    screen-up = -(cosY,sinY)
-                             : std::atan2( h.y,  h.x);   // bottom: screen-up =  (cosY,sinY)
-    } else {
-        yaw = std::atan2(dir.z, dir.x);
+    float yaw = std::atan2(dir.z, dir.x);
+    if (std::abs(dir.y) > kPoleCos) {
+        // Looking (nearly) straight down/up (an ortho Top/Bottom view): yaw is
+        // indeterminate from `dir` alone - at the exact pole atan2(0,0) collapses
+        // to 0, and a few degrees off it the azimuth of the tilt is arbitrary, so
+        // either way the first orbit would spin the picture to a random angle.
+        // Recover the azimuth from the screen's up instead, so the orbit tips off
+        // the pole the way the screen is already oriented.
+        const glm::vec3 us = prevUp - dir * glm::dot(prevUp, dir);
+        const glm::vec2 upH(us.x, us.z);
+        if (glm::length(upH) > 1e-4f) {
+            const glm::vec2 h = glm::normalize(upH);
+            yaw = (dir.y > 0.0f) ? std::atan2(-h.y, -h.x)   // top:    screen-up = -(cosY,sinY)
+                                 : std::atan2( h.y,  h.x);   // bottom: screen-up =  (cosY,sinY)
+        }
     }
 
     yaw += yawDelta;
@@ -109,15 +137,8 @@ void Camera::orbitLevel(float yawDelta, float pitchDelta)
     glm::vec3 newDir(std::cos(pitch) * std::cos(yaw),
                      std::sin(pitch),
                      std::cos(pitch) * std::sin(yaw));
-    m_position = m_target + R(newDir * radius);
-    m_up = glm::vec3(0.0f, sg, 0.0f);
-    if (m_blendActive) {
-        // Level the roll over the blend instead of in one step: a sketch view
-        // that was turned sideways (Look At, ViewCube) would otherwise snap
-        // upright on the first orbit.
-        m_blendLevel = true;
-        m_up = blendedUp(R(newDir));
-    }
+    m_position = m_target + Qi * (newDir * radius);
+    m_up = axis;
 }
 
 void Camera::orbit(float deltaX, float deltaY)
@@ -130,6 +151,7 @@ void Camera::orbit(float deltaX, float deltaY)
         leaveOrthographic();
         trackballRotate(m_position, m_target, m_up,
                         -deltaX * s, -deltaY * s);
+        m_levelAxis = glm::vec3(0.0f, m_up.y < 0.0f ? -1.0f : 1.0f, 0.0f);
     }
 }
 
@@ -141,6 +163,7 @@ void Camera::rotateAroundTarget(float yawRadians, float pitchRadians)
     } else {
         leaveOrthographic();
         trackballRotate(m_position, m_target, m_up, -yawRadians, -pitchRadians);
+        m_levelAxis = glm::vec3(0.0f, m_up.y < 0.0f ? -1.0f : 1.0f, 0.0f);
     }
 }
 
@@ -278,6 +301,7 @@ void Camera::reset()
     m_position = glm::vec3(5.0f, 5.0f, 5.0f);
     m_target = glm::vec3(0.0f, 0.0f, 0.0f);
     m_up = glm::vec3(0.0f, 1.0f, 0.0f);
+    m_levelAxis = glm::vec3(0.0f, 1.0f, 0.0f);
     m_fov = 45.0f;
     m_orthographic = false;
 }
@@ -330,6 +354,7 @@ void Camera::setUp(glm::vec3 up)
     finishAnimation();
     finishBlend();
     m_up = up;
+    m_levelAxis = glm::vec3(0.0f, up.y < 0.0f ? -1.0f : 1.0f, 0.0f);
 }
 
 
@@ -373,6 +398,7 @@ void Camera::animateTo(glm::vec3 position, glm::vec3 target, glm::vec3 up,
 {
     finishAnimation();   // settle any move in flight; start from where we truly are
     finishBlend();
+    m_levelAxis = glm::vec3(0.0f, up.y < 0.0f ? -1.0f : 1.0f, 0.0f);
 
     const glm::vec3 fallbackDir(0.0f, 0.0f, 1.0f);
     const glm::vec3 dir1 = safeDirection(position, target, fallbackDir);
@@ -418,9 +444,7 @@ void Camera::leaveOrthographic()
     m_blendOrthoSize = m_orthoSize;
     m_blendT = 0.0f;
     m_blendActive = true;
-    m_blendLevel = false;
-    m_blendRollSet = false;
-    m_blendUp0 = m_up;
+    m_levelAxis = levelAxisFor(dir, m_up, m_levelAxis);
     m_fovEff = kBlendStartFov;
     m_position = m_target + dir * equivalentDistance(m_orthoSize, m_fovEff);
     m_orthographic = false;
@@ -433,34 +457,6 @@ void Camera::finishBlend()
     m_fovEff = m_fov;
     const glm::vec3 dir = safeDirection(m_position, m_target, glm::vec3(0.0f, 0.0f, 1.0f));
     m_position = m_target + dir * equivalentDistance(m_blendOrthoSize, m_fov);
-    if (m_blendLevel) {
-        m_blendT = 1.0f;
-        m_up = blendedUp(dir);
-    }
-}
-
-glm::vec3 Camera::blendedUp(const glm::vec3& dir)
-{
-    // Roll from the blend's starting up to world-up (level horizon) as a real
-    // rotation about the view axis, eased by the blend's progress. A straight
-    // mix of the two vectors passes through zero when they are opposite - an
-    // upside-down view (X reversed) flipped 180 degrees in one frame.
-    const glm::vec3 worldUp(0.0f, m_levelSign, 0.0f);   // the level up this view keeps
-    glm::vec3 a = m_blendUp0 - dir * glm::dot(m_blendUp0, dir);
-    glm::vec3 b = worldUp - dir * glm::dot(worldUp, dir);
-    if (glm::length(a) < 1e-4f || glm::length(b) < 1e-4f) return m_up;   // along the pole
-    a = glm::normalize(a);
-    b = glm::normalize(b);
-    float ang = std::atan2(glm::dot(dir, glm::cross(a, b)), glm::dot(a, b));
-    // Near 180 degrees the sign is a coin toss that can change as the camera
-    // moves; stay on the side the roll already took.
-    const float pi = 3.14159265f;
-    if (m_blendRollSet && std::abs(ang - m_blendRollAngle) > pi)
-        ang += (m_blendRollAngle > ang) ? 2.0f * pi : -2.0f * pi;
-    m_blendRollAngle = ang;
-    m_blendRollSet = true;
-    const float r = ang * ease(m_blendT);
-    return glm::normalize(a * std::cos(r) + glm::cross(dir, a) * std::sin(r));
 }
 
 bool Camera::tick(float dtSeconds)
@@ -479,7 +475,6 @@ bool Camera::tick(float dtSeconds)
         m_fovEff = m_blendT >= 1.0f ? m_fov : glm::degrees(2.0f * std::atan(th));
         const glm::vec3 dir = safeDirection(m_position, m_target, glm::vec3(0.0f, 0.0f, 1.0f));
         m_position = m_target + dir * std::max(m_blendOrthoSize / th, 1e-3f);
-        if (m_blendLevel) m_up = blendedUp(dir);
         if (m_blendT >= 1.0f) m_blendActive = false;
         moved = true;
     }

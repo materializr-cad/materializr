@@ -121,8 +121,6 @@ private:
     /// framing throughout. (Flipping the flag outright made the first orbit out
     /// of a sketch snap in scale and parallax; tick() drives the blend.)
     void leaveOrthographic();
-    /// World-up mixed in by the blend's progress, perpendicular to `dir`.
-    glm::vec3 blendedUp(const glm::vec3& dir);
 
 public:
     /// Settle a running ortho->perspective blend at its end state (no-op idle).
@@ -181,11 +179,9 @@ private:
     bool  m_blendActive = false; // ortho->perspective dolly-zoom running
     float m_blendT = 0.0f;
     float m_blendOrthoSize = 10.0f; // the ortho half-height being preserved
-    bool  m_blendRollSet = false;   // m_blendRollAngle holds a previous value
-    float m_blendRollAngle = 0.0f;  // last roll-to-level angle (keeps its sign)
-    float m_levelSign = 1.0f;       // +1 upright, -1 upside-down turntable (level orbit)
-    bool  m_blendLevel = false;  // level orbit is also rolling the view upright
-    glm::vec3 m_blendUp0 = glm::vec3(0.0f, 1.0f, 0.0f); // up when the blend began
+    // Axis the level orbit turns about and keeps vertical on screen: +Y, -Y for an
+    // upside-down view, or the up of the ortho view just left (see leaveOrthographic).
+    glm::vec3 m_levelAxis = glm::vec3(0.0f, 1.0f, 0.0f);
     float m_nearPlane;
     float m_farPlane;
     float m_aspect;
