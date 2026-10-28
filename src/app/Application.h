@@ -167,6 +167,14 @@ private:
     // the projection progress overlay and the thread-cutting modal).
     void drawIndeterminateBar();
     bool m_progressCancelled = false;
+    // The last complete frame (UI + model), kept while a heavy task is pending so
+    // the progress window can paint it behind its card instead of blanking the
+    // screen. Desktop only; see captureProgressBackdrop().
+    void captureProgressBackdrop();
+    unsigned m_progressBackdropTex = 0;
+    int  m_progressBackdropW = 0;
+    int  m_progressBackdropH = 0;
+    bool m_progressBackdropValid = false;
     // Set once the first splash frame has been rendered to BOTH swap-chain
     // buffers (see renderSplashFrame) - kills the intermittent black flash from
     // the undefined back buffer being presented before the first swap.

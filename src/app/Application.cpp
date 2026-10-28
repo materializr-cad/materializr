@@ -1594,6 +1594,41 @@ void Application::renderSplashFrame(const char* status) {
     }
 }
 
+void Application::captureProgressBackdrop() {
+#if !defined(MZ_MOBILE)
+    // Called after a frame's ImGui pass, before the swap, only when a heavy task
+    // is queued to run at the top of the next iteration: the progress window
+    // then has the frame the user was just looking at to paint behind its card.
+    // The back buffer is undefined after a swap, so this is the only moment it
+    // can be had. Mobile keeps the plain cleared window (its default framebuffer
+    // is not the one bound here).
+    if (!m_window) return;
+    int fbw = 0, fbh = 0;
+    m_window->framebufferSize(fbw, fbh);
+    if (fbw <= 0 || fbh <= 0) return;
+    GLint prevTex = 0;
+    glGetIntegerv(GL_TEXTURE_BINDING_2D, &prevTex);
+    if (!m_progressBackdropTex) {
+        glGenTextures(1, &m_progressBackdropTex);
+        glBindTexture(GL_TEXTURE_2D, m_progressBackdropTex);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    } else {
+        glBindTexture(GL_TEXTURE_2D, m_progressBackdropTex);
+    }
+    if (fbw == m_progressBackdropW && fbh == m_progressBackdropH)
+        glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, fbw, fbh);
+    else
+        glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 0, 0, fbw, fbh, 0);
+    glBindTexture(GL_TEXTURE_2D, static_cast<GLuint>(prevTex));
+    m_progressBackdropW = fbw;
+    m_progressBackdropH = fbh;
+    m_progressBackdropValid = glGetError() == GL_NO_ERROR;
+#endif
+}
+
 void Application::drawIndeterminateBar() {
     // A segment sweeping left → right (marquee), not a bouncing fill. Used for
     // work with no readable progress (the projection boolean, a thread sweep).
@@ -1643,6 +1678,16 @@ bool Application::renderProgressFrame(float fraction, const char* label) {
 
     beginFrame();
     const ImGuiViewport* vp = ImGui::GetMainViewport();
+    // The frame the user was looking at, frozen behind the card - not a blank
+    // window that reads as the whole app vanishing. Falls back to the cleared
+    // window when no frame was kept (startup, a resize since, mobile).
+    if (m_progressBackdropValid && m_progressBackdropTex &&
+        m_progressBackdropW == fbw && m_progressBackdropH == fbh) {
+        ImGui::GetBackgroundDrawList()->AddImage(
+            static_cast<ImTextureID>(m_progressBackdropTex),
+            vp->Pos, ImVec2(vp->Pos.x + vp->Size.x, vp->Pos.y + vp->Size.y),
+            ImVec2(0, 1), ImVec2(1, 0));
+    }
     const float boxW = 440.0f;
     ImGui::SetNextWindowPos(ImVec2(vp->WorkPos.x + (vp->WorkSize.x - boxW) * 0.5f,
                                    vp->WorkPos.y + vp->WorkSize.y * 0.42f));
@@ -8137,6 +8182,7 @@ void Application::run() {
                         std::chrono::milliseconds(200)), cost * 4);
             });
             task();                // keepAliveGuard disarms on every exit
+            m_progressBackdropValid = false;   // stale once the task is done
             noteHeavyPumpGap();   // close the books on the tail of the task
             m_heavyRanThisIter = true;   // the watchdog reads this next time round
             m_wakeFrames = 5; // task finished - repaint the result
@@ -8759,6 +8805,10 @@ void Application::run() {
         glClear(GL_COLOR_BUFFER_BIT);
 
         endFrame();
+
+        // A heavy task queued this frame runs at the top of the next iteration;
+        // keep this frame for its progress window to paint behind.
+        if (!m_deferredHeavy.empty()) captureProgressBackdrop();
 
         m_window->swapBuffers();
 
