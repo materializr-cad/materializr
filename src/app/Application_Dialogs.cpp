@@ -587,6 +587,23 @@ void Application::renderSettings() {
                     }
                     ImGui::SetItemTooltip("%s", materializr::tr("Multisampling (MSAA) smooths jagged edges in the viewport."));
 
+                    // Experimental (#123): workarounds for a grid that shimmers
+                    // under multisampling on some GPU drivers (seen on Intel Arc).
+                    const char* gridItems[] = {
+                        materializr::tr("Default"),
+                        materializr::tr("1: measure line width directly"),
+                        materializr::tr("2: grid without multisampling"),
+                        materializr::tr("3: both"),
+                    };
+                    if (ImGui::Combo(materializr::tr("Grid rendering (experimental)"),
+                                     &m_gridMode, gridItems, 4)) {
+                        applyRenderingSettings();
+                        changed = true;
+                    }
+                    ImGui::SetItemTooltip("%s", materializr::tr(
+                        "Only change this if the grid looks speckled or flickering with "
+                        "anti-aliasing on. Try 1, 2 and 3 and keep whichever fixes it."));
+
                     // Mesh quality - denser tessellation for smoother curved surfaces.
                     const char* mqItems[] = { materializr::tr("Low"), materializr::tr("Medium"),
                                               materializr::tr("High"), materializr::tr("Ultra") };

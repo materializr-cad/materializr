@@ -61,8 +61,29 @@ uniform float u_depthBias;     // signed depth nudge: + toward camera (draw the
                                // - away (let a coplanar body face occlude it)
 uniform float u_lightBg;       // 1 = light viewport: use dark-on-light line palette
 uniform float u_sketchThickness; // sketch grid line-width multiplier (1 = default)
+uniform mat4 u_invViewProjection;
+uniform float u_analyticDeriv; // 1 = per-pixel footprint computed here, no fwidth()
+uniform vec2 u_viewport;       // framebuffer size in pixels
 
 out vec4 fragColor;
+
+// Grid-plane (u, v) at a given NDC position: the same ray / plane intersection
+// main() does, repeated for a neighbouring pixel so the pixel's footprint in
+// grid units can be measured without screen-space derivatives.
+vec2 planeUvAtNdc(vec2 ndc) {
+    vec4 n = u_invViewProjection * vec4(ndc, -1.0, 1.0);
+    vec4 f = u_invViewProjection * vec4(ndc,  1.0, 1.0);
+    vec3 np = n.xyz / n.w;
+    vec3 d  = f.xyz / f.w - np;
+    float dn = dot(d, u_planeNormal);
+    float dnSafe = (abs(dn) < 1e-6) ? ((dn < 0.0) ? -1e-6 : 1e-6) : dn;
+    float tt = clamp(dot(u_planeOrigin - np, u_planeNormal) / dnSafe, 0.0, 1.0e6);
+    vec3 rel = np + tt * d - u_planeOrigin;
+    return vec2(dot(rel, u_planeU), dot(rel, u_planeV));
+}
+
+// |d uv / d pixel x| + |d uv / d pixel y|, i.e. fwidth(uv), without fwidth().
+vec2 g_uvDeriv = vec2(0.0);
 
 float computeDepth(vec3 pos) {
     vec4 clipPos = u_viewProjection * vec4(pos, 1.0);
@@ -76,8 +97,10 @@ float computeDepth(vec3 pos) {
 // is in cell units (one integer step = one grid cell); `widthPx` is the line
 // width in pixels. When cells go sub-pixel the line just widens to fill and the
 // grid greys out evenly, so there is no moiré beat pattern either.
-float gridCoverage(vec2 coord, float widthPx) {
-    vec2 deriv = fwidth(coord);                       // cell units per pixel
+float gridCoverage(vec2 coord, float widthPx, float tier) {
+    // `tier` = how many cells of `coord` fit in one uv unit (coord = uv * tier).
+    vec2 deriv = (u_analyticDeriv > 0.5) ? g_uvDeriv * tier
+                                         : fwidth(coord);   // cell units per pixel
     vec2 toLine = abs(fract(coord - 0.5) - 0.5);      // 0 at a line, 0.5 mid-cell
     vec2 halfW = deriv * (widthPx * 0.5);             // half line width, cell units
     vec2 aa = deriv;                                  // one-pixel anti-alias band
@@ -90,6 +113,8 @@ float gridCoverage(vec2 coord, float widthPx) {
 void main() {
     vec3 dir = v_farPoint - v_nearPoint;
     float denom = dot(dir, u_planeNormal);
+    vec2 ndc0 = vec2(0.0);
+    if (u_analyticDeriv > 0.5) ndc0 = gl_FragCoord.xy / u_viewport * 2.0 - 1.0;
     // Don't discard here: an early discard runs BEFORE the fwidth() calls
     // below, and fwidth() needs every fragment in a pixel's 2x2 quad to take
     // the same code path to produce a valid derivative. At grazing camera
@@ -129,7 +154,13 @@ void main() {
     // The finest (1×) tier, drawn with the anti-moiré pristine-grid coverage.
     // The thickness multiplier scales every tier's line width (sketch AND the
     // world/ground grid) so the slider reads the same way the opacity one does.
-    float covMinor = gridCoverage(uv * u_scale, 1.3 * u_sketchThickness);
+    if (u_analyticDeriv > 0.5) {
+        vec2 stepNdc = 2.0 / u_viewport;
+        vec2 uv0 = planeUvAtNdc(ndc0);
+        g_uvDeriv = abs(planeUvAtNdc(ndc0 + vec2(stepNdc.x, 0.0)) - uv0)
+                  + abs(planeUvAtNdc(ndc0 + vec2(0.0, stepNdc.y)) - uv0);
+    }
+    float covMinor = gridCoverage(uv * u_scale, 1.3 * u_sketchThickness, u_scale);
 
     // Line palettes. On the dark viewport the lines are light and coarser tiers
     // get BRIGHTER (more prominent); on the light viewport they flip to dark, and
@@ -159,7 +190,7 @@ void main() {
         // now blends over geometry (no depth punch-through) it reads cleanly. The
         // pristine-grid coverage still greys each tier out evenly when it gets
         // dense, so no moiré; the opacity slider dims the whole sheet together.
-        float covMajor = gridCoverage(uv * u_scale * 0.1, 1.6 * u_sketchThickness);
+        float covMajor = gridCoverage(uv * u_scale * 0.1, 1.6 * u_sketchThickness, u_scale * 0.1);
         rgb = sketchCol;
         a   = covMinor * u_minorAlpha;
         rgb = mix(rgb, sketchMajor, covMajor);
@@ -169,8 +200,8 @@ void main() {
         // mega (every 100). The coarser 10- and 100-unit lines read on top;
         // zooming reveals finer tiers. Keeps the tiered look (the "10 mm /
         // 100 mm lines") the user wants on the ground grid.
-        float covMajor = gridCoverage(uv * u_scale * 0.1,  1.3 * u_sketchThickness);
-        float covMega  = gridCoverage(uv * u_scale * 0.01, 1.3 * u_sketchThickness);
+        float covMajor = gridCoverage(uv * u_scale * 0.1,  1.3 * u_sketchThickness, u_scale * 0.1);
+        float covMega  = gridCoverage(uv * u_scale * 0.01, 1.3 * u_sketchThickness, u_scale * 0.01);
         rgb = minorCol;
         a   = covMinor * u_minorAlpha;
         rgb = mix(rgb, majorCol, covMajor);
@@ -182,7 +213,7 @@ void main() {
     // Coloured axes through the grid origin (red = U, blue = V), anti-aliased
     // over one pixel and always drawn on top so the origin reads at any zoom.
     vec2 acoord = uv * u_scale;
-    vec2 aderiv = fwidth(acoord);
+    vec2 aderiv = (u_analyticDeriv > 0.5) ? g_uvDeriv * u_scale : fwidth(acoord);
     float axisU = 1.0 - min(abs(acoord.y) / max(aderiv.y, 1e-6), 1.0); // V≈0 → U axis
     float axisV = 1.0 - min(abs(acoord.x) / max(aderiv.x, 1e-6), 1.0); // U≈0 → V axis
     if (axisU > 0.0) { rgb = mix(rgb, vec3(0.80, 0.20, 0.20), axisU); a = max(a, axisU); }
@@ -248,6 +279,8 @@ bool Grid::initialize()
     m_locDepthBias = glGetUniformLocation(m_shaderProgram, "u_depthBias");
     m_locLightBg = glGetUniformLocation(m_shaderProgram, "u_lightBg");
     m_locSketchThickness = glGetUniformLocation(m_shaderProgram, "u_sketchThickness");
+    m_locAnalyticDeriv = glGetUniformLocation(m_shaderProgram, "u_analyticDeriv");
+    m_locViewport = glGetUniformLocation(m_shaderProgram, "u_viewport");
 
     // Create a dummy VAO (required for core profile, even with no vertex attributes)
     glGenVertexArrays(1, &m_vao);
@@ -284,6 +317,19 @@ void Grid::render(const glm::mat4& view, const glm::mat4& projection,
     glUniform1f(m_locDepthBias, depthBias);
     glUniform1f(m_locLightBg, lightBg);
     glUniform1f(m_locSketchThickness, sketchThickness);
+    glUniform1f(m_locAnalyticDeriv, (m_mode == 1 || m_mode == 3) ? 1.0f : 0.0f);
+    {
+        GLint vp[4] = {0, 0, 1, 1};
+        glGetIntegerv(GL_VIEWPORT, vp);
+        glUniform2f(m_locViewport, static_cast<float>(vp[2] > 0 ? vp[2] : 1),
+                                   static_cast<float>(vp[3] > 0 ? vp[3] : 1));
+    }
+#if !defined(MZ_GLES)
+    // Mode 2/3: shade the grid once per pixel instead of through the
+    // multisample rasteriser (see setMode).
+    const bool noMsaa = (m_mode == 2 || m_mode == 3);
+    if (noMsaa) glDisable(GL_MULTISAMPLE);
+#endif
 
     // Enable blending for grid transparency
     glEnable(GL_BLEND);
@@ -306,6 +352,9 @@ void Grid::render(const glm::mat4& view, const glm::mat4& projection,
 
     glDepthMask(GL_TRUE);
     glDisable(GL_BLEND);
+#if !defined(MZ_GLES)
+    if (noMsaa) glEnable(GL_MULTISAMPLE);
+#endif
     glUseProgram(0);
 }
 

@@ -1290,6 +1290,7 @@ private:
     bool  m_animateCamera = true;
     bool  m_photoReflections = true; // metals reflect a photographed studio
     int   m_msaaSamples = 4;        // viewport anti-aliasing: 0=off, 2, 4, 8
+    int   m_gridMode = 0;           // experimental grid workaround (Grid::setMode, #123)
     int   m_meshQuality = 1;        // tessellation density: 0=Low..3=Ultra
     float m_selectionLineWidth = 3.0f; // px width of highlighted edges/body outlines
     float m_sketchLineWidth = 2.5f;    // px width of sketch geometry over the grid

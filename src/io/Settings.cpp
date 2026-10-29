@@ -124,6 +124,7 @@ void applyKv(const std::map<std::string, std::string>& kv, AppSettings& s) {
     readBool(kv, "lightFill",            s.lightFill);
     readBool(kv, "photoReflections",     s.photoReflections);
     readIntClamped(kv, "msaaSamples",    s.msaaSamples, 0, 8);
+    readIntClamped(kv, "gridMode",       s.gridMode, 0, 3);
     readIntClamped(kv, "meshQuality",    s.meshQuality, 0, 3);
     readFloat(kv, "selectionLineWidth",  s.selectionLineWidth);
     readFloat(kv, "sketchLineWidth",     s.sketchLineWidth);
@@ -450,6 +451,7 @@ bool SettingsIO::save(const std::string& path, const AppSettings& s) {
     ofs << "lightFill = "           << (s.lightFill ? "true" : "false") << "\n";
     ofs << "photoReflections = "    << (s.photoReflections ? "true" : "false") << "\n";
     ofs << "msaaSamples = "         << s.msaaSamples         << "\n";
+    ofs << "gridMode = "            << s.gridMode            << "\n";
     ofs << "meshQuality = "         << s.meshQuality         << "\n";
     ofs << "selectionLineWidth = "  << s.selectionLineWidth  << "\n";
     ofs << "sketchLineWidth = "     << s.sketchLineWidth     << "\n";
@@ -579,6 +581,7 @@ bool SettingsIO::exportJson(const std::string& path, const AppSettings& s) {
     ofs << "  \"lightFill\": "               << b(s.lightFill)          << ",\n";
     ofs << "  \"photoReflections\": "        << b(s.photoReflections)   << ",\n";
     ofs << "  \"msaaSamples\": "             << s.msaaSamples           << ",\n";
+    ofs << "  \"gridMode\": "                << s.gridMode              << ",\n";
     ofs << "  \"meshQuality\": "             << s.meshQuality           << ",\n";
     ofs << "  \"selectionLineWidth\": "      << s.selectionLineWidth    << ",\n";
     ofs << "  \"sketchLineWidth\": "         << s.sketchLineWidth       << ",\n";

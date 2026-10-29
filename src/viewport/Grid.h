@@ -50,6 +50,12 @@ public:
     /// the light-theme viewport (lines stay readable against a light background).
     /// `sketchThickness` multiplies the sketch grid's line width (1 = default);
     /// it has no effect on the tiered world/ground grid.
+    /// Experimental workaround switch for drivers that mangle the grid under
+    /// multisampling (#123, Intel Arc). 0 = default; 1 = derive line widths
+    /// analytically instead of with fwidth(); 2 = draw the grid with
+    /// multisampling off; 3 = both. Default draws exactly as before.
+    void setMode(int mode) { m_mode = mode < 0 ? 0 : (mode > 3 ? 3 : mode); }
+
     void render(const glm::mat4& view, const glm::mat4& projection,
                 const glm::vec3& fadeCenter, float fadeDistance,
                 const Plane& plane, float minorStep,
@@ -80,6 +86,9 @@ private:
     int m_locDepthBias = -1;
     int m_locLightBg = -1;
     int m_locSketchThickness = -1;
+    int m_locAnalyticDeriv = -1;
+    int m_locViewport = -1;
+    int m_mode = 0;
 };
 
 } // namespace materializr

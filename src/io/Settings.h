@@ -104,6 +104,7 @@ struct AppSettings {
     bool  lightFill      = true;  // soft opposing fill light to lift dark sides
     bool  photoReflections = true; // metals reflect a photographed studio, not the drawn one
     int   msaaSamples    = 4;     // viewport anti-aliasing: 0=off, 2, 4, 8
+    int   gridMode       = 0;     // experimental grid workaround, see Grid::setMode (#123)
     int   meshQuality    = 1;     // tessellation density: 0=Low,1=Medium,2=High,3=Ultra
     float selectionLineWidth = 3.0f; // px width of highlighted edges/body outlines (1..10)
     float sketchLineWidth = 2.5f;    // px width of sketch geometry - thicker reads better over the grid (1..6)

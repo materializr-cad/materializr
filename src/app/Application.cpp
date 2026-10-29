@@ -2055,6 +2055,7 @@ void Application::applyRenderingSettings() {
     lp.photoReflections = m_photoReflections;
     m_shapeRenderer->setLighting(lp);
     m_viewport->setSamples(m_msaaSamples);
+    if (m_grid) m_grid->setMode(m_gridMode);
     if (m_selectionHighlight) m_selectionHighlight->setLineWidth(m_selectionLineWidth);
     if (m_sketchRenderer) m_sketchRenderer->setLineWidth(m_sketchLineWidth);
 }
@@ -2097,6 +2098,7 @@ AppSettings Application::currentSettings() const {
     s.lightFill = m_lightFill;
     s.photoReflections = m_photoReflections;
     s.msaaSamples = m_msaaSamples;
+    s.gridMode = m_gridMode;
     s.meshQuality = m_meshQuality;
     s.selectionLineWidth = m_selectionLineWidth;
     s.sketchLineWidth = m_sketchLineWidth;
@@ -2213,6 +2215,7 @@ void Application::applyAppSettings(const AppSettings& s) {
     m_lightFill = s.lightFill;
     m_photoReflections = s.photoReflections;
     m_msaaSamples = s.msaaSamples;
+    m_gridMode = s.gridMode;
     m_meshQuality = s.meshQuality;
     m_selectionLineWidth = s.selectionLineWidth;
     m_sketchLineWidth = s.sketchLineWidth;
