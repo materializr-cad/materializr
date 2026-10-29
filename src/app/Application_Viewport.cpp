@@ -4773,16 +4773,30 @@ void Application::renderViewport() {
                                 // despite the moves recording (0,0,0) -> (-84,0,0) ->
                                 // (-84,65,0).
                                 //
-                                // So commit the creation before recording the move. The
-                                // user dragging the previewed plane is a clear enough
-                                // signal they want to keep it; Esc after this undoes
-                                // both steps rather than discarding the preview, which
-                                // is the ordinary history behaviour.
+                                // So the creation must reach history before the move. For
+                                // the previewed plane alone the popup stays OPEN: the move
+                                // is folded into the preview (the panel keeps its Apply /
+                                // Cancel and the pose survives alignment / offset edits)
+                                // and commitConstructionPlane records it as a
+                                // PlaneTransformOp right after the creation step. A drag
+                                // that includes some other plane too can't be folded that
+                                // way, so it commits the creation first.
+                                const auto planeIds = m_document->getAllPlaneIds();
+                                const bool previewOnly =
+                                    m_planeOpActive && m_planeGizmoDrag.size() == 1 &&
+                                    !planeIds.empty() &&
+                                    m_planeGizmoDrag.front().first == planeIds.back();
+                                if (previewOnly) {
+                                    const auto* pe = m_document->getPlane(planeIds.back());
+                                    if (pe)
+                                        notePlaneOpGizmoMove(m_planeGizmoDrag.front().second,
+                                                             pe->plane);
+                                } else {
                                 if (m_planeOpActive) {
                                     std::fprintf(stderr,
                                         "[Plane] gizmo moved a plane still previewed by the "
-                                        "popup - committing its creation first so history "
-                                        "stays in order.\n");
+                                        "popup along with others - committing its creation "
+                                        "first so history stays in order.\n");
                                     commitConstructionPlane();
                                 }
                                 if (m_history) {
@@ -4798,6 +4812,7 @@ void Application::renderViewport() {
                                             std::make_unique<PlaneTransformOp>(
                                                 lbl, std::move(entries)));
                                     }
+                                }
                                 }
                             } else if (axisOnly) {
                                 // Axis gizmo wrote the new pose via setAxis during

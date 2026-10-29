@@ -46,6 +46,7 @@
 #include "modeling/PatchOp.h"
 #include "modeling/SewOp.h"
 #include "modeling/ConstructionPlaneOp.h"
+#include "modeling/PlaneTransformOp.h"
 #include "io/FileDialogs.h"
 #include "modeling/SvgImport.h"
 #include "plugin/PluginRegistry.h"
@@ -1236,6 +1237,7 @@ void Application::cascadeFromSketchEdit(int sketchId) {
     // body (moved on its own in 3D) - editing it must NOT retro-drive the body.
     if (auto sk = m_document->getSketch(sketchId); sk && sk->isDetachedFromBody())
         return;
+    const auto cascadeStart = std::chrono::steady_clock::now();
     // Re-derive the profile of every APPLIED sketch-sourced extrude / push-pull
     // that references the edited sketch, and remember the EARLIEST such step.
     // We do NOT execute them in isolation here - that used to overwrite the body
@@ -1353,6 +1355,8 @@ void Application::cascadeFromSketchEdit(int sketchId) {
     }
     for (const auto& [id, shp] : beforeBodies)
         if (!nowIds.count(id)) m_dirtyBodyIds.insert(id); // removed → mesh cleared
+    m_lastCascadeMs = std::chrono::duration<double, std::milli>(
+        std::chrono::steady_clock::now() - cascadeStart).count();
 }
 
 void Application::cancelLoft() {
@@ -1727,6 +1731,7 @@ void Application::beginConstructionPlane() {
     m_planeOpOffset = 0.0;
     materializr::formatLengthDigits(m_planeOpOffsetBuf, sizeof(m_planeOpOffsetBuf), m_planeOpOffset);
     m_planeOpPreview.clear(*m_document);
+    m_planeOpHasGizmoDelta = false;
     m_planeOpActive = true;
 
     updateConstructionPlane();
@@ -1827,7 +1832,14 @@ void Application::updateConstructionPlane() {
     // and the rotation have to follow it -- otherwise the photo vanished and
     // the tilt silently reset the moment the user changed the alignment or
     // nudged the offset.
+    {
+        const auto ids = m_document->getAllPlaneIds();
+        if (!ids.empty())
+            if (const auto* pe = m_document->getPlane(ids.back()))
+                m_planeOpBasePose = pe->plane;
+    }
     applyPlaneOpRotation();
+    applyPlaneOpGizmoDelta();
     reattachPlaneOpRefImage();
     // Datums draw from the document every frame and the picker keys on them
     // directly: no body changed, so no mesh rebuild.
@@ -1862,6 +1874,32 @@ void Application::applyPlaneOpRotation() {
         pln.Transform(t);
     }
     m_document->setPlane(pid, pln);
+}
+
+// Re-apply the gizmo move/rotate the user made on the preview plane, so
+// changing the alignment or offset afterwards keeps it.
+void Application::applyPlaneOpGizmoDelta() {
+    if (!m_planeOpHasGizmoDelta || !m_document) return;
+    const auto ids = m_document->getAllPlaneIds();
+    if (ids.empty()) return;
+    const int pid = ids.back();
+    const auto* entry = m_document->getPlane(pid);
+    if (!entry) return;
+    gp_Pln pln = entry->plane;
+    pln.Transform(m_planeOpGizmoDelta);
+    m_document->setPlane(pid, pln);
+}
+
+// The motion that takes pose `before` to pose `after`, composed onto any
+// earlier gizmo motion (the new one acts on the already-moved plane).
+void Application::notePlaneOpGizmoMove(const gp_Pln& before, const gp_Pln& after) {
+    gp_Trsf toLocal, fromLocal;
+    toLocal.SetTransformation(before.Position());
+    fromLocal.SetTransformation(after.Position());
+    gp_Trsf step = fromLocal.Inverted().Multiplied(toLocal);
+    m_planeOpGizmoDelta = m_planeOpHasGizmoDelta
+                              ? step.Multiplied(m_planeOpGizmoDelta) : step;
+    m_planeOpHasGizmoDelta = true;
 }
 
 // Put the pending image on whatever plane the preview currently is.
@@ -1899,8 +1937,31 @@ void Application::commitConstructionPlane() {
     m_planeOpHasPendingImage = false;
     m_planeOpPendingImage = RefImageEntry{};
     m_planeOpRotX = m_planeOpRotY = m_planeOpRotZ = 0.0f;
-    m_planeOpPreview.commit(*m_history, *m_document);
+    m_planeOpHasGizmoDelta = false;
+    // The pose the user left the preview in (typed tilt, gizmo drag). The op
+    // being committed only knows its own un-tilted plane, so without this a
+    // save/reload or undo/redo puts the plane back where it was born.
+    int pid = -1;
+    gp_Pln livePose;
+    if (const auto ids = m_document->getAllPlaneIds(); !ids.empty())
+        if (const auto* pe = m_document->getPlane(ids.back())) {
+            pid = ids.back();
+            livePose = pe->plane;
+        }
+    const bool landed = m_planeOpPreview.commit(*m_history, *m_document);
     m_planeOpActive = false;
+    if (landed && pid >= 0) {
+        const gp_Pln& base = m_planeOpBasePose;
+        const bool moved =
+            livePose.Location().Distance(base.Location()) > 1e-6 ||
+            !livePose.Axis().Direction().IsEqual(base.Axis().Direction(), 1e-9) ||
+            !livePose.XAxis().Direction().IsEqual(base.XAxis().Direction(), 1e-9);
+        if (moved) {
+            std::vector<PlaneTransformOp::Entry> entries{{pid, base, livePose}};
+            m_history->pushExecuted(
+                std::make_unique<PlaneTransformOp>("Move Plane", std::move(entries)));
+        }
+    }
 
     // The plane now exists and previewApply auto-selected it, so the id is the
     // most recent one. Attaching here (rather than inside the op) keeps the
@@ -1909,6 +1970,7 @@ void Application::commitConstructionPlane() {
 }
 
 void Application::cancelConstructionPlane() {
+    m_planeOpHasGizmoDelta = false;
     m_planeOpRotX = m_planeOpRotY = m_planeOpRotZ = 0.0f;
     m_planeOpWantRefImage = false;
     m_planeOpHasPendingImage = false;

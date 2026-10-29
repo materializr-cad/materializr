@@ -251,7 +251,22 @@ Application::Application(bool safeMode, float uiScaleOverride)
     // identifies the sketch (Properties → Constraints panel today), re-run
     // every enabled ExtrudeOp downstream of that sketch so its body follows.
     m_eventBus->subscribe<SketchEditedEvent>(
-        [this](const SketchEditedEvent& e) { cascadeFromSketchEdit(e.sketchId); });
+        [this](const SketchEditedEvent& e) {
+            // MZR_CASCADE_DEFER_MS overrides the "this model is heavy" cut-off
+            // (a negative value defers every in-sketch edit - for testing).
+            static const double deferAboveMs = []() {
+                const char* v = std::getenv("MZR_CASCADE_DEFER_MS");
+                return v ? std::atof(v) : 400.0;
+            }();
+            if (m_inSketchMode && m_lastCascadeMs > deferAboveMs) {
+                if (m_pendingSketchCascades.insert(e.sketchId).second &&
+                    m_pendingSketchCascades.size() == 1)
+                    showToast(materializr::tr("Big model: the body updates when you finish "
+                                              "the sketch."), 4.0);
+                return;
+            }
+            cascadeFromSketchEdit(e.sketchId);
+        });
 
     // Transient status/error messages from non-UI code (plugins, ops).
     m_eventBus->subscribe<materializr::ToastEvent>(
@@ -7500,11 +7515,28 @@ void Application::exitSketchMode() {
         m_lastDraftElemCount = -1;
     }
 
+    flushPendingSketchCascades();
+
     // Stay where the user is - don't yank them back to the pre-sketch camera.
     // Exiting sketch should feel like leaving ortho-snap mode: the area being
     // looked at remains framed, only the sketch grid disappears. Any orbit
     // they do drops ortho mode and returns to perspective with a level
     // horizon (handled in Camera::orbitLevel).
+}
+
+// Rebuild the bodies of sketches edited while the model was too heavy to follow
+// every edit. Runs between frames behind the progress card, like any other
+// slow commit, so the one long replay is visible and the window stays alive.
+void Application::flushPendingSketchCascades() {
+    if (m_pendingSketchCascades.empty()) return;
+    std::vector<int> ids(m_pendingSketchCascades.begin(), m_pendingSketchCascades.end());
+    m_pendingSketchCascades.clear();
+    m_deferredHeavy.queue([this, ids = std::move(ids)]() {
+        renderProgressFrame(-1.0f, materializr::tr("Updating the model..."));
+        for (int sid : ids)
+            if (m_document && m_document->getSketch(sid)) cascadeFromSketchEdit(sid);
+        markDirty();
+    });
 }
 
 void Application::writeSketchDraftIfDue() {

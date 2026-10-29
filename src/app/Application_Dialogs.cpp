@@ -3669,7 +3669,7 @@ void Application::renderConstructionPlanePanel() {
     // Only sync for the standard / parallel modes: the derived modes (4/5/6)
     // measure their offset relative to a computed base position, so reading
     // back the plane's absolute distance-from-origin would fight them.
-    if (m_planeOpKindIdx <= 3) {
+    if (m_planeOpKindIdx <= 3 && !m_planeOpHasGizmoDelta) {
         auto ids = m_document->getAllPlaneIds();
         if (!ids.empty()) {
             const auto* p = m_document->getPlane(ids.back());
@@ -3755,6 +3755,7 @@ void Application::renderConstructionPlanePanel() {
             "Return the plane to its chosen alignment and offset, with no tilt."));
 
     if (rotReset) {
+        m_planeOpHasGizmoDelta = false;
         m_planeOpRotX = m_planeOpRotY = m_planeOpRotZ = 0.0f;
         std::snprintf(m_planeOpRotBufX, sizeof(m_planeOpRotBufX), "0.0");
         std::snprintf(m_planeOpRotBufY, sizeof(m_planeOpRotBufY), "0.0");

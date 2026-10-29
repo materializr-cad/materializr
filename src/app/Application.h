@@ -796,6 +796,14 @@ private:
     // sketch immediately; chained workflows leave downstream ops on their
     // old body shape (user re-does manually).
     void cascadeFromSketchEdit(int sketchId);
+    // How long the last cascade that did real work took. On a heavy model one
+    // replay is seconds, and doing it after every drag release / dimension
+    // edit makes sketching unusable - so once it has proved slow, edits made
+    // INSIDE sketch mode only note the sketch here and the body is rebuilt
+    // once when the sketch is finished (see exitSketchMode).
+    double m_lastCascadeMs = 0.0;
+    std::set<int> m_pendingSketchCascades;
+    void flushPendingSketchCascades();
     // Map each sketch id to the body ids it drives (created/modified through a
     // sketch-sourced extrude / push-pull). Used by the gizmo commit to tell a
     // unison move (body + its driving sketch) from a lone move that de-links.
@@ -2036,6 +2044,18 @@ private:
     // nudging the offset no longer throws the rotation away.
     float m_planeOpRotX = 0.0f, m_planeOpRotY = 0.0f, m_planeOpRotZ = 0.0f;
     void applyPlaneOpRotation();
+    // The previewed plane's pose straight out of the op, before the typed
+    // rotation and any gizmo move. Commit diffs the live pose against it so
+    // the tilt / drag is recorded as a PlaneTransformOp AFTER the creation
+    // step (the op's own params blob only holds the unmoved plane).
+    gp_Pln m_planeOpBasePose;
+    // A gizmo move/rotate of the previewed plane, kept as a rigid motion so
+    // it survives the preview being rebuilt (alignment / offset edits).
+    bool    m_planeOpHasGizmoDelta = false;
+    gp_Trsf m_planeOpGizmoDelta;
+    void applyPlaneOpGizmoDelta();
+    // Fold a finished gizmo drag of the preview plane into the delta.
+    void notePlaneOpGizmoMove(const gp_Pln& before, const gp_Pln& after);
     int   m_planeOpRotAxisIdx = 0; // 0=X, 1=Z (user up), 2=Y
 
     // Selection-derived inputs for the kind-index 4/5/6 creation modes,
