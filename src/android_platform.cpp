@@ -4,6 +4,7 @@
 
 #include <SDL3/SDL.h>
 #include <android/log.h>
+#include <jni.h>
 
 #include <cstdio>
 #include <cstdlib>
@@ -136,10 +137,36 @@ void androidInitRuntime() {
     logi("Materializr Android runtime initialized (home=" + internal + ")");
 }
 
+int androidTopInsetPx() {
+    // The bar can appear / vanish (rotation, split-screen, freeform resize), so
+    // re-ask a few times a second rather than caching forever.
+    static int cached = 0;
+    static Uint64 lastAskMs = 0;
+    const Uint64 now = SDL_GetTicks();
+    if (lastAskMs != 0 && now - lastAskMs < 250) return cached;
+    lastAskMs = now;
+
+    JNIEnv* env = static_cast<JNIEnv*>(SDL_GetAndroidJNIEnv());
+    jobject act = static_cast<jobject>(SDL_GetAndroidActivity());
+    if (!env || !act) return cached;
+    jclass cls = env->GetObjectClass(act);
+    if (cls) {
+        jmethodID mid = env->GetStaticMethodID(cls, "nativeTopInset", "()I");
+        if (mid) cached = static_cast<int>(env->CallStaticIntMethod(cls, mid));
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        env->DeleteLocalRef(cls);
+    }
+    env->DeleteLocalRef(act);
+    return cached;
+}
+
 } // namespace materializr
 
 #else  // desktop: nothing to do
 
-namespace materializr { void androidInitRuntime() {} }
+namespace materializr {
+void androidInitRuntime() {}
+int androidTopInsetPx() { return 0; }
+}
 
 #endif

@@ -125,6 +125,7 @@ inline void resetFpuForOcct() {
 #include "io/Settings.h"
 #include "mobile_files.h" // mobileLastDocUri/Name + mobileOpenUri (Open Recent via persisted refs)
 #include "ios_platform.h" // iosInBackground (inline false off-iOS)
+#include "android_platform.h" // androidTopInsetPx (0 off-Android)
 #include "core/EventBus.h"
 #include "core/Events.h"
 #include "core/Verbose.h"
@@ -1491,6 +1492,16 @@ void Application::beginFrame() {
             vp->BuildWorkInsetMin.y += t;
             vp->BuildWorkInsetMax.x += r;  // insets are positive on all four sides
             vp->BuildWorkInsetMax.y += b;
+        }
+    }
+#elif defined(__ANDROID__)
+    // Keep the menu bar clear of the status bar / freeform caption bar when the
+    // surface runs edge-to-edge underneath it (always on Android 15+).
+    {
+        const int top = materializr::androidTopInsetPx();
+        if (top > 0) {
+            ImGuiViewportP* vp = static_cast<ImGuiViewportP*>(ImGui::GetMainViewport());
+            vp->BuildWorkInsetMin.y += static_cast<float>(top);
         }
     }
 #endif

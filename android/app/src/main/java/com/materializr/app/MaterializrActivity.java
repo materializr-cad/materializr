@@ -11,6 +11,7 @@ import android.os.Bundle;
 import android.provider.DocumentsContract;
 import android.provider.OpenableColumns;
 import android.view.View;
+import android.view.WindowInsets;
 import android.view.inputmethod.InputMethodManager;
 
 import java.io.File;
@@ -435,15 +436,45 @@ public class MaterializrActivity extends SDLActivity {
         return hwKeyboard || multiWindow;
     }
 
+    // Pixels at the top of our surface that system UI draws over: the status
+    // bar, or the caption bar of a freeform window, plus any display cutout.
+    // Native pushes the menu bar down by this much (Application::beginFrame).
+    // Measured as "bar height minus how far down the surface already sits", so
+    // it is 0 where Android has already laid the window out below the bar and
+    // the full bar height where the surface runs edge-to-edge under it.
+    public static int nativeTopInset() {
+        final MaterializrActivity a = sInstance;
+        if (a == null || mSurface == null) return 0;
+        try {
+            WindowInsets wi = a.getWindow().getDecorView().getRootWindowInsets();
+            if (wi == null) return 0;
+            int bar;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                bar = wi.getInsets(WindowInsets.Type.statusBars()
+                                 | WindowInsets.Type.captionBar()
+                                 | WindowInsets.Type.displayCutout()).top;
+            } else {
+                bar = wi.getSystemWindowInsetTop();
+            }
+            int[] loc = new int[2];
+            mSurface.getLocationInWindow(loc);
+            return Math.max(0, bar - loc[1]);
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
     private void applyWindowMode() {
         View dv = getWindow().getDecorView();
         if (!isDesktopMode()) {
+            // Hide the navigation bar but KEEP the status bar (clock,
+            // notifications). FULLSCREEN / LAYOUT_FULLSCREEN would hide it, and
+            // on Android 15+ edge-to-edge is enforced anyway, so the UI is
+            // pushed below the bar by nativeTopInset() instead.
             dv.setSystemUiVisibility(
                 View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                 | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
                 | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                | View.SYSTEM_UI_FLAG_FULLSCREEN
                 | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
         } else {
             dv.setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);

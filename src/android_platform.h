@@ -12,4 +12,10 @@ namespace materializr {
 //     OCCT consults for unit/message/STEP/IGES data.
 void androidInitRuntime();
 
+// Pixels at the top of the window covered by system UI (status bar / freeform
+// caption bar / cutout), in the same units as ImGui coordinates. 0 off Android
+// and wherever the window is already laid out below the bar. Cheap to call every
+// frame: the JNI query is throttled and the last value reused.
+int androidTopInsetPx();
+
 } // namespace materializr
