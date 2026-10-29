@@ -1280,7 +1280,6 @@ private:
     bool  m_lightFill = true;       // soft opposing fill light
     // Glide to a sketch plane instead of cutting to it (Settings > Navigation).
     bool  m_animateCamera = true;
-    bool  m_vsync = true;   // Settings > General; off = no swap-interval, no frame sleep
     bool  m_photoReflections = true; // metals reflect a photographed studio
     int   m_msaaSamples = 4;        // viewport anti-aliasing: 0=off, 2, 4, 8
     int   m_meshQuality = 1;        // tessellation density: 0=Low..3=Ultra

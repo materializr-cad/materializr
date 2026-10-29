@@ -341,8 +341,11 @@ void Window::shutdownImGuiBackend() {
     ImGui_ImplSDL3_Shutdown();
 }
 
-void Window::setVSync(bool on) {
-    SDL_GL_SetSwapInterval(on ? 1 : 0);
+float Window::displayRefreshHz() const {
+    const SDL_DisplayID id = SDL_GetDisplayForWindow(m_window);
+    const SDL_DisplayMode* mode = id ? SDL_GetCurrentDisplayMode(id) : nullptr;
+    const float hz = mode ? mode->refresh_rate : 0.0f;
+    return hz >= 24.0f && hz <= 1000.0f ? hz : 60.0f;
 }
 
 void Window::swapBuffers() {

@@ -598,14 +598,6 @@ void Application::renderSettings() {
                     }
                     ImGui::SetItemTooltip("%s", materializr::tr("Higher quality uses more polygons, smoothing curves and holes."));
 
-#if !defined(MZ_MOBILE)
-                    if (ImGui::Checkbox(materializr::tr("VSync (cap frame rate to the display)"), &m_vsync)) {
-                        if (m_window) m_window->setVSync(m_vsync);
-                        changed = true;
-                    }
-                    ImGui::TextWrapped("%s", materializr::tr("Off: render as fast as the machine allows, up to 240 fps. Uses more GPU/CPU and can tear."));
-#endif
-
                     ImGui::Spacing();
                     ImGui::SeparatorText(materializr::tr("Imported meshes (STL)"));
                     // Wireframe of imported mesh bodies - toggling applies live by

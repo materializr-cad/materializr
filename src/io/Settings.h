@@ -81,7 +81,6 @@ struct AppSettings {
 #endif
     bool levelOrbit         = true; // turntable (level) vs free trackball orbit
     bool animateCamera      = true; // glide to a sketch plane instead of cutting to it
-    bool vsync              = true; // pace frames to the display refresh (off: render as fast as possible)
     // Uniform multiplier on camera input deltas (orbit / pan / zoom). 1.0 =
     // the hard-coded baseline; below 1 calms a touchy trackpad, above 1
     // snappier. Persisted so the user doesn't have to re-set it every launch.

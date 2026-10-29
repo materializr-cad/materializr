@@ -2061,7 +2061,6 @@ AppSettings Application::currentSettings() const {
     s.panButton = m_panButton;
     s.levelOrbit = m_viewport->getCamera().isLevelOrbit();
     s.animateCamera = m_animateCamera;
-    s.vsync = m_vsync;
     s.mouseSensitivity = m_viewport->getCamera().getMouseSensitivity();
     s.autosaveEnabled = m_autosaveEnabled;
     s.invertCubeDrag = m_invertCubeDrag;
@@ -2173,11 +2172,6 @@ void Application::applyAppSettings(const AppSettings& s) {
     m_settingsPanButton = s.panButton;
     m_viewport->getCamera().setLevelOrbit(s.levelOrbit);
     m_animateCamera = s.animateCamera;
-    m_vsync = s.vsync;
-#if defined(MZ_MOBILE)
-    m_vsync = true;   // no setting on mobile; the frame cap is load-bearing there
-#endif
-    if (m_window) m_window->setVSync(m_vsync);
     m_viewport->getCamera().setMouseSensitivity(s.mouseSensitivity);
     m_autosaveEnabled = s.autosaveEnabled;
     m_invertCubeDrag = s.invertCubeDrag;
@@ -8073,7 +8067,9 @@ void Application::run() {
         // at the bottom of the loop (measured after the event wait so the
         // idle floor's own sleep doesn't count against the budget).
         const uint32_t frameLoopStartMs = platformTicksMs();
+#if !defined(MZ_MOBILE)
         const uint64_t frameLoopStartNs = platformTicksNs();
+#endif
         // Significant events (click, key, scroll, resize, focus): 5 frames.
         // Trivial events (mouse motion, expose): 25 frames - at 60 fps that is
         // ~416 ms, enough for ImGui's default 300 ms hover-tooltip delay to fire
@@ -8821,18 +8817,25 @@ void Application::run() {
         // Sleeping out the remainder of a 60 Hz budget yields the main
         // thread to the OS every frame; where vsync already paces us the
         // remainder is ~0 and this is a no-op.
-        // With VSync off (desktop only; mobile has no such setting and keeps the
-        // 60 Hz cap) the loop still stops at 240 fps, an absolute ceiling so a
-        // light scene can't spin a core and the GPU flat out.
-        if (m_vsync) {
+        // Desktop caps at the refresh rate of the display the window is on, not a
+        // fixed 60: a 144 Hz monitor gets 144. The swap interval already paces
+        // to it; this is the backstop for when it doesn't (a hidden or occluded
+        // window, a compositor that doesn't block). 5 % under, so it never
+        // fights the swap interval over a frame boundary.
+#if defined(MZ_MOBILE)
+        {
             constexpr uint32_t kMinFrameMs = 16;
             const uint32_t spent = platformTicksMs() - frameLoopStartMs;
             if (spent < kMinFrameMs) platformSleepMs(kMinFrameMs - spent);
-        } else {
-            constexpr uint64_t kMinFrameNs = 1000000000ull / 240;
-            const uint64_t spent = platformTicksNs() - frameLoopStartNs;
-            if (spent < kMinFrameNs) platformSleepPreciseNs(kMinFrameNs - spent);
         }
+#else
+        {
+            const uint64_t minFrameNs =
+                static_cast<uint64_t>(0.95e9 / m_window->displayRefreshHz());
+            const uint64_t spent = platformTicksNs() - frameLoopStartNs;
+            if (spent < minFrameNs) platformSleepPreciseNs(minFrameNs - spent);
+        }
+#endif
         }
         break;   // the inner loop's own break/exit conditions reached: done
       } catch (const std::exception& e) {

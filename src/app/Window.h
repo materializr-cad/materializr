@@ -28,8 +28,8 @@ public:
     bool shouldClose() const { return m_shouldClose; }
     void requestClose(bool close = true) { m_shouldClose = close; }
     void swapBuffers();
-    /// Pace swaps to the display refresh (on) or present as fast as possible (off).
-    void setVSync(bool on);
+    /// Refresh rate of the display the window is on, in Hz (60 when SDL can't say).
+    float displayRefreshHz() const;
     // Pump SDL events and forward them to the ImGui backend. If waitMs > 0,
     // blocks up to that many milliseconds for the first event before draining
     // (use this when idle to sleep instead of busy-spinning).
