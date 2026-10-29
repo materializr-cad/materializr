@@ -5,6 +5,32 @@ All notable changes to Materializr are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- **Grid rendering (experimental)** in Settings ▸ Rendering: three workarounds
+  for a grid that shimmers or flickers with anti-aliasing on certain GPU drivers
+  (seen on Intel Arc). Leave it on Default unless the grid looks wrong.
+
+### Changed
+
+- **Frame rate follows your display.** The VSync option is gone; the frame rate
+  is capped at the refresh rate of the monitor the window is on, so a 144 Hz
+  screen is no longer held to 60.
+- The "Working" window now draws over the last frame instead of blanking the
+  viewport.
+- **Construction Plane** stays open after you drag it with the gizmo, with Apply
+  and Cancel; the move is recorded in history and kept through undo and reload.
+  A typed tilt is now saved too.
+- Editing a sketch on a very heavy model no longer rebuilds the body after every
+  edit: once a rebuild is slow, the body updates once when you finish the sketch.
+- Camera: leaving orthographic view no longer rolls or snaps.
+
+### Fixed
+
+- Lathe / Cut: a body picked after opening the dialog is no longer ignored.
+- Android: the status bar stays visible and the menu bar sits below it, instead
+  of being covered on tablets that draw edge-to-edge (Android 15).
+
 ## [1.7.5] - 2026-10-25
 
 Sketching and laser work: fill regions for engraving, rebindable keyboard
