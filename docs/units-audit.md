@@ -261,7 +261,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 
 - CONVERTED: 1
 - allowed-by-hand: 92
-- comment: 296
+- comment: 298
 - diagnostic: 12
 - identifier/other: 9
 
@@ -663,7 +663,9 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | comment | src/viewport/Grid.cpp | `// 100 mm lines") the user wants on the ground grid.` |
 | comment | src/viewport/GridScale.h | `// -> mm turns a 304.8 mm grid into a 1 mm one without moving the camera, and a` |
 | comment | src/viewport/GridScale.h | `// the opposite end: a 1 ft grid in a view 100 mm across puts one cell every` |
-| comment | src/viewport/GridScale.h | `// 100 mm view with nothing to show.` |
+| comment | src/viewport/GridScale.h | `// a foot-wide grid in a 100 mm view with nothing to show.` |
+| comment | src/viewport/GridScale.h | `// ladder (an inch or a foot, 25.4 / 304.8 mm) keeps whole decades: a 5x step of` |
+| comment | src/viewport/GridScale.h | `// 25.4 mm is 127 mm, which is not a recognisable fraction of an inch.` |
 | comment | src/viewport/GridScale.h | `// Framing a fixed count of DISPLAY units is right in spirit - 40 mm is a fine` |
 | comment | src/viewport/GridScale.h | `// shows a sensible number of cells, but a 1 ft base makes it 12192 mm on its` |
 | comment | src/viewport/Picker.cpp | `// Edge polyline vs. face mesh gap (Low quality chords reach 0.5 mm).` |

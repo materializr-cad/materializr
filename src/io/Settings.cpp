@@ -214,6 +214,8 @@ void applyKv(const std::map<std::string, std::string>& kv, AppSettings& s) {
     readBool(kv, "showInferenceToolbarToggle", s.showInferenceToolbarToggle);
     readBool(kv, "exportGreyFills", s.exportGreyFills);
     readBool(kv, "showSelectionMeasurements", s.showSelectionMeasurements);
+    readBool(kv, "zoomScaledGrid",   s.zoomScaledGrid);
+    readBool(kv, "androidFullscreen", s.androidFullscreen);
     readIntClamped(kv, "angleSnapDeg",   s.angleSnapDeg, 1, 90);
     readFloat(kv, "stlImportAccuracy",   s.stlImportAccuracy);
     readBool(kv, "meshShowWireframe",    s.meshShowWireframe);
@@ -500,6 +502,10 @@ bool SettingsIO::save(const std::string& path, const AppSettings& s) {
         << (s.exportGreyFills ? "true" : "false") << "\n";
     ofs << "showSelectionMeasurements = "
         << (s.showSelectionMeasurements ? "true" : "false") << "\n";
+    ofs << "zoomScaledGrid = "
+        << (s.zoomScaledGrid ? "true" : "false") << "\n";
+    ofs << "androidFullscreen = "
+        << (s.androidFullscreen ? "true" : "false") << "\n";
     ofs << "angleSnapDeg = "             << s.angleSnapDeg        << "\n";
     ofs << "stlImportAccuracy = "        << s.stlImportAccuracy   << "\n";
     ofs << "meshShowWireframe = "        << (s.meshShowWireframe ? "true" : "false") << "\n";
@@ -613,6 +619,8 @@ bool SettingsIO::exportJson(const std::string& path, const AppSettings& s) {
         << b(s.showInferenceToolbarToggle) << ",\n";
     ofs << "  \"showSelectionMeasurements\": "
         << b(s.showSelectionMeasurements) << ",\n";
+    ofs << "  \"zoomScaledGrid\": " << b(s.zoomScaledGrid) << ",\n";
+    ofs << "  \"androidFullscreen\": " << b(s.androidFullscreen) << ",\n";
     ofs << "  \"angleSnapDeg\": "             << s.angleSnapDeg          << ",\n";
     ofs << "  \"stlImportAccuracy\": "        << s.stlImportAccuracy     << ",\n";
     for (const auto& kb : s.keyBindings)

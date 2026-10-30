@@ -472,12 +472,13 @@ void Application::renderViewport() {
         // the grid (which no longer writes depth) blends over bodies instead of
         // punching through coplanar faces.
         // The step the user picked is a BASE; what the sketch actually uses is
-        // that base scaled by whole decades to suit this zoom (GridScale.h).
+        // that base scaled to suit this zoom (GridScale.h), unless the user
+        // turned the scaling off (Settings > Sketch), in which case it IS the base.
         // Computed HERE as a plain statement rather than inside drawGrid,
         // because six later sites read it and a value assigned as a side
         // effect of "draw the grid" makes that dependency invisible.
         m_effectiveGridStepMm = std::max(m_sketchGridStep, 0.01f);
-        if (m_inSketchMode && m_activeSketch) {
+        if (m_zoomScaledGrid && m_inSketchMode && m_activeSketch) {
             const glm::vec2 g0 = screenToSketch(0.0f, 0.0f, contentSize.x, contentSize.y);
             const glm::vec2 g1 = screenToSketch(1.0f, 0.0f, contentSize.x, contentSize.y);
             m_effectiveGridStepMm = gridStepForZoom(
@@ -2723,6 +2724,14 @@ void Application::renderViewport() {
                         if (!above || !w->WasActive || w->Hidden) continue;
                         if (w->Flags & (ImGuiWindowFlags_ChildWindow | ImGuiWindowFlags_Tooltip))
                             continue;
+                        // The dockspace host spans the whole work area, is
+                        // transparent and only ever holds docked panels. In
+                        // modern / im-touch it is empty yet still "active", and
+                        // whether it sits in front of the viewport depends on
+                        // focus history - so after a fresh start it covered every
+                        // label (and a layout switch, which reshuffles the order,
+                        // briefly uncovered them). It never hides anything.
+                        if (std::strcmp(w->Name, "DockHost") == 0) continue;
                         if (w->Rect().Overlaps(r)) return true;
                     }
                     return false;

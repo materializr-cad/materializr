@@ -160,6 +160,26 @@ int androidTopInsetPx() {
     return cached;
 }
 
+void androidSetFullscreen(bool on) {
+    static int last = -1;               // -1: never told Java yet
+    if (last == (on ? 1 : 0)) return;
+
+    JNIEnv* env = static_cast<JNIEnv*>(SDL_GetAndroidJNIEnv());
+    jobject act = static_cast<jobject>(SDL_GetAndroidActivity());
+    if (!env || !act) return;           // not ready yet - try again next frame
+    jclass cls = env->GetObjectClass(act);
+    if (cls) {
+        jmethodID mid = env->GetStaticMethodID(cls, "nativeSetFullscreen", "(Z)V");
+        if (mid) {
+            env->CallStaticVoidMethod(cls, mid, static_cast<jboolean>(on));
+            last = on ? 1 : 0;
+        }
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        env->DeleteLocalRef(cls);
+    }
+    env->DeleteLocalRef(act);
+}
+
 } // namespace materializr
 
 #else  // desktop: nothing to do
@@ -167,6 +187,7 @@ int androidTopInsetPx() {
 namespace materializr {
 void androidInitRuntime() {}
 int androidTopInsetPx() { return 0; }
+void androidSetFullscreen(bool) {}
 }
 
 #endif

@@ -18,4 +18,17 @@ void androidInitRuntime();
 // frame: the JNI query is throttled and the last value reused.
 int androidTopInsetPx();
 
+// True in the Android build. Lets settings UI for Android-only options be
+// compiled (and type-checked) on every platform instead of hiding behind #ifdef.
+#ifdef __ANDROID__
+inline constexpr bool kIsAndroid = true;
+#else
+inline constexpr bool kIsAndroid = false;
+#endif
+
+// Hide (true) or keep (false) the status bar, on top of the navigation bar the
+// app always hides. Remembers the last value and only calls into Java when it
+// changes, so it is safe to call every frame. No-op off Android.
+void androidSetFullscreen(bool on);
+
 } // namespace materializr

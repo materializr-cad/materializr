@@ -212,6 +212,12 @@ struct AppSettings {
     bool exportGreyFills = true;
     // Sketch Select tool: show lengths / radii / arc sweep on selected geometry.
     bool showSelectionMeasurements = false;
+    // Sketch grid: scale the snap step by powers of 10 / 5 to suit the zoom
+    // (GridScale.h). Off = the grid and the snap lattice are always exactly the
+    // chosen step, however far in or out the view is.
+    bool zoomScaledGrid = true;
+    // Android only: hide the status bar too (true full screen). Off keeps it.
+    bool androidFullscreen = false;
     // Line angle-snap increment in degrees (0 = off). The line tool snaps its
     // direction to multiples of this from the segment anchor. Default 15.
     int  angleSnapDeg = 15;

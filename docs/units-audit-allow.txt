@@ -394,7 +394,9 @@ src/viewport/Grid.cpp: // zooming reveals finer tiers. Keeps the tiered look (th
 src/viewport/Grid.cpp: // 100 mm lines") the user wants on the ground grid.
 src/viewport/GridScale.h: // -> mm turns a 304.8 mm grid into a 1 mm one without moving the camera, and a
 src/viewport/GridScale.h: // the opposite end: a 1 ft grid in a view 100 mm across puts one cell every
-src/viewport/GridScale.h: // 100 mm view with nothing to show.
+src/viewport/GridScale.h: // a foot-wide grid in a 100 mm view with nothing to show.
+src/viewport/GridScale.h: // ladder (an inch or a foot, 25.4 / 304.8 mm) keeps whole decades: a 5x step of
+src/viewport/GridScale.h: // 25.4 mm is 127 mm, which is not a recognisable fraction of an inch.
 src/viewport/GridScale.h: // Framing a fixed count of DISPLAY units is right in spirit - 40 mm is a fine
 src/viewport/GridScale.h: // shows a sensible number of cells, but a 1 ft base makes it 12192 mm on its
 src/viewport/Picker.cpp: // Edge polyline vs. face mesh gap (Low quality chords reach 0.5 mm).

@@ -1497,6 +1497,7 @@ void Application::beginFrame() {
 #elif defined(__ANDROID__)
     // Keep the menu bar clear of the status bar / freeform caption bar when the
     // surface runs edge-to-edge underneath it (always on Android 15+).
+    materializr::androidSetFullscreen(m_androidFullscreen);
     {
         const int top = materializr::androidTopInsetPx();
         if (top > 0) {
@@ -2152,6 +2153,8 @@ AppSettings Application::currentSettings() const {
     s.showInferenceToolbarToggle = m_showInferenceToolbarToggle;
     s.exportGreyFills = m_exportGreyFills;
     s.showSelectionMeasurements = m_showSelectionMeasurements;
+    s.zoomScaledGrid = m_zoomScaledGrid;
+    s.androidFullscreen = m_androidFullscreen;
     s.angleSnapDeg = m_sketchTool ? m_sketchTool->getAngleSnapDeg() : 15;
     s.stlImportAccuracy = m_stlImportAccuracy;
     s.meshShowWireframe = m_meshShowWireframe;
@@ -2247,6 +2250,8 @@ void Application::applyAppSettings(const AppSettings& s) {
     m_showInferenceToolbarToggle = s.showInferenceToolbarToggle;
     m_exportGreyFills = s.exportGreyFills;
     m_showSelectionMeasurements = s.showSelectionMeasurements;
+    m_zoomScaledGrid = s.zoomScaledGrid;
+    m_androidFullscreen = s.androidFullscreen;
     m_stlImportAccuracy = s.stlImportAccuracy;
     m_meshShowWireframe = s.meshShowWireframe;
     materializr::FileDialogs::setLastDir(s.lastFileDir);

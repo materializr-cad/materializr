@@ -446,6 +446,12 @@ public class MaterializrActivity extends SDLActivity {
         final MaterializrActivity a = sInstance;
         if (a == null || mSurface == null) return 0;
         try {
+            // Full screen means the app owns the whole display. The status bar
+            // is hidden, but the system's caption bar / app handle still reports
+            // an inset of the same height, which left a blank strip where the bar
+            // had been. In a freeform window the caption bar is real, so only
+            // the bare-tablet case is exempt.
+            if (sFullscreen && !a.isDesktopMode()) return 0;
             WindowInsets wi = a.getWindow().getDecorView().getRootWindowInsets();
             if (wi == null) return 0;
             int bar;
@@ -464,18 +470,37 @@ public class MaterializrActivity extends SDLActivity {
         }
     }
 
+    // Settings > Appearance > "Full screen": also hide the status bar. Off by
+    // default, which keeps the clock and notifications visible.
+    private static volatile boolean sFullscreen = false;
+
+    // Called from native (android_platform.cpp) whenever the setting changes.
+    public static void nativeSetFullscreen(final boolean on) {
+        final MaterializrActivity a = sInstance;
+        if (sFullscreen == on) return;
+        sFullscreen = on;
+        if (a != null) a.runOnUiThread(new Runnable() {
+            @Override public void run() { a.applyWindowMode(); }
+        });
+    }
+
     private void applyWindowMode() {
         View dv = getWindow().getDecorView();
         if (!isDesktopMode()) {
-            // Hide the navigation bar but KEEP the status bar (clock,
-            // notifications). FULLSCREEN / LAYOUT_FULLSCREEN would hide it, and
-            // on Android 15+ edge-to-edge is enforced anyway, so the UI is
-            // pushed below the bar by nativeTopInset() instead.
-            dv.setSystemUiVisibility(
-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+            // Always hide the navigation bar. The status bar (clock,
+            // notifications) stays unless the user chose full screen:
+            // FULLSCREEN / LAYOUT_FULLSCREEN would hide it, and on Android 15+
+            // edge-to-edge is enforced anyway, so with the bar showing the UI is
+            // pushed below it by nativeTopInset() instead.
+            int flags = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                 | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
                 | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+            if (sFullscreen) {
+                flags |= View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                      |  View.SYSTEM_UI_FLAG_FULLSCREEN;
+            }
+            dv.setSystemUiVisibility(flags);
         } else {
             dv.setSystemUiVisibility(View.SYSTEM_UI_FLAG_VISIBLE);
         }

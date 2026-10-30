@@ -1,11 +1,12 @@
-// The sketch grid scales the user's BASE step by whole decades so the cell
-// stays legible at the current zoom, and the same number drives both the drawn
-// lines and the snap lattice. Two invariants carry the whole design:
+// The sketch grid scales the user's BASE step so the cell stays legible at the
+// current zoom, and the same number drives both the drawn lines and the snap
+// lattice. Two invariants carry the whole design:
 //
-//   1. the step is base x 10^n for an integer n, so every drawn line is a
-//      snap point and the lattice reads as a 1/10/100 of the unit; and
-//   2. the resulting cell is at least kGridMinPx and under ten times that, at
-//      every zoom and every unit.
+//   1. the step is a 1-5-10 rung (0.1, 0.5, 1, 5, 10 ...) for a base on that
+//      ladder, and base x 10^n for any other (inch, foot), so every drawn line
+//      is a snap point and the lattice stays recognisable; and
+//   2. the resulting cell is at least kGridMinPx and under five times that on
+//      the ladder, ten times that off it, at every zoom and every unit.
 #include "viewport/GridScale.h"
 
 #include <gtest/gtest.h>
@@ -22,6 +23,13 @@ constexpr float kMinPx = 8.0f;
 bool isDecadeMultiple(float step, float base) {
     const double n = std::log10(static_cast<double>(step) / base);
     return std::abs(n - std::round(n)) < 1e-4;
+}
+
+// On the 1-5-10 ladder: a power of ten, or five times one.
+bool isLadderRung(float step) {
+    const double e = std::floor(std::log10(static_cast<double>(step)) + 1e-6);
+    const double m = step / std::pow(10.0, e);
+    return std::abs(m - 1.0) < 1e-3 || std::abs(m - 5.0) < 1e-3;
 }
 } // namespace
 
@@ -45,17 +53,24 @@ TEST(GridScale, RescuesBothAnInvisibleAndAnAbsentGrid) {
 // of magnitude, against zooms spanning six.
 TEST(GridScale, CellStaysLegibleAndTheStepStaysADecadeMultiple) {
     for (float base : {0.1f, 0.5f, 1.0f, 10.0f, 25.4f, 304.8f}) {
+        const bool ladder = (base != 25.4f && base != 304.8f);
         for (float mmPerPx = 0.0001f; mmPerPx < 1000.0f; mmPerPx *= 1.7f) {
             const float step = gridStepForZoom(base, mmPerPx, kMinPx);
             const float cellPx = step / mmPerPx;
             EXPECT_GE(cellPx, kMinPx * 0.999f)
                 << "cell too small: base=" << base << " mmPerPx=" << mmPerPx;
-            EXPECT_LT(cellPx, kMinPx * 10.0f * 1.001f)
+            EXPECT_LT(cellPx, kMinPx * (ladder ? 5.0f : 10.0f) * 1.001f)
                 << "cell too large: base=" << base << " mmPerPx=" << mmPerPx
                 << " step=" << step;
-            EXPECT_TRUE(isDecadeMultiple(step, base))
-                << "not a decade multiple: base=" << base
-                << " mmPerPx=" << mmPerPx << " step=" << step;
+            if (ladder) {
+                EXPECT_TRUE(isLadderRung(step))
+                    << "not a 1-5-10 rung: base=" << base
+                    << " mmPerPx=" << mmPerPx << " step=" << step;
+            } else {
+                EXPECT_TRUE(isDecadeMultiple(step, base))
+                    << "not a decade multiple: base=" << base
+                    << " mmPerPx=" << mmPerPx << " step=" << step;
+            }
         }
     }
 }
@@ -63,21 +78,54 @@ TEST(GridScale, CellStaysLegibleAndTheStepStaysADecadeMultiple) {
 // A base already sized for the zoom is left exactly alone - no drift, and no
 // cosmetic rescaling of a step the user deliberately chose.
 TEST(GridScale, LeavesAWellSizedBaseUntouched) {
-    // cell = 1.0 / 0.05 = 20 px, inside [8, 80).
-    EXPECT_FLOAT_EQ(1.0f, gridStepForZoom(1.0f, 0.05f, kMinPx));
-    // Exactly at the threshold counts as legible: cell = 8 px.
+    // cell = 1.0 / 0.1 = 10 px: legible, and 0.5 would be 5 px - too small.
+    EXPECT_FLOAT_EQ(1.0f, gridStepForZoom(1.0f, 0.1f, kMinPx));
+    // Exactly at the threshold counts as legible: cell = 8 px (off the ladder,
+    // so this is the decade rule).
     EXPECT_FLOAT_EQ(8.0f, gridStepForZoom(8.0f, 1.0f, kMinPx));
 }
 
 // ceil, not round. A cell 3x under the floor is the illegible case the whole
 // function exists to prevent, and round() would happily return it.
 TEST(GridScale, PicksTheSmallestDecadeThatClearsTheFloor) {
-    // wants 4 mm; one decade up is 10 (cell 20 px), zero decades is 1 (5 px).
-    EXPECT_FLOAT_EQ(10.0f, gridStepForZoom(1.0f, 0.5f, kMinPx));
-    // wants 80 mm -> two decades, not one (10 mm would be 1 px).
+    // wants 4 mm; 5 is the smallest rung that clears it (cell 10 px), 1 is 2 px.
+    EXPECT_FLOAT_EQ(5.0f, gridStepForZoom(1.0f, 0.5f, kMinPx));
+    // wants 80 mm -> 100, not 50 (50 mm would be 5 px) and not 10 (1 px).
     EXPECT_FLOAT_EQ(100.0f, gridStepForZoom(1.0f, 10.0f, kMinPx));
-    // Stepping DOWN obeys the same rule: 0.1 would be 10x smaller than needed.
-    EXPECT_FLOAT_EQ(1.0f, gridStepForZoom(1000.0f, 0.05f, kMinPx));
+    // Stepping DOWN obeys the same rule: wants 0.4, so 0.5 - 0.1 is too fine.
+    EXPECT_FLOAT_EQ(0.5f, gridStepForZoom(1000.0f, 0.05f, kMinPx));
+}
+
+// The point of the ladder: zooming a grid in or out passes through the 5 rung
+// instead of leaping a decade. 0.1 -> 0.5 -> 1 -> 5 -> 10 as the view widens.
+TEST(GridScale, ZoomingPassesThroughTheFiveRung) {
+    // mmPerPx chosen so `want` (= 8 x mmPerPx) sits just above each rung.
+    EXPECT_FLOAT_EQ(0.1f, gridStepForZoom(0.1f, 0.012f, kMinPx));  // base cell 8.3 px
+    EXPECT_FLOAT_EQ(0.5f, gridStepForZoom(0.1f, 0.0126f, kMinPx)); // just over 0.1
+    EXPECT_FLOAT_EQ(1.0f, gridStepForZoom(0.1f, 0.0626f, kMinPx)); // just over 0.5
+    EXPECT_FLOAT_EQ(5.0f, gridStepForZoom(0.1f, 0.1251f, kMinPx)); // just over 1
+    EXPECT_FLOAT_EQ(10.0f, gridStepForZoom(0.1f, 0.626f, kMinPx)); // just over 5
+}
+
+// The base still means something: it is left alone while its own cell is a
+// comfortable size, and only a base zoomed well past that refines.
+TEST(GridScale, TheBaseStaysUntilItsCellIsFiveTimesTheFloor) {
+    // base 1: 39 px stays, 40 px refines to 0.5 (20 px), 81 px to 0.1 (8.1 px).
+    EXPECT_FLOAT_EQ(1.0f, gridStepForZoom(1.0f, 1.0f / 39.0f, kMinPx));
+    EXPECT_FLOAT_EQ(0.5f, gridStepForZoom(1.0f, 1.0f / 41.0f, kMinPx));
+    EXPECT_FLOAT_EQ(0.1f, gridStepForZoom(1.0f, 1.0f / 81.0f, kMinPx));
+    // ...and a grid is never coarser than the base unless the base is too small
+    // to see: base 5 at 20 px stays 5.
+    EXPECT_FLOAT_EQ(5.0f, gridStepForZoom(5.0f, 0.25f, kMinPx));
+}
+
+// An inch or foot base is not on the ladder, and stays on whole decades: 5x of
+// 25.4 mm is 127 mm, which is not a recognisable fraction of an inch.
+TEST(GridScale, NonLadderBasesKeepWholeDecades) {
+    // wants 4 mm -> 25.4 mm (cell 31 px) stays; 5 rung would be 127 mm.
+    EXPECT_FLOAT_EQ(25.4f, gridStepForZoom(25.4f, 0.5f, kMinPx));
+    // wants 40 mm: the decade rule rounds up to 254, not to 127.
+    EXPECT_NEAR(254.0f, gridStepForZoom(25.4f, 5.0f, kMinPx), 1e-3);
 }
 
 // Garbage in is handed straight back rather than coerced into a lattice that

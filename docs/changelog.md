@@ -10,6 +10,12 @@ All notable changes to Materializr are documented here. Format loosely follows
 - **Grid rendering (experimental)** in Settings ▸ Rendering: three workarounds
   for a grid that shimmers or flickers with anti-aliasing on certain GPU drivers
   (seen on Intel Arc). Leave it on Default unless the grid looks wrong.
+- **Scale grid with zoom** switch (Settings ▸ Sketch, and in the snap popup under
+  the ViewCube). On, as before, the sketch grid uses a coarser or finer step to
+  suit the zoom; off, the grid and snapping always use exactly the step you
+  picked.
+- **Android: Full screen** switch (Settings ▸ Appearance). Off by default, which
+  keeps the status bar visible; on hides it as well.
 
 ### Changed
 
@@ -24,12 +30,20 @@ All notable changes to Materializr are documented here. Format loosely follows
 - Editing a sketch on a very heavy model no longer rebuilds the body after every
   edit: once a rebuild is slow, the body updates once when you finish the sketch.
 - Camera: leaving orthographic view no longer rolls or snaps.
+- **Sketch grid steps pass through 0.5 and 5 as you zoom.** The grid used to
+  jump a whole decade at a time (0.1, 1, 10), so zooming out from a 0.1 grid
+  showed 1 with nothing between. It now steps 0.1, 0.5, 1, 5, 10. Inch and foot
+  grids keep whole steps.
 
 ### Fixed
 
 - Lathe / Cut: a body picked after opening the dialog is no longer ignored.
 - Android: the status bar stays visible and the menu bar sits below it, instead
   of being covered on tablets that draw edge-to-edge (Android 15).
+- Select-tool measurement labels (Settings ▸ Sketch) now show in the modern
+  and touch layouts right after the app starts, not only after switching layouts.
+- Android: with Full screen on, the top bar no longer leaves a blank strip
+  where the status bar was.
 
 ## [1.7.5] - 2026-10-25
 

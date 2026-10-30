@@ -136,6 +136,7 @@ static const char* mouseButtonName(int b) {
 #include <gp_Mat.hxx>
 #include <gp_XYZ.hxx>
 #include "../ui/NumField.h"
+#include "../android_platform.h" // kIsAndroid
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -287,6 +288,14 @@ void Application::renderSettings() {
                         ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s", materializr::tr("Restart Materializr to apply the new mode."));
                     }
 
+                    if (materializr::kIsAndroid) {
+                        ImGui::Spacing();
+                        if (ImGui::Checkbox(materializr::tr("Full screen (hide the status bar)"), &m_androidFullscreen)) {
+                            changed = true;
+                        }
+                        ImGui::TextWrapped("%s", materializr::tr("Off (default): the clock and notifications stay visible above the app. On: the app uses the whole screen; swipe down from the top edge to see the status bar."));
+                    }
+
                     ImGui::Spacing();
                     ImGui::SeparatorText(materializr::tr("Theme"));
                     // Theme selector (the View menu mirrors this).
@@ -425,6 +434,13 @@ void Application::renderSettings() {
                         }
                         ImGui::SetItemTooltip("%s", materializr::tr("While drawing a line, snap its direction to multiples of this angle from the start point. Lower = more snap rays (15° is the classic CAD default); higher = only the cardinal angles; Off = free angles."));
                     }
+
+                    ImGui::Spacing();
+                    ImGui::SeparatorText(materializr::tr("Snap grid"));
+                    if (ImGui::Checkbox(materializr::tr("Scale grid with zoom"), &m_zoomScaledGrid)) {
+                        changed = true;
+                    }
+                    ImGui::TextWrapped("%s", materializr::tr("On (default): the snap step you pick is a starting point. When the grid cells would be too small to click, the sketch uses a coarser step (0.1, 0.5, 1, 5, 10 ...), and a finer one when you zoom well in. The number under the ViewCube shows the step in use. Off: the grid and snapping always use exactly the step you picked, at every zoom."));
 
                     ImGui::Spacing();
                     if (ImGui::Checkbox(materializr::tr("Show level toggle in sketch toolbar"),
@@ -3561,6 +3577,12 @@ void Application::renderSnapSettingsPopup() {
             if (m_toolbar) m_toolbar->setSnapToGrid(m_snapToGrid);
             saveAppSettings();
         }
+        // The auto-scaling is invisible unless you know to look for the badge,
+        // so the switch lives where the step is chosen as well as in Settings.
+        if (ImGui::Checkbox(materializr::tr("Scale grid with zoom"), &m_zoomScaledGrid)) {
+            saveAppSettings();
+        }
+        ImGui::SetItemTooltip("%s", materializr::tr("On: the grid uses a coarser step when zoomed out (and a finer one when zoomed in) so the cells stay clickable. Off: always exactly the step below."));
         ImGui::Spacing();
 
         // The same dropdown as Settings, here because this is where step size
