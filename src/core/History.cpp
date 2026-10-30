@@ -280,6 +280,7 @@ bool History::editStep(int index, Document& doc, bool transactional) {
     ReplayGuard _rg{doc};
 
     m_lastEditFailStep = -1;
+    m_lastEditAborted = false;
     ++m_revision;
     if (index < 0 || index >= static_cast<int>(m_operations.size())) {
         return false;
@@ -360,10 +361,22 @@ bool History::editStep(int index, Document& doc, bool transactional) {
         if (op->isEnabled()) op->undo(doc);
     }
     bool editRejected = false;
+    // Asked after each step: an aborted step may have returned anything (a
+    // cancelled boolean fails, or keeps half its targets), so the snapshot is
+    // the only trustworthy outcome.
+    auto aborted = [&]() {
+        if (!transactional || !m_editAbort || !m_editAbort()) return false;
+        std::fprintf(stderr, "[history-dbg] editStep: aborted over budget, rolled back\n");
+        restoreSnapshot();
+        m_lastEditAborted = true;
+        return true;
+    };
     for (int i = index; i <= limit; ++i) {
         Operation* op = m_operations[i].get();
         if (op->isEnabled()) {
-            if (!op->execute(doc)) {
+            const bool ok = op->execute(doc);
+            if (aborted()) return false;
+            if (!ok) {
                 // If the EDITED step itself rejects its new values (e.g. a
                 // fillet radius its host geometry can't carry), restore the
                 // parameters from its last successful execute and reapply -

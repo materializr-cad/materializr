@@ -400,6 +400,24 @@ void Document::flipPlaneNormal(int id) {
     }
 }
 
+bool Document::renumberPlane(int from, int to) {
+    if (from == to || to < 0 || getPlane(to)) return false;
+    for (auto& p : m_planes) {
+        if (p.id != from) continue;
+        p.id = to;
+        for (auto& r : m_refImages) if (r.planeId == from) r.planeId = to;
+        for (auto& t : m_meshTraces) if (t.planeId == from) t.planeId = to;
+        if (to >= m_nextPlaneId) m_nextPlaneId = to + 1;
+        // Renderers key their slots by id: drop the old, adopt the new.
+        if (m_eventBus) {
+            m_eventBus->publish(materializr::PlaneRemovedEvent{from});
+            m_eventBus->publish(materializr::PlaneAddedEvent{to});
+        }
+        return true;
+    }
+    return false;
+}
+
 void Document::removePlane(int id) {
     for (auto it = m_planes.begin(); it != m_planes.end(); ++it) {
         if (it->id == id) {
@@ -619,6 +637,21 @@ int Document::addAxis(const gp_Pnt& origin, const gp_Dir& direction,
         m_eventBus->publish(materializr::DocumentModifiedEvent{true});
     }
     return id;
+}
+
+bool Document::renumberAxis(int from, int to) {
+    if (from == to || to < 0 || getAxis(to)) return false;
+    for (auto& a : m_axes) {
+        if (a.id != from) continue;
+        a.id = to;
+        if (to >= m_nextAxisId) m_nextAxisId = to + 1;
+        if (m_eventBus) {
+            m_eventBus->publish(materializr::AxisRemovedEvent{from});
+            m_eventBus->publish(materializr::AxisAddedEvent{to});
+        }
+        return true;
+    }
+    return false;
 }
 
 void Document::removeAxis(int id) {

@@ -6925,7 +6925,7 @@ void Application::renderViewport() {
                         if (m_activeSketch) {
                             m_activeSketch->pruneOrphanPoints();
                             if (m_activeSketchId >= 0)
-                                cascadeFromSketchEdit(m_activeSketchId);
+                                requestSketchCascade(m_activeSketchId);
                         }
                     }
                     m_sketchPressActive = false;

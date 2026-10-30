@@ -59,6 +59,9 @@ private:
     // For undo
     int m_createdBodyId = -1;
     TopoDS_Shape m_previousTargetShape;
+    // The last boolean needed the fuzzy retry: try fuzzy first next time (see
+    // robustBoolean in RevolveOp.cpp). Not serialized - relearned on reload.
+    bool m_preferFuzzy = false;
 
     // Axis direction components for UI editing
     double m_axisDirX = 0.0;

@@ -190,3 +190,84 @@ TEST(RegionAnchor, ProjectSketchFilterKeepsItsPointsThroughASaveAndLoad) {
     mismatched.setRegionFilter({1, 2, 3}, {glm::vec2(0.0f, 0.0f)});
     EXPECT_EQ(mismatched.serializeParams().find(";ranch="), std::string::npos);
 }
+
+namespace {
+
+// Rectangles of distinct area, drawn in order: A 10x10 (100), B 20x20 (400),
+// C 5x5 (25). `withA` false is the same sketch after A was deleted, so B and C
+// each move down one region index.
+void drawRects(Sketch& sk, bool withA) {
+    sk = Sketch();
+    sk.setPlane(groundPlane());
+    if (withA) sk.addRectangle(glm::vec2(0, 0), glm::vec2(10, 10));
+    sk.addRectangle(glm::vec2(30, 0), glm::vec2(50, 20));
+    sk.addRectangle(glm::vec2(60, 0), glm::vec2(65, 5));
+}
+
+double totalVolume(const Document& doc) {
+    double v = 0.0;
+    for (int id : doc.getAllBodyIds()) v += volumeOf(doc.getBody(id));
+    return v;
+}
+
+// Re-derive from the sketch and re-run, the way the cascade replays the op.
+double replay(PushPullOp& op, Document& doc, int sid) {
+    op.undo(doc);
+    EXPECT_TRUE(op.rebuildProfileFromSketch(doc, sid));
+    EXPECT_TRUE(op.execute(doc));
+    return totalVolume(doc);
+}
+
+} // namespace
+
+TEST(RegionAnchor, DeletingAPushedRegionDropsItsPrismAndUndoBringsItBack) {
+    // A tester deleted one of nine pushed circles: its target fell back to its
+    // old index - now the NEXT circle - so that circle was cut twice, the
+    // deleted one's point was overwritten, and restoring the circle never got
+    // its hole back.
+    Document doc;
+    auto sk = std::make_shared<Sketch>();
+    drawRects(*sk, true);
+    const int sid = doc.addSketch(sk);
+    auto regions = sk->buildRegions();
+    const int a = regionWithArea(regions, 100.0), b = regionWithArea(regions, 400.0);
+    ASSERT_GE(a, 0); ASSERT_GE(b, 0);
+
+    PushPullOp op;
+    op.setTargets({PushPullOp::Target{}, PushPullOp::Target{}});
+    op.setDistance(5.0);
+    op.setSketchSource(0, sid, a, regions[a].representativePoint);
+    op.setSketchSource(1, sid, b, regions[b].representativePoint);
+    ASSERT_TRUE(op.rebuildProfileFromSketch(doc, sid));
+    ASSERT_TRUE(op.execute(doc));
+    EXPECT_NEAR(totalVolume(doc), 500.0 * 5.0, 1.0);
+
+    drawRects(*sk, false);   // delete A
+    EXPECT_NEAR(replay(op, doc, sid), 400.0 * 5.0, 1.0)
+        << "only B is pushed - not B twice, and not C in A's place";
+    EXPECT_NE(op.serializeParams().find(";a0=5.000000:5.000000"), std::string::npos)
+        << "A's point is kept for the undo: " << op.serializeParams();
+
+    drawRects(*sk, true);    // undo the delete
+    EXPECT_NEAR(replay(op, doc, sid), 500.0 * 5.0, 1.0) << "A's prism is back";
+}
+
+TEST(RegionAnchor, TwoTargetsOnOneRegionPushItOnce) {
+    // A file saved by the old fallback carries two targets with the same point.
+    Document doc;
+    auto sk = std::make_shared<Sketch>();
+    drawRects(*sk, true);
+    const int sid = doc.addSketch(sk);
+    auto regions = sk->buildRegions();
+    const int b = regionWithArea(regions, 400.0);
+    ASSERT_GE(b, 0);
+
+    PushPullOp op;
+    op.setTargets({PushPullOp::Target{}, PushPullOp::Target{}});
+    op.setDistance(5.0);
+    op.setSketchSource(0, sid, b, regions[b].representativePoint);
+    op.setSketchSource(1, sid, b, regions[b].representativePoint);
+    ASSERT_TRUE(op.rebuildProfileFromSketch(doc, sid));
+    ASSERT_TRUE(op.execute(doc));
+    EXPECT_NEAR(totalVolume(doc), 400.0 * 5.0, 1.0);
+}

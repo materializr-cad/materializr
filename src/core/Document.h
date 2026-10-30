@@ -399,6 +399,11 @@ public:
     int addPlane(const gp_Pln& plane, const std::string& name = "",
                  int reuseId = -1);
     void removePlane(int id);
+    // Move plane `from` to the unused id `to`, with its reference image and
+    // mesh trace. For reload repair only (see ConstructionPlaneOp::
+    // rehydrateFromReload) - nothing else should ever change an id. False if
+    // `from` is missing or `to` is taken.
+    bool renumberPlane(int from, int to);
     // Update an existing plane's gp_Pln (move + rotate gizmo write-back).
     // Fires PlaneChangedEvent so the renderer / selection-aware UI updates.
     void setPlane(int id, const gp_Pln& plane);
@@ -441,6 +446,7 @@ public:
     int addAxis(const gp_Pnt& origin, const gp_Dir& direction,
                 const std::string& name = "", int reuseId = -1);
     void removeAxis(int id);
+    bool renumberAxis(int from, int to);   // as renumberPlane
     void setAxis(int id, const gp_Pnt& origin, const gp_Dir& direction);
     // Reverse an axis's direction in place (keeps origin). Flips which way
     // Revolve spins around it. Fires AxisChangedEvent.

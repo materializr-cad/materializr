@@ -488,10 +488,9 @@ ProjectSaveResult ProjectIO::save(const std::string& filePath, const Document& d
     // --- Construction primitives (planes + axes) ---
     // Saved as document records (not history-derived) so they survive
     // reload even when their creating op isn't re-executed. Format is the
-    // minimal "free-floating thing in the doc" line shape; ids are NOT
-    // preserved on reload (new monotonic ids are allocated) since no
-    // cross-references exist yet - Revolve persistence will need a fixup
-    // pass when it gets here (TODO once axis-id references land).
+    // minimal "free-floating thing in the doc" line shape. The id is kept on
+    // reload: history steps (Construction Plane / Axis, Move Plane) name
+    // their plane or axis by it.
     {
         std::vector<int> planeIds = doc.getAllPlaneIds();
         ofs << "CPLANE_COUNT " << static_cast<int>(planeIds.size()) << "\n";
@@ -1257,9 +1256,10 @@ ProjectLoadResult loadImpl(const std::string& filePath, Document& doc,
                 doc.setBodyPrint(bid, p);
             }
         } else if (tok == "CPLANE_COUNT") {
-            // Construction plane block. We re-issue addPlane so the
-            // Document's next-id counter ticks; saved ids are NOT preserved
-            // (no cross-references yet - see save-side note).
+            // Construction plane block. Saved ids ARE kept: Construction Plane
+            // and Move Plane steps name their plane by id, and renumbering on
+            // load (1, 2, ... in file order) left a step pointing at a plane
+            // that no longer existed - the step could only load frozen.
             int n = 0; iss >> n;
             for (int i = 0; i < n; ++i) {
                 std::string pline;
@@ -1292,13 +1292,13 @@ ProjectLoadResult loadImpl(const std::string& filePath, Document& doc,
                                 gp_Dir(xx, xy, xz).Crossed(gp_Dir(yx, yy, yz)),
                                 gp_Dir(xx, xy, xz));
                     gp_Pln pln(ax);
-                    int newId = doc.addPlane(pln, pname);
+                    int newId = doc.addPlane(pln, pname, savedId > 0 ? savedId : -1);
                     doc.setPlaneVisible(newId, vis != 0);
                     refImgPlaneRemap[savedId] = newId; // REFIMG remaps via this
                 } catch (...) {}
             }
         } else if (tok == "CAXIS_COUNT") {
-            // Construction axis block. Same id-not-preserved policy as planes.
+            // Construction axis block. Saved ids kept, as for planes.
             int n = 0; iss >> n;
             for (int i = 0; i < n; ++i) {
                 std::string aline;
@@ -1322,10 +1322,10 @@ ProjectLoadResult loadImpl(const std::string& filePath, Document& doc,
                 }
                 try {
                     int newId = doc.addAxis(gp_Pnt(ox, oy, oz),
-                                             gp_Dir(dx, dy, dz), aname);
+                                             gp_Dir(dx, dy, dz), aname,
+                                             savedId > 0 ? savedId : -1);
                     doc.setAxisVisible(newId, vis != 0);
                     (void)halfLen; // halfLength setter is internal; default fine
-                    (void)savedId;
                 } catch (...) {}
             }
         } else if (tok == "REFIMG_COUNT") {

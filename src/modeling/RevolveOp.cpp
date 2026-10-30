@@ -17,12 +17,80 @@
 #include "../i18n.h"
 #include "../i18n.h"
 #include "BoolArgs.h"
+#include "../core/OpProgress.h"
+#include <BRepCheck_Analyzer.hxx>
+#include <BRepGProp.hxx>
+#include <GProp_GProps.hxx>
+#include <TopExp_Explorer.hxx>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
 
 RevolveOp::RevolveOp() = default;
+
+namespace {
+
+// A boolean result worth committing: valid, with at least one solid of real
+// volume. A Subtract whose tool runs within a hair of the body's own faces (a
+// cavity profile traced from the sketch that already hollows the body) comes
+// back "done" with a zero-volume or invalid shell, and committing that wiped
+// the body - and every hole downstream - out of the model.
+bool usableResult(const TopoDS_Shape& s) {
+    if (s.IsNull() || !TopExp_Explorer(s, TopAbs_SOLID).More()) return false;
+    try {
+        if (!BRepCheck_Analyzer(s).IsValid()) return false;
+        GProp_GProps gp;
+        BRepGProp::VolumeProperties(s, gp);
+        return gp.Mass() > 1e-6;
+    } catch (...) { return false; }
+}
+
+// Run `op` on (body, tool); if the exact result is unusable, retry once with a
+// fuzzy tolerance so near-coincident faces are treated as coincident. Returns
+// a null shape when neither run gives a usable result.
+//
+// `preferFuzzy` is the op's memory of the last run: a tool that needed the
+// fuzzy pass once (it hugs the body's own faces) almost always needs it again,
+// and the failing exact pass is the slow one - 2.5 s of a 4 s lathe on a
+// traced cavity - so every rebuild after the first goes fuzzy-first. If fuzzy
+// stops working (the geometry moved apart) the exact pass runs and the flag
+// clears.
+//
+// `progress` (may be null) lets the kernel poll for a cancel mid-boolean - the
+// in-sketch cascade budget uses it; a cancelled run is never retried.
+TopoDS_Shape robustBoolean(BRepAlgoAPI_BooleanOperation& op, const TopoDS_Shape& body,
+                           const TopoDS_Shape& tool,
+                           const Handle(materializr::OpProgressBridge)& progress,
+                           bool& preferFuzzy) {
+    auto range = [&]() {
+        return progress.IsNull() ? Message_ProgressRange() : progress->Start();
+    };
+    auto run = [&](double fuzzy) -> TopoDS_Shape {
+        op.SetFuzzyValue(fuzzy);
+        op.Build(range());
+        if (!progress.IsNull() && progress->cancelled()) return TopoDS_Shape();
+        return op.IsDone() && usableResult(op.Shape()) ? op.Shape() : TopoDS_Shape();
+    };
+    auto cancelled = [&]() { return !progress.IsNull() && progress->cancelled(); };
+    materializr::setBooleanShapes(op, body, tool);
+    op.SetRunParallel(Standard_True);
+    const double kFuzzy = 1.0e-2;
+    TopoDS_Shape r = run(preferFuzzy ? kFuzzy : 0.0);
+    if (!r.IsNull() || cancelled()) return r;
+    r = run(preferFuzzy ? 0.0 : kFuzzy);
+    if (!r.IsNull()) {
+        preferFuzzy = !preferFuzzy;
+        if (preferFuzzy)
+            std::fprintf(stderr, "[Lathe] exact boolean unusable; fuzzy (0.01 mm) result kept\n");
+        return r;
+    }
+    if (!cancelled())
+        std::fprintf(stderr, "[Lathe] boolean result invalid or empty - step refused\n");
+    return TopoDS_Shape();
+}
+
+} // namespace
 
 void RevolveOp::setProfile(const TopoDS_Shape& profile) {
     m_profile = profile;
@@ -71,6 +139,11 @@ bool RevolveOp::execute(Document& doc) {
         m_axis = gp_Ax1(origin, dir);
 
         TopoDS_Shape revolvedShape;
+        Handle(materializr::OpProgressBridge) progress;
+        if (m_progress)
+            progress = new materializr::OpProgressBridge(
+                [this](float f, const char* l) { return reportProgress(f, l); },
+                materializr::tr("Lathe"));
 
         if (std::abs(m_angle - 360.0) < 1e-6) {
             // Full revolution
@@ -104,12 +177,12 @@ bool RevolveOp::execute(Document& doc) {
                 }
                 m_previousTargetShape = doc.getBody(m_targetBodyId);
                 BRepAlgoAPI_Fuse fuse;
-                materializr::setBooleanShapes(fuse, m_previousTargetShape, revolvedShape);
-                fuse.Build();
-                if (!fuse.IsDone()) {
+                TopoDS_Shape result = robustBoolean(fuse, m_previousTargetShape, revolvedShape, progress,
+                                                    m_preferFuzzy);
+                if (result.IsNull()) {
                     return false;
                 }
-                doc.updateBody(m_targetBodyId, fuse.Shape());
+                doc.updateBody(m_targetBodyId, result);
                 m_createdBodyId = -1;
                 break;
             }
@@ -119,12 +192,12 @@ bool RevolveOp::execute(Document& doc) {
                 }
                 m_previousTargetShape = doc.getBody(m_targetBodyId);
                 BRepAlgoAPI_Cut cut;
-                materializr::setBooleanShapes(cut, m_previousTargetShape, revolvedShape);
-                cut.Build();
-                if (!cut.IsDone()) {
+                TopoDS_Shape result = robustBoolean(cut, m_previousTargetShape, revolvedShape, progress,
+                                                    m_preferFuzzy);
+                if (result.IsNull()) {
                     return false;
                 }
-                doc.updateBody(m_targetBodyId, cut.Shape());
+                doc.updateBody(m_targetBodyId, result);
                 m_createdBodyId = -1;
                 break;
             }
@@ -134,12 +207,12 @@ bool RevolveOp::execute(Document& doc) {
                 }
                 m_previousTargetShape = doc.getBody(m_targetBodyId);
                 BRepAlgoAPI_Common common;
-                materializr::setBooleanShapes(common, m_previousTargetShape, revolvedShape);
-                common.Build();
-                if (!common.IsDone()) {
+                TopoDS_Shape result = robustBoolean(common, m_previousTargetShape, revolvedShape, progress,
+                                                    m_preferFuzzy);
+                if (result.IsNull()) {
                     return false;
                 }
-                doc.updateBody(m_targetBodyId, common.Shape());
+                doc.updateBody(m_targetBodyId, result);
                 m_createdBodyId = -1;
                 break;
             }

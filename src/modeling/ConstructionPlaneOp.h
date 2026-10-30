@@ -50,6 +50,7 @@ private:
     gp_Pnt m_p1, m_p2, m_p3;
     std::string m_planeName = "Plane";
     int m_createdPlaneId = -1;
+    bool m_visible = true;   // the plane's visibility, carried across undo/redo
 
     // Reload support: the params blob stores the COMPUTED plane (the creation
     // inputs - picked faces/points - aren't reconstructable across sessions),

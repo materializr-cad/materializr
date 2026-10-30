@@ -139,6 +139,9 @@ private:
     // this existed have none and fall back to the index alone. Serialized as `a<i>=`.
     std::vector<glm::vec2> m_sketchSourceAnchors;
     std::vector<char> m_hasAnchor;
+    // Region count seen at the last rebuildProfileFromSketch, per sketch (not
+    // serialized): tells a region dragged off its anchor from a deleted one.
+    std::map<int, int> m_lastRegionCount;
     // Reload support for FACE-driven targets: per-target ordinal index of the
     // profile face within the source body's pre-op shape (see
     // SubShapeIndex.h). 0 = not a face target / not resolvable.
