@@ -1622,19 +1622,23 @@ void Application::renderSplashFrame(const char* status) {
 }
 
 void Application::captureProgressBackdrop() {
-#if !defined(MZ_MOBILE)
     // Called after a frame's ImGui pass, before the swap, only when a heavy task
     // is queued to run at the top of the next iteration: the progress window
     // then has the frame the user was just looking at to paint behind its card.
     // The back buffer is undefined after a swap, so this is the only moment it
-    // can be had. Mobile keeps the plain cleared window (its default framebuffer
-    // is not the one bound here).
+    // can be had. Read from g_windowFramebuffer, not whatever happens to be
+    // bound: on iOS the screen is an FBO, not 0. Android's default framebuffer
+    // is single-sample (the viewport resolves into it), so the copy is legal
+    // in GL ES too.
     if (!m_window) return;
     int fbw = 0, fbh = 0;
     m_window->framebufferSize(fbw, fbh);
     if (fbw <= 0 || fbh <= 0) return;
-    GLint prevTex = 0;
+    GLint prevTex = 0, prevReadFbo = 0;
     glGetIntegerv(GL_TEXTURE_BINDING_2D, &prevTex);
+    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prevReadFbo);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, g_windowFramebuffer);
+    while (glGetError() != GL_NO_ERROR) {}   // an earlier stray error must not veto the copy
     if (!m_progressBackdropTex) {
         glGenTextures(1, &m_progressBackdropTex);
         glBindTexture(GL_TEXTURE_2D, m_progressBackdropTex);
@@ -1650,10 +1654,10 @@ void Application::captureProgressBackdrop() {
     else
         glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 0, 0, fbw, fbh, 0);
     glBindTexture(GL_TEXTURE_2D, static_cast<GLuint>(prevTex));
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, static_cast<GLuint>(prevReadFbo));
     m_progressBackdropW = fbw;
     m_progressBackdropH = fbh;
     m_progressBackdropValid = glGetError() == GL_NO_ERROR;
-#endif
 }
 
 void Application::drawIndeterminateBar() {

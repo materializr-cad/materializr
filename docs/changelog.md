@@ -40,6 +40,8 @@ All notable changes to Materializr are documented here. Format loosely follows
 - Lathe / Cut: a body picked after opening the dialog is no longer ignored.
 - Android: the status bar stays visible and the menu bar sits below it, instead
   of being covered on tablets that draw edge-to-edge (Android 15).
+- Android/iOS: the "Working" window now sits over the last frame of the app
+  instead of a grey screen, as on desktop.
 - Select-tool measurement labels (Settings ▸ Sketch) now show in the modern
   and touch layouts right after the app starts, not only after switching layouts.
 - Android: with Full screen on, the top bar no longer leaves a blank strip

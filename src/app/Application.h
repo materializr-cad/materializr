@@ -169,7 +169,7 @@ private:
     bool m_progressCancelled = false;
     // The last complete frame (UI + model), kept while a heavy task is pending so
     // the progress window can paint it behind its card instead of blanking the
-    // screen. Desktop only; see captureProgressBackdrop().
+    // screen. see captureProgressBackdrop().
     void captureProgressBackdrop();
     unsigned m_progressBackdropTex = 0;
     int  m_progressBackdropW = 0;
