@@ -93,13 +93,21 @@ jobs:
       # every Windows-specific code path (the _WIN32 branches in
       # ProjectRecovery, url_open.h, portable-file-dialogs) shipped without a
       # single test having run against it on Windows.
+      #
+      # VCPKG_INSTALLED_DIR: the toolchain runs its own `vcpkg install` at
+      # configure time, by default into build/vcpkg_installed. Point it at the
+      # tree the step above just filled so that install is a no-op. Otherwise,
+      # on a cache miss in a PR (read-only feed, and `clear;` disables vcpkg's
+      # local cache), OCCT compiled from source TWICE: ~1h in each step.
       - name: Configure
         shell: pwsh
         run: |
+          $installed = "$($PWD.Path -replace '\\','/')/vcpkg_installed"
           cmake -B build -S . `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
             -DVCPKG_TARGET_TRIPLET=x64-windows `
             -DVCPKG_MANIFEST_MODE=ON `
+            -DVCPKG_INSTALLED_DIR="$installed" `
             -DBUILD_TESTS=ON
 
       - name: Build
