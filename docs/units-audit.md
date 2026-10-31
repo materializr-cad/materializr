@@ -12,7 +12,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 - angle: 38
 - count: 1
 - percent: 18
-- px/ui: 4
+- px/ui: 5
 - ratio: 7
 - seconds: 4
 - unitless: 10
@@ -64,6 +64,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | unitless | src/app/Application_Dialogs.cpp | `if (materializr::inputNumber("##patchTolCurv", &m_patchParams.tolCurv,` |
 | CONVERTED | src/app/Application_Dialogs.cpp | `if (materializr::parseLength(m_sketchMoveBuf[i], mv)) m_sketchMove[i] = mv;` |
 | CONVERTED | src/app/Application_Dialogs.cpp | `if (materializr::lengthSlider("##slider", &m_sketchMove[i], -100.0f, 100.0f)) {` |
+| px/ui | src/app/Application_Dialogs.cpp | `if (ImGui::SliderFloat(materializr::tr("Step switch size"), &m_gridMinCellPx,` |
 | CONVERTED | src/app/Application_Dialogs.cpp | `if (materializr::parseLength(m_planeOpOffsetBuf, parsed) &&` |
 | CONVERTED | src/app/Application_Dialogs.cpp | `if (materializr::lengthStepperRow("planeOffsetStep", &offsetF, /*allowNegative=*/true,` |
 | angle | src/app/Application_Dialogs.cpp | `materializr::parseFinite(m_planeOpRotBufX, dx);` |
@@ -262,7 +263,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 - CONVERTED: 1
 - allowed-by-hand: 92
 - comment: 298
-- diagnostic: 12
+- diagnostic: 13
 - identifier/other: 9
 
 | class | file | code |
@@ -537,6 +538,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | comment | src/modeling/PushPullOp.cpp | `// Region anchor: "<x>:<y>" in sketch-plane mm.` |
 | allowed-by-hand | src/modeling/ResizeCylindricalOp.cpp | `"[Resize] cap-following fill built (final vol=%.3f mm³)\n",` |
 | allowed-by-hand | src/modeling/ResizeCylindricalOp.cpp | `"[Resize] fuse: bodyVol %.3f → %.3f mm³ (delta=%+.3f)\n",` |
+| diagnostic | src/modeling/RevolveOp.cpp | `std::fprintf(stderr, "[Lathe] exact boolean unusable; fuzzy (0.01 mm) result kept\n");` |
 | comment | src/modeling/ScaleFaceOp.cpp | `// they were converted display->mm on commit, so typing 100 under inches` |
 | allowed-by-hand | src/modeling/SewOp.cpp | `ImGui::TextDisabled(materializr::tr("Joined at %.4f mm."), m_tolUsed);` |
 | allowed-by-hand | src/modeling/ShellOp.cpp | `"body (thickness %.3f mm).\n", m_thickness);` |

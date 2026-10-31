@@ -216,6 +216,11 @@ struct AppSettings {
     // (GridScale.h). Off = the grid and the snap lattice are always exactly the
     // chosen step, however far in or out the view is.
     bool zoomScaledGrid = true;
+    // Smallest on-screen cell (UI points) the zoom-scaled grid keeps. The step
+    // moves to the next rung once its cells would be narrower than this, so a
+    // higher value gives a coarser grid on screen. Screens differ in how many
+    // points a millimetre covers, hence a setting rather than a constant.
+    float gridMinCellPx = 8.0f;
     // Android only: hide the status bar too (true full screen). Off keeps it.
     bool androidFullscreen = false;
     // Line angle-snap increment in degrees (0 = off). The line tool snaps its

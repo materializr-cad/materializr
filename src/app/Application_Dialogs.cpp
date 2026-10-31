@@ -436,11 +436,7 @@ void Application::renderSettings() {
                     }
 
                     ImGui::Spacing();
-                    ImGui::SeparatorText(materializr::tr("Snap grid"));
-                    if (ImGui::Checkbox(materializr::tr("Scale grid with zoom"), &m_zoomScaledGrid)) {
-                        changed = true;
-                    }
-                    ImGui::TextWrapped("%s", materializr::tr("On (default): the snap step you pick is a starting point. When the grid cells would be too small to click, the sketch uses a coarser step (0.1, 0.5, 1, 5, 10 ...), and a finer one when you zoom well in. The number under the ViewCube shows the step in use. Off: the grid and snapping always use exactly the step you picked, at every zoom."));
+                    ImGui::TextDisabled("%s", materializr::tr("Grid step scaling lives in the snap popup (click the grid badge in the viewport)."));
 
                     ImGui::Spacing();
                     if (ImGui::Checkbox(materializr::tr("Show level toggle in sketch toolbar"),
@@ -3568,6 +3564,16 @@ void Application::renderSnapWidget() {
 }
 
 void Application::renderSnapSettingsPopup() {
+    // SetItemTooltip draws one unbroken line, which for these paragraphs runs
+    // wider than the screen. Same wrap as the other long tooltips.
+    auto wrapTip = [](const char* text) {
+        if (ImGui::BeginItemTooltip()) {
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 24.0f);
+            ImGui::TextUnformatted(text);
+            ImGui::PopTextWrapPos();
+            ImGui::EndTooltip();
+        }
+    };
     if (ImGui::BeginPopup("SnapSettings")) {
         ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Snap & Grid"));
         ImGui::Separator();
@@ -3582,7 +3588,18 @@ void Application::renderSnapSettingsPopup() {
         if (ImGui::Checkbox(materializr::tr("Scale grid with zoom"), &m_zoomScaledGrid)) {
             saveAppSettings();
         }
-        ImGui::SetItemTooltip("%s", materializr::tr("On: the grid uses a coarser step when zoomed out (and a finer one when zoomed in) so the cells stay clickable. Off: always exactly the step below."));
+        wrapTip(materializr::tr("On (default): the step you pick below is a starting point. When the grid cells would be too small to click, the sketch uses a coarser step (0.1, 0.5, 1, 5, 10 ...), and a finer one when you zoom well in. The number on the badge shows the step in use. Off: the grid and snapping always use exactly the step you picked, at every zoom."));
+        // Where the steps happen. Different screens cover different amounts
+        // of sketch per point, so what reads as "too small" differs; the
+        // checkbox alone left no way to tune it.
+        ImGui::BeginDisabled(!m_zoomScaledGrid);
+        ImGui::SetNextItemWidth(materializr::uiSz(150, 0).x);
+        if (ImGui::SliderFloat(materializr::tr("Step switch size"), &m_gridMinCellPx,
+                               4.0f, 40.0f, "%.0f px", ImGuiSliderFlags_AlwaysClamp)) {
+            saveAppSettings();
+        }
+        wrapTip(materializr::tr("How wide a grid cell may get before the step changes while you zoom. Higher = coarser grid, steps change sooner when zooming out. Lower = finer grid. Default 8."));
+        ImGui::EndDisabled();
         ImGui::Spacing();
 
         // The same dropdown as Settings, here because this is where step size

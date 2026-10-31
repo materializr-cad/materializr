@@ -2145,6 +2145,7 @@ AppSettings Application::currentSettings() const {
     s.exportGreyFills = m_exportGreyFills;
     s.showSelectionMeasurements = m_showSelectionMeasurements;
     s.zoomScaledGrid = m_zoomScaledGrid;
+    s.gridMinCellPx = m_gridMinCellPx;
     s.androidFullscreen = m_androidFullscreen;
     s.angleSnapDeg = m_sketchTool ? m_sketchTool->getAngleSnapDeg() : 15;
     s.stlImportAccuracy = m_stlImportAccuracy;
@@ -2242,6 +2243,7 @@ void Application::applyAppSettings(const AppSettings& s) {
     m_exportGreyFills = s.exportGreyFills;
     m_showSelectionMeasurements = s.showSelectionMeasurements;
     m_zoomScaledGrid = s.zoomScaledGrid;
+    m_gridMinCellPx = s.gridMinCellPx;
     m_androidFullscreen = s.androidFullscreen;
     m_stlImportAccuracy = s.stlImportAccuracy;
     m_meshShowWireframe = s.meshShowWireframe;

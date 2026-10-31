@@ -1346,6 +1346,7 @@ private:
     bool  m_showSelectionMeasurements = false;
     // Sketch snap grid follows the zoom (GridScale.h). Off: always the base step.
     bool  m_zoomScaledGrid = true;
+    float m_gridMinCellPx = 8.0f; // see Settings::gridMinCellPx
     // Android: hide the status bar as well as the navigation bar.
     bool  m_androidFullscreen = false;
     // STL import (persisted). m_stlImportAccuracy pre-fills the import dialog's

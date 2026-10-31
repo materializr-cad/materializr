@@ -124,11 +124,6 @@ namespace materializr { namespace force_link { void linkAll(); } }
 // renderer plus its drag-projection helper.
 namespace materializr {
 
-// Smallest on-screen cell, in pixels, the sketch grid will draw. Below this
-// the shader's density fade greys the lines out anyway, so a finer lattice
-// costs fill rate and shows nothing.
-constexpr float kGridMinPx = 8.0f;
-
 // opDialogDragGrip moved to ui/OpDialogGrip.h - Move Face's panel (in
 // FaceOpControllers.cpp) uses it too.
 
@@ -473,7 +468,9 @@ void Application::renderViewport() {
         // punching through coplanar faces.
         // The step the user picked is a BASE; what the sketch actually uses is
         // that base scaled to suit this zoom (GridScale.h), unless the user
-        // turned the scaling off (Settings > Sketch), in which case it IS the base.
+        // turned the scaling off (snap popup), in which case it IS the base. The smallest
+        // cell it will draw is m_gridMinCellPx (the popup's slider; the shader's
+        // density fade greys out anything finer anyway).
         // Computed HERE as a plain statement rather than inside drawGrid,
         // because six later sites read it and a value assigned as a side
         // effect of "draw the grid" makes that dependency invisible.
@@ -482,7 +479,7 @@ void Application::renderViewport() {
             const glm::vec2 g0 = screenToSketch(0.0f, 0.0f, contentSize.x, contentSize.y);
             const glm::vec2 g1 = screenToSketch(1.0f, 0.0f, contentSize.x, contentSize.y);
             m_effectiveGridStepMm = gridStepForZoom(
-                m_effectiveGridStepMm, glm::length(g1 - g0), kGridMinPx);
+                m_effectiveGridStepMm, glm::length(g1 - g0), m_gridMinCellPx);
         }
 
         auto drawGrid = [&]() {

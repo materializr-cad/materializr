@@ -215,6 +215,10 @@ void applyKv(const std::map<std::string, std::string>& kv, AppSettings& s) {
     readBool(kv, "exportGreyFills", s.exportGreyFills);
     readBool(kv, "showSelectionMeasurements", s.showSelectionMeasurements);
     readBool(kv, "zoomScaledGrid",   s.zoomScaledGrid);
+    readFloat(kv, "gridMinCellPx",   s.gridMinCellPx);
+    // Written so a nan falls to the floor rather than slipping through min/max.
+    if (!(s.gridMinCellPx >= 4.0f)) s.gridMinCellPx = 4.0f;
+    if (s.gridMinCellPx > 40.0f)    s.gridMinCellPx = 40.0f;
     readBool(kv, "androidFullscreen", s.androidFullscreen);
     readIntClamped(kv, "angleSnapDeg",   s.angleSnapDeg, 1, 90);
     readFloat(kv, "stlImportAccuracy",   s.stlImportAccuracy);
@@ -504,6 +508,7 @@ bool SettingsIO::save(const std::string& path, const AppSettings& s) {
         << (s.showSelectionMeasurements ? "true" : "false") << "\n";
     ofs << "zoomScaledGrid = "
         << (s.zoomScaledGrid ? "true" : "false") << "\n";
+    ofs << "gridMinCellPx = " << s.gridMinCellPx << "\n";
     ofs << "androidFullscreen = "
         << (s.androidFullscreen ? "true" : "false") << "\n";
     ofs << "angleSnapDeg = "             << s.angleSnapDeg        << "\n";
@@ -620,6 +625,7 @@ bool SettingsIO::exportJson(const std::string& path, const AppSettings& s) {
     ofs << "  \"showSelectionMeasurements\": "
         << b(s.showSelectionMeasurements) << ",\n";
     ofs << "  \"zoomScaledGrid\": " << b(s.zoomScaledGrid) << ",\n";
+    ofs << "  \"gridMinCellPx\": " << s.gridMinCellPx << ",\n";
     ofs << "  \"androidFullscreen\": " << b(s.androidFullscreen) << ",\n";
     ofs << "  \"angleSnapDeg\": "             << s.angleSnapDeg          << ",\n";
     ofs << "  \"stlImportAccuracy\": "        << s.stlImportAccuracy     << ",\n";

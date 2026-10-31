@@ -10,10 +10,12 @@ All notable changes to Materializr are documented here. Format loosely follows
 - **Grid rendering (experimental)** in Settings ▸ Rendering: three workarounds
   for a grid that shimmers or flickers with anti-aliasing on certain GPU drivers
   (seen on Intel Arc). Leave it on Default unless the grid looks wrong.
-- **Scale grid with zoom** switch (Settings ▸ Sketch, and in the snap popup under
-  the ViewCube). On, as before, the sketch grid uses a coarser or finer step to
-  suit the zoom; off, the grid and snapping always use exactly the step you
-  picked.
+- **Scale grid with zoom** switch in the snap popup under the ViewCube. On, as
+  before, the sketch grid uses a coarser or finer step to suit the zoom; off, the
+  grid and snapping always use exactly the step you picked.
+- **Step switch size** slider next to it (4 to 40 px, default 8): how wide a grid
+  cell may get before the step changes while you zoom. Raise it for a coarser
+  grid on a screen where the cells look too fine, lower it for a finer one.
 - **Android: Full screen** switch (Settings ▸ Appearance). Off by default, which
   keeps the status bar visible; on hides it as well.
 
