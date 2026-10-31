@@ -954,7 +954,110 @@ void Sketch::removeConstraint(int id) {
 // The longest OPEN chain in the sketch - see the header note. Each element
 // becomes a run of 2D sample points; chains are walked from degree-1 nodes so
 // closed loops (which buildWires owns) never qualify.
+bool Sketch::hasConstructionGeometry() const {
+    for (const auto& l : m_lines)    if (l.isConstruction) return true;
+    for (const auto& c : m_circles)  if (c.isConstruction) return true;
+    for (const auto& a : m_arcs)     if (a.isConstruction) return true;
+    for (const auto& s : m_splines)  if (s.isConstruction) return true;
+    for (const auto& g : m_polygons) if (g.isConstruction) return true;
+    return false;
+}
+
+bool Sketch::isConstructionElement(int id) const {
+    for (const auto& l : m_lines)    if (l.id == id) return l.isConstruction;
+    for (const auto& c : m_circles)  if (c.id == id) return c.isConstruction;
+    for (const auto& a : m_arcs)     if (a.id == id) return a.isConstruction;
+    for (const auto& s : m_splines)  if (s.id == id) return s.isConstruction;
+    for (const auto& g : m_polygons) if (g.id == id) return g.isConstruction;
+    return false;
+}
+
+bool Sketch::setElementConstruction(int id, bool on) {
+    // An edge of a polygon stands for the polygon (see the header).
+    for (const auto& g : m_polygons) {
+        if (std::find(g.lineIds.begin(), g.lineIds.end(), id) != g.lineIds.end()) {
+            id = g.id;
+            break;
+        }
+    }
+    for (auto& g : m_polygons) {
+        if (g.id != id) continue;
+        g.isConstruction = on;
+        for (int lid : g.lineIds)
+            for (auto& l : m_lines) if (l.id == lid) l.isConstruction = on;
+        return true;
+    }
+    for (auto& l : m_lines)   if (l.id == id) { l.isConstruction = on; return true; }
+    for (auto& c : m_circles) if (c.id == id) { c.isConstruction = on; return true; }
+    for (auto& a : m_arcs)    if (a.id == id) { a.isConstruction = on; return true; }
+    for (auto& s : m_splines) if (s.id == id) { s.isConstruction = on; return true; }
+    return false;
+}
+
+void Sketch::setConstructionSince(int firstId, bool on) {
+    for (auto& l : m_lines)    if (l.id >= firstId) l.isConstruction = on;
+    for (auto& c : m_circles)  if (c.id >= firstId) c.isConstruction = on;
+    for (auto& a : m_arcs)     if (a.id >= firstId) a.isConstruction = on;
+    for (auto& s : m_splines)  if (s.id >= firstId) s.isConstruction = on;
+    for (auto& g : m_polygons) if (g.id >= firstId) g.isConstruction = on;
+}
+
+Sketch Sketch::withoutConstruction() const {
+    Sketch out = *this;
+    // The copy carries this sketch's memo of regions built FROM the full
+    // geometry; it must not answer for the reduced one.
+    out.m_regionCacheValid = false;
+    out.m_filledIdxValid = false;
+
+    auto drop = [](auto& v) {
+        v.erase(std::remove_if(v.begin(), v.end(),
+                               [](const auto& e) { return e.isConstruction; }),
+                v.end());
+    };
+    drop(out.m_lines);
+    drop(out.m_circles);
+    drop(out.m_arcs);
+    drop(out.m_splines);
+    drop(out.m_polygons);
+
+    // A point that only construction geometry used must go too, or it would
+    // still split a real line it happens to sit on (the profile builder turns
+    // any point lying on a line into a vertex). Points the REAL geometry also
+    // uses - a construction line started at a corner - stay, and so does a
+    // point nothing references (the Point tool's standalone points).
+    std::unordered_set<int> usedByReal, usedByConstruction;
+    auto use = [](std::unordered_set<int>& s, int id) { s.insert(id); };
+    for (const auto& l : out.m_lines) { use(usedByReal, l.startPointId); use(usedByReal, l.endPointId); }
+    for (const auto& c : out.m_circles) use(usedByReal, c.centerPointId);
+    for (const auto& a : out.m_arcs) {
+        use(usedByReal, a.centerPointId); use(usedByReal, a.startPointId); use(usedByReal, a.endPointId);
+    }
+    for (const auto& s : out.m_splines) for (int p : s.controlPointIds) use(usedByReal, p);
+    for (const auto& g : out.m_polygons) {
+        use(usedByReal, g.centerPointId);
+        for (int p : g.vertexPointIds) use(usedByReal, p);
+    }
+    for (const auto& l : m_lines) if (l.isConstruction) { use(usedByConstruction, l.startPointId); use(usedByConstruction, l.endPointId); }
+    for (const auto& c : m_circles) if (c.isConstruction) use(usedByConstruction, c.centerPointId);
+    for (const auto& a : m_arcs) if (a.isConstruction) {
+        use(usedByConstruction, a.centerPointId); use(usedByConstruction, a.startPointId); use(usedByConstruction, a.endPointId);
+    }
+    for (const auto& s : m_splines) if (s.isConstruction) for (int p : s.controlPointIds) use(usedByConstruction, p);
+    for (const auto& g : m_polygons) if (g.isConstruction) {
+        use(usedByConstruction, g.centerPointId);
+        for (int p : g.vertexPointIds) use(usedByConstruction, p);
+    }
+    out.m_points.erase(
+        std::remove_if(out.m_points.begin(), out.m_points.end(),
+            [&](const SketchPoint& p) {
+                return usedByConstruction.count(p.id) && !usedByReal.count(p.id);
+            }),
+        out.m_points.end());
+    return out;
+}
+
 TopoDS_Wire Sketch::buildOpenWire() const {
+    if (hasConstructionGeometry()) return withoutConstruction().buildOpenWire();
     struct ChainEdge {
         int a = -1, b = -1;                 // endpoint point-ids
         std::vector<glm::vec2> pts;         // samples a → b (inclusive)
@@ -1049,6 +1152,7 @@ TopoDS_Wire Sketch::buildOpenWire() const {
 }
 
 std::vector<TopoDS_Wire> Sketch::buildWires() const {
+    if (hasConstructionGeometry()) return withoutConstruction().buildWires();
     std::vector<TopoDS_Wire> wires;
 
     // Helper edge spec used by the adjacency walker
@@ -1895,13 +1999,16 @@ uint64_t Sketch::geometryHash() const {
     for (const auto& a : m_arcs) {
         mixI(a.id); mixI(a.centerPointId); mixI(a.startPointId);
         mixI(a.endPointId); mixD(a.radius);
+        mixI(a.isConstruction ? 1 : 0);
     }
     for (const auto& s : m_splines) {
         mixI(s.id);
         for (int id : s.controlPointIds) mixI(id);
+        mixI(s.isConstruction ? 1 : 0);
     }
     for (const auto& g : m_polygons) {
         mixI(g.id); mixI(g.centerPointId); mixD(g.radius); mixI(g.sides);
+        mixI(g.isConstruction ? 1 : 0);
     }
     mixI(m_sourceBodyId);
     // Source face identity: the TShape pointer changes whenever the host
@@ -1924,6 +2031,7 @@ uint64_t Sketch::geometryHash() const {
 }
 
 TopoDS_Shape Sketch::buildProfileShape() const {
+    if (hasConstructionGeometry()) return withoutConstruction().buildProfileShape();
     auto wires = buildWires();
     if (wires.empty()) return TopoDS_Shape();
     const size_t n = wires.size();
@@ -2034,6 +2142,8 @@ TopoDS_Shape Sketch::buildProfileShape() const {
 
 std::vector<Sketch::Region> Sketch::buildRegionsUncached(
     const Message_ProgressRange& range) const {
+    if (hasConstructionGeometry())
+        return withoutConstruction().buildRegionsUncached(range);
     std::vector<Region> regions;
     // Two steps, the only two that run long: the general fuse, then the
     // open-curve splitter. Both poll the range, so an off-thread build that

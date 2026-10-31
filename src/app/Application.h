@@ -247,6 +247,10 @@ private:
     // Polygon in the tool rail opens a side-count popout (matching the
     // classic sketch toolbar). Shared by the modern rail and im-touch bar.
     void renderRailPolygonSidesPopup(bool clicked);
+    // Rectangle / Circle in the tool rail: the first tap picks the tool, a tap
+    // while it is already active opens a Corner/Center (or Center/2-Point)
+    // menu. `wasActive` is the rail entry's active flag from BEFORE the tap.
+    void renderRailDrawOriginPopup(bool isRect, bool wasActive, bool clicked);
     void renderTouchOverflowPopup(); // shared ⋯/☰ menu popup (modern + im-touch)
     // Undo/redo with the sketch-edit cascade (shared by the Edit menu, the
     // touch shell's top bar, and nothing else - the Ctrl+Z shortcut has its

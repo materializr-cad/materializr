@@ -1,6 +1,7 @@
 #include "UiTheme.h"
 #include "Toolbar.h"
 #include "TouchIcons.h"
+#include "TouchWidgets.h"
 #include "PolygonSidesMenu.h"
 #include "../core/SelectionManager.h"
 #include "../core/History.h"
@@ -115,8 +116,9 @@ ToolAction Toolbar::render() {
 std::vector<Toolbar::RailTool> Toolbar::railTools() const {
     std::vector<RailTool> t;
     auto add = [&](const char* icon, const char* label, ToolAction a,
-                   bool active = false, const char* tip = nullptr) {
-        t.push_back({icon, label, a, active, tip});
+                   bool active = false, const char* tip = nullptr,
+                   bool menu = false) {
+        t.push_back({icon, label, a, active, tip, -1, menu});
     };
 
     // Plugin toolbar contributions for the given context mask - the rail twin
@@ -164,29 +166,23 @@ std::vector<Toolbar::RailTool> Toolbar::railTools() const {
             "like every other sketch tool.");
         add(MZ_ICON_LINE,    "Line",    ToolAction::Line,         m_activeSketchMode == 2,
             "Draw straight line segments. Tap to add vertices; Finish ends the chain.");
+        // Circle and Rectangle open an "origin" menu (Center/2-Point,
+        // Corner/Center) when tapped again while active. That replaces the
+        // extra toggle button that used to appear under them; `menu` puts the
+        // corner wedge on the button so the second tap is discoverable.
         add(MZ_ICON_CIRCLE,  "Circle",  ToolAction::Circle,       m_activeSketchMode == 3,
-            "Draw a circle: press the centre, drag to the radius.");
-        // Draw-origin toggle directly under the ACTIVE circle/rect tool, same
-        // as the classic toolbar - label shows the current mode.
-        if (m_activeSketchMode == 3)
-            add(MZ_ICON_CIRCLE, m_circleMode == 0 ? "Center" : "2-Point",
-                ToolAction::SketchToggleDrawOrigin, false,
-                "Circle origin: Center = tap the centre then drag the radius; "
-                "2-Point = the two taps are opposite ends of the diameter. "
-                "Tap to toggle.");
+            "Draw a circle: press the centre, drag to the radius. Tap again "
+            "while it is active to choose Center or 2-Point.", /*menu=*/true);
         add(MZ_ICON_RECT,    "Rectangle", ToolAction::Rectangle,  m_activeSketchMode == 4,
-            "Draw a rectangle: press one corner, drag to the opposite.");
-        if (m_activeSketchMode == 4)
-            add(MZ_ICON_RECT, m_rectMode == 0 ? "Corner" : "Center",
-                ToolAction::SketchToggleDrawOrigin, false,
-                "Rectangle origin: Corner = tap a corner, drag to the opposite; "
-                "Center = tap the centre, drag to a corner. Tap to toggle.");
+            "Draw a rectangle: press one corner, drag to the opposite. Tap "
+            "again while it is active to choose Corner or Center.", /*menu=*/true);
         add(MZ_ICON_ARC,     "Arc",     ToolAction::Arc,          m_activeSketchMode == 5,
             "Three-point arc: tap start, end, then a point on the curve.");
         add(MZ_ICON_SPLINE,  "Spline",  ToolAction::Spline,       m_activeSketchMode == 6,
             "Multi-point spline. Tap control points; Finish ends the curve.");
         add(MZ_ICON_POLYGON, "Polygon", ToolAction::Polygon,      m_activeSketchMode == 7,
-            "Regular polygon: tap the centre, drag to size. Side count in properties.");
+            "Regular polygon: tap the centre, drag to size. Side count in properties.",
+            /*menu=*/true);
         add(MZ_ICON_TEXT,    "Text",    ToolAction::SketchText,   m_activeSketchMode == 9,
             "Insert text as real outline geometry: set string, font and letter "
             "height in the popup, then tap to place.");
@@ -209,6 +205,12 @@ std::vector<Toolbar::RailTool> Toolbar::railTools() const {
         add(MZ_ICON_MEASURE, "Dimension", ToolAction::SketchDimension,
             m_activeSketchMode == 12,
             "Dimension: tap entities, tap to place the label, type the value.");
+        add(MZ_ICON_CONSTRUCTION, "Construction", ToolAction::SketchConstruction,
+            m_constructionDraw,
+            "Construction geometry: reference lines that help you draw but are "
+            "not part of the shape - they never affect extrudes or exports. "
+            "With elements selected, tap to turn them into construction (or "
+            "back). Otherwise tap to draw the next shapes as construction.");
         // Sketch-element transforms - mirror the classic sketch toolbar so all
         // three layouts behave identically. Like classic, they're always here
         // in a sketch and simply no-op if nothing is selected. (The rail
@@ -710,23 +712,41 @@ ToolAction Toolbar::renderSketchTools() {
         return clicked;
     };
 
-    // Draw-origin toggle, rendered directly beneath whichever of Circle /
-    // Rectangle is active so it reads as part of that tool (not stranded at the
-    // bottom of the list).
-    auto drawOriginToggle = [&](bool isRect) {
-        const char* label = isRect
-            ? (m_rectMode == 0 ? "Draw from: Corner" : "Draw from: Center")
-            : (m_circleMode == 0 ? "Draw from: Center" : "Draw from: 2-Point");
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.22f, 0.38f, 0.55f, 1.0f));
-        if (ImGui::Button(materializr::tr(label), ImVec2(-1, bh(22))))
-            action = ToolAction::SketchToggleDrawOrigin;
-        ImGui::PopStyleColor();
-        tip(isRect
-            ? "Rectangle origin: Corner = click a corner, drag to the opposite; "
-              "Center = click the centre, drag to a corner. Click to toggle."
-            : "Circle origin: Center = click the centre, drag the radius; "
-              "2-Point = the two clicks are opposite ends of the diameter "
-              "(rim passes through the first click). Click to toggle.");
+    // A button that opens a menu: the corner wedge says so, so the menu is not
+    // hidden behind an unmarked button.
+    auto menuMark = [&]() {
+        materializr::touchui::drawMenuMark(
+            ImGui::GetWindowDrawList(), ImGui::GetItemRectMax(),
+            ImGui::GetFontSize() * 1.5f, ImGui::GetColorU32(ImGuiCol_TextDisabled));
+    };
+    // Rectangle / Circle: the first click picks the tool as before; clicking it
+    // AGAIN while active opens the origin menu (it used to switch the tool off,
+    // and the origin lived on a separate toggle button beneath it).
+    auto drawOriginMenu = [&](bool isRect, const char* label, int modeId,
+                              ToolAction act, const char* tipText) {
+        const bool wasActive = (m_activeSketchMode == modeId);
+        const char* popup = isRect ? "RectOriginMenu" : "CircleOriginMenu";
+        const bool clicked = skBtn(label, modeId);
+        menuMark();
+        tip(tipText);
+        if (clicked) {
+            if (wasActive) ImGui::OpenPopup(popup);
+            else action = act;
+        }
+        if (ImGui::BeginPopup(popup)) {
+            const int cur = isRect ? m_rectMode : m_circleMode;
+            const char* names[2] = { isRect ? "Corner" : "Center",
+                                     isRect ? "Center" : "2-Point" };
+            ImGui::TextDisabled("%s", materializr::tr("Draw from"));
+            for (int i = 0; i < 2; ++i) {
+                if (ImGui::MenuItem(materializr::tr(names[i]), nullptr, cur == i)) {
+                    // Exactly two modes, so choosing the other one IS the toggle.
+                    if (cur != i) action = ToolAction::SketchToggleDrawOrigin;
+                    ImGui::CloseCurrentPopup();
+                }
+            }
+            ImGui::EndPopup();
+        }
     };
 
     if (skBtn("Select / Move", 1)) action = ToolAction::SelectSketch;
@@ -735,12 +755,10 @@ ToolAction Toolbar::renderSketchTools() {
     tip(materializr::tr("Place a standalone point. Snaps to existing points, lines and curves like every other sketch tool."));
     if (skBtn("Line",      2))     action = ToolAction::Line;
     tip(materializr::tr("Draw straight line segments. Click to add vertices, Esc to finish."));
-    if (skBtn("Circle",    3))     action = ToolAction::Circle;
-    tip(materializr::tr("Draw a circle: click centre, drag to radius."));
-    if (m_activeSketchMode == 3)   drawOriginToggle(false);
-    if (skBtn("Rectangle", 4))     action = ToolAction::Rectangle;
-    tip(materializr::tr("Draw an axis-aligned rectangle: click one corner, drag to the opposite."));
-    if (m_activeSketchMode == 4)   drawOriginToggle(true);
+    drawOriginMenu(false, "Circle", 3, ToolAction::Circle,
+        materializr::tr("Draw a circle: click centre, drag to radius. Click again while it is active to choose Center or 2-Point (the two clicks are opposite ends of the diameter)."));
+    drawOriginMenu(true, "Rectangle", 4, ToolAction::Rectangle,
+        materializr::tr("Draw an axis-aligned rectangle: click one corner, drag to the opposite. Click again while it is active to choose Corner or Center (click the centre, drag to a corner)."));
     if (skBtn("Arc",       5))     action = ToolAction::Arc;
     tip(materializr::tr("Three-point arc: click start, end, then a point on the curve."));
     if (skBtn("Spline",    6))     action = ToolAction::Spline;
@@ -756,6 +774,7 @@ ToolAction Toolbar::renderSketchTools() {
         }
         if (ImGui::Button(materializr::tr("Polygon"), ImVec2(-1, bh(30))))
             ImGui::OpenPopup("PolygonSidesMenu");
+        menuMark();
         if (active) { ImGui::PopStyleColor(); ImGui::PopStyleVar(); }
         tip(materializr::tr("Regular polygon: pick the number of sides, then click the centre and drag for size / rotation."));
         if (ImGui::BeginPopup("PolygonSidesMenu")) {
@@ -782,6 +801,18 @@ ToolAction Toolbar::renderSketchTools() {
     tip(materializr::tr("Fill closed regions for SVG and DXF export (laser engraving): click a region to fill it, click again to clear. Cosmetic only - it never affects Extrude, Push/Pull or anything else you model."));
     if (skBtn("Dimension", 12))    action = ToolAction::SketchDimension;
     tip(materializr::tr("Dimension tool (D): click a line, circle, point pair, or two lines, place the label, then type the value."));
+    // Construction: lit while "draw as construction" is on. Same border as an
+    // active tool so the state reads at a glance.
+    {
+        if (m_constructionDraw) {
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 2.0f);
+            ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+        }
+        if (ImGui::Button(materializr::tr("Construction"), ImVec2(-1, bh(30))))
+            action = ToolAction::SketchConstruction;
+        if (m_constructionDraw) { ImGui::PopStyleColor(); ImGui::PopStyleVar(); }
+        tip(materializr::tr("Construction geometry: reference lines that help you draw but are not part of the shape - they never affect extrudes or exports. With elements selected, click to turn them into construction (or back). Otherwise click to draw the next shapes as construction."));
+    }
 
     // Transforms operate on the current sketch-element selection (Select tool +
     // click/Ctrl+click on points and lines). No-op if nothing is selected.

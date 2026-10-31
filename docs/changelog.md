@@ -21,11 +21,27 @@ All notable changes to Materializr are documented here. Format loosely follows
   of the size picked for your display, for when everything is too small to read
   without switching to Touch mode. Takes effect on restart; use Reset panel
   layout afterwards if the panels look cramped.
+- **Construction geometry (first pass).** A **Construction** button in the
+  sketch tools. With lines, circles, arcs or splines selected it turns them into
+  construction (or back); otherwise it makes what you draw next construction.
+  Construction geometry draws dashed and teal, stays selectable and snappable,
+  and has no effect on the shape: regions, extrudes, push/pull and SVG/DXF
+  export come out exactly as if it were not there. Trim, mirror, copy and
+  patterns keep the flag. This is an early version: feedback on what it needs
+  next (infinite lines, horizontal/vertical/parallel helpers, tangents) is
+  welcome.
 - **Android: Full screen** switch (Settings ▸ Appearance). Off by default, which
   keeps the status bar visible; on hides it as well.
 
 ### Changed
 
+- **Rectangle and Circle choose their origin from a menu.** Click the tool again
+  while it is active to pick Corner or Center (Center or 2-Point for circles).
+  This replaces the extra "Draw from" button that appeared under them.
+- **Buttons that open a menu now say so.** A small corner wedge marks the tool
+  rail's group buttons (Multiply, Transform, Repair, Import, Construct, Sketch
+  on, Primitive) and Rectangle, Circle and Polygon, so the options are no longer
+  hidden behind an unmarked button.
 - **Frame rate follows your display.** The VSync option is gone; the frame rate
   is capped at the refresh rate of the monitor the window is on, so a 144 Hz
   screen is no longer held to 60.

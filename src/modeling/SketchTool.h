@@ -83,6 +83,17 @@ public:
     void setMode(SketchToolMode mode);
     SketchToolMode getMode() const;
 
+    // "Draw as construction": while on, everything the drawing tools (Line,
+    // Circle, Rectangle, Arc, Spline, Polygon) create is construction geometry
+    // (see Sketch::hasConstructionGeometry). Sticky for the sketch session; the
+    // app turns it off when the sketch closes.
+    void setConstructionDraw(bool on) { m_constructionDraw = on; }
+    bool getConstructionDraw() const { return m_constructionDraw; }
+    // Flag whatever was created since `firstId` per the mode above. Called by
+    // the input entry points; public only so a scope guard outside the class
+    // body can reach it.
+    void flagNewElements(int firstId);
+
     // Input events (in sketch 2D coordinates). `addToSel` is the modifier state
     // for Select-mode multi-pick (Ctrl held); ignored by other tools.
     void onMouseDown(glm::vec2 pos, bool addToSel = false);
@@ -683,6 +694,7 @@ private:
     int m_dragPointId = -1;
     bool m_isDragging = false;
     bool m_lastDownAddedToSel = false; // Ctrl state for the current click
+    bool m_constructionDraw = false;
     std::set<int> m_selectedPoints;
     std::set<int> m_selectedLines;
     std::set<int> m_selectedCircles;

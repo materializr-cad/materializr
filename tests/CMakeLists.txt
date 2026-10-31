@@ -687,6 +687,11 @@ add_executable(test_region_anchor test_region_anchor.cpp)
 target_link_libraries(test_region_anchor PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_region_anchor COMMAND test_region_anchor)
 
+# test_sketch_construction - construction geometry never changes what a sketch produces
+add_executable(test_sketch_construction test_sketch_construction.cpp)
+target_link_libraries(test_sketch_construction PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_sketch_construction COMMAND test_sketch_construction)
+
 # test_sketch_region_worker - off-thread region builds for picking (#130)
 add_executable(test_sketch_region_worker test_sketch_region_worker.cpp)
 target_link_libraries(test_sketch_region_worker PRIVATE materializr_core gtest gtest_main)

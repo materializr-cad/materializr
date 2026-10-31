@@ -63,8 +63,41 @@ SketchToolMode SketchTool::getMode() const {
     return m_mode;
 }
 
+void SketchTool::flagNewElements(int firstId) {
+    if (!m_constructionDraw || !m_sketch) return;
+    switch (m_mode) {
+        case SketchToolMode::Line:
+        case SketchToolMode::Circle:
+        case SketchToolMode::Rectangle:
+        case SketchToolMode::Arc:
+        case SketchToolMode::Spline:
+        case SketchToolMode::Polygon:
+            m_sketch->setConstructionSince(firstId, true);
+            break;
+        default:
+            // Text, SVG, Airfoil and the rest produce real geometry whatever
+            // the toggle says; Trim keeps the flag of what it cuts instead.
+            break;
+    }
+}
+
+namespace {
+// Flags what one input event created. A guard rather than a call at the end
+// because onMouseDown and applyDimension both return from many places, and the
+// dozen creation sites inside the drawing tools should not each know the mode.
+struct NewElementGuard {
+    SketchTool& tool;
+    Sketch* sketch;
+    int firstId;
+    NewElementGuard(SketchTool& t, Sketch* s)
+        : tool(t), sketch(s), firstId(s ? s->nextElementId() : 0) {}
+    ~NewElementGuard() { if (sketch) tool.flagNewElements(firstId); }
+};
+} // namespace
+
 void SketchTool::onMouseDown(glm::vec2 pos, bool addToSel) {
     if (!m_sketch) return;
+    NewElementGuard newElements(*this, m_sketch);
     m_lastDownAddedToSel = addToSel;
     // Placing a point ends this segment's charge - re-hover to charge again.
     m_charged = {};
@@ -461,6 +494,7 @@ bool SketchTool::dropLineChainTail() {
 
 bool SketchTool::applyDimension(float value) {
     if (!m_sketch || !m_isPlacing || value <= 0.0f) return false;
+    NewElementGuard newElements(*this, m_sketch);
 
     // Offset takes the typed value as a MAGNITUDE and keeps the side the
     // cursor already chose - a distance cannot express a direction. It only
@@ -4028,6 +4062,11 @@ int findOrAddPoint(Sketch& sketch, glm::vec2 pos, float tol = 1e-2f) {
 void applyTrim(Sketch& sketch, const TrimAction& a) {
     if (a.kind == TrimAction::Kind::None) return;
 
+    // What is left of a construction line, circle, arc or spline after a trim
+    // is still construction: trimming one back to a boundary must not turn the
+    // remainder into real geometry that suddenly shapes the profile.
+    const bool cons = sketch.isConstructionElement(a.targetId);
+
     if (a.kind == TrimAction::Kind::FullDelete) {
         sketch.removeElement(a.targetId);
         return;
@@ -4041,7 +4080,10 @@ void applyTrim(Sketch& sketch, const TrimAction& a) {
                 int pid = (c.id >= 0 && sketch.getPoint(c.id)) ? c.id : findOrAddPoint(sketch, c.pos);
                 if (ids.empty() || ids.back() != pid) ids.push_back(pid);
             }
-            if (ids.size() >= 2) sketch.addSpline(ids);
+            if (ids.size() >= 2) {
+                const int ns = sketch.addSpline(ids);
+                if (cons) sketch.setElementConstruction(ns, true);
+            }
         }
         return;
     }
@@ -4057,7 +4099,8 @@ void applyTrim(Sketch& sketch, const TrimAction& a) {
             glm::vec2 ep = a.lineP1 + a.lineBounds[i + 1] * (a.lineP2 - a.lineP1);
             int sid = findOrAddPoint(sketch, sp);
             int eid = findOrAddPoint(sketch, ep);
-            sketch.addLine(sid, eid);
+            const int nl = sketch.addLine(sid, eid);
+            if (cons) sketch.setElementConstruction(nl, true);
         }
         return;
     }
@@ -4075,7 +4118,8 @@ void applyTrim(Sketch& sketch, const TrimAction& a) {
             glm::vec2 ep = a.circCenter + glm::vec2(std::cos(a1), std::sin(a1)) * a.circRadius;
             int sid = findOrAddPoint(sketch, sp);
             int eid = findOrAddPoint(sketch, ep);
-            sketch.addArc(centerId, sid, eid, static_cast<double>(a.circRadius));
+            const int na = sketch.addArc(centerId, sid, eid, static_cast<double>(a.circRadius));
+            if (cons) sketch.setElementConstruction(na, true);
         }
         return;
     }
@@ -4092,7 +4136,8 @@ void applyTrim(Sketch& sketch, const TrimAction& a) {
             glm::vec2 ep = a.arcCenter + glm::vec2(std::cos(angB), std::sin(angB)) * a.arcRadius;
             int sid = findOrAddPoint(sketch, sp);
             int eid = findOrAddPoint(sketch, ep);
-            sketch.addArc(centerId, sid, eid, static_cast<double>(a.arcRadius));
+            const int na = sketch.addArc(centerId, sid, eid, static_cast<double>(a.arcRadius));
+            if (cons) sketch.setElementConstruction(na, true);
         }
         return;
     }
@@ -4383,7 +4428,10 @@ void SketchTool::commitMirror(std::set<int>& outPoints, std::set<int>& outLines)
         for (const auto& l : m_sketch->getLines()) if (l.id == lid) {
             int s = remapPt(l.startPointId), e = remapPt(l.endPointId);
             if (s >= 0 && e >= 0 && s != e) {
+                // Read before addLine: it can reallocate the vector `l` lives in.
+                const bool cons = l.isConstruction;
                 int nl = m_sketch->addLine(s, e);
+                if (cons) m_sketch->setElementConstruction(nl, true);
                 outLines.insert(nl); outPoints.insert(s); outPoints.insert(e);
             }
             break;
@@ -4391,7 +4439,12 @@ void SketchTool::commitMirror(std::set<int>& outPoints, std::set<int>& outLines)
     for (int cid : m_mirrorCircles)
         for (const auto& c : m_sketch->getCircles()) if (c.id == cid) {
             int ctr = remapPt(c.centerPointId);
-            if (ctr >= 0) { m_sketch->addCircle(ctr, c.radius); outPoints.insert(ctr); }
+            if (ctr >= 0) {
+                const bool cons = c.isConstruction;
+                const int nc = m_sketch->addCircle(ctr, c.radius);
+                if (cons) m_sketch->setElementConstruction(nc, true);
+                outPoints.insert(ctr);
+            }
             break;
         }
     for (int aid : m_mirrorArcs)
@@ -4401,7 +4454,9 @@ void SketchTool::commitMirror(std::set<int>& outPoints, std::set<int>& outLines)
             // Reflection reverses winding - swap start/end so the rebuilt arc
             // keeps the same swept (minor) span on the mirrored side.
             if (ctr >= 0 && s >= 0 && e >= 0) {
-                m_sketch->addArc(ctr, e, s, a.radius);
+                const bool cons = a.isConstruction;
+                const int na = m_sketch->addArc(ctr, e, s, a.radius);
+                if (cons) m_sketch->setElementConstruction(na, true);
                 outPoints.insert(s); outPoints.insert(e); outPoints.insert(ctr);
             }
             break;
@@ -4410,7 +4465,11 @@ void SketchTool::commitMirror(std::set<int>& outPoints, std::set<int>& outLines)
         for (const auto& sp : m_sketch->getSplines()) if (sp.id == sid) {
             std::vector<int> cps;
             for (int cp : sp.controlPointIds) { int n2 = remapPt(cp); if (n2 >= 0) cps.push_back(n2); }
-            if (cps.size() >= 2) m_sketch->addSpline(cps);
+            if (cps.size() >= 2) {
+                const bool cons = sp.isConstruction;
+                const int ns = m_sketch->addSpline(cps);
+                if (cons) m_sketch->setElementConstruction(ns, true);
+            }
             for (int n2 : cps) outPoints.insert(n2);
             break;
         }

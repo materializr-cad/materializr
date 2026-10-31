@@ -134,7 +134,9 @@ Anchor classify(const TopoDS_Edge& e, int sketchId,
     }
     double u1, v1, u2, v2;
     if (rimEnds(e, f, u1, v1, u2, v2, h)) {
+        // Construction geometry never produces an edge, so it cannot anchor one.
         for (const auto& L : sk.getLines()) {
+            if (L.isConstruction) continue;
             const auto* pa = sk.getPoint(L.startPointId);
             const auto* pb = sk.getPoint(L.endPointId);
             if (!pa || !pb) continue;
@@ -147,6 +149,7 @@ Anchor classify(const TopoDS_Edge& e, int sketchId,
     double r;
     if (cylUVRH(e, f, u, v, r, h)) {
         for (const auto& A : sk.getArcs()) {
+            if (A.isConstruction) continue;
             const auto* pc = sk.getPoint(A.centerPointId);
             if (!pc) continue;
             if (near2(u, v, pc->pos.x, pc->pos.y, tol) &&
@@ -154,6 +157,7 @@ Anchor classify(const TopoDS_Edge& e, int sketchId,
                 return { Anchor::Arc, sketchId, A.id, h, 0.5 };
         }
         for (const auto& C : sk.getCircles()) {
+            if (C.isConstruction) continue;
             const auto* pc = sk.getPoint(C.centerPointId);
             if (!pc) continue;
             if (near2(u, v, pc->pos.x, pc->pos.y, tol) &&

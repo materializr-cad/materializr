@@ -412,15 +412,6 @@ void Application::renderModernLayout() {
                 ++railCellIdx;
                 return railCellW;
             };
-            // A full-width row (own line, spans both columns). Used for the
-            // circle/rectangle draw-origin sub-toggle so it never lands split
-            // off in the other column of the two-column grid. Rounds the grid
-            // up to the next even cell so the following tool starts fresh at
-            // column 0.
-            auto fullRow = [&]() -> float {
-                railCellIdx = (railCellIdx + 1) & ~1;   // next even
-                return 0.0f;                            // 0 = full content width
-            };
 
             // Grouped popups for the create tools the contextual rail omits -
             // one tap away (not buried in the ⋯ menu). On a touch screen they
@@ -438,7 +429,8 @@ void Application::renderModernLayout() {
             auto popPopupPad = [&] { if (touchPad) ImGui::PopStyleVar(2); };
             auto constructGroup = [&] {
                 if (touchui::railButton("constructGroup", MZ_ICON_FOCUS,
-                                        materializr::tr("Construct"), false, cell()))
+                                        materializr::tr("Construct"), false, cell(),
+                                        false, /*hasMenu=*/true))
                     ImGui::OpenPopup("##railConstruct");
                 tip(materializr::tr("Create a construction plane or axis derived from the selection"));
                 pushPopupPad();
@@ -454,7 +446,8 @@ void Application::renderModernLayout() {
             // selection the contextual tools lead and Construct follows.
             if (nothingSel) {
                 if (touchui::railButton("sketchOnGroup", MZ_ICON_SKETCH,
-                                        materializr::tr("Sketch on..."), false, cell()))
+                                        materializr::tr("Sketch on..."), false, cell(),
+                                        false, /*hasMenu=*/true))
                     ImGui::OpenPopup("##railSketchOn");
                 tip(materializr::tr("Start a sketch on a world plane (XY / XZ / YZ)"));
                 pushPopupPad();
@@ -469,7 +462,8 @@ void Application::renderModernLayout() {
                 }
                 popPopupPad();
                 if (touchui::railButton("primGroup", MZ_ICON_PRIMITIVE,
-                                        materializr::tr("Primitive"), false, cell()))
+                                        materializr::tr("Primitive"), false, cell(),
+                                        false, /*hasMenu=*/true))
                     ImGui::OpenPopup("##railPrimitive");
                 tip(materializr::tr("Add a primitive solid: box, cylinder, sphere, cone or torus"));
                 pushPopupPad();
@@ -576,7 +570,8 @@ void Application::renderModernLayout() {
                                            : g == 4 ? "##railRepair"
                                                     : "##railImport";
                         ImGui::PushID(2000 + g);
-                        if (touchui::railButton(gLabel, gIcon, tr(gLabel), false, cell()))
+                        if (touchui::railButton(gLabel, gIcon, tr(gLabel), false, cell(),
+                                                false, /*hasMenu=*/true))
                             ImGui::OpenPopup(gPopup);
                         tip(materializr::tr(
                             g == 3 ? "Bring outside artwork into the sketch: an "
@@ -599,21 +594,21 @@ void Application::renderModernLayout() {
                         continue;
                     }
                     ImGui::PushID(railIdx++); // labels can repeat across groups
-                    // Draw-origin sub-toggle (Corner/Center, Center/2-Point):
-                    // full width on its own row so it stays visually tied to
-                    // its tool, and forced-active so it highlights BLUE and
-                    // draws the eye to the option (Steve).
-                    const bool isDrawOrigin =
-                        tool.action == ToolAction::SketchToggleDrawOrigin;
+                    // Circle / Rectangle / Polygon carry `menu`: a corner wedge
+                    // on the button, and a second tap while active opens the
+                    // origin / sides menu instead of the old extra toggle row.
                     const bool clicked = touchui::railButton(
-                        tool.label, tool.icon, tr(tool.label),
-                        isDrawOrigin ? true : tool.active,
-                        isDrawOrigin ? fullRow() : cell());
+                        tool.label, tool.icon, tr(tool.label), tool.active, cell(),
+                        false, tool.menu);
                     tip(materializr::tr(tool.tip));
                     if (tool.pluginIndex >= 0) {
                         if (clicked) m_toolbar->fireRailPlugin(tool.pluginIndex);
                     } else if (tool.action == ToolAction::Polygon)
                         renderRailPolygonSidesPopup(clicked);
+                    else if (tool.action == ToolAction::Rectangle ||
+                             tool.action == ToolAction::Circle)
+                        renderRailDrawOriginPopup(tool.action == ToolAction::Rectangle,
+                                                  tool.active, clicked);
                     else if (clicked)
                         handleToolAction(static_cast<int>(tool.action));
                     ImGui::PopID();

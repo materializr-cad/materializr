@@ -15,9 +15,17 @@ namespace touchui {
 // by the lite shell's horizontal tool bar). `solid` gives the inactive state
 // a panel-coloured fill too, so the button reads as solid standing alone on
 // the viewport (not just when hovered/active) without a separate backing
-// window. Returns true on press.
+// window. `hasMenu` marks a button that opens a menu of variants (a group
+// flyout, or a tool with options on a second press) with a small corner
+// wedge, so the menu is not hidden behind an unmarked button. Returns true on
+// press.
 bool railButton(const char* id, const char* icon, const char* label, bool active,
-                float width = 0.0f, bool solid = false);
+                float width = 0.0f, bool solid = false, bool hasMenu = false);
+
+// The corner wedge itself, for buttons drawn by other code (the classic
+// toolbar's text buttons). `max` is the button's bottom-right corner; `size`
+// the icon size the wedge scales with.
+void drawMenuMark(ImDrawList* dl, const ImVec2& max, float size, ImU32 col);
 
 // Floating action button: filled accent circle with a centered icon
 // (im-touch-lite's "+ create"). Returns true on press.

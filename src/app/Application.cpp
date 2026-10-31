@@ -2765,6 +2765,37 @@ void Application::handleToolAction(int action) {
             }
             break;
 
+        case ToolAction::SketchConstruction:
+            if (m_inSketchMode && m_sketchTool && m_activeSketch) {
+                // Elements picked in Select mode: flip them. Otherwise the
+                // button is the "draw as construction" mode for the tools.
+                std::vector<int> ids;
+                if (m_sketchTool->getMode() == SketchToolMode::Select) {
+                    for (int id : m_sketchTool->getSelectedLines())   ids.push_back(id);
+                    for (int id : m_sketchTool->getSelectedCircles()) ids.push_back(id);
+                    for (int id : m_sketchTool->getSelectedArcs())    ids.push_back(id);
+                    for (int id : m_sketchTool->getSelectedSplines()) ids.push_back(id);
+                }
+                if (!ids.empty()) {
+                    // All construction already -> make them real again; any
+                    // mix or all real -> make them construction.
+                    bool allConstruction = true;
+                    for (int id : ids)
+                        if (!m_activeSketch->isConstructionElement(id)) { allConstruction = false; break; }
+                    recordSketchMutation([&]{
+                        for (int id : ids)
+                            m_activeSketch->setElementConstruction(id, !allConstruction);
+                    });
+                    markDirty();
+                    // The flag decides what is part of the shape, so a body
+                    // driven by this sketch has to follow.
+                    if (m_activeSketchId >= 0) requestSketchCascade(m_activeSketchId);
+                } else {
+                    m_sketchTool->setConstructionDraw(!m_sketchTool->getConstructionDraw());
+                }
+            }
+            break;
+
         case ToolAction::ResetCamera: m_viewport->getCamera().reset(); break;
         case ToolAction::Measure:
             if (m_measureTool) {
@@ -3397,20 +3428,26 @@ void Application::handleShortcuts() {
                     for (const auto& l : src->getLines()) {
                         auto a = pmap.find(l.startPointId);
                         auto b = pmap.find(l.endPointId);
-                        if (a != pmap.end() && b != pmap.end())
-                            dst->addLine(a->second, b->second);
+                        if (a != pmap.end() && b != pmap.end()) {
+                            const int nl = dst->addLine(a->second, b->second);
+                            if (l.isConstruction) dst->setElementConstruction(nl, true);
+                        }
                     }
                     for (const auto& c : src->getCircles()) {
                         auto cp = pmap.find(c.centerPointId);
-                        if (cp != pmap.end())
-                            dst->addCircle(cp->second, c.radius);
+                        if (cp != pmap.end()) {
+                            const int nc = dst->addCircle(cp->second, c.radius);
+                            if (c.isConstruction) dst->setElementConstruction(nc, true);
+                        }
                     }
                     for (const auto& arc : src->getArcs()) {
                         auto cp = pmap.find(arc.centerPointId);
                         auto sp = pmap.find(arc.startPointId);
                         auto ep = pmap.find(arc.endPointId);
-                        if (cp != pmap.end() && sp != pmap.end() && ep != pmap.end())
-                            dst->addArc(cp->second, sp->second, ep->second, arc.radius);
+                        if (cp != pmap.end() && sp != pmap.end() && ep != pmap.end()) {
+                            const int na = dst->addArc(cp->second, sp->second, ep->second, arc.radius);
+                            if (arc.isConstruction) dst->setElementConstruction(na, true);
+                        }
                     }
                     int newId = m_document->addSketch(dst,
                                   m_document->getSketchName(first.sketchId) + " copy");
@@ -6894,21 +6931,25 @@ void Application::recordSketchMutation(const std::function<void()>& mutator) {
         mix(s.getPoints().size());
         for (const auto& p : s.getPoints()) { mix(static_cast<size_t>(p.id)); mixPos(p.pos); }
         mix(s.getLines().size());
-        for (const auto& l : s.getLines()) mix(static_cast<size_t>(l.id));
+        // The construction flag too: flipping it changes nothing else, and a
+        // change that does not register is not an undo step.
+        for (const auto& l : s.getLines()) { mix(static_cast<size_t>(l.id)); mix(l.isConstruction ? 1u : 0u); }
         mix(s.getCircles().size());
         for (const auto& c : s.getCircles()) {
             mix(static_cast<size_t>(c.id));
             mix(static_cast<size_t>(std::llround(c.radius * 1e4)));
+            mix(c.isConstruction ? 1u : 0u);
         }
         mix(s.getArcs().size());
         for (const auto& a : s.getArcs()) {
             mix(static_cast<size_t>(a.id));
             mix(static_cast<size_t>(std::llround(a.radius * 1e4)));
+            mix(a.isConstruction ? 1u : 0u);
         }
         mix(s.getSplines().size());
-        for (const auto& sp : s.getSplines()) mix(static_cast<size_t>(sp.id));
+        for (const auto& sp : s.getSplines()) { mix(static_cast<size_t>(sp.id)); mix(sp.isConstruction ? 1u : 0u); }
         mix(s.getPolygons().size());
-        for (const auto& p : s.getPolygons()) mix(static_cast<size_t>(p.id));
+        for (const auto& p : s.getPolygons()) { mix(static_cast<size_t>(p.id)); mix(p.isConstruction ? 1u : 0u); }
         // Constraints too - including their values so an edit (not just an
         // add / remove) registers as a mutation and pushes a history step.
         mix(s.getConstraints().size());
@@ -7490,6 +7531,9 @@ void Application::exitSketchMode() {
     if (m_history) m_history->clearUndoFloor();  // undo is unrestricted again
     m_toolbar->setSketchMode(false);
     m_sketchTool->setMode(SketchToolMode::None);
+    // "Draw as construction" is a per-sketch-session choice: it must not carry
+    // into the next sketch, where the next line would come out dashed unasked.
+    m_sketchTool->setConstructionDraw(false);
     m_sketchTool->setSketch(nullptr);
     m_sketchTool->setSolver(nullptr);
     // Drop any stale Dimension edit-popup state so it can't reopen (with a
@@ -8537,6 +8581,8 @@ void Application::run() {
                 m_toolbar->setRectMode(static_cast<int>(m_sketchTool->getRectMode()));
                 m_toolbar->setCircleMode(static_cast<int>(m_sketchTool->getCircleMode()));
             }
+            m_toolbar->setConstructionDraw(m_inSketchMode && m_sketchTool &&
+                                           m_sketchTool->getConstructionDraw());
             // Per-frame hide/show of the toolbar's inference cycle button.
             // Users who set the level once in Settings can declutter the
             // sketch toolbar; default is on (the live toggle is visible).

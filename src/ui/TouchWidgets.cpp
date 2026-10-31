@@ -150,6 +150,24 @@ void drawIconCentered(ImDrawList* dl, const ImVec2& center, float size,
                           ImVec2(center.x + hs, center.y + hs), col);
         return;
     }
+    // MZ_ICON_CONSTRUCTION sentinel (U+E008): three dashes along a diagonal,
+    // the look of construction geometry in the sketch itself.
+    if (std::strcmp(icon, "\xee\x80\x88") == 0) {
+        const float th = std::max(1.5f, size * 0.075f);
+        const float half = size * 0.40f;
+        const ImVec2 a(center.x - half, center.y + half);   // bottom-left
+        const ImVec2 b(center.x + half, center.y - half);   // top-right
+        const int dashes = 3;
+        for (int i = 0; i < dashes; ++i) {
+            // Each dash is 0.55 of its slot: segments with visible gaps.
+            const float t0 = (i + 0.0f) / dashes;
+            const float t1 = (i + 0.55f) / dashes;
+            dl->AddLine(ImVec2(a.x + (b.x - a.x) * t0, a.y + (b.y - a.y) * t0),
+                        ImVec2(a.x + (b.x - a.x) * t1, a.y + (b.y - a.y) * t1),
+                        col, th);
+        }
+        return;
+    }
     ImFont* font = ImGui::GetFont();
     const ImVec2 ts = font->CalcTextSizeA(size, FLT_MAX, 0.0f, icon);
     dl->AddText(font, size, ImVec2(center.x - ts.x * 0.5f, center.y - ts.y * 0.5f),
@@ -158,8 +176,20 @@ void drawIconCentered(ImDrawList* dl, const ImVec2& center, float size,
 
 } // namespace
 
+void drawMenuMark(ImDrawList* dl, const ImVec2& max, float size, ImU32 col) {
+    // A small right-angle wedge in the bottom-right corner: the convention for
+    // "this button opens a menu of variants" (Photoshop's toolbox, Fusion).
+    // Right-angled so it reads as a corner mark rather than a dropdown caret.
+    // `max` is the button's own corner; the wedge insets itself from it.
+    const float k = size / 22.0f;
+    const float leg = 8.0f * k, in = 3.5f * k;
+    dl->AddTriangleFilled(ImVec2(max.x - in - leg, max.y - in),
+                          ImVec2(max.x - in,       max.y - in),
+                          ImVec2(max.x - in,       max.y - in - leg), col);
+}
+
 bool railButton(const char* id, const char* icon, const char* label, bool active,
-                float width, bool solid) {
+                float width, bool solid, bool hasMenu) {
     const float s = uiScale();
     const float w = width > 0.0f ? width : ImGui::GetContentRegionAvail().x;
     // 52 (was 62): shorter so the whole tool set fits with less scrolling,
@@ -193,6 +223,8 @@ bool railButton(const char* id, const char* icon, const char* label, bool active
     const ImVec2 lsz = font->CalcTextSizeA(ls, FLT_MAX, 0.0f, label);
     dl->AddText(font, ls,
                 ImVec2(p.x + (w - lsz.x) * 0.5f, p.y + h * 0.62f), fgDim, label);
+    if (hasMenu)
+        drawMenuMark(dl, ImVec2(p.x + w, p.y + h), 22.0f * s, fgDim);
     ImGui::PopID();
     return pressed;
 }

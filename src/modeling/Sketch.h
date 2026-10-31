@@ -174,6 +174,35 @@ public:
     int pruneOrphanPoints();
     void clear();
 
+    // CONSTRUCTION GEOMETRY: reference lines, circles, arcs and splines that
+    // help you draw but are not part of the shape. The contract is that they
+    // have NO effect on anything the sketch produces - regions, profile wires,
+    // extrusions, SVG/DXF export - so a sketch with construction geometry
+    // yields exactly what the same sketch without it would. They stay
+    // selectable, snappable and dimensionable, and take part in the solver.
+    //
+    // That contract is kept in ONE place rather than a skip in every loop:
+    // every builder (buildOpenWire, buildWires, buildProfileShape,
+    // buildRegions) works from withoutConstruction() when there is any
+    // construction geometry, so a builder added later cannot forget it.
+    bool hasConstructionGeometry() const;
+    bool isConstructionElement(int id) const;
+    // Flip one element. A polygon's edge flips the whole polygon, because a
+    // polygon has no valid state with one edge missing (see removeElement).
+    // Returns false when `id` names no line/circle/arc/spline/polygon.
+    bool setElementConstruction(int id, bool on);
+    // The next id the sketch will hand out. Elements and points share one
+    // counter, so everything a tool creates during one action has an id at or
+    // above the value read before it ran.
+    int nextElementId() const { return m_nextId; }
+    // Mark every element whose id is >= firstId. How a tool in "draw as
+    // construction" mode flags what it just made without each of the dozen
+    // creation sites knowing about the mode.
+    void setConstructionSince(int firstId, bool on);
+    // A copy with every construction element - and every point only they use -
+    // removed. For builders; it keeps ids, plane and source face.
+    Sketch withoutConstruction() const;
+
     // Convert closed profiles to OCCT wires for extrusion
     std::vector<TopoDS_Wire> buildWires() const;
 

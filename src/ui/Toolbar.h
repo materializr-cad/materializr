@@ -49,7 +49,11 @@ enum class ToolAction {
     // Sketch Fill tool: mark closed regions solid for SVG export (engraving).
     // Appended rather than grouped with the sketch tools above so no existing
     // value shifts.
-    SketchFill
+    SketchFill,
+    // Sketch construction geometry. With elements picked in Select mode it
+    // flips them between real and construction; otherwise it toggles "draw as
+    // construction" for the tools. Appended for the same no-shift reason.
+    SketchConstruction
 };
 
 class Toolbar {
@@ -75,6 +79,7 @@ public:
         bool        active = false;   // highlight (current sketch tool)
         const char* tip = nullptr;    // hover tooltip (im-touch shell)
         int         pluginIndex = -1; // >= 0: plugin contribution, not a ToolAction
+        bool        menu = false;     // opens a menu on a second press: draw a corner wedge
     };
     std::vector<RailTool> railTools() const;
     // Fire a plugin RailTool (activate its tool / run its action) - the rail
@@ -170,6 +175,9 @@ public:
     // SketchTool::RectMode (0=Corner,1=Center) and CircleMode (0=Center,1=2-Point).
     void setRectMode(int m) { m_rectMode = m; }
     void setCircleMode(int m) { m_circleMode = m; }
+    // "Draw as construction" is on (SketchTool::getConstructionDraw): lights the
+    // Construction button so a drawn dashed line is never a surprise.
+    void setConstructionDraw(bool on) { m_constructionDraw = on; }
     // Off hides the inference cycle button from the sketch toolbar so a user
     // who set the level once in Settings can declutter. Default on.
     void setShowInferenceToggle(bool b) { m_showInferenceToggle = b; }
@@ -215,6 +223,7 @@ private:
     int  m_requestedPolygonSides = 6; // last pick from the Polygon popout
     int  m_rectMode = 0;       // 0=Corner, 1=Center (see setRectMode)
     int  m_circleMode = 0;     // 0=Center, 1=2-Point (see setCircleMode)
+    bool m_constructionDraw = false; // see setConstructionDraw
     bool m_showInferenceToggle = true; // see setShowInferenceToggle
 
     ToolAction renderSketchTools();

@@ -153,7 +153,9 @@ Anchor classify(const TopoDS_Face& face, int sketchId,
         // Wall - normal perpendicular to the axis: swept from a sketch line the
         // centroid sits over. Intersecting features clip walls into fragments,
         // so on-segment containment (not endpoint equality), like rim edges.
+        // Construction geometry never produces a wall, so it cannot anchor one.
         for (const auto& L : sk.getLines()) {
+            if (L.isConstruction) continue;
             const auto* pa = sk.getPoint(L.startPointId);
             const auto* pb = sk.getPoint(L.endPointId);
             if (!pa || !pb) continue;
@@ -171,6 +173,7 @@ Anchor classify(const TopoDS_Face& face, int sketchId,
         const double r  = s.Cylinder().Radius();
         const double au = f.u(ax.Location()), av = f.v(ax.Location());
         for (const auto& A : sk.getArcs()) {
+            if (A.isConstruction) continue;
             const auto* pc = sk.getPoint(A.centerPointId);
             if (!pc) continue;
             if (near2(au, av, pc->pos.x, pc->pos.y, tol) &&
@@ -178,6 +181,7 @@ Anchor classify(const TopoDS_Face& face, int sketchId,
                 return { Anchor::Cyl, sketchId, A.id, ch, cu, cv };
         }
         for (const auto& C : sk.getCircles()) {
+            if (C.isConstruction) continue;
             const auto* pc = sk.getPoint(C.centerPointId);
             if (!pc) continue;
             if (near2(au, av, pc->pos.x, pc->pos.y, tol) &&
@@ -197,6 +201,7 @@ Anchor classify(const TopoDS_Face& face, int sketchId,
         if (prof.empty()) return a;
         const double ctol = std::max(tol, 0.02);
         for (const auto& sp : sk.getSplines()) {
+            if (sp.isConstruction) continue;
             const auto poly = sk.sampleSpline2D(sp, 48);
             if (poly.size() < 2) continue;
             int miss = 0;

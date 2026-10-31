@@ -784,6 +784,10 @@ void Application::renderImTouchLayout() {
                     }
                 } else if (tool.action == ToolAction::Polygon) {
                     renderRailPolygonSidesPopup(clicked);
+                } else if (tool.action == ToolAction::Rectangle ||
+                           tool.action == ToolAction::Circle) {
+                    renderRailDrawOriginPopup(tool.action == ToolAction::Rectangle,
+                                              tool.active, clicked);
                 } else if (clicked) {
                     handleToolAction(static_cast<int>(tool.action));
                     if (inPopup &&
@@ -794,7 +798,8 @@ void Application::renderImTouchLayout() {
             auto flatButton = [&](const Toolbar::RailTool& tool, int id) {
                 ImGui::PushID(id); // labels can repeat across groups
                 const bool clicked = touchui::railButton(
-                    tool.label, tool.icon, tr(tool.label), tool.active, 64.0f * s);
+                    tool.label, tool.icon, tr(tool.label), tool.active, 64.0f * s,
+                    false, tool.menu);
                 tip(materializr::tr(tool.tip));
                 fire(tool, clicked, /*inPopup=*/false);
                 ImGui::PopID();
@@ -814,7 +819,8 @@ void Application::renderImTouchLayout() {
                                         activeTool ? activeTool->icon : groupIcon,
                                         materializr::tr(activeTool ? activeTool->label
                                                                    : groupLabel),
-                                        activeTool != nullptr, 64.0f * s))
+                                        activeTool != nullptr, 64.0f * s,
+                                        false, /*hasMenu=*/true))
                     ImGui::OpenPopup(popupId);
                 tip(materializr::tr(groupTip));
                 if (ImGui::BeginPopup(popupId)) {

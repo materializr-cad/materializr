@@ -2642,8 +2642,13 @@ void Application::updateSketchPattern() {
                 auto eIt = remap.find(l.endPointId);
                 if (sIt != remap.end() && eIt != remap.end() &&
                     sIt->second != eIt->second &&
-                    lineKeys.insert(std::minmax(sIt->second, eIt->second)).second)
-                    m_activeSketch->addLine(sIt->second, eIt->second);
+                    lineKeys.insert(std::minmax(sIt->second, eIt->second)).second) {
+                    // A copy of construction stays construction. Read before
+                    // addLine, which can reallocate the vector `l` lives in.
+                    const bool cons = l.isConstruction;
+                    const int nl = m_activeSketch->addLine(sIt->second, eIt->second);
+                    if (cons) m_activeSketch->setElementConstruction(nl, true);
+                }
                 break;
             }
         }
@@ -2651,7 +2656,10 @@ void Application::updateSketchPattern() {
         for (const auto& c : circles) {
             if (!m_sketchPatternCircles.count(c.id)) continue;
             auto it = remap.find(c.centerPointId);
-            if (it != remap.end()) m_activeSketch->addCircle(it->second, c.radius);
+            if (it != remap.end()) {
+                const int nc = m_activeSketch->addCircle(it->second, c.radius);
+                if (c.isConstruction) m_activeSketch->setElementConstruction(nc, true);
+            }
         }
         auto arcs = m_activeSketch->getArcs();
         for (const auto& a : arcs) {
@@ -2659,8 +2667,10 @@ void Application::updateSketchPattern() {
             auto ic = remap.find(a.centerPointId);
             auto is = remap.find(a.startPointId);
             auto ie = remap.find(a.endPointId);
-            if (ic != remap.end() && is != remap.end() && ie != remap.end())
-                m_activeSketch->addArc(ic->second, is->second, ie->second, a.radius);
+            if (ic != remap.end() && is != remap.end() && ie != remap.end()) {
+                const int na = m_activeSketch->addArc(ic->second, is->second, ie->second, a.radius);
+                if (a.isConstruction) m_activeSketch->setElementConstruction(na, true);
+            }
         }
     }
 }

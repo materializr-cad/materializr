@@ -746,4 +746,34 @@ void Application::renderRailPolygonSidesPopup(bool clicked) {
     }
 }
 
+void Application::renderRailDrawOriginPopup(bool isRect, bool wasActive, bool clicked) {
+    // Same menu as the classic toolbar's (Toolbar.cpp drawOriginMenu), so every
+    // layout answers the second tap the same way. The popup id is shared: only
+    // one rail button is ever tapped at a time, and BeginPopup keys on the id
+    // within the calling button's ID scope.
+    const ToolAction act = isRect ? ToolAction::Rectangle : ToolAction::Circle;
+    if (clicked) {
+        if (wasActive) ImGui::OpenPopup("##railDrawOrigin");
+        else handleToolAction(static_cast<int>(act));
+    }
+    if (ImGui::BeginPopup("##railDrawOrigin")) {
+        int cur = 0;
+        if (m_sketchTool)
+            cur = isRect ? static_cast<int>(m_sketchTool->getRectMode())
+                         : static_cast<int>(m_sketchTool->getCircleMode());
+        const char* names[2] = { isRect ? "Corner" : "Center",
+                                 isRect ? "Center" : "2-Point" };
+        ImGui::TextDisabled("%s", materializr::tr("Draw from"));
+        for (int i = 0; i < 2; ++i) {
+            if (ImGui::MenuItem(materializr::tr(names[i]), nullptr, cur == i)) {
+                // Exactly two modes, so choosing the other one IS the toggle.
+                if (cur != i)
+                    handleToolAction(static_cast<int>(ToolAction::SketchToggleDrawOrigin));
+                ImGui::CloseCurrentPopup();
+            }
+        }
+        ImGui::EndPopup();
+    }
+}
+
 } // namespace materializr

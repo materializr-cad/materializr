@@ -108,6 +108,10 @@
 // drawIconCentered. Matches how a sketch point itself renders (SketchRenderer
 // drawPoints) - Iconoir's outline-only glyphs have no filled dot.
 #define MZ_ICON_POINT      "\xee\x80\x87"  // U+E007
+// Construction - sentinel (PUA U+E008): a dashed diagonal line, which is how
+// construction geometry itself draws in the sketch. Iconoir has no dashed-line
+// glyph. Drawn in drawIconCentered.
+#define MZ_ICON_CONSTRUCTION "\xee\x80\x88"  // U+E008
 #define MZ_ICON_FILL       ICON_IC_FILL_COLOR  // sketch Fill tool (paint bucket)
 #define MZ_ICON_FINISH     ICON_IC_CHECK
 #define MZ_ICON_DISCARD    ICON_IC_XMARK

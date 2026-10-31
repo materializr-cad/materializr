@@ -21,6 +21,7 @@
 #include <TopoDS_Edge.hxx>
 #include <TopoDS_Wire.hxx>
 #include <cstdio>
+#include <algorithm>
 #include <cmath>
 
 namespace materializr {
@@ -134,20 +135,25 @@ std::uint64_t SketchRenderer::contentSignature(const Sketch* sketch) const {
         mixI(p.id); mixF(p.pos.x); mixF(p.pos.y);
         mixI(p.fromText ? 1 : 0); mixI(p.isConstruction ? 1 : 0);
     }
+    // The construction flag is part of what is drawn (dashed, other colour),
+    // so a flip has to invalidate the cached passes.
     for (const auto& l : sketch->getLines()) {
         mixI(l.id); mixI(l.startPointId); mixI(l.endPointId);
-        mixI(l.fromText ? 1 : 0);
+        mixI(l.fromText ? 1 : 0); mixI(l.isConstruction ? 1 : 0);
     }
     for (const auto& c : sketch->getCircles()) {
         mixI(c.id); mixI(c.centerPointId); mixD(c.radius);
+        mixI(c.isConstruction ? 1 : 0);
     }
     for (const auto& a : sketch->getArcs()) {
         mixI(a.id); mixI(a.centerPointId); mixI(a.startPointId);
         mixI(a.endPointId); mixD(a.radius);
+        mixI(a.isConstruction ? 1 : 0);
     }
     for (const auto& s : sketch->getSplines()) {
         mixI(s.id);
         for (int cp : s.controlPointIds) mixI(cp);
+        mixI(s.isConstruction ? 1 : 0);
     }
     for (const auto& pg : sketch->getPolygons()) {
         mixI(pg.id); mixI(pg.centerPointId);
@@ -472,8 +478,64 @@ glm::vec3 SketchRenderer::toWorld(const Sketch* sketch, glm::vec2 pt2d) const {
     );
 }
 
+namespace {
+
+// Construction geometry draws dashed and teal: the dashes say "reference, not
+// shape" and the colour keeps it apart from both the cobalt real geometry and
+// the gold selection highlight.
+const glm::vec3 kConstructionColor(0.05f, 0.62f, 0.55f);
+
+// Dash length in sketch units. Scaled to the DRAWING, not the zoom: the static
+// passes are cached by content, so a zoom-dependent dash would rebuild every
+// buffer on every scroll tick. About thirty dashes across the sketch reads as
+// dashed rather than dotted at any ordinary zoom.
+float constructionDash(const Sketch* sketch) {
+    glm::vec2 lo(1e30f), hi(-1e30f);
+    for (const auto& p : sketch->getPoints()) {
+        lo = glm::min(lo, p.pos);
+        hi = glm::max(hi, p.pos);
+    }
+    if (hi.x < lo.x) return 1.0f;
+    const float extent = std::max(hi.x - lo.x, hi.y - lo.y);
+    return std::min(std::max(extent / 32.0f, 0.3f), 40.0f);
+}
+
+// Append a polyline as dashes (line-list vertices). The dash pattern runs
+// ACROSS the polyline's own segments, so a circle sampled in 64 pieces dashes
+// as one curve rather than one dash per piece.
+void appendDashed(std::vector<float>& out, const std::vector<glm::vec3>& poly,
+                  float dash) {
+    const float gap = dash * 0.6f;
+    auto push = [&](const glm::vec3& a, const glm::vec3& b) {
+        out.push_back(a.x); out.push_back(a.y); out.push_back(a.z);
+        out.push_back(b.x); out.push_back(b.y); out.push_back(b.z);
+    };
+    bool on = true;
+    float remain = dash;
+    for (size_t i = 1; i < poly.size(); ++i) {
+        const glm::vec3 a = poly[i - 1], b = poly[i];
+        const float len = glm::length(b - a);
+        if (len < 1e-9f) continue;
+        // A segment that would shatter into thousands of dashes (a very long
+        // line against a tiny dash) is drawn solid instead of flooding the buffer.
+        if (len / (dash + gap) > 4000.0f) { push(a, b); continue; }
+        const glm::vec3 dir = (b - a) / len;
+        float t = 0.0f;
+        while (t < len) {
+            const float step = std::min(remain, len - t);
+            if (on) push(a + dir * t, a + dir * (t + step));
+            t += step;
+            remain -= step;
+            if (remain <= 1e-9f) { on = !on; remain = on ? dash : gap; }
+        }
+    }
+}
+
+} // namespace
+
 void SketchRenderer::drawLines(const Sketch* sketch, const glm::mat4& vp) {
-    std::vector<float> verts;
+    std::vector<float> verts, cverts;
+    const float dash = sketch->hasConstructionGeometry() ? constructionDash(sketch) : 1.0f;
     for (const auto& line : sketch->getLines()) {
         const SketchPoint* p1 = lutPoint(sketch, line.startPointId);
         const SketchPoint* p2 = lutPoint(sketch, line.endPointId);
@@ -481,6 +543,10 @@ void SketchRenderer::drawLines(const Sketch* sketch, const glm::mat4& vp) {
 
         glm::vec3 w1 = toWorld(sketch, p1->pos);
         glm::vec3 w2 = toWorld(sketch, p2->pos);
+        if (line.isConstruction) {
+            appendDashed(cverts, {w1, w2}, dash);
+            continue;
+        }
         verts.push_back(w1.x); verts.push_back(w1.y); verts.push_back(w1.z);
         verts.push_back(w2.x); verts.push_back(w2.y); verts.push_back(w2.z);
     }
@@ -489,16 +555,30 @@ void SketchRenderer::drawLines(const Sketch* sketch, const glm::mat4& vp) {
     // tint, while keeping the "blue = sketch" convention.
     glm::vec3 color = glm::vec3(0.10f, 0.35f, 0.95f);
     uploadAndDraw(verts, GL_LINES, color, vp, m_lineWidth);
+    uploadAndDraw(cverts, GL_LINES, kConstructionColor, vp, m_lineWidth);
 }
 
 void SketchRenderer::drawCircles(const Sketch* sketch, const glm::mat4& vp) {
     const int segments = 64;
-    std::vector<float> verts;
+    std::vector<float> verts, cverts;
+    const float dash = sketch->hasConstructionGeometry() ? constructionDash(sketch) : 1.0f;
 
     for (const auto& circle : sketch->getCircles()) {
         const SketchPoint* center = lutPoint(sketch, circle.centerPointId);
         if (!center) continue;
 
+        if (circle.isConstruction) {
+            std::vector<glm::vec3> poly;
+            poly.reserve(segments + 1);
+            const float r = static_cast<float>(circle.radius);
+            for (int i = 0; i <= segments; i++) {
+                const float a = 2.0f * M_PI * i / segments;
+                poly.push_back(toWorld(sketch, glm::vec2(center->pos.x + r * std::cos(a),
+                                                         center->pos.y + r * std::sin(a))));
+            }
+            appendDashed(cverts, poly, dash);
+            continue;
+        }
         for (int i = 0; i < segments; i++) {
             float a1 = 2.0f * M_PI * i / segments;
             float a2 = 2.0f * M_PI * (i + 1) / segments;
@@ -515,11 +595,13 @@ void SketchRenderer::drawCircles(const Sketch* sketch, const glm::mat4& vp) {
 
     glm::vec3 color = glm::vec3(0.10f, 0.35f, 0.95f); // deep cobalt
     uploadAndDraw(verts, GL_LINES, color, vp, m_lineWidth);
+    uploadAndDraw(cverts, GL_LINES, kConstructionColor, vp, m_lineWidth);
 }
 
 void SketchRenderer::drawArcs(const Sketch* sketch, const glm::mat4& vp) {
     const int segments = 32;
-    std::vector<float> verts;
+    std::vector<float> verts, cverts;
+    const float dash = sketch->hasConstructionGeometry() ? constructionDash(sketch) : 1.0f;
 
     for (const auto& arc : sketch->getArcs()) {
         const SketchPoint* center = lutPoint(sketch, arc.centerPointId);
@@ -531,6 +613,19 @@ void SketchRenderer::drawArcs(const Sketch* sketch, const glm::mat4& vp) {
         float endAngle = std::atan2(end->pos.y - center->pos.y, end->pos.x - center->pos.x);
 
         if (endAngle < startAngle) endAngle += 2.0f * M_PI;
+
+        if (arc.isConstruction) {
+            std::vector<glm::vec3> poly;
+            poly.reserve(segments + 1);
+            const float r = static_cast<float>(arc.radius);
+            for (int i = 0; i <= segments; i++) {
+                const float a = startAngle + (endAngle - startAngle) * (static_cast<float>(i) / segments);
+                poly.push_back(toWorld(sketch, glm::vec2(center->pos.x + r * std::cos(a),
+                                                         center->pos.y + r * std::sin(a))));
+            }
+            appendDashed(cverts, poly, dash);
+            continue;
+        }
 
         for (int i = 0; i < segments; i++) {
             float t1 = static_cast<float>(i) / segments;
@@ -550,16 +645,25 @@ void SketchRenderer::drawArcs(const Sketch* sketch, const glm::mat4& vp) {
 
     glm::vec3 color = glm::vec3(0.10f, 0.35f, 0.95f); // deep cobalt
     uploadAndDraw(verts, GL_LINES, color, vp, m_lineWidth);
+    uploadAndDraw(cverts, GL_LINES, kConstructionColor, vp, m_lineWidth);
 }
 
 void SketchRenderer::drawSplines(const Sketch* sketch, const glm::mat4& vp) {
-    std::vector<float> verts;
+    std::vector<float> verts, cverts;
+    const float dash = sketch->hasConstructionGeometry() ? constructionDash(sketch) : 1.0f;
 
     for (const auto& spline : sketch->getSplines()) {
         // Draw the SAME smooth interpolated curve the profile builder
         // emits - what you see is what extrudes. (This used to draw the
         // raw control polyline, back when splines were display-only.)
         std::vector<glm::vec2> pts = sketch->sampleSpline2D(spline, 12);
+        if (spline.isConstruction) {
+            std::vector<glm::vec3> poly;
+            poly.reserve(pts.size());
+            for (const auto& q : pts) poly.push_back(toWorld(sketch, q));
+            appendDashed(cverts, poly, dash);
+            continue;
+        }
         for (size_t i = 0; i + 1 < pts.size(); ++i) {
             glm::vec3 w1 = toWorld(sketch, pts[i]);
             glm::vec3 w2 = toWorld(sketch, pts[i + 1]);
@@ -570,6 +674,7 @@ void SketchRenderer::drawSplines(const Sketch* sketch, const glm::mat4& vp) {
 
     glm::vec3 color = glm::vec3(0.10f, 0.35f, 0.95f); // deep cobalt - match all sketch geometry
     uploadAndDraw(verts, GL_LINES, color, vp, m_lineWidth);
+    uploadAndDraw(cverts, GL_LINES, kConstructionColor, vp, m_lineWidth);
 }
 
 void SketchRenderer::drawPolygons(const Sketch* sketch, const glm::mat4& vp) {
