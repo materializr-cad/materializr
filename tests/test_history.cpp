@@ -3,6 +3,7 @@
 #include "core/Document.h"
 #include "core/Operation.h"
 #include <BRepPrimAPI_MakeBox.hxx>
+#include <map>
 
 // Mock operation that adds a box body to the document
 class MockAddBodyOp : public Operation {
@@ -339,4 +340,32 @@ TEST(HistoryTest, UndoRespectsFloorWithAllDisabledStepsAbove) {
     EXPECT_EQ(history.currentStep(), current);
     EXPECT_EQ(doc.bodyCount(), bodies);
     EXPECT_EQ(doc.getAllBodyIds(), bodyIds);
+}
+
+// An in-sketch cascade that runs over its time budget gives up between steps:
+// the model must come back exactly as it was (same bodies, same shapes), with
+// no fail step for the cascade's disable-and-retry loop to act on.
+TEST(HistoryTest, AbortedTransactionalEditRollsBackUntouched) {
+    Document doc;
+    History history;
+    for (double s : {10.0, 5.0, 2.0})
+        history.pushOperation(std::make_unique<MockAddBodyOp>(s), doc);
+    std::map<int, TopoDS_Shape> before;
+    for (int id : doc.getAllBodyIds()) before[id] = doc.getBody(id);
+    ASSERT_EQ(before.size(), 3u);
+
+    int checks = 0;
+    history.setEditAbort([&]() { return ++checks >= 2; });   // over budget after step 2
+    EXPECT_FALSE(history.editStep(0, doc, /*transactional=*/true));
+    EXPECT_TRUE(history.lastEditAborted());
+    EXPECT_EQ(history.lastEditFailStep(), -1) << "an abort is not a step failure";
+    EXPECT_EQ(history.currentStep(), 2);
+    ASSERT_EQ(doc.getAllBodyIds().size(), before.size());
+    for (const auto& [id, shp] : before)
+        EXPECT_TRUE(doc.getBody(id).IsSame(shp)) << "body " << id << " not restored";
+
+    // With the hook cleared the same edit runs to the end.
+    history.setEditAbort({});
+    EXPECT_TRUE(history.editStep(0, doc, /*transactional=*/true));
+    EXPECT_FALSE(history.lastEditAborted());
 }

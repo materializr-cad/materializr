@@ -1183,3 +1183,13 @@ add_test(NAME test_mate_store COMMAND test_mate_store)
 add_executable(test_mate_solver test_mate_solver.cpp)
 target_link_libraries(test_mate_solver PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_mate_solver COMMAND test_mate_solver)
+
+# probe_report_holes - replay a tester's push/pull-holes report (sketch edits,
+# delete + undo a circle, hidden plane after an upstream edit) headlessly
+add_executable(probe_report_holes probe_report_holes.cpp)
+target_link_libraries(probe_report_holes PRIVATE materializr_core)
+
+# test_construction_visibility - a hidden plane/axis survives undo + re-execute
+add_executable(test_construction_visibility test_construction_visibility.cpp)
+target_link_libraries(test_construction_visibility PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_construction_visibility COMMAND test_construction_visibility)

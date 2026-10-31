@@ -39,6 +39,7 @@
 #include <TopoDS_Compound.hxx>
 #include <BRep_Builder.hxx>
 #include <map>
+#include <set>
 #include <TopTools_ListIteratorOfListOfShape.hxx>
 #include <TopAbs.hxx>
 #include <gp_Pnt.hxx>
@@ -181,28 +182,72 @@ bool PushPullOp::rebuildProfileFromSketch(Document& doc, int sketchId) {
     if (!sk) return false;
     auto regions = sk->buildRegions();
     if (regions.empty()) return false;
+    // Region count at the previous rebuild from this sketch (-1: none yet this
+    // session). Unchanged means the regions were reshaped, not added/removed,
+    // so an index still names the region it did.
+    const auto lastIt = m_lastRegionCount.find(sketchId);
+    const int lastCount = lastIt != m_lastRegionCount.end() ? lastIt->second : -1;
+    const int count = static_cast<int>(regions.size());
+    m_lastRegionCount[sketchId] = count;
+
+    // Which target each region went to in THIS pass: by-point hits first, so a
+    // fallback index can never steal a region another target positively owns.
+    std::vector<int> owner(regions.size(), -1);
+    std::vector<int> byPoint(m_targets.size(), -1);
+    for (size_t i = 0; i < m_targets.size(); ++i) {
+        if (i >= m_sketchSourceIds.size() || m_sketchSourceIds[i] != sketchId) continue;
+        if (i >= m_hasAnchor.size() || !m_hasAnchor[i]) continue;
+        byPoint[i] = sk->regionAtAnchor(regions, m_sketchSourceAnchors[i]);
+        if (byPoint[i] >= 0 && owner[byPoint[i]] < 0) owner[byPoint[i]] = static_cast<int>(i);
+    }
+
     bool any = false;
     for (size_t i = 0; i < m_targets.size(); ++i) {
         if (i >= m_sketchSourceIds.size() ||
             m_sketchSourceIds[i] != sketchId) continue;
         int idx = (i < m_sketchSourceRegions.size())
                       ? m_sketchSourceRegions[i] : -1;
+        const bool anchored = i < m_hasAnchor.size() && m_hasAnchor[i];
         // The saved point finds the region whatever the numbering did since.
-        // A point that no longer lands in any region (the sketch was edited
-        // away from it) falls back to the index, as before.
-        if (i < m_hasAnchor.size() && m_hasAnchor[i]) {
-            const int byPoint = sk->regionAtAnchor(regions, m_sketchSourceAnchors[i]);
-            if (byPoint >= 0) idx = byPoint;
+        bool trusted = !anchored || byPoint[i] >= 0;
+        if (anchored && byPoint[i] >= 0) {
+            idx = byPoint[i];
+        } else if (anchored) {
+            // The point lands in no region. Dragged off it (same region count)
+            // the index still names it. Otherwise the region was DELETED and
+            // the index now names a neighbour: following it cut that neighbour
+            // a second time, left the deleted circle's hole filled in, and
+            // overwrote the point - so Redo restoring the circle never got its
+            // hole back. Count unknown: follow the index only into a region no
+            // other target owns, and leave the point alone.
+            if (lastCount >= 0 && lastCount != count) idx = -1;
+            trusted = lastCount == count;
         }
-        if (idx < 0 || idx >= static_cast<int>(regions.size())) idx = 0;
-        if (regions[idx].face.IsNull()) continue;
+        if (idx >= count) idx = -1;
+        if (idx < 0 && !anchored && count > 0) idx = 0;   // pre-anchor files
+        // One region, one prism: a second target landing on a region already
+        // taken (two anchors collapsed onto one by the old fallback) is dropped.
+        if (idx >= 0 && owner[idx] >= 0 && owner[idx] != static_cast<int>(i)) idx = -1;
+        if (idx >= 0 && regions[idx].face.IsNull()) continue;
+        if (idx < 0) {
+            // Region gone: no prism this build. Keep the saved identity, so an
+            // undo / redo that brings the region back brings the target back.
+            if (!m_targets[i].profile.IsNull()) {
+                m_targets[i].profile = TopoDS_Face();
+                any = true;
+            }
+            continue;
+        }
+        owner[idx] = static_cast<int>(i);
         m_targets[i].profile = regions[idx].face;
         // Keep the identity current, so a file saved from here carries the
         // point even if it was loaded from one that only had the index.
-        if (i < m_sketchSourceRegions.size()) m_sketchSourceRegions[i] = idx;
-        if (i < m_hasAnchor.size()) {
-            m_sketchSourceAnchors[i] = regions[idx].representativePoint;
-            m_hasAnchor[i] = 1;
+        if (trusted) {
+            if (i < m_sketchSourceRegions.size()) m_sketchSourceRegions[i] = idx;
+            if (i < m_hasAnchor.size()) {
+                m_sketchSourceAnchors[i] = regions[idx].representativePoint;
+                m_hasAnchor[i] = 1;
+            }
         }
         any = true;
     }
@@ -1037,9 +1082,10 @@ bool PushPullOp::rehydrateFromReload(const ReloadState& state, Document& doc) {
     }
     // Sketch-sourced targets: rebuild each distinct source sketch's targets
     // (the helper fills every target bound to that sketch in one call).
+    std::set<int> rebuiltSketches;
     for (size_t i = 0; i < m_targets.size(); ++i) {
         if (m_sketchSourceIds[i] < 0) continue;
-        if (!m_targets[i].profile.IsNull()) continue; // already rebuilt
+        if (!rebuiltSketches.insert(m_sketchSourceIds[i]).second) continue;
         if (!rebuildProfileFromSketch(doc, m_sketchSourceIds[i])) return false;
     }
     // Face-driven targets: resolve against the source body's before-shape.
@@ -1054,9 +1100,14 @@ bool PushPullOp::rehydrateFromReload(const ReloadState& state, Document& doc) {
         if (f.IsNull() || f.ShapeType() != TopAbs_FACE) return false;
         m_targets[i].profile = TopoDS::Face(f);
     }
+    // A sketch target may legitimately come back empty (its region is gone, or
+    // it duplicated another target's region - see rebuildProfileFromSketch);
+    // execute skips it. The op still needs something to push.
+    bool anyProfile = false;
     for (const auto& t : m_targets) {
-        if (t.profile.IsNull()) return false;
+        if (!t.profile.IsNull()) anyProfile = true;
     }
+    if (!anyProfile) return false;
     // A push/pull must have created or mutated SOMETHING; both sets empty
     // means the step's diff is missing from the file - decline so undo
     // doesn't silently no-op.

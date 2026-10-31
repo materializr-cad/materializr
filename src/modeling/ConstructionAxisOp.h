@@ -55,6 +55,7 @@ private:
     gp_Pnt m_p1, m_p2;
     std::string m_axisName = "Axis";
     int m_createdAxisId = -1;
+    bool m_visible = true;   // the axis's visibility, carried across undo/redo
 
     // Reload support: params persist the COMPUTED (origin, direction) - the
     // picked-geometry inputs aren't reconstructable - so a rehydrated op

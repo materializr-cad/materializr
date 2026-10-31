@@ -255,6 +255,9 @@ public:
     void setProgressReporter(std::function<bool(float, const char*)> r) {
         m_progress = std::move(r);
     }
+    const std::function<bool(float, const char*)>& progressReporter() const {
+        return m_progress;
+    }
 
 protected:
     // Call from inside a long execute() loop. Returns true if the user

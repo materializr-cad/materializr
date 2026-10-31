@@ -112,6 +112,10 @@ bool ConstructionPlaneOp::execute(Document& doc) {
         // session or of a reloaded step - restores the plane under the same
         // id, keeping sketches / transform steps that reference it valid.
         m_createdPlaneId = doc.addPlane(plane, m_planeName, m_createdPlaneId);
+        // addPlane makes a visible plane; a replay must not un-hide one the
+        // user hid (any upstream sketch edit undoes and re-runs this step).
+        if (m_createdPlaneId >= 0 && !m_visible)
+            doc.setPlaneVisible(m_createdPlaneId, false);
         return m_createdPlaneId >= 0;
     } catch (...) {
         return false;
@@ -125,6 +129,8 @@ bool ConstructionPlaneOp::undo(Document& doc) {
     // visible "every selection shows" + "offset has no effect" symptoms.
     // The id itself is KEPT so the next execute() re-adds under it.
     if (m_createdPlaneId >= 0) {
+        if (doc.getPlane(m_createdPlaneId))
+            m_visible = doc.isPlaneVisible(m_createdPlaneId);
         doc.removePlane(m_createdPlaneId);
     }
     return true;
@@ -200,7 +206,19 @@ bool ConstructionPlaneOp::rehydrateFromReload(const ReloadState& /*state*/,
     // loaded - verify our recorded id points at it, so undo() removes the
     // right plane and a redo re-adds under the same id.
     if (!m_hasLiteralPlane || m_createdPlaneId < 0) return false;
-    return doc.getPlane(m_createdPlaneId) != nullptr;
+    if (doc.getPlane(m_createdPlaneId)) return true;
+    // Files saved before plane ids survived a load: the plane came back under a
+    // new id (1, 2, ... in file order) while this step - and any Move Plane
+    // step after it - still name the original. If exactly one plane carries
+    // this step's name, it is ours: give it back its id, which repairs every
+    // step that names it at once. Ambiguous names stay frozen, as before.
+    int match = -1;
+    for (int id : doc.getAllPlaneIds()) {
+        if (doc.getPlaneName(id) != m_planeName) continue;
+        if (match >= 0) return false;
+        match = id;
+    }
+    return match >= 0 && doc.renumberPlane(match, m_createdPlaneId);
 }
 
 std::string ConstructionPlaneOp::description() const {

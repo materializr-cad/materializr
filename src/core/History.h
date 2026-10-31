@@ -53,6 +53,13 @@ public:
     // tell the user WHICH feature needs re-applying instead of reverting the
     // whole edit with a guess of a message (#53).
     int lastEditFailStep() const { return m_lastEditFailStep; }
+    // Optional "give up" test for a TRANSACTIONAL editStep, asked after every
+    // replayed step: true rolls the model back to exactly where it was and the
+    // edit returns false with lastEditAborted() set (and no fail step). Lets
+    // an in-sketch cascade stop a rebuild that is running over its time budget
+    // and leave it for sketch Finish. Ignored by non-transactional edits.
+    void setEditAbort(std::function<bool()> abort) { m_editAbort = std::move(abort); }
+    bool lastEditAborted() const { return m_lastEditAborted; }
     void setUndoFloor(int step) { m_undoFloor = step; }
     void clearUndoFloor() { m_undoFloor = -1; }
 
@@ -213,6 +220,8 @@ private:
     void resolveMates(Document& doc, bool regenerated);
     int m_undoFloor = -1;   // see setUndoFloor(): floor for in-sketch undo
     int m_lastEditFailStep = -1; // see lastEditFailStep()
+    std::function<bool()> m_editAbort; // see setEditAbort()
+    bool m_lastEditAborted = false;
     unsigned m_revision = 0; // see revision()
     // Step that failed to recompute during the last editStep/redo replay;
     // cleared by manual undo, by a successful retry, or by clear().

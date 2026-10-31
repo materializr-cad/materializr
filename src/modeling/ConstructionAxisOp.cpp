@@ -64,6 +64,9 @@ bool ConstructionAxisOp::execute(Document& doc) {
         // session or of a reloaded step - restores the axis under the same id,
         // keeping Revolve / pattern steps that reference it valid.
         m_createdAxisId = doc.addAxis(o, d, m_axisName, m_createdAxisId);
+        // addAxis makes a visible axis; a replay must not un-hide one the user hid.
+        if (m_createdAxisId >= 0 && !m_visible)
+            doc.setAxisVisible(m_createdAxisId, false);
         return m_createdAxisId >= 0;
     } catch (...) {
         return false;
@@ -73,6 +76,8 @@ bool ConstructionAxisOp::execute(Document& doc) {
 bool ConstructionAxisOp::undo(Document& doc) {
     // The id is KEPT so the next execute() re-adds under it.
     if (m_createdAxisId >= 0) {
+        if (doc.getAxis(m_createdAxisId))
+            m_visible = doc.isAxisVisible(m_createdAxisId);
         doc.removeAxis(m_createdAxisId);
     }
     return true;
@@ -137,7 +142,16 @@ bool ConstructionAxisOp::rehydrateFromReload(const ReloadState& /*state*/,
     // The axis is persisted as a document entity and already loaded - verify
     // the recorded id resolves so undo() removes the right one.
     if (!m_hasLiteralAxis || m_createdAxisId < 0) return false;
-    return doc.getAxis(m_createdAxisId) != nullptr;
+    if (doc.getAxis(m_createdAxisId)) return true;
+    // Older files renumbered axes on load - same repair as
+    // ConstructionPlaneOp::rehydrateFromReload: a unique name match is ours.
+    int match = -1;
+    for (int id : doc.getAllAxisIds()) {
+        if (doc.getAxisName(id) != m_axisName) continue;
+        if (match >= 0) return false;
+        match = id;
+    }
+    return match >= 0 && doc.renumberAxis(match, m_createdAxisId);
 }
 
 std::string ConstructionAxisOp::description() const {

@@ -253,20 +253,7 @@ Application::Application(bool safeMode, float uiScaleOverride)
     // every enabled ExtrudeOp downstream of that sketch so its body follows.
     m_eventBus->subscribe<SketchEditedEvent>(
         [this](const SketchEditedEvent& e) {
-            // MZR_CASCADE_DEFER_MS overrides the "this model is heavy" cut-off
-            // (a negative value defers every in-sketch edit - for testing).
-            static const double deferAboveMs = []() {
-                const char* v = std::getenv("MZR_CASCADE_DEFER_MS");
-                return v ? std::atof(v) : 400.0;
-            }();
-            if (m_inSketchMode && m_lastCascadeMs > deferAboveMs) {
-                if (m_pendingSketchCascades.insert(e.sketchId).second &&
-                    m_pendingSketchCascades.size() == 1)
-                    showToast(materializr::tr("Big model: the body updates when you finish "
-                                              "the sketch."), 4.0);
-                return;
-            }
-            cascadeFromSketchEdit(e.sketchId);
+            requestSketchCascade(e.sketchId);
         });
 
     // Transient status/error messages from non-UI code (plugins, ops).
@@ -1769,7 +1756,7 @@ void Application::undoWithCascade() {
     const int idx = m_history->lastUndoneStep();
     const int activeSketchId = (m_inSketchMode && m_activeSketch) ? m_activeSketchId : -1;
     materializr::dispatchUndoRedoCascade(idx, m_history->getStep(idx), *m_document,
-        activeSketchId, [&](int sid) { cascadeFromSketchEdit(sid); });
+        activeSketchId, [&](int sid) { requestSketchCascade(sid); });
 }
 
 void Application::redoWithCascade() {
@@ -1778,7 +1765,7 @@ void Application::redoWithCascade() {
     const int idx = m_history->lastRedoneStep();
     const int activeSketchId = (m_inSketchMode && m_activeSketch) ? m_activeSketchId : -1;
     materializr::dispatchUndoRedoCascade(idx, m_history->getStep(idx), *m_document,
-        activeSketchId, [&](int sid) { cascadeFromSketchEdit(sid); });
+        activeSketchId, [&](int sid) { requestSketchCascade(sid); });
 }
 
 void Application::renderSmallScreenWarning() {
@@ -3195,7 +3182,7 @@ void Application::handleShortcuts() {
                 }
                 const int activeSketchId = (m_inSketchMode && m_activeSketch) ? m_activeSketchId : -1;
                 materializr::dispatchUndoRedoCascade(idx, undone, *m_document, activeSketchId,
-                    [&](int sid) { cascadeFromSketchEdit(sid); });
+                    [&](int sid) { requestSketchCascade(sid); });
                 // The undo can remove/renumber the very entities the
                 // Dimension tool has picked or is mid-pick on - stale ids
                 // referencing geometry that may no longer exist. Drop them
@@ -3228,7 +3215,7 @@ void Application::handleShortcuts() {
                 }
                 const int activeSketchId = (m_inSketchMode && m_activeSketch) ? m_activeSketchId : -1;
                 materializr::dispatchUndoRedoCascade(idx, redone, *m_document, activeSketchId,
-                    [&](int sid) { cascadeFromSketchEdit(sid); });
+                    [&](int sid) { requestSketchCascade(sid); });
                 // Same stale-pick hazard as the undo path above.
                 if (m_inSketchMode && m_sketchTool &&
                     m_sketchTool->getMode() == SketchToolMode::Dimension) {
@@ -7545,6 +7532,32 @@ void Application::exitSketchMode() {
     // looked at remains framed, only the sketch grid disappears. Any orbit
     // they do drops ortho mode and returns to perspective with a level
     // horizon (handled in Camera::orbitLevel).
+}
+
+void Application::requestSketchCascade(int sketchId) {
+    if (!m_inSketchMode) { cascadeFromSketchEdit(sketchId); return; }
+    // MZR_CASCADE_DEFER_MS overrides the "this model is heavy" cut-off
+    // (a negative value defers every in-sketch edit - for testing).
+    static const double deferAboveMs = []() {
+        const char* v = std::getenv("MZR_CASCADE_DEFER_MS");
+        return v ? std::atof(v) : 400.0;
+    }();
+    auto defer = [&]() {
+        if (m_pendingSketchCascades.insert(sketchId).second &&
+            m_pendingSketchCascades.size() == 1)
+            showToast(materializr::tr("Big model: the body updates when you finish "
+                                      "the sketch."), 4.0);
+    };
+    // Already slow, or one is already waiting for Finish (running a later one
+    // now would rebuild the body against a sketch whose earlier edits never
+    // reached it, then rebuild it again at Finish anyway).
+    if (m_lastCascadeMs > deferAboveMs || !m_pendingSketchCascades.empty()) {
+        defer();
+        return;
+    }
+    // Unknown cost: try it, but stop at the cut-off instead of freezing for the
+    // whole replay. The edit that runs over is the first deferred one.
+    if (!cascadeFromSketchEdit(sketchId, deferAboveMs)) defer();
 }
 
 // Rebuild the bodies of sketches edited while the model was too heavy to follow

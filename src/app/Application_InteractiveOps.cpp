@@ -1231,12 +1231,12 @@ std::string Application::linkHintFor(bool isBody, int id) const {
            materializr::tr(" - editing this sketch updates it.");
 }
 
-void Application::cascadeFromSketchEdit(int sketchId) {
-    if (sketchId < 0 || !m_history || !m_document) return;
+bool Application::cascadeFromSketchEdit(int sketchId, double budgetMs) {
+    if (sketchId < 0 || !m_history || !m_document) return true;
     // A detached sketch has been deliberately broken out of unison with its
     // body (moved on its own in 3D) - editing it must NOT retro-drive the body.
     if (auto sk = m_document->getSketch(sketchId); sk && sk->isDetachedFromBody())
-        return;
+        return true;
     const auto cascadeStart = std::chrono::steady_clock::now();
     // Re-derive the profile of every APPLIED sketch-sourced extrude / push-pull
     // that references the edited sketch, and remember the EARLIEST such step.
@@ -1262,7 +1262,7 @@ void Application::cascadeFromSketchEdit(int sketchId) {
         // matched == 0: nothing in the model is built from this sketch (e.g.
         // editing a freshly-duplicated sketch before it's extruded). That's the
         // normal case while sketching - stay silent, just refresh.
-        return;
+        return true;
     }
 
     // Replay the chain from the earliest re-derived op forward, TRANSACTIONALLY:
@@ -1289,7 +1289,40 @@ void Application::cascadeFromSketchEdit(int sketchId) {
     if (auto sk = m_document->getSketch(sketchId))
         m_document->setCascadeSketchOverride(
             sketchId, std::make_shared<materializr::Sketch>(*sk));
+
+    // In-sketch budget: History checks it between replayed steps, and the ops
+    // that run long booleans (push/pull, lathe) poll it from inside the kernel
+    // through their progress reporter, so one slow cut can't hold the window
+    // for its whole run either. Over budget, the replay rolls back untouched.
+    std::vector<std::pair<Operation*, std::function<bool(float, const char*)>>> budgeted;
+    if (budgetMs > 0.0) {
+        auto over = [cascadeStart, budgetMs]() {
+            return std::chrono::duration<double, std::milli>(
+                       std::chrono::steady_clock::now() - cascadeStart).count() > budgetMs;
+        };
+        m_history->setEditAbort(over);
+        for (int i = earliest; i <= m_history->currentStep(); ++i) {
+            Operation* op = const_cast<Operation*>(m_history->getStep(i));
+            if (!op || !op->isEnabled()) continue;
+            budgeted.emplace_back(op, op->progressReporter());
+            op->setProgressReporter([over](float, const char*) { return over(); });
+        }
+    }
+    auto endBudget = [&]() {
+        if (budgetMs <= 0.0) return;
+        m_history->setEditAbort({});
+        for (auto& [op, prev] : budgeted) op->setProgressReporter(std::move(prev));
+    };
+
     bool ok = m_history->editStep(earliest, *m_document, /*transactional=*/true);
+    if (!ok && m_history->lastEditAborted()) {
+        endBudget();
+        m_document->clearCascadeSketchOverrides();
+        std::fprintf(stderr, "[Cascade] sketchId=%d replay from step %d: over the %.0f ms "
+                     "budget - deferred to sketch Finish\n", sketchId, earliest, budgetMs);
+        // Rolled back: no body changed, nothing to remesh.
+        return false;
+    }
     // A step that can't follow the change (its geometry no longer exists on
     // the re-derived body) used to revert the WHOLE edit behind a message
     // that guessed at the culprit. Instead: disable the failing step, retry,
@@ -1307,6 +1340,7 @@ void Application::cascadeFromSketchEdit(int sketchId) {
         disabledSteps.push_back(bad);
         ok = m_history->editStep(earliest, *m_document, /*transactional=*/true);
     }
+    endBudget();
     if (!ok && !disabledSteps.empty()) {
         // Still failing - restore what we disabled and fall back to a clean
         // full revert (never leave the history silently gutted).
@@ -1357,6 +1391,7 @@ void Application::cascadeFromSketchEdit(int sketchId) {
         if (!nowIds.count(id)) m_dirtyBodyIds.insert(id); // removed → mesh cleared
     m_lastCascadeMs = std::chrono::duration<double, std::milli>(
         std::chrono::steady_clock::now() - cascadeStart).count();
+    return true;
 }
 
 void Application::cancelLoft() {
