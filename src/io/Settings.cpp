@@ -84,6 +84,12 @@ const char* aiProviderName(AiProvider p) {
 void applyKv(const std::map<std::string, std::string>& kv, AppSettings& s) {
     readIntClamped(kv, "theme",          s.theme, 0, 1);
     readFloat(kv, "desktopUiScale",      s.desktopUiScale);
+    readFloat(kv, "uiScaleUser",         s.uiScaleUser);
+    // Written so a nan (or zero/negative) falls to 1.0 rather than slipping
+    // through min/max.
+    if (!(s.uiScaleUser > 0.0f)) s.uiScaleUser = 1.0f;
+    if (s.uiScaleUser < 0.75f)   s.uiScaleUser = 0.75f;
+    if (s.uiScaleUser > 2.5f)    s.uiScaleUser = 2.5f;
     readBool(kv, "touchMode",            s.touchMode);
     // Interface layout. Legacy first (older builds wrote the coupled bool
     // pair imTouchUi/imTouchLite, where "im-touch on + lite" is today's
@@ -436,6 +442,7 @@ bool SettingsIO::save(const std::string& path, const AppSettings& s) {
            "# defaults. Safe to edit by hand or to carry across versions.\n";
     ofs << "theme = "               << s.theme               << "\n";
     ofs << "desktopUiScale = "      << s.desktopUiScale      << "\n";
+    ofs << "uiScaleUser = "         << s.uiScaleUser         << "\n";
     ofs << "touchMode = "           << (s.touchMode ? "true" : "false") << "\n";
     ofs << "uiLayout = "            << uiLayoutName(s.uiLayout) << "\n";
     ofs << "imTouchTree = "         << (s.imTouchTree ? "true" : "false") << "\n";
@@ -576,6 +583,7 @@ bool SettingsIO::exportJson(const std::string& path, const AppSettings& s) {
     ofs << "{\n";
     ofs << "  \"theme\": "                   << s.theme                 << ",\n";
     ofs << "  \"desktopUiScale\": "          << s.desktopUiScale        << ",\n";
+    ofs << "  \"uiScaleUser\": "             << s.uiScaleUser           << ",\n";
     ofs << "  \"touchMode\": "               << (s.touchMode ? "true" : "false") << ",\n";
     ofs << "  \"uiLayout\": \""              << uiLayoutName(s.uiLayout) << "\",\n";
     ofs << "  \"orbitButton\": "             << s.orbitButton           << ",\n";

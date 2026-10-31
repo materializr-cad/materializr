@@ -1190,6 +1190,11 @@ private:
     // saved setting for this launch - an escape hatch when the UI is too small
     // to read to change it in Settings.
     float m_cliUiScale = 0.0f;
+    // Interface scale multiplier (Settings > Appearance). m_uiScaleUser is the
+    // staged/saved value; m_uiScaleApplied is what this launch baked into the
+    // font atlas, so the dialog can say a restart is pending.
+    float m_uiScaleUser = 1.0f;
+    float m_uiScaleApplied = 1.0f;
 
     // Interface layout (see UiLayout in io/Settings.h and src/app/layout/).
     // Live-switchable: read every frame by run()/renderViewport(); persisted

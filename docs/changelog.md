@@ -16,6 +16,11 @@ All notable changes to Materializr are documented here. Format loosely follows
 - **Step switch size** slider next to it (4 to 40 px, default 8): how wide a grid
   cell may get before the step changes while you zoom. Raise it for a coarser
   grid on a screen where the cells look too fine, lower it for a finer one.
+- **Interface scale** slider (Settings ▸ Appearance, 75% to 250%) on desktop.
+  Scales the whole interface together (text, buttons, spacing, panels) on top
+  of the size picked for your display, for when everything is too small to read
+  without switching to Touch mode. Takes effect on restart; use Reset panel
+  layout afterwards if the panels look cramped.
 - **Android: Full screen** switch (Settings ▸ Appearance). Off by default, which
   keeps the status bar visible; on hides it as well.
 

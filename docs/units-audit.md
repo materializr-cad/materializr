@@ -11,7 +11,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 - absolute-mm: 2
 - angle: 38
 - count: 1
-- percent: 18
+- percent: 19
 - px/ui: 5
 - ratio: 7
 - seconds: 4
@@ -19,6 +19,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 
 | dim | file | code |
 |---|---|---|
+| percent | src/app/Application_Dialogs.cpp | `if (ImGui::SliderInt("##uiScaleUser", &pct, 75, 250, "%d%%",` |
 | seconds | src/app/Application_Dialogs.cpp | `if (ImGui::SliderFloat(materializr::tr("Fillet time limit"),` |
 | px/ui | src/app/Application_Dialogs.cpp | `if (ImGui::SliderFloat(materializr::tr("Selection line width"), &m_selectionLineWidth, 1.0f, 10.0f, "%.1f px")` |
 | px/ui | src/app/Application_Dialogs.cpp | `if (ImGui::SliderFloat(materializr::tr("Sketch line width"), &m_sketchLineWidth, 1.0f, 6.0f, "%.1f px")) {` |

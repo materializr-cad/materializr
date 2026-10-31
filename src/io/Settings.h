@@ -36,6 +36,12 @@ struct AppSettings {
     // both pickers are gone. --ui-scale is the escape hatch. Don't wire this
     // back up.
     float desktopUiScale    = 1.0f;
+    // User multiplier on top of the DETECTED scale (Settings > Appearance >
+    // Interface scale). 1.0 = exactly what detection chose. Not the legacy
+    // picker above: that replaced detection, this refines it, and a separate
+    // key means an old file's stale desktopUiScale can never resurrect here.
+    // Applies on restart; ignored in touch mode and when --ui-scale is given.
+    float uiScaleUser       = 1.0f;
     // Touch mode: large UI + touch-gesture interaction. Defaults on for Android,
     // off elsewhere; a saved setting so a tablet with a mouse/keyboard can run
     // the desktop model. Drives materializr::setTouchMode() at startup.

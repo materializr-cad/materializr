@@ -52,11 +52,17 @@ public:
     // UI scale factor for HiDPI / touch. 1.0 on desktop; on Android it's derived
     // from the display DPI so fonts and widgets are finger-sized on a tablet.
     float uiScale() const;
+    // The scale detection arrives at, before the user's multiplier.
+    float uiScaleDetected() const;
 
     // Explicit desktop UI-scale preference (Settings → Appearance, Linux only).
     // > 0 overrides the platform default on Linux desktop; 0 = follow default.
     // Set before the font atlas is built (a change takes effect on restart).
     void setUiScaleOverride(float s) { m_uiScaleOverride = (s > 0.0f ? s : 0.0f); }
+    // The user's multiplier on the detected scale (Settings > Appearance). Same
+    // timing rule: before the font atlas is built. Ignored in touch mode, which
+    // has its own scale, and when setUiScaleOverride() is in force.
+    void setUiScaleUser(float s) { m_uiScaleUser = (s > 0.0f ? s : 1.0f); }
     // Linux/X11: size the X theme cursors to match uiScale(). Must be called
     // once the scale is final and BEFORE ImGui creates its system cursors -
     // Xcursor reads XCURSOR_SIZE as it loads each one, and never again.
@@ -142,6 +148,7 @@ private:
     SDL_Window* m_window = nullptr;
     std::vector<std::string> m_droppedFiles;
     float m_uiScaleOverride = 0.0f;  // desktop UI-scale pref (Linux); 0 = default
+    float m_uiScaleUser = 1.0f;      // user multiplier on the detected scale
     // Coordinate model, fixed at creation: true where window coordinates are
     // POINTS with a separate pixel density (macOS, iOS, native Wayland), false
     // where they are device pixels (Windows, X11, Android).

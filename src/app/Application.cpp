@@ -351,6 +351,8 @@ Application::Application(bool safeMode, float uiScaleOverride)
         // display whose DPI is reported wrongly.
         if (m_window) {
             if (m_cliUiScale > 0.0f) m_window->setUiScaleOverride(m_cliUiScale);
+            m_uiScaleUser = m_uiScaleApplied = early.uiScaleUser;
+            m_window->setUiScaleUser(early.uiScaleUser);
             // Cursor size rides the same answer, and must be set before
             // initImGui() creates ImGui's system cursors.
             m_window->applyCursorScale();
@@ -2068,6 +2070,7 @@ AppSettings Application::currentSettings() const {
     AppSettings s;
     s.theme = (m_themeManager->getTheme() == Theme::Light) ? 1 : 0;
     s.touchMode = m_touchMode;
+    s.uiScaleUser = m_uiScaleUser;
     s.uiLayout = m_uiLayout;
     s.language = m_language;
     s.displayUnit = m_displayUnit;
@@ -2166,6 +2169,7 @@ void Application::applyAppSettings(const AppSettings& s) {
     // reads a consistent value within the run.
     materializr::setTouchMode(s.touchMode);
     m_touchMode = s.touchMode;   // staged value for the Settings dialog
+    m_uiScaleUser = s.uiScaleUser;
     m_uiLayout = s.uiLayout;     // interface layout - live, no restart needed
     // UI language - also live. -1 means the user has never chosen, which the
     // setup wizard turns into its opening question; until then, English.

@@ -291,3 +291,36 @@ TEST(SettingsSessions, SavingRetiresTheLegacyGridStepKey) {
     EXPECT_FLOAT_EQ(2.0f, SettingsIO::load(p).sketchGridStep);
     std::remove(p.c_str());
 }
+
+// The interface-scale multiplier and the grid switch size persist, and a bad
+// hand-edited value lands in range instead of reaching the font atlas / grid.
+// uiScaleUser in particular multiplies the whole UI, so a nan, zero or huge
+// value would otherwise become an unusable (or unrenderable) interface.
+TEST(SettingsSessions, UiScaleAndGridCellRoundTripAndClamp) {
+    const std::string p = tmpCfg("uiscale");
+    AppSettings s;
+    s.uiScaleUser = 1.5f;
+    s.gridMinCellPx = 12.0f;
+    ASSERT_TRUE(SettingsIO::save(p, s));
+    EXPECT_FLOAT_EQ(1.5f, SettingsIO::load(p).uiScaleUser);
+    EXPECT_FLOAT_EQ(12.0f, SettingsIO::load(p).gridMinCellPx);
+
+    auto loadWith = [&](const char* key, const char* from, const char* to) {
+        std::string txt = readAll(p);
+        const std::string want = std::string(key) + " = " + from;
+        const auto at = txt.find(want);
+        EXPECT_NE(std::string::npos, at) << want;
+        if (at == std::string::npos) return AppSettings{};
+        txt.replace(at, want.size(), std::string(key) + " = " + to);
+        std::ofstream f(p); f << txt; f.close();
+        return SettingsIO::load(p);
+    };
+    EXPECT_FLOAT_EQ(2.5f,  loadWith("uiScaleUser", "1.5", "9").uiScaleUser);
+    EXPECT_FLOAT_EQ(0.75f, loadWith("uiScaleUser", "9", "0.1").uiScaleUser);
+    EXPECT_FLOAT_EQ(1.0f,  loadWith("uiScaleUser", "0.1", "0").uiScaleUser);
+    EXPECT_FLOAT_EQ(1.0f,  loadWith("uiScaleUser", "0", "nan").uiScaleUser);
+    EXPECT_FLOAT_EQ(40.0f, loadWith("gridMinCellPx", "12", "500").gridMinCellPx);
+    EXPECT_FLOAT_EQ(4.0f,  loadWith("gridMinCellPx", "500", "-3").gridMinCellPx);
+    EXPECT_FLOAT_EQ(4.0f,  loadWith("gridMinCellPx", "-3", "nan").gridMinCellPx);
+    fs::remove(p);
+}

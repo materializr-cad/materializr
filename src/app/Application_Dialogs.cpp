@@ -271,6 +271,39 @@ void Application::renderSettings() {
                         ImGui::SetTooltip("%s", materializr::tr("Restore the default panel arrangement - use this if a panel gets dragged off-screen or docking gets messy. Also re-applies the interface scale to the panel widths."));
 
                     ImGui::Spacing();
+                    // One multiplier over everything the interface draws, not
+                    // just text: the font atlas, padding, widgets, toolbar
+                    // heights, cursor and default panel widths all derive from
+                    // the same scale, so they stay in proportion. Baked at
+                    // startup like Touch mode, hence the restart note.
+                    ImGui::SeparatorText(materializr::tr("Interface scale"));
+                    ImGui::BeginDisabled(materializr::touchMode() || m_cliUiScale > 0.0f);
+                    {
+                        int pct = static_cast<int>(m_uiScaleUser * 100.0f + 0.5f);
+                        ImGui::SetNextItemWidth(materializr::uiSz(200, 0).x);
+                        if (ImGui::SliderInt("##uiScaleUser", &pct, 75, 250, "%d%%",
+                                             ImGuiSliderFlags_AlwaysClamp)) {
+                            m_uiScaleUser = static_cast<float>(pct) / 100.0f;
+                        }
+                        if (ImGui::IsItemDeactivatedAfterEdit()) changed = true;
+                        ImGui::SameLine();
+                        if (ImGui::Button(materializr::tr("Reset##uiScale")) &&
+                            m_uiScaleUser != 1.0f) {
+                            m_uiScaleUser = 1.0f;
+                            changed = true;
+                        }
+                    }
+                    ImGui::EndDisabled();
+                    ImGui::TextWrapped("%s", materializr::tr("Makes the whole interface larger or smaller: text, buttons, spacing and panels together. 100% is the size picked for your display. Takes effect on restart."));
+                    if (materializr::touchMode()) {
+                        ImGui::TextDisabled("%s", materializr::tr("Touch mode sets its own size, so this is off while Touch mode is on."));
+                    } else if (m_cliUiScale > 0.0f) {
+                        ImGui::TextDisabled("%s", materializr::tr("This launch was started with --ui-scale, which takes priority."));
+                    } else if (std::abs(m_uiScaleUser - m_uiScaleApplied) > 1e-4f) {
+                        ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s", materializr::tr("Restart Materializr to apply the new size, then use Reset panel layout if the panels look cramped."));
+                    }
+
+                    ImGui::Spacing();
                     // Touch mode is a separate axis (input model), independent of
                     // the layout above - it swaps mouse/keyboard for finger
                     // gestures + larger targets and takes full effect on restart.

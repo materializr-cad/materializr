@@ -905,6 +905,17 @@ void Window::applyCursorScale() {
 }
 
 float Window::uiScale() const {
+    float s = uiScaleDetected();
+    // One place, after detection, so every consumer (font atlas, style,
+    // uiSz widgets, toolbar, cursor, default dock widths) sees the same number
+    // and nothing can scale on its own. Touch has its own scale and --ui-scale
+    // is an exact override, so neither is multiplied.
+    if (!materializr::touchMode() && m_uiScaleOverride <= 0.0f)
+        s *= m_uiScaleUser;
+    return std::min(std::max(s, 0.5f), 4.0f);
+}
+
+float Window::uiScaleDetected() const {
     if (materializr::touchMode()) {
 #if defined(MZ_IOS)
         // iOS window coords are POINTS - the OS already normalizes density
