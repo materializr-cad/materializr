@@ -5,6 +5,8 @@ All notable changes to Materializr are documented here. Format loosely follows
 
 ## [Unreleased]
 
+## [1.7.7] - 2026-10-31
+
 ### Added
 
 - **Grid rendering (experimental)** in Settings ▸ Rendering: three workarounds
