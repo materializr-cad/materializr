@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.12.0.schema.json
 
 PackageIdentifier: Materializr.Materializr
-PackageVersion: 1.7.5
+PackageVersion: 1.7.7
 InstallerLocale: en-US
 InstallerType: nullsoft
 Scope: machine
@@ -14,15 +14,15 @@ Dependencies:
   PackageDependencies:
   - PackageIdentifier: Microsoft.VCRedist.2015+.x64
 ProductCode: Materializr
-ReleaseDate: 2026-10-25
+ReleaseDate: 2026-10-31
 AppsAndFeaturesEntries:
 - ProductCode: Materializr
-  DisplayVersion: v1.7.5
+  DisplayVersion: v1.7.7
 InstallationMetadata:
   DefaultInstallLocation: '%ProgramFiles%\Materializr'
 Installers:
 - Architecture: x64
-  InstallerUrl: https://github.com/materializr-cad/materializr/releases/download/v1.7.5/Materializr-Setup.exe
-  InstallerSha256: 0CDE619E9D11C72869E7CA0274B22807CBCED492DEE8540B9D32977437425E02
+  InstallerUrl: https://github.com/materializr-cad/materializr/releases/download/v1.7.7/Materializr-Setup.exe
+  InstallerSha256: E727220A5828D3FD98CCC749CE66E9D1CBA91BD4311E1B96711FB2255FB080E3
 ManifestType: installer
 ManifestVersion: 1.12.0
