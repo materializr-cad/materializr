@@ -112,6 +112,11 @@ cmake --build "$BUILD/occt-$PLATFORM" --target install -j"$JOBS"
 fetch "https://github.com/libsdl-org/SDL/releases/download/release-$SDL_VER/SDL3-$SDL_VER.tar.gz" "$DL/sdl3.tar.gz" "$SDL3_SHA256"
 rm -rf "$SRC/SDL3-$SDL_VER"
 tar -xzf "$DL/sdl3.tar.gz" -C "$SRC"
+# iOS 27 made statusBarOrientation a no-op, and 3.4.18 uses it to swap the width
+# and height of the view frame: a landscape window got a portrait layout (#150).
+# Upstream's fix is on release-3.4.x but not in a release yet. The re-extract
+# above keeps re-runs from stacking the patch. Drop it at the next SDL bump.
+patch -d "$SRC/SDL3-$SDL_VER" -p1 < "$(cd "$(dirname "$0")/.." && pwd)/patches/sdl3-3.4.18-ios27-orientation.patch"
 rm -rf "$BUILD/sdl3-$PLATFORM"
 # Joystick/haptic/sensor/hidapi/camera OFF: a CAD app uses none of them, and
 # their iOS backends reference CoreBluetooth/CoreMotion/CoreHaptics/AVCapture -

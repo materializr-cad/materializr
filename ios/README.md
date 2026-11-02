@@ -34,6 +34,12 @@ SDL's `SDLUIKitSceneDelegate`, and `Info.plist.in` names that class in its
 it is gone.) A prefix built before the move to SDL3 still holds SDL2 -
 **re-run `setup-deps.sh`** after pulling, or the configure step won't find SDL3.
 
+iOS 27 also made `statusBarOrientation` a no-op, which gave landscape windows a
+portrait layout on SDL 3.4.18 (#150). `setup-deps.sh` applies
+`patches/sdl3-3.4.18-ios27-orientation.patch`, a backport from upstream's
+`release-3.4.x`. A prefix built without it still has the bug: **re-run
+`setup-deps.sh`**. Delete the patch at the next SDL bump.
+
 ## Prerequisites
 
 - macOS with **Xcode 15+** (`xcode-select --install` done, an iOS SDK present)
@@ -100,9 +106,10 @@ Simulator (arm64, Apple Silicon Macs): re-run `setup-deps.sh` with
   (self-heals: Open Recent drops dead entries on first use). Documents opened
   via the picker record correct security-scoped bookmarks.
 - **No app icon yet** - asset catalog to be added.
-- Split View / Stage Manager is disabled (`UIRequiresFullScreen`); Apple
-  Pencil arrives as plain touch; autosave-on-background not yet wired (iOS
-  may kill the suspended app; save before switching apps).
+- `UIRequiresFullScreen` is set, but iPadOS 27 still runs the app in a window
+  when windowed multitasking is on (#150). Apple Pencil arrives as plain touch;
+  autosave-on-background not yet wired (iOS may kill the suspended app; save
+  before switching apps).
 
 ## Distribution reminder
 
