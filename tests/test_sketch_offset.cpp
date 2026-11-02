@@ -1022,3 +1022,102 @@ TEST(SketchOffsetSpline, OneSmoothCurveOffsetsToOneCurve) {
     applyOffset(sk, res, nullptr, pts, els);
     EXPECT_EQ(els.size(), 1u) << "and commits as a single element";
 }
+
+// An offset of a construction line used to come out as a normal line. The copy
+// now keeps its source's type, and turning "draw as construction" on flips it.
+namespace {
+int countConstructionLines(const Sketch& sk, size_t from) {
+    int n = 0;
+    for (size_t i = from; i < sk.getLines().size(); ++i)
+        if (sk.getLines()[i].isConstruction) ++n;
+    return n;
+}
+
+// Offsets the square drawn with `markConstruction` of its four edges set as
+// construction; returns how many of the four new edges are construction.
+int offsetSquare(int markConstruction, bool invert) {
+    Sketch sk;
+    makeSquare(sk, 10.0f);
+    for (int i = 0; i < markConstruction && i < static_cast<int>(sk.getLines().size()); ++i)
+        sk.setElementConstruction(sk.getLines()[i].id, true);
+    OffsetChain ch = walkOffsetChain(sk, {5.0f, 0.0f}, 0.5f);
+    const float d = outward(ch, 2.0f);
+    OffsetResult res = offsetChain(ch, d, OffsetCorners::Sharp);
+    pruneOffset(res, ch, d);
+    const size_t before = sk.getLines().size();
+    std::set<int> pts, els;
+    applyOffset(sk, res, nullptr, pts, els, invert);
+    return countConstructionLines(sk, before);
+}
+} // namespace
+
+TEST(SketchOffsetConstruction, NormalChainOffsetsToNormalLines) {
+    EXPECT_EQ(offsetSquare(0, false), 0);
+}
+
+TEST(SketchOffsetConstruction, ConstructionEdgesStayConstructionInTheCopy) {
+    EXPECT_EQ(offsetSquare(4, false), 4);
+    EXPECT_EQ(offsetSquare(2, false), 2) << "a mixed chain keeps its mix";
+}
+
+TEST(SketchOffsetConstruction, DrawAsConstructionFlipsEveryEdge) {
+    EXPECT_EQ(offsetSquare(0, true), 4) << "normal -> construction";
+    EXPECT_EQ(offsetSquare(4, true), 0) << "construction -> normal";
+    EXPECT_EQ(offsetSquare(1, true), 3) << "a mixed chain swaps wholesale";
+}
+
+// A closed contour with something else attached at one corner is still ONE
+// contour. The walk used to stop at that corner (three elements meet there),
+// so the chain came out open and the corner was left unjoined on an outward
+// offset.
+TEST(SketchOffsetWalk, LoopWithAStemAtOneCornerIsStillClosed) {
+    Sketch sk;
+    auto pts = makeSquare(sk, 10.0f);
+    int tip = sk.addPoint({-6.0f, -6.0f});
+    sk.addLine(pts[0], tip);                      // stem off the (0,0) corner
+
+    OffsetChain ch = walkOffsetChain(sk, {5.0f, 0.0f}, 0.5f);
+    ASSERT_TRUE(ch.valid());
+    EXPECT_TRUE(ch.closed);
+    EXPECT_EQ(ch.segs.size(), 4u) << "the four sides; the stem is its own chain";
+    expectContiguous(ch);
+
+    const float d = outward(ch, 2.0f);
+    OffsetResult res = offsetChain(ch, d, OffsetCorners::Sharp);
+    pruneOffset(res, ch, d);
+    ASSERT_TRUE(res.valid);
+    EXPECT_TRUE(res.closed);
+    EXPECT_EQ(res.segs.size(), 4u) << "all four mitred corners, including the one with the stem";
+}
+
+TEST(SketchOffsetWalk, OnlyTheSelectedSegmentIsPickedWhenRestricted) {
+    Sketch sk;
+    makeSquare(sk, 10.0f);
+    const int bottom = sk.getLines()[0].id;
+
+    // Unrestricted: the whole square.
+    OffsetChain all = walkOffsetChain(sk, {5.0f, 0.0f}, 0.5f);
+    ASSERT_EQ(all.segs.size(), 4u);
+
+    // Restricted to the bottom edge: just that line, an open chain of one.
+    std::set<int> only{bottom};
+    OffsetChain one = walkOffsetChain(sk, {5.0f, 0.0f}, 0.5f, &only);
+    ASSERT_TRUE(one.valid());
+    EXPECT_FALSE(one.closed);
+    ASSERT_EQ(one.segs.size(), 1u);
+    EXPECT_EQ(one.segs[0].sourceId, bottom);
+
+    // Clicking a side that is not selected picks nothing.
+    EXPECT_FALSE(walkOffsetChain(sk, {10.0f, 5.0f}, 0.5f, &only).valid());
+}
+
+TEST(SketchOffsetWalk, ARestrictedRunStopsWhereTheSelectionStops) {
+    Sketch sk;
+    makeSquare(sk, 10.0f);
+    std::set<int> two{sk.getLines()[0].id, sk.getLines()[1].id};   // bottom + right
+    OffsetChain ch = walkOffsetChain(sk, {5.0f, 0.0f}, 0.5f, &two);
+    ASSERT_TRUE(ch.valid());
+    EXPECT_FALSE(ch.closed);
+    EXPECT_EQ(ch.segs.size(), 2u);
+    expectContiguous(ch);
+}

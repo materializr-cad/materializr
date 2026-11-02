@@ -27,6 +27,7 @@ struct OffsetSeg {
 
     Kind kind = Kind::Line;
     int  sourceId = -1;      // sketch element id this came from (-1 if generated)
+    bool construction = false; // the source element is construction geometry
     glm::vec2 p0{0.0f};      // Line: start. Arc: start point. Circle: point at a0.
     glm::vec2 p1{0.0f};      // Line: end.   Arc: end point.   Circle: == p0.
     glm::vec2 c{0.0f};       // Arc / Circle: centre
@@ -70,7 +71,13 @@ struct OffsetChain {
 // Splines ARE offsettable (an aerofoil section is two splines, and SVG imports
 // carry them too): the curve is sampled, offset point-by-point along its
 // normal, and re-fitted to a spline at commit.
-OffsetChain walkOffsetChain(const Sketch& sk, glm::vec2 pos, float threshold);
+//
+// `only`, when given, limits the walk to those element ids: nothing else can be
+// picked and nothing else joins the chain. It is how an existing selection
+// (select a segment, then Offset) offsets just that, instead of the whole
+// connected contour.
+OffsetChain walkOffsetChain(const Sketch& sk, glm::vec2 pos, float threshold,
+                            const std::set<int>* only = nullptr);
 
 // How an OPENING corner is closed - the two offset segments have pulled apart
 // and something must bridge the gap.
@@ -128,9 +135,15 @@ void pruneOffset(OffsetResult& res, const OffsetChain& src, float d);
 // landing on existing geometry joins it instead of leaving a duplicate, the
 // same way Mirror does. Segments that meet each other share one point id, so
 // the result is a connected chain for region building.
+//
+// Each new element takes the construction flag of the element it was offset
+// from. `invertConstruction` (the "draw as construction" toggle being on)
+// flips that for every one, so a normal chain comes out as construction and a
+// construction chain comes out normal - a mixed chain swaps wholesale.
 void applyOffset(Sketch& sk, const OffsetResult& res,
                  const std::function<int(glm::vec2)>& weld,
-                 std::set<int>& outPoints, std::set<int>& outElements);
+                 std::set<int>& outPoints, std::set<int>& outElements,
+                 bool invertConstruction = false);
 
 // Densified polylines for drawing. One polyline per contiguous run, so a
 // pruned offset with gaps renders correctly.

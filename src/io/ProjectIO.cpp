@@ -576,6 +576,7 @@ ProjectSaveResult ProjectIO::save(const std::string& filePath, const Document& d
             ofs << "NAME \"" << st.name << "\"\n";
             ofs << "DESC \"" << st.description << "\"\n";
             ofs << "ENABLED " << (st.enabled ? 1 : 0) << "\n";
+            if (st.suspended) ofs << "SUSPENDED 1\n";
             // Per-op parameter blob. v3 uses a length-prefixed binary-safe
             // form (PARAMS_LEN + raw bytes) so the blob can carry multi-line
             // content like the SketchEditOp before/after sketch snapshots.
@@ -1483,6 +1484,7 @@ ProjectLoadResult loadImpl(const std::string& filePath, Document& doc,
                         std::string skip; std::getline(ifs, skip);
                         st.params = std::move(data);
                     } else if (t == "ENABLED") { int e = 1; ls >> e; st.enabled = (e != 0); }
+                    else if (t == "SUSPENDED") { int e = 0; ls >> e; st.suspended = (e != 0); }
                     else if (t == "CHANGED_COUNT") {
                         int m = 0; ls >> m;
                         for (int j = 0; j < m; ++j) {

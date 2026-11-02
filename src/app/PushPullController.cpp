@@ -211,9 +211,21 @@ int PushPullController::onBegin(const IopContext& ctx) {
         ctx.toast(materializr::tr("Push/Pull works on flat faces - not curved or "
                                   "fillet faces."));
     if (m_st.targets.empty()) {
-        if (!curvedFaceSkipped)
+        if (!curvedFaceSkipped) {
             std::fprintf(stderr,
                          "Push/Pull: select a sketch region or a body face first\n");
+            // Said, not swallowed: nothing on screen otherwise tells the user
+            // the tool did not start, or why.
+            bool sketchPicked = false;
+            for (const auto& e : ctx.selection.getSelection())
+                if (e.type == SelectionType::Sketch || e.type == SelectionType::SketchRegion)
+                    sketchPicked = true;
+            if (ctx.toast)
+                ctx.toast(sketchPicked
+                    ? materializr::tr("That sketch has no closed contour to push or pull - "
+                                      "close its open ends first.")
+                    : materializr::tr("Select a sketch region or a flat face to push/pull first."));
+        }
         return -1;
     }
 

@@ -219,7 +219,7 @@ void Camera::zoom(float delta)
         // Multiplicative step keeps the feel consistent across scales.
         float factor = 1.0f - delta * s;
         factor = glm::clamp(factor, 0.1f, 10.0f);
-        m_orthoSize = std::max(0.01f, m_orthoSize * factor);
+        m_orthoSize = std::clamp(m_orthoSize * factor, kMinOrthoSize, kMaxOrthoSize);
         return;
     }
 
@@ -248,11 +248,21 @@ void Camera::zoomToward(const glm::vec3& focus, float delta)
     float factor = 1.0f - delta * m_zoomSpeed * m_mouseSensitivity;
     factor = glm::clamp(factor, 0.1f, 10.0f);
     if (m_orthographic) {
-        // In ortho, both the camera/target slide AND the view extent scale -
-        // otherwise the focus would shift on screen as we narrow the frustum.
-        m_orthoSize = std::max(0.01f, m_orthoSize * factor);
-        m_position  = focus + (m_position - focus) * factor;
-        m_target    = focus + (m_target   - focus) * factor;
+        // In ortho, the view extent scales AND the camera slides toward the
+        // focus - otherwise the focus would shift on screen as we narrow the
+        // frustum. The slide is a pure TRANSLATION of camera and target: the
+        // image only depends on the lateral part, and scaling the camera-to-
+        // target distance too (as the perspective maths does) collapses it to
+        // nothing under repeated zoom-in - the near plane (which tracks the
+        // ortho size) then clips the whole scene, and once the distance
+        // reaches zero the view matrix is NaN and zooming back out cannot
+        // recover it.
+        if (factor < 1.0f && m_orthoSize * factor < kMinOrthoSize) return;
+        if (factor > 1.0f && m_orthoSize * factor > kMaxOrthoSize) return;
+        m_orthoSize = std::max(kMinOrthoSize, m_orthoSize * factor);
+        const glm::vec3 slide = (focus - m_target) * (1.0f - factor);
+        m_position += slide;
+        m_target   += slide;
         return;
     }
     glm::vec3 newPos    = focus + (m_position - focus) * factor;

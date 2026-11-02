@@ -1339,6 +1339,28 @@ void Application::renderViewport() {
                              imgMin.y + (1.0f - (c.y / c.w * 0.5f + 0.5f)) * imgSize.y);
                 return true;
             };
+            // Free ends of a sketch an operation was just refused for: blink
+            // red squares over them (flagOpenEnds).
+            if (!m_openEndMarks.empty()) {
+                const double now = ImGui::GetTime();
+                if (now >= m_openEndMarksUntil) {
+                    m_openEndMarks.clear();
+                } else {
+                    m_wakeFrames = std::max(m_wakeFrames, 2);   // keep it blinking
+                    const float blink = 0.5f + 0.5f * std::sin(static_cast<float>(now) * 9.0f);
+                    const float half = 7.0f * (m_window ? m_window->uiScale() : 1.0f);
+                    for (const glm::vec3& w : m_openEndMarks) {
+                        ImVec2 p;
+                        if (!toImg(w, p)) continue;
+                        dl->AddRectFilled(ImVec2(p.x - half, p.y - half),
+                                          ImVec2(p.x + half, p.y + half),
+                                          IM_COL32(235, 40, 40, static_cast<int>(110 + 145 * blink)));
+                        dl->AddRect(ImVec2(p.x - half - 2, p.y - half - 2),
+                                    ImVec2(p.x + half + 2, p.y + half + 2),
+                                    IM_COL32(255, 255, 255, 220), 0.0f, 0, 1.5f);
+                    }
+                }
+            }
             // Style enum lets callers pick between the subtle sketch / move
             // gizmo readout (Normal) and the bolder fluorescent-yellow arrow
             // used during active body operations (Bold) - push/pull, fillet,
@@ -5683,6 +5705,7 @@ void Application::renderViewport() {
                         if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
                             glm::vec2 mn = m_boxSelect->getMin();
                             glm::vec2 mx = m_boxSelect->getMax();
+                            const bool windowSel = m_boxSelect->isWindow();
                             m_boxSelect->end();
 
                             // Tiny rectangle = treat as a plain click → clear.
@@ -5719,9 +5742,13 @@ void Application::renderViewport() {
                                             any = true;
                                         }
                                         if (!any) continue;
-                                        // AABB overlap test against the box rect.
-                                        if (bMax.x >= mn.x && bMin.x <= mx.x &&
-                                            bMax.y >= mn.y && bMin.y <= mx.y) {
+                                        // Window (drag right): wholly inside the rect.
+                                        // Crossing (drag left): AABB overlaps it.
+                                        if (windowSel
+                                                ? (bMin.x >= mn.x && bMax.x <= mx.x &&
+                                                   bMin.y >= mn.y && bMax.y <= mx.y)
+                                                : (bMax.x >= mn.x && bMin.x <= mx.x &&
+                                                   bMax.y >= mn.y && bMin.y <= mx.y)) {
                                             SelectionEntry e;
                                             e.type = SelectionType::Body;
                                             e.bodyId = id;
@@ -5780,8 +5807,11 @@ void Application::renderViewport() {
                                 auto considerSketch = [&](int sid, const Sketch& sk) {
                                     glm::vec2 bMin, bMax;
                                     if (!projectSketch(sk, bMin, bMax)) return;
-                                    if (!(bMax.x >= mn.x && bMin.x <= mx.x &&
-                                          bMax.y >= mn.y && bMin.y <= mx.y))
+                                    if (windowSel
+                                            ? !(bMin.x >= mn.x && bMax.x <= mx.x &&
+                                                bMin.y >= mn.y && bMax.y <= mx.y)
+                                            : !(bMax.x >= mn.x && bMin.x <= mx.x &&
+                                                bMax.y >= mn.y && bMin.y <= mx.y))
                                         return;
                                     // Region-granular: box-select picks up
                                     // the sketch's closed REGIONS, exactly
@@ -6709,6 +6739,9 @@ void Application::renderViewport() {
                     if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
                         glm::vec2 mn = m_boxSelect->getMin();
                         glm::vec2 mx = m_boxSelect->getMax();
+                        // Left -> right takes only what lies wholly inside the
+                        // rectangle; right -> left takes anything it touches.
+                        const bool windowSel = m_boxSelect->isWindow();
                         m_boxSelect->end();
                         m_sketchBoxSelectActive = false;
 
@@ -6754,8 +6787,11 @@ void Application::renderViewport() {
                                 if (a == ptScreen.end() || b == ptScreen.end()) continue;
                                 glm::vec2 lmin = glm::min(a->second, b->second);
                                 glm::vec2 lmax = glm::max(a->second, b->second);
-                                if (lmax.x >= mn.x && lmin.x <= mx.x &&
-                                    lmax.y >= mn.y && lmin.y <= mx.y) {
+                                if (windowSel
+                                        ? (lmin.x >= mn.x && lmax.x <= mx.x &&
+                                           lmin.y >= mn.y && lmax.y <= mx.y)
+                                        : (lmax.x >= mn.x && lmin.x <= mx.x &&
+                                           lmax.y >= mn.y && lmin.y <= mx.y)) {
                                     selLns.insert(l.id);
                                 }
                             }
@@ -6766,15 +6802,19 @@ void Application::renderViewport() {
                             std::set<int> selCircs = io.KeyCtrl ? m_sketchTool->getSelectedCircles() : std::set<int>{};
                             std::set<int> selArcs  = io.KeyCtrl ? m_sketchTool->getSelectedArcs()    : std::set<int>{};
                             std::set<int> selSpls  = io.KeyCtrl ? m_sketchTool->getSelectedSplines() : std::set<int>{};
+                            // Crossing: any sample of the curve in the rect.
+                            // Window: EVERY sample in it (99.9% inside is out).
                             auto anySampleInRect = [&](const std::vector<glm::vec2>& s2d) {
+                                bool any = false, all = !s2d.empty();
                                 for (glm::vec2 q : s2d) {
                                     glm::vec2 sp;
-                                    if (projectPt(q, sp) &&
+                                    const bool in = projectPt(q, sp) &&
                                         sp.x >= mn.x && sp.x <= mx.x &&
-                                        sp.y >= mn.y && sp.y <= mx.y)
-                                        return true;
+                                        sp.y >= mn.y && sp.y <= mx.y;
+                                    any = any || in;
+                                    all = all && in;
                                 }
-                                return false;
+                                return windowSel ? all : any;
                             };
                             for (const auto& c : m_activeSketch->getCircles()) {
                                 const SketchPoint* ctr = m_activeSketch->getPoint(c.centerPointId);

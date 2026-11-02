@@ -129,6 +129,13 @@ public:
     /// Half-height (world units) of the ortho view box. Width is derived from aspect.
     void setOrthoSize(float halfHeight) { m_orthoSize = halfHeight; }
     float getOrthoSize() const { return m_orthoSize; }
+    // Smallest half-height an orthographic zoom will go to (world units, mm).
+    // Zooming past it stops: finer than this the grid labels and picking run
+    // out of float precision long before there is anything left to see.
+    static constexpr float kMinOrthoSize = 0.02f;
+    // ...and the largest (a kilometre). Without a ceiling a long run of zoom-out
+    // steps multiplies the view up to infinity and takes the matrices with it.
+    static constexpr float kMaxOrthoSize = 1.0e6f;
 
     /// When true (default), orbiting is a level turntable around world up (the
     /// horizon never rolls). When false, orbiting is a free trackball.

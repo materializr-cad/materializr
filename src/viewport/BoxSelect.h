@@ -18,6 +18,10 @@ public:
     bool isActive() const;
     glm::vec2 getMin() const;
     glm::vec2 getMax() const;
+    // Dragged left -> right: a WINDOW selection (only what lies wholly inside
+    // the rectangle). Right -> left is a CROSSING selection (anything the
+    // rectangle touches), which is how the marquee always behaved.
+    bool isWindow() const { return m_current.x >= m_start.x; }
 
     // Render the selection rectangle
     void render(float viewportWidth, float viewportHeight);

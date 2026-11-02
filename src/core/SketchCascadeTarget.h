@@ -28,6 +28,29 @@ inline int sketchIdForCascade(const Operation* op, const Document& doc) {
     return -1;
 }
 
+// How far back Ctrl+Z may reach while `sketchId` is open for editing.
+//
+// A freshly opened sketch stops undo at the step it was opened on: past that
+// lies the host body, and rolling it back under a live sketch crashed. But
+// reopening a sketch you already drew in is the same editing session as far as
+// the user is concerned - the lines from the last visit have to undo too,
+// exactly as they do from the 3D view. So the floor drops below the run of
+// this sketch's own edits that ends at the current step (nothing in between
+// touches a body, so it is as safe as undoing within one visit), and stops at
+// the first step that is anything else.
+//
+// Returns the step index undo must NOT go below (-1 = the very start).
+inline int sketchUndoFloor(const History& history, const Document& doc, int sketchId) {
+    int floor = history.currentStep();
+    if (sketchId < 0) return floor;
+    while (floor >= 0) {
+        const Operation* op = history.getStep(floor);
+        if (!op || !op->isEnabled() || sketchIdForCascade(op, doc) != sketchId) break;
+        --floor;
+    }
+    return floor;
+}
+
 // Undo can leave a sketch empty: stepping back past the step that drew it
 // restores the sketch to zero elements, but the sketch itself stays in the
 // document. Left visible it is a blank entry that can be opened and Finished -
@@ -109,6 +132,67 @@ inline int rederiveSketchDrivenOps(History& history, Document& doc, int sketchId
     }
     if (matchedOut) *matchedOut = matched;
     return earliest;
+}
+
+// True when `op` is an extrude / push-pull / lathe built from `sketchId`.
+inline bool opBuiltFromSketch(const Operation* op, int sketchId) {
+    if (auto* ext = dynamic_cast<const ExtrudeOp*>(op))
+        return ext->getSketchId() == sketchId;
+    if (auto* rv = dynamic_cast<const RevolveOp*>(op))
+        return rv->getSketchId() == sketchId;
+    if (auto* pp = dynamic_cast<const PushPullOp*>(op)) {
+        for (int t = 0; t < pp->targetCount(); ++t)
+            if (pp->getSketchIdAt(t) == sketchId) return true;
+    }
+    return false;
+}
+
+// A cascade that can't make a step follow a sketch edit switches it off
+// (Operation::isCascadeSuspended). That used to be permanent: drag a lathe
+// profile across its axis by half a millimetre and the Lathe - and the cut and
+// union built on it - went dark, and stayed dark after the profile was dragged
+// back. This gives such steps another try on the next cascade of their sketch.
+//
+// Flags every suspended applied step from the first one built from `sketchId`
+// onward as REVIVING (enabled, not yet applied) and returns their indices,
+// ascending; empty when nothing built from this sketch is suspended. The
+// caller replays the chain from the first one and then calls settleRevived().
+// Steps suspended for an unrelated sketch are left alone.
+inline std::vector<int> reviveSuspendedFor(History& history, int sketchId) {
+    std::vector<int> revived;
+    bool started = false;
+    const int applied = history.currentStep();
+    for (int i = 0; i <= applied && i < history.stepCount(); ++i) {
+        Operation* op = const_cast<Operation*>(history.getStep(i));
+        if (!op || op->isEnabled() || !op->isCascadeSuspended()) continue;
+        if (!started && !opBuiltFromSketch(op, sketchId)) continue;
+        started = true;
+        op->setEnabled(true);
+        op->setReviving(true);
+        revived.push_back(i);
+    }
+    return revived;
+}
+
+// Ends a revival started by reviveSuspendedFor(). `replayOk`: the replay
+// succeeded, so every step still reviving ran and is simply applied again.
+// Otherwise they go back to suspended, for the next attempt. Returns how many
+// steps came back.
+inline int settleRevived(History& history, const std::vector<int>& revived,
+                         bool replayOk) {
+    int back = 0;
+    for (int i : revived) {
+        Operation* op = const_cast<Operation*>(history.getStep(i));
+        if (!op || !op->isReviving()) continue;
+        op->setReviving(false);
+        if (replayOk) {
+            op->setCascadeSuspended(false);
+            ++back;
+        } else {
+            op->setEnabled(false);
+        }
+    }
+    return back;
 }
 
 // Fires `cascade(sketchId)` for every sketch that needs its driven body

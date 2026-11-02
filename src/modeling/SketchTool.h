@@ -282,6 +282,11 @@ public:
     // arrangement as the Dimension tool's dimReadyToCommit().
     bool offsetReadyToCommit() const { return m_offsetCommitRequested; }
     void commitOffset(std::set<int>& outPoints, std::set<int>& outElements);
+    // Elements that were selected when the tool was chosen: while any stand,
+    // only they can be picked (and only they join the chain). Dropped by the
+    // first commit or by clearOffsetSelection().
+    int  offsetSelectionCount() const { return static_cast<int>(m_offsetOnly.size()); }
+    void clearOffsetSelection() { m_offsetOnly.clear(); m_offsetChainHover.clear(); }
     void cancelOffset();
 
     // Rectangle's typed-value placement is two-stage: first Enter sets the
@@ -694,6 +699,12 @@ private:
     int m_dragPointId = -1;
     bool m_isDragging = false;
     bool m_lastDownAddedToSel = false; // Ctrl state for the current click
+    // The line the last Select click landed on, so a repeat click at the same
+    // spot can walk to the next of several overlapping lines.
+    std::set<int> m_offsetOnly;   // see offsetSelectionCount()
+    const std::set<int>* offsetOnly() const { return m_offsetOnly.empty() ? nullptr : &m_offsetOnly; }
+    int       m_lastLinePickId = -1;
+    glm::vec2 m_lastLinePickPos{0.0f};
     bool m_constructionDraw = false;
     std::set<int> m_selectedPoints;
     std::set<int> m_selectedLines;

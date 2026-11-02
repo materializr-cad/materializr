@@ -358,7 +358,7 @@ bool History::editStep(int index, Document& doc, bool transactional) {
     // then re-execute from `index` forward so the edited parameters take effect.
     for (int i = limit; i >= index; --i) {
         Operation* op = m_operations[i].get();
-        if (op->isEnabled()) op->undo(doc);
+        if (op->isEnabled() && !op->isReviving()) op->undo(doc);
     }
     bool editRejected = false;
     // Asked after each step: an aborted step may have returned anything (a
@@ -557,6 +557,9 @@ bool History::setStepEnabled(int index, bool enabled, Document& doc) {
     int count = static_cast<int>(m_operations.size());
     if (index < 0 || index >= count) return false;
     Operation* target = m_operations[index].get();
+    // Toggling a step is the user's call (the cascade re-flags the steps it
+    // switches off itself, after this returns).
+    target->setCascadeSuspended(false);
     if (target->isEnabled() == enabled) return true; // no change
 
     // Above the applied tip (redo region / breakpoint-suppressed): the step
@@ -574,7 +577,7 @@ bool History::setStepEnabled(int index, bool enabled, Document& doc) {
     // never applied, so it's correctly skipped.
     for (int i = m_currentIndex; i >= index; --i) {
         Operation* op = m_operations[i].get();
-        if (op->isEnabled()) op->undo(doc);
+        if (op->isEnabled() && !op->isReviving()) op->undo(doc);
     }
 
     target->setEnabled(enabled);

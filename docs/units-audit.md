@@ -263,7 +263,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 
 - CONVERTED: 1
 - allowed-by-hand: 93
-- comment: 299
+- comment: 300
 - diagnostic: 13
 - identifier/other: 9
 
@@ -664,6 +664,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | allowed-by-hand | src/ui/TouchWidgets.h | `const char* suffix = "mm", int decimals = 1,` |
 | comment | src/viewport/Camera.cpp | `// least 0.1 mm of standoff so the view doesn't degenerate.` |
 | comment | src/viewport/Camera.cpp | `// showing geometry instead of getting clipped at the legacy 1000 mm far` |
+| comment | src/viewport/Camera.h | `// Smallest half-height an orthographic zoom will go to (world units, mm).` |
 | comment | src/viewport/Grid.cpp | `// zooming reveals finer tiers. Keeps the tiered look (the "10 mm /` |
 | comment | src/viewport/Grid.cpp | `// 100 mm lines") the user wants on the ground grid.` |
 | comment | src/viewport/GridScale.h | `// -> mm turns a 304.8 mm grid into a 1 mm one without moving the camera, and a` |

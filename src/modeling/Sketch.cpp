@@ -831,7 +831,43 @@ bool Sketch::explodePolygon(int id) {
     return true;
 }
 
-void Sketch::removeElements(const std::vector<int>& ids) {
+void Sketch::removeElements(const std::vector<int>& idsIn) {
+    // A point can't be deleted out from under the geometry that uses it: a line
+    // left pointing at a missing point stays in the sketch but drops out of
+    // every profile (the loop it closed no longer closes, and the body built
+    // from it stops following the sketch). Take the lines, arcs and circles
+    // anchored on a deleted point with it, and shorten a spline that loses a
+    // control point rather than deleting the whole curve.
+    std::vector<int> ids = idsIn;
+    {
+        // A polygon's vertices and centre are not erased by this call at all -
+        // the polygon cascades instead, and a point other geometry still uses
+        // survives it - so they have nothing to take along.
+        std::unordered_set<int> polygonPoints;
+        for (const auto& pg : m_polygons) {
+            polygonPoints.insert(pg.centerPointId);
+            polygonPoints.insert(pg.vertexPointIds.begin(), pg.vertexPointIds.end());
+        }
+        std::unordered_set<int> gone;
+        for (int id : idsIn)
+            if (getPoint(id) && !polygonPoints.count(id)) gone.insert(id);
+        if (!gone.empty()) {
+            auto has = [&](int pid) { return gone.count(pid) != 0; };
+            for (const auto& l : m_lines)
+                if (has(l.startPointId) || has(l.endPointId)) ids.push_back(l.id);
+            for (const auto& a : m_arcs)
+                if (has(a.centerPointId) || has(a.startPointId) || has(a.endPointId))
+                    ids.push_back(a.id);
+            for (const auto& c : m_circles)
+                if (has(c.centerPointId)) ids.push_back(c.id);
+            for (auto& sp : m_splines) {
+                auto& cp = sp.controlPointIds;
+                if (std::none_of(cp.begin(), cp.end(), has)) continue;
+                cp.erase(std::remove_if(cp.begin(), cp.end(), has), cp.end());
+                if (cp.size() < 2) ids.push_back(sp.id);
+            }
+        }
+    }
     // Resolve every polygon touched by ANY id in this batch against the
     // sketch's state BEFORE deleting anything. A batch selection can contain
     // more than one piece of the same polygon (two vertices, an edge plus a

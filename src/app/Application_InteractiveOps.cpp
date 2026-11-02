@@ -1246,9 +1246,18 @@ bool Application::cascadeFromSketchEdit(int sketchId, double budgetMs) {
     // chain from the earliest affected step below. Steps above the undo tip are
     // excluded (see rederiveSketchDrivenOps): replaying "from" one would roll
     // the tip forward through everything just undone.
+    //
+    // Steps an earlier cascade switched off (it couldn't follow a sketch edit)
+    // get another chance first: the edit that broke them may since have been
+    // undone or corrected. They ride along as "reviving" - enabled but not
+    // applied yet - and go back to suspended if they still can't follow.
+    const std::vector<int> reviving =
+        materializr::reviveSuspendedFor(*m_history, sketchId);
     int matched = 0;
-    const int earliest =
+    int earliest =
         materializr::rederiveSketchDrivenOps(*m_history, *m_document, sketchId, &matched);
+    if (!reviving.empty() && (earliest < 0 || reviving.front() < earliest))
+        earliest = reviving.front();
     if (earliest < 0) {
         std::fprintf(stderr, "[Cascade] sketchId=%d: %d matched, none re-derivable\n",
                      sketchId, matched);
@@ -1318,6 +1327,7 @@ bool Application::cascadeFromSketchEdit(int sketchId, double budgetMs) {
     if (!ok && m_history->lastEditAborted()) {
         endBudget();
         m_document->clearCascadeSketchOverrides();
+        materializr::settleRevived(*m_history, reviving, false);
         std::fprintf(stderr, "[Cascade] sketchId=%d replay from step %d: over the %.0f ms "
                      "budget - deferred to sketch Finish\n", sketchId, earliest, budgetMs);
         // Rolled back: no body changed, nothing to remesh.
@@ -1332,15 +1342,28 @@ bool Application::cascadeFromSketchEdit(int sketchId, double budgetMs) {
     while (!ok && m_history->lastEditFailStep() >= 0 &&
            disabledSteps.size() < 8) {
         const int bad = m_history->lastEditFailStep();
-        const Operation* op = m_history->getStep(bad);
+        Operation* op = const_cast<Operation*>(m_history->getStep(bad));
         if (!op) break;
-        std::fprintf(stderr, "[Cascade] disabling step %d (%s) and retrying\n",
-                     bad, op->name().c_str());
-        m_history->setStepEnabled(bad, false, *m_document);
-        disabledSteps.push_back(bad);
+        if (op->isReviving()) {
+            // A retry that still can't follow: it was never applied, so just
+            // put it back to suspended - quietly, the user was told already.
+            std::fprintf(stderr, "[Cascade] step %d (%s) still can't follow; staying "
+                         "suspended\n", bad, op->name().c_str());
+            op->setReviving(false);
+            op->setEnabled(false);
+        } else {
+            std::fprintf(stderr, "[Cascade] disabling step %d (%s) and retrying\n",
+                         bad, op->name().c_str());
+            m_history->setStepEnabled(bad, false, *m_document);
+            op->setCascadeSuspended(true);
+            disabledSteps.push_back(bad);
+        }
         ok = m_history->editStep(earliest, *m_document, /*transactional=*/true);
     }
     endBudget();
+    // Before the restore below: the steps still reviving were never applied,
+    // so they must be off again before anything is re-enabled and replayed.
+    const int revivedCount = materializr::settleRevived(*m_history, reviving, ok);
     if (!ok && !disabledSteps.empty()) {
         // Still failing - restore what we disabled and fall back to a clean
         // full revert (never leave the history silently gutted).
@@ -1362,6 +1385,9 @@ bool Application::cascadeFromSketchEdit(int sketchId, double budgetMs) {
             : std::string(materializr::tr("Couldn't update the model for that sketch change - a "
                                           "downstream feature couldn't follow it, so "
                                           "the model was left unchanged.")));
+    } else if (revivedCount > 0 && disabledSteps.empty()) {
+        showToast(materializr::tr("Restored the features an earlier sketch change had "
+                                  "switched off."), 6.0);
     } else if (!disabledSteps.empty()) {
         std::string names;
         for (size_t i = 0; i < disabledSteps.size(); ++i) {

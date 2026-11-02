@@ -135,6 +135,20 @@ public:
     bool isEnabled() const { return m_enabled; }
     void setEnabled(bool enabled) { m_enabled = enabled; }
 
+    // Set when a sketch cascade switched this step off because it couldn't
+    // follow a sketch edit (see Application::cascadeFromSketchEdit). Unlike a
+    // step the user disabled, it gets another try the next time its sketch
+    // changes - the edit that broke it may have been undone or corrected.
+    // Persisted with the project; cleared when the user toggles the step.
+    bool isCascadeSuspended() const { return m_cascadeSuspended; }
+    void setCascadeSuspended(bool s) { m_cascadeSuspended = s; }
+
+    // Transient, only while a cascade is retrying a suspended step: the step
+    // is enabled but NOT applied to the document yet, so History must not
+    // undo() it when it rolls the chain back.
+    bool isReviving() const { return m_reviving; }
+    void setReviving(bool r) { m_reviving = r; }
+
     // Clone this operation retargeted at another body. Used by the
     // thread-last reflow to propagate a finishing pass onto bodies the
     // inserted op created (the second half of a split gets its own thread
@@ -268,6 +282,8 @@ protected:
     }
 
     bool m_enabled = true;
+    bool m_cascadeSuspended = false;
+    bool m_reviving = false;
     Precomputed m_precomputed;
     bool m_hasPrecomputed = false;
     std::string m_lastGoodParams; // see lastGoodParams()

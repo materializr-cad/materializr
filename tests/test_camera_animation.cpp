@@ -188,3 +188,52 @@ TEST(CameraOrbitExit, SlightlyOffPoleTopViewDoesNotSpinOnTheFirstFrame) {
         }
     }
 }
+
+// Hammering the wheel in a sketch (orthographic) used to slide the camera
+// toward the focus point as well as shrink the view, so the camera-to-target
+// distance fell geometrically. The near plane tracks the ortho size, so the
+// scene was clipped away, and when the distance reached zero the view matrix
+// went NaN and zooming back out never recovered ("everything disappears, the
+// grid scale turns to hex, only Home fixes it").
+TEST(CameraZoom, OrthoZoomInKeepsTheCameraDistanceAndStopsAtTheFloor) {
+    Camera cam;
+    cam.animateTo(glm::vec3(10, 40, 5), glm::vec3(10, 0, 5), glm::vec3(0, 0, 1),
+                  true, 25.0f, 0.35f);
+    runToEnd(cam);
+    ASSERT_TRUE(cam.isOrthographic());
+    const float dist0 = glm::length(cam.getPosition() - cam.getTarget());
+
+    const glm::vec3 focus(12.0f, 0.0f, 7.0f);
+    for (int i = 0; i < 400; ++i) cam.zoomToward(focus, 3.0f);
+
+    EXPECT_NEAR(glm::length(cam.getPosition() - cam.getTarget()), dist0, 1e-2f)
+        << "an ortho zoom must not move the camera toward its target";
+    EXPECT_GE(cam.getOrthoSize(), Camera::kMinOrthoSize);
+    EXPECT_LT(cam.getOrthoSize(), 0.05f) << "400 zoom-in steps should reach the floor";
+    const glm::mat4 vp = cam.getProjectionMatrix() * cam.getViewMatrix();
+    for (int c = 0; c < 4; ++c)
+        for (int r = 0; r < 4; ++r) EXPECT_TRUE(std::isfinite(vp[c][r]));
+
+    // ...and the view comes back out again.
+    for (int i = 0; i < 400; ++i) cam.zoomToward(focus, -3.0f);
+    EXPECT_GT(cam.getOrthoSize(), 25.0f);
+    EXPECT_NEAR(glm::length(cam.getPosition() - cam.getTarget()), dist0, 1e-2f);
+}
+
+TEST(CameraZoom, OrthoZoomKeepsTheFocusPointFixedOnScreen) {
+    Camera cam;
+    cam.animateTo(glm::vec3(0, 40, 0), glm::vec3(0, 0, 0), glm::vec3(0, 0, 1),
+                  true, 20.0f, 0.35f);
+    runToEnd(cam);
+    cam.setAspect(1.0f);
+    const glm::vec3 focus(6.0f, 0.0f, -4.0f);
+    auto ndc = [&](const glm::vec3& p) {
+        glm::vec4 c = cam.getProjectionMatrix() * cam.getViewMatrix() * glm::vec4(p, 1.0f);
+        return glm::vec2(c.x / c.w, c.y / c.w);
+    };
+    const glm::vec2 before = ndc(focus);
+    for (int i = 0; i < 5; ++i) cam.zoomToward(focus, 1.5f);
+    const glm::vec2 after = ndc(focus);
+    EXPECT_NEAR(before.x, after.x, 1e-3f);
+    EXPECT_NEAR(before.y, after.y, 1e-3f);
+}

@@ -4147,12 +4147,29 @@ void Application::renderRevolvePopup() {
         }
     }
 
-    // Apply-enabled validation depends on the chosen What.
-    const bool canApply = (m_revolveWhatIdx == 0)
-                              ? !m_revolveBodyIds.empty()
-                              : (m_revolveSketchId >= 0);
+    // Apply-enabled validation depends on the chosen What. Whatever is missing
+    // is SAID, in red above the buttons: a dead Apply with no reason (or one
+    // that closed the popup and did nothing) reads as a bug.
+    const char* blocker = nullptr;
+    if (m_revolveWhatIdx == 0) {
+        if (m_revolveBodyIds.empty())
+            blocker = materializr::tr("Select the body (or bodies) to rotate first.");
+    } else if (m_revolveSketchId < 0) {
+        blocker = materializr::tr("Select the sketch to revolve first.");
+    } else if (auto sk = m_document->getSketch(m_revolveSketchId);
+               !sk || sk->buildRegions().empty()) {
+        blocker = materializr::tr("This sketch has no closed contour to revolve - "
+                                  "close its open ends first.");
+        flagOpenEnds(m_revolveSketchId, 0.5);   // refreshed every frame the popup is up
+    } else if (m_revolveModeIdx != 0 && m_revolveBodyId < 0) {
+        blocker = materializr::tr("Select the target body together with the sketch "
+                                  "to use Union, Subtract or Intersect.");
+    }
+    const bool canApply = blocker == nullptr;
 
     ImGui::Separator();
+    if (blocker)
+        ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.35f, 1.0f), "%s", blocker);
     ImGui::BeginDisabled(!canApply);
     bool applyClicked  = ImGui::Button(materializr::tr("Apply"), materializr::uiSz(130, 0));
     ImGui::EndDisabled();
@@ -4166,8 +4183,17 @@ void Application::renderRevolvePopup() {
         // op would compute "previous = already-rotated", and undo would
         // bring us back to the live-preview state instead of true origin.
         revolveLiveRestore();
-        applyRevolve();
-        m_revolveActive = false;
+        if (applyRevolve()) {
+            m_revolveActive = false;
+        } else {
+            // Said, not swallowed - and the popup stays up so the settings
+            // can be fixed instead of re-entered.
+            showToast(m_revolveWhatIdx == 0
+                ? materializr::tr("Nothing could be rotated - bodies placed by a mate are skipped.")
+                : materializr::tr("The Lathe couldn't be built from this profile. "
+                                  "Check that it doesn't cross the axis."), 6.0);
+            revolveLiveBegin();
+        }
     } else if (cancelClicked) {
         revolveLiveRestore();
         m_revolveActive = false;
@@ -4734,8 +4760,8 @@ void Application::revolveLiveRestore() {
     m_revolveLiveActive = false;
 }
 
-void Application::applyRevolve() {
-    if (!m_history || !m_document) return;
+bool Application::applyRevolve() {
+    if (!m_history || !m_document) return false;
     auto trackBodies = trackBodyChanges(); // re-tessellate only what changes
 
     // Resolve the axis once - both flows use the same picker.
@@ -4758,7 +4784,7 @@ void Application::applyRevolve() {
     if (m_revolveWhatIdx == 0) {
         if (m_revolveBodyIds.empty()) {
             std::fprintf(stderr, "[Revolve] apply skipped: no bodies captured\n");
-            return;
+            return false;
         }
         // Bundle all bodies' rotations into one ReplayOp so the user undoes
         // the entire revolve in a single Ctrl+Z. Snapshot each body before
@@ -4828,13 +4854,13 @@ void Application::applyRevolve() {
                              axisOrigin.X(), axisOrigin.Y(), axisOrigin.Z(),
                              rotated);
         }
-        return;
+        return rotated > 0;
     }
 
     // Sweep Sketch path - original RevolveOp flow.
-    if (m_revolveSketchId < 0) return;
+    if (m_revolveSketchId < 0) return false;
     auto sk = m_document->getSketch(m_revolveSketchId);
-    if (!sk) return;
+    if (!sk) return false;
     auto regions = sk->buildRegions();
     // Pick the outermost region (largest outer bbox) - its face carries any
     // inner boundaries as holes. Matches RevolveOp::rebuildProfileFromSketch
@@ -4854,7 +4880,7 @@ void Application::applyRevolve() {
     }
     if (bestIdx < 0) {
         std::fprintf(stderr, "[Revolve] sketch has no closed region to revolve\n");
-        return;
+        return false;
     }
 
     auto op = std::make_unique<RevolveOp>();
@@ -4875,9 +4901,10 @@ void Application::applyRevolve() {
     if (m_history->pushOperation(std::move(op), *m_document)) {
         std::fprintf(stdout, "[Revolve] sweep-sketch applied: angle=%.1f° mode=%d\n",
                      m_revolveAngle, m_revolveModeIdx);
-    } else {
-        std::fprintf(stderr, "[Revolve] op execute failed\n");
+        return true;
     }
+    std::fprintf(stderr, "[Revolve] op execute failed\n");
+    return false;
 }
 
 void Application::renderConstructionAxisPanel() {
@@ -5533,9 +5560,18 @@ void Application::renderOffsetToolPanel() {
         // longer second hint grew the window off the right edge.
         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * 22.0f);
         if (!picked) {
-            ImGui::TextDisabled("%s", materializr::tr(
-                "Hover a line, arc or circle - the whole connected chain "
-                "highlights. Click to choose it."));
+            if (const int n = m_sketchTool->offsetSelectionCount(); n > 0) {
+                ImGui::TextDisabled("%s", materializr::tr(
+                    "Offsetting only what you had selected. Hover one of those "
+                    "and click to choose it."));
+                if (ImGui::SmallButton(materializr::tr("Use the whole connected contour")))
+                    m_sketchTool->clearOffsetSelection();
+            } else {
+                ImGui::TextDisabled("%s", materializr::tr(
+                    "Hover a line, arc or circle - the whole connected chain "
+                    "highlights. Click to choose it. To offset just some "
+                    "segments, select them first, then choose Offset."));
+            }
         } else {
             ImGui::TextDisabled("%s", materializr::tr(
                 "Move the cursor to set the distance; the side it is on picks "

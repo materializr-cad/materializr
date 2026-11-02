@@ -497,6 +497,11 @@ add_executable(test_sketch_select_delete_polygon test_sketch_select_delete_polyg
 target_link_libraries(test_sketch_select_delete_polygon PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_sketch_select_delete_polygon COMMAND test_sketch_select_delete_polygon)
 
+# test_sketch_pick_overlap - overlapping lines: construction first, repeat click cycles
+add_executable(test_sketch_pick_overlap test_sketch_pick_overlap.cpp)
+target_link_libraries(test_sketch_pick_overlap PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_sketch_pick_overlap COMMAND test_sketch_pick_overlap)
+
 # Face-sketch grid direction: world-aligned edge beats the longest diagonal
 add_executable(test_sketch_plane_axis test_sketch_plane_axis.cpp)
 target_link_libraries(test_sketch_plane_axis PRIVATE materializr_core gtest gtest_main)
@@ -755,6 +760,16 @@ add_test(NAME test_chamfer_at_limit COMMAND test_chamfer_at_limit)
 add_executable(test_cascade_applied_only test_cascade_applied_only.cpp)
 target_link_libraries(test_cascade_applied_only PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_cascade_applied_only COMMAND test_cascade_applied_only)
+
+# test_cascade_revival - steps a cascade switched off get another try on the next cascade of their sketch
+add_executable(test_cascade_revival test_cascade_revival.cpp)
+target_link_libraries(test_cascade_revival PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_cascade_revival COMMAND test_cascade_revival)
+
+# test_sketch_point_delete - deleting a point takes the geometry anchored on it (no dangling references)
+add_executable(test_sketch_point_delete test_sketch_point_delete.cpp)
+target_link_libraries(test_sketch_point_delete PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_sketch_point_delete COMMAND test_sketch_point_delete)
 
 
 # test_topo_pushpull - PushPullOp face-driven target via topo::Ref survives a resize

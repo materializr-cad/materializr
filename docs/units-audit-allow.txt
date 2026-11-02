@@ -393,6 +393,7 @@ src/ui/TouchWidgets.h: const char* suffix = "mm", int decimals = 1,
 src/ui/TouchWidgets.h: const char* suffix = "mm", int decimals = 1,
 src/viewport/Camera.cpp: // least 0.1 mm of standoff so the view doesn't degenerate.
 src/viewport/Camera.cpp: // showing geometry instead of getting clipped at the legacy 1000 mm far
+src/viewport/Camera.h: // Smallest half-height an orthographic zoom will go to (world units, mm).
 src/viewport/Grid.cpp: // zooming reveals finer tiers. Keeps the tiered look (the "10 mm /
 src/viewport/Grid.cpp: // 100 mm lines") the user wants on the ground grid.
 src/viewport/GridScale.h: // -> mm turns a 304.8 mm grid into a 1 mm one without moving the camera, and a

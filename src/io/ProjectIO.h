@@ -37,6 +37,10 @@ struct ProjectLoadResult {
 struct ProjectHistoryStep {
     std::string typeId, name, description;
     bool enabled = true;
+    // Switched off by a sketch cascade (not by the user) - see
+    // Operation::isCascadeSuspended. Written only when set, so older builds
+    // skip the line and read the step as a plain disabled one.
+    bool suspended = false;
     std::vector<std::pair<int, TopoDS_Shape>> changed; // id -> shape after this step
     std::vector<int> deleted;                          // ids removed at this step
     // Opaque per-op parameter blob (radii, distances, etc.) produced by

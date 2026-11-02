@@ -2478,10 +2478,13 @@ void Application::handleToolAction(int action) {
                         beginInteractiveExtrude(entry.shape,
                                                 ExtrudeMode::NewBody,
                                                 /*targetBody=*/-1);
+                        started = true;
                         break;
                     }
                 }
             }
+            if (!started)
+                showToast(materializr::tr("Select a sketch or a face to extrude first."));
             break;
         }
 
@@ -2501,10 +2504,13 @@ void Application::handleToolAction(int action) {
                 for (const auto& entry : sel) {
                     if (entry.type == SelectionType::Sketch && entry.sketchId >= 0) {
                         extrudeSketchById(entry.sketchId, ExtrudeMode::Subtract);
+                        started = true;
                         break;
                     }
                 }
             }
+            if (!started)
+                showToast(materializr::tr("Select a sketch (or a region of one) to cut with first."));
             break;
         }
         case ToolAction::PushPull: {
@@ -3207,7 +3213,7 @@ void Application::handleShortcuts() {
                        // into the host body - rolling the body back while the
                        // sketch is live (and rendering against it) crashed.
                        (!m_inSketchMode ||
-                        m_history->currentStep() > m_sketchEntryHistoryStep)) {
+                        m_history->currentStep() > m_sketchUndoFloorStep)) {
                 m_history->undo(*m_document);
                 const int idx = m_history->lastUndoneStep();
                 const Operation* undone = m_history->getStep(idx);
@@ -4319,6 +4325,7 @@ ProjectHistory Application::captureProjectHistory(bool cancelPreviews) {
         steps[i].name = op->name();
         steps[i].description = op->description();
         steps[i].enabled = op->isEnabled();
+        steps[i].suspended = op->isCascadeSuspended() && !op->isEnabled();
         // SketchEditOp's params blob needs the live document to look up the
         // sketch id its m_target belongs to. Other ops use the parameterless
         // serializeParams() - base Operation returns "" so they're a no-op.
@@ -4514,6 +4521,7 @@ void Application::rebuildHistoryFromProject(const ProjectHistory& hist,
                 static_cast<ReplayOp*>(op.get())->setStoredParams(st.params);
         }
         op->setEnabled(st.enabled);
+        op->setCascadeSuspended(st.suspended && !st.enabled);
         // Restore the original timestamp so the HistoryPanel's date grouping
         // is preserved across reload. Legacy projects (timestamp == 0) get
         // bumped to "yesterday" so they group under that header instead of
@@ -5809,7 +5817,8 @@ void Application::enterSketchMode() {
     m_sketchTool->setMode(SketchToolMode::Line);
     m_inSketchMode = true;
     m_sketchEntryHistoryStep = m_history ? m_history->currentStep() : -1;
-    if (m_history) m_history->setUndoFloor(m_sketchEntryHistoryStep);  // no undo past sketch entry
+    m_sketchUndoFloorStep = m_sketchEntryHistoryStep;
+    if (m_history) m_history->setUndoFloor(m_sketchUndoFloorStep);  // no undo past sketch entry
     m_toolbar->setSketchMode(true);
     // Fresh sketch session: drop any stale Dimension edit-popup state left
     // over from a previous session (e.g. Esc/undo left m_dimEditingId set
@@ -5838,7 +5847,8 @@ void Application::enterSketchOnPlane(const gp_Pln& plane) {
     m_sketchTool->setMode(SketchToolMode::Line);
     m_inSketchMode = true;
     m_sketchEntryHistoryStep = m_history ? m_history->currentStep() : -1;
-    if (m_history) m_history->setUndoFloor(m_sketchEntryHistoryStep);  // no undo past sketch entry
+    m_sketchUndoFloorStep = m_sketchEntryHistoryStep;
+    if (m_history) m_history->setUndoFloor(m_sketchUndoFloorStep);  // no undo past sketch entry
     m_toolbar->setSketchMode(true);
     // Fresh sketch session: drop any stale Dimension edit-popup state left
     // over from a previous session (e.g. Esc/undo left m_dimEditingId set
@@ -6511,7 +6521,8 @@ void Application::enterSketchOnFace(const TopoDS_Face& face, int sourceBodyId) {
     m_sketchTool->setMode(SketchToolMode::Line);
     m_inSketchMode = true;
     m_sketchEntryHistoryStep = m_history ? m_history->currentStep() : -1;
-    if (m_history) m_history->setUndoFloor(m_sketchEntryHistoryStep);  // no undo past sketch entry
+    m_sketchUndoFloorStep = m_sketchEntryHistoryStep;
+    if (m_history) m_history->setUndoFloor(m_sketchUndoFloorStep);  // no undo past sketch entry
     m_toolbar->setSketchMode(true);
     // Fresh sketch session: drop any stale Dimension edit-popup state left
     // over from a previous session (e.g. Esc/undo left m_dimEditingId set
@@ -7213,7 +7224,12 @@ void Application::editSketch(int sketchId) {
     m_sketchTool->setMode(SketchToolMode::Select);
     m_inSketchMode = true;
     m_sketchEntryHistoryStep = m_history ? m_history->currentStep() : -1;
-    if (m_history) m_history->setUndoFloor(m_sketchEntryHistoryStep);  // no undo past sketch entry
+    // Discard still rewinds to the entry step; Ctrl+Z, though, reaches back
+    // through this sketch's own earlier edits (see sketchUndoFloor).
+    m_sketchUndoFloorStep = (m_history && m_document)
+        ? materializr::sketchUndoFloor(*m_history, *m_document, sketchId)
+        : m_sketchEntryHistoryStep;
+    if (m_history) m_history->setUndoFloor(m_sketchUndoFloorStep);  // no undo past this
     m_toolbar->setSketchMode(true);
     // Fresh sketch session: drop any stale Dimension edit-popup state left
     // over from a previous session (e.g. Esc/undo left m_dimEditingId set
@@ -7226,6 +7242,40 @@ void Application::editSketch(int sketchId) {
     alignCameraToActiveSketch();
 }
 
+void Application::flagOpenEnds(int sketchId, double seconds) {
+    m_openEndMarks.clear();
+    auto sk = m_document ? m_document->getSketch(sketchId) : nullptr;
+    if (!sk) return;
+    // A point is a free end when exactly ONE profile edge reaches it. Circles
+    // are closed on their own; an arc's centre is not on the outline; a spline
+    // meets the rest only by its two end control points. Construction
+    // geometry never takes part in a profile.
+    std::map<int, int> degree;
+    for (const auto& l : sk->getLines()) {
+        if (l.isConstruction) continue;
+        ++degree[l.startPointId]; ++degree[l.endPointId];
+    }
+    for (const auto& a : sk->getArcs()) {
+        if (a.isConstruction) continue;
+        ++degree[a.startPointId]; ++degree[a.endPointId];
+    }
+    for (const auto& s : sk->getSplines()) {
+        if (s.isConstruction || s.controlPointIds.size() < 2) continue;
+        ++degree[s.controlPointIds.front()]; ++degree[s.controlPointIds.back()];
+    }
+    const gp_Ax3& ax = sk->getPlane().Position();
+    const glm::vec3 O(ax.Location().X(), ax.Location().Y(), ax.Location().Z());
+    const glm::vec3 X(ax.XDirection().X(), ax.XDirection().Y(), ax.XDirection().Z());
+    const glm::vec3 Y(ax.YDirection().X(), ax.YDirection().Y(), ax.YDirection().Z());
+    for (const auto& [pid, d] : degree) {
+        if (d != 1) continue;
+        if (const SketchPoint* p = sk->getPoint(pid))
+            m_openEndMarks.push_back(O + X * p->pos.x + Y * p->pos.y);
+    }
+    m_openEndMarksUntil = ImGui::GetTime() + seconds;
+    m_wakeFrames = std::max(m_wakeFrames, 2);
+}
+
 void Application::extrudeSketchById(int sketchId, ExtrudeMode mode) {
     auto sketch = m_document->getSketch(sketchId);
     if (!sketch) return;
@@ -7235,6 +7285,9 @@ void Application::extrudeSketchById(int sketchId, ExtrudeMode mode) {
     TopoDS_Shape profile = sketch->buildProfileShape();
     if (profile.IsNull()) {
         std::fprintf(stderr, "Sketch has no closed profile to extrude\n");
+        showToast(materializr::tr("This sketch has no closed contour to extrude - "
+                                  "close its open ends first."), 6.0);
+        flagOpenEnds(sketchId);
         return;
     }
 
@@ -7266,6 +7319,7 @@ void Application::subtractSketchRegion(int sketchId, int regionIndex) {
     const TopoDS_Face& profile = regions[regionIndex].face;
     if (profile.IsNull()) {
         std::fprintf(stderr, "Sketch region has no profile face to subtract\n");
+        showToast(materializr::tr("That region has no closed contour to cut with."), 6.0);
         return;
     }
     beginInteractiveExtrude(profile, ExtrudeMode::Subtract, targetBody, sketchId);

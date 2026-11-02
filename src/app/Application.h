@@ -137,6 +137,10 @@ private:
     // few seconds, doesn't fight the per-frame status-bar message.
     void showThreadsLastToast();
     void showToast(const std::string& text, double seconds = 4.0);
+    // Blink red squares over the free ends of `sketchId`'s open contours for a
+    // few seconds - what an Extrude / Push / Lathe that was refused for lack of
+    // a closed profile points at.
+    void flagOpenEnds(int sketchId, double seconds = 4.0);
     void renderTransientToast();
     std::string m_toastText;
     double m_toastExpiry = 0.0;   // < 0: not yet drawn, armed on first draw
@@ -213,6 +217,8 @@ private:
     // Idle-render throttle: counts down frames to render after the last event
     // or active-work wakeup. Zero = skip the frame and sleep for the next event.
     int m_wakeFrames = 0;
+    std::vector<glm::vec3> m_openEndMarks;   // world positions, see flagOpenEnds()
+    double m_openEndMarksUntil = 0.0;        // ImGui::GetTime() the marks expire at
     // True only while a load is tessellating in the deferred slot: tells
     // rebuildMeshes to pump a per-body progress frame (safe between frames).
     bool m_pumpMeshProgress = false;
@@ -981,6 +987,7 @@ private:
     // partial content. -1 = no sketch in progress (or pre-sketch state
     // wasn't capturable).
     int m_sketchEntryHistoryStep = -1;
+    int m_sketchUndoFloorStep = -1;   // Ctrl+Z stops here; below the entry step when reopening a sketch
     int m_activeSketchId = -1; // document id of the sketch being edited, or -1 if new
 
     // In-progress-sketch crash/kill recovery (see io/SketchRecovery). While in
@@ -2275,7 +2282,7 @@ private:
     // when revolve is requested" logic stays in one place.
     void beginRevolve();
     void renderRevolvePopup();
-    void applyRevolve();
+    bool applyRevolve();   // false = nothing applied; the popup stays up and says so
     // Cancel / commit helpers - share the restore-original logic.
     void revolveLiveBegin();
     void revolveLiveApply(float angle);

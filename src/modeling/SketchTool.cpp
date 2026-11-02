@@ -36,6 +36,19 @@ void SketchTool::setMode(SketchToolMode mode) {
     if (m_isPlacing) {
         onCancel();
     }
+    // Select a segment, THEN pick Offset: the tool offsets what was selected
+    // (just that, not the whole connected contour). Taken before the selection
+    // is dropped below. Re-picking Offset with nothing selected keeps whatever
+    // restriction is already standing.
+    if (mode == SketchToolMode::Offset && m_mode != SketchToolMode::Offset) {
+        std::set<int> sel(m_selectedLines);
+        sel.insert(m_selectedCircles.begin(), m_selectedCircles.end());
+        sel.insert(m_selectedArcs.begin(), m_selectedArcs.end());
+        sel.insert(m_selectedSplines.begin(), m_selectedSplines.end());
+        m_offsetOnly = std::move(sel);
+    } else if (mode != SketchToolMode::Offset) {
+        m_offsetOnly.clear();
+    }
     m_mode = mode;
     // Leaving select/move: drop element highlights so they don't linger as
     // golden geometry once the user goes back to drawing.
@@ -2391,9 +2404,15 @@ void SketchTool::handleSelectTool(glm::vec2 pos) {
     int nearSpline = -1;
     const float tol = std::max(tolStep() * 0.5f, 0.5f) * snapScale(); // sketch units (wider on touch)
     if (nearPt < 0) {
-        // Line segments.
-        float bestD = 0.0f;
+        // Line segments. Lines drawn on top of one another sit at the same
+        // distance from the click, so the nearest one is a coin toss that always
+        // landed on whichever was created first. Among the equally-near ones a
+        // construction line wins (the one more often moved or deleted), and a
+        // repeat click at the same spot walks on to the next of them.
+        struct LineHit { int id; float d; bool construction; };
+        std::vector<LineHit> hits;
         const auto& lines = m_sketch->getLines();
+        float bestD = 0.0f;
         for (const auto& l : lines) {
             const SketchPoint* a = m_sketch->getPoint(l.startPointId);
             const SketchPoint* b = m_sketch->getPoint(l.endPointId);
@@ -2404,10 +2423,30 @@ void SketchTool::handleSelectTool(glm::vec2 pos) {
             float t = glm::clamp(glm::dot(pos - a->pos, ab) / len2, 0.0f, 1.0f);
             glm::vec2 proj = a->pos + ab * t;
             float d = glm::distance(proj, pos);
-            if (d < tol && (nearLine < 0 || d < bestD)) {
-                nearLine = l.id;
-                bestD = d;
+            if (d >= tol) continue;
+            if (hits.empty() || d < bestD) bestD = d;
+            hits.push_back({l.id, d, l.isConstruction});
+        }
+        const float tie = std::max(tol * 0.05f, 1e-4f);
+        hits.erase(std::remove_if(hits.begin(), hits.end(),
+                       [&](const LineHit& h) { return h.d > bestD + tie; }),
+                   hits.end());
+        std::stable_sort(hits.begin(), hits.end(),
+                         [](const LineHit& x, const LineHit& y) {
+                             return x.construction && !y.construction;
+                         });
+        if (!hits.empty()) {
+            size_t pick = 0;
+            if (hits.size() > 1 && m_lastLinePickId >= 0 &&
+                glm::distance(pos, m_lastLinePickPos) < tol * 0.5f) {
+                for (size_t i = 0; i < hits.size(); ++i)
+                    if (hits[i].id == m_lastLinePickId) { pick = (i + 1) % hits.size(); break; }
             }
+            nearLine = hits[pick].id;
+            m_lastLinePickId = nearLine;
+            m_lastLinePickPos = pos;
+        } else {
+            m_lastLinePickId = -1;
         }
         // Circle / arc perimeters - only consulted when no line landed.
         if (nearLine < 0) {
@@ -4487,7 +4526,7 @@ void SketchTool::updateOffsetHover(glm::vec2 pos) {
     }
     // Same catch range Trim picks with, so the two hover the same way.
     const float threshold = std::max(0.3f, tolStep() * 0.5f);
-    OffsetChain ch = walkOffsetChain(*m_sketch, pos, threshold);
+    OffsetChain ch = walkOffsetChain(*m_sketch, pos, threshold, offsetOnly());
     if (ch.valid()) densifyChain(ch, m_offsetChainHover);
 }
 
@@ -4516,7 +4555,7 @@ void SketchTool::handleOffsetTool(glm::vec2 pos) {
 
     if (m_offsetPhase == OffsetPhase::Pick) {
         const float threshold = std::max(0.3f, tolStep() * 0.5f);
-        OffsetChain ch = walkOffsetChain(*m_sketch, pos, threshold);
+        OffsetChain ch = walkOffsetChain(*m_sketch, pos, threshold, offsetOnly());
         if (!ch.valid()) return; // missed, or landed on something unofferable
         m_offsetChain = std::move(ch);
         m_offsetChainHover.clear();
@@ -4538,11 +4577,14 @@ void SketchTool::handleOffsetTool(glm::vec2 pos) {
 void SketchTool::commitOffset(std::set<int>& outPoints, std::set<int>& outElements) {
     m_offsetCommitRequested = false;
     if (!m_sketch || !m_offsetResult.valid) return;
+    m_offsetOnly.clear(); // the selection was for this one; the next pick is free
     applyOffset(*m_sketch, m_offsetResult,
                 // EXACT: offset endpoints are generated, so committing the
                 // same preview must give the same connectivity at any zoom.
                 [this](glm::vec2 p) { return findExactCoincidentPoint(p, -1); },
-                outPoints, outElements);
+                outPoints, outElements,
+                // "Draw as construction" on = flip each element's type.
+                m_constructionDraw);
     // Back to Pick, tool still active: offsetting several chains in a row is
     // the normal way to use this (Trim likewise stays active after a click).
     const glm::vec2 where = m_currentPos;
