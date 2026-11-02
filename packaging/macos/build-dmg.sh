@@ -25,7 +25,11 @@ BUILD_DIR="${BUILD_DIR:-build}"
 BIN="$BUILD_DIR/materializr"
 APP="$BUILD_DIR/Materializr.app"
 VERSION="$(grep -m1 'project(Materializr VERSION' CMakeLists.txt | sed -E 's/.*VERSION ([0-9.]+).*/\1/')"
-DMG="$BUILD_DIR/Materializr-${VERSION}-arm64.dmg"
+# The Info.plist versions must stay purely numeric, so a beta's "-beta.1" suffix
+# goes only into the file name and the volume name (read the same way the
+# Linux and Windows workflows do, restricted to version characters).
+SUFFIX="$(grep -m1 '^set(MATERIALIZR_VERSION_SUFFIX' CMakeLists.txt | sed -nE 's/^set\(MATERIALIZR_VERSION_SUFFIX "([0-9A-Za-z.+-]*)".*/\1/p')"
+DMG="$BUILD_DIR/Materializr-${VERSION}${SUFFIX}-arm64.dmg"
 BREW="$(brew --prefix)"
 
 [ -x "$BIN" ] || { echo "error: $BIN not found - build first: cmake --build $BUILD_DIR"; exit 1; }
@@ -147,7 +151,7 @@ mkdir -p "$STAGE"
 cp -R "$APP" "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
 rm -f "$DMG"
-hdiutil create -volname "Materializr ${VERSION}" -srcfolder "$STAGE" \
+hdiutil create -volname "Materializr ${VERSION}${SUFFIX}" -srcfolder "$STAGE" \
   -ov -format UDZO "$DMG" >/dev/null
 
 echo "==> Done"
