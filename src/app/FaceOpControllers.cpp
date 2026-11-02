@@ -220,7 +220,7 @@ void ShellController::panelBody(const IopContext& ctx, bool& changed) {
     // than feeding inf into MakeThickSolid.
     // The member is the truth; the buffer follows it unless being typed in.
     materializr::reseedLengthBufferIfIdle("##shellThickness", m_inputBuf, sizeof(m_inputBuf), m_thickness);
-    if (materializr::inputNumberText("##shellThickness", m_inputBuf, sizeof(m_inputBuf),
+    if (materializr::lengthNumberText("##shellThickness", m_inputBuf, sizeof(m_inputBuf),
                          ImGuiInputTextFlags_EnterReturnsTrue)) {
         (void)materializr::parseLength(m_inputBuf, m_thickness);
         requestCommit();

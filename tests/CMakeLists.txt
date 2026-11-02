@@ -508,6 +508,11 @@ add_executable(test_plane_references test_plane_references.cpp)
 target_link_libraries(test_plane_references PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_plane_references COMMAND test_plane_references)
 
+# test_sketch_reference_tool - the Reference tool copies on-plane geometry into the sketch
+add_executable(test_sketch_reference_tool test_sketch_reference_tool.cpp)
+target_link_libraries(test_sketch_reference_tool PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_sketch_reference_tool COMMAND test_sketch_reference_tool)
+
 # Face-sketch grid direction: world-aligned edge beats the longest diagonal
 add_executable(test_sketch_plane_axis test_sketch_plane_axis.cpp)
 target_link_libraries(test_sketch_plane_axis PRIVATE materializr_core gtest gtest_main)

@@ -141,6 +141,32 @@ inline bool lengthStepperRow(const char* id, float* mm, bool allowNegative,
     return changed;
 }
 
+namespace detail {
+// ImGui CharFilter callback: refuse a digit that would add a decimal place the
+// unit does not display (see decimalDigitRefused). UserData -> int maxDecimals.
+inline int decimalCapFilter(ImGuiInputTextCallbackData* d) {
+    if (d->EventFlag != ImGuiInputTextFlags_CallbackCharFilter) return 0;
+    const int maxDecimals = *static_cast<const int*>(d->UserData);
+    ImGuiInputTextState* st = ImGui::GetInputTextState(GImGui->ActiveId);
+    if (!st) return 0;
+    return decimalDigitRefused(st->GetText(), st->TextLen, st->GetCursorPos(),
+                               st->GetSelectionStart(), st->GetSelectionEnd(),
+                               maxDecimals, d->EventChar) ? 1 : 0;
+}
+} // namespace detail
+
+// inputNumberText for a LENGTH: on desktop the field stops accepting digits past
+// the current display unit's decimals (two in millimetres), so 0.005 cannot be
+// typed only to be rounded to 0.01. The touch pad keeps its own entry.
+inline bool lengthNumberText(const char* label, char* buf, size_t bufSize,
+                             ImGuiInputTextFlags flags = 0, bool padEnterCommits = false) {
+    if (touchMode()) return inputNumberText(label, buf, bufSize, flags, padEnterCommits);
+    int decimals = unitInfo(currentUnit()).decimals;
+    return ImGui::InputText(label, buf, bufSize,
+                            flags | ImGuiInputTextFlags_CallbackCharFilter,
+                            detail::decimalCapFilter, &decimals);
+}
+
 inline bool lengthBufferIsActive(const char* label) {
     const ImGuiID id = ImGui::GetID(label);
     // inputNumberText's pad commit counts as an edit for the frame it lands in.

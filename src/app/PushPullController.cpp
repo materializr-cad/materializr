@@ -793,7 +793,7 @@ void PushPullController::renderPushPullPanel(const IopContext& ctx) {
     } else {
         // The member is the truth; the buffer follows it unless being typed in.
         materializr::reseedLengthBufferIfIdle("##ppdist", m_st.inputBuf, sizeof(m_st.inputBuf), m_st.distance);
-        if (materializr::inputNumberText("##ppdist", m_st.inputBuf, sizeof(m_st.inputBuf),
+        if (materializr::lengthNumberText("##ppdist", m_st.inputBuf, sizeof(m_st.inputBuf),
                              ImGuiInputTextFlags_EnterReturnsTrue)) {
             (void)materializr::parseLength(m_st.inputBuf, m_st.distance);
             m_st.distanceRaw = m_st.distance;

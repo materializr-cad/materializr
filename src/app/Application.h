@@ -758,10 +758,7 @@ private:
     // NB: no blanket m_meshesDirty here. Push/Pull's preview marks only the
     // bodies it touched (markPreviewDirty) - a full rebuild per frame is both
     // the dense-project perf hazard and what erases the ghost tool volume.
-    void beginPushPull() {
-        cancelActiveIops();
-        m_ppCtl.beginPushPull(iopContext());
-    }
+    void beginPushPull();
     // applySnap=false bypasses the grid snap for that update - the stepper
     // buttons are an explicit fine override (a 0.1 nudge under a 1 mm grid must
     // actually move), so they call updatePushPull(false).

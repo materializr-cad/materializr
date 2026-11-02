@@ -36,6 +36,7 @@ using materializr::kPi;
 #include <string>
 
 using materializr::DimKind;
+using materializr::decimalDigitRefused;
 using materializr::LengthUnit;
 
 namespace {
@@ -161,4 +162,37 @@ TEST(LengthEdit, StepperMagnitudesFollowTheUnit) {
     { ScopedUnit s(LengthUnit::Cm);
       const double st = materializr::unitInfo(materializr::currentUnit()).step;
       EXPECT_NEAR(1.0, materializr::toMm(st), 1e-9); }
+}
+
+// A field that only honours two decimals must not let a third be typed.
+TEST(DecimalCap, ThirdDecimalIsRefused) {
+    const char* t = "0.12";
+    EXPECT_TRUE(decimalDigitRefused(t, 4, 4, 4, 4, 2, '5'));
+    EXPECT_FALSE(decimalDigitRefused(t, 4, 4, 4, 4, 3, '5')) << "three are fine for a 3-decimal unit";
+}
+
+TEST(DecimalCap, DigitsBeforeThePointAndNonDigitsPass) {
+    const char* t = "10.12";
+    EXPECT_FALSE(decimalDigitRefused(t, 5, 1, 1, 1, 2, '5')) << "integer part";
+    EXPECT_FALSE(decimalDigitRefused(t, 5, 5, 5, 5, 2, 'i')) << "unit letters";
+    EXPECT_FALSE(decimalDigitRefused(t, 5, 5, 5, 5, 2, '+')) << "operators";
+    EXPECT_FALSE(decimalDigitRefused("12", 2, 2, 2, 2, 2, '5')) << "no point yet";
+}
+
+TEST(DecimalCap, EditingInsideTheFractionIsRefusedOnlyWhenItWouldOverflow) {
+    // "0.12" with the caret between the 1 and the 2: inserting makes three.
+    EXPECT_TRUE(decimalDigitRefused("0.12", 4, 3, 3, 3, 2, '9'));
+    // "0.1": room for one more.
+    EXPECT_FALSE(decimalDigitRefused("0.1", 3, 3, 3, 3, 2, '9'));
+}
+
+TEST(DecimalCap, ATypedOverSelectionFreesRoom) {
+    // "0.12" with the "12" selected: typing replaces them, so a digit is fine.
+    EXPECT_FALSE(decimalDigitRefused("0.12", 4, 4, 2, 4, 2, '7'));
+    // Selecting only the last digit leaves one, so one more still fits.
+    EXPECT_FALSE(decimalDigitRefused("0.12", 4, 4, 3, 4, 2, '7'));
+}
+
+TEST(DecimalCap, UnlimitedWhenTheCapIsNegative) {
+    EXPECT_FALSE(decimalDigitRefused("0.123456", 8, 8, 8, 8, -1, '7'));
 }

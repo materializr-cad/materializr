@@ -198,6 +198,10 @@ std::vector<Toolbar::RailTool> Toolbar::railTools() const {
         add(MZ_ICON_OFFSET,  "Offset",  ToolAction::SketchOffset, m_activeSketchMode == 14,
             "Offset a chain: tap an edge to take the whole connected run, then "
             "drag or type the distance. The side you are on picks the direction.");
+        add(MZ_ICON_COPY,    "Reference", ToolAction::SketchReference, m_activeSketchMode == 17,
+            "Copy geometry that lies on this plane into the sketch: tap a body "
+            "edge, a cross-section line or another sketch's line or circle. "
+            "Hold Ctrl to take the whole connected run.");
         add(MZ_ICON_FILL,    "Fill",    ToolAction::SketchFill,   m_activeSketchMode == 16,
             "Fill closed regions for SVG and DXF export (laser engraving): tap a "
             "region to fill it, tap again to clear. Cosmetic only - it never "
@@ -801,6 +805,8 @@ ToolAction Toolbar::renderSketchTools() {
     tip(materializr::tr("Trim a sketch segment at the nearest intersections."));
     if (skBtn("Offset",   14))     action = ToolAction::SketchOffset;
     tip(materializr::tr("Offset a chain: click an edge to take the whole connected run, then move the cursor or type a distance. Which side you are on picks the direction."));
+    if (skBtn("Reference", 17))    action = ToolAction::SketchReference;
+    tip(materializr::tr("Copy geometry that lies on this plane into the sketch: click a body edge, a cross-section line, or another sketch's line or circle. Ctrl+click takes the whole connected run of lines."));
     if (skBtn("Fill",     16))     action = ToolAction::SketchFill;
     tip(materializr::tr("Fill closed regions for SVG and DXF export (laser engraving): click a region to fill it, click again to clear. Cosmetic only - it never affects Extrude, Push/Pull or anything else you model."));
     if (skBtn("Dimension", 12))    action = ToolAction::SketchDimension;

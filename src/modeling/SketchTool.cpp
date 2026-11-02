@@ -50,6 +50,7 @@ void SketchTool::setMode(SketchToolMode mode) {
         m_offsetOnly.clear();
     }
     m_mode = mode;
+    m_refHover.clear();
     // Leaving select/move: drop element highlights so they don't linger as
     // golden geometry once the user goes back to drawing.
     if (mode != SketchToolMode::Select) clearElementSelection();
@@ -201,6 +202,11 @@ void SketchTool::onMouseDown(glm::vec2 pos, bool addToSel) {
         case SketchToolMode::Point:
             handlePointTool(snapped);
             break;
+        case SketchToolMode::Reference:
+            // Raw cursor, like Trim and Offset: the reference lines are what
+            // is being aimed at, so snapping first would only pull the pick.
+            handleReferenceTool(pos);
+            break;
         default:
             break;
     }
@@ -225,6 +231,12 @@ void SketchTool::onMouseMove(glm::vec2 pos) {
     if (m_mode == SketchToolMode::Dimension || m_mode == SketchToolMode::Fill) {
         m_currentPos = pos;
         m_activeInferences.clear();
+        return;
+    }
+    if (m_mode == SketchToolMode::Reference) {
+        m_currentPos = pos;
+        m_activeInferences.clear();
+        updateReferenceHover(pos);
         return;
     }
     // Offset: the Pick phase hit-tests with the RAW cursor (as Trim does), the
@@ -4548,6 +4560,152 @@ void SketchTool::recomputeOffsetPreview() {
 void SketchTool::setOffsetDistance(float d) {
     m_offsetDistance = d;
     recomputeOffsetPreview();
+}
+
+// --- Reference tool -------------------------------------------------------
+
+namespace {
+constexpr float kRefTwoPi = 6.28318530717958647692f;
+
+float wrapPositive(float a) {
+    while (a < 0.0f) a += kRefTwoPi;
+    while (a >= kRefTwoPi) a -= kRefTwoPi;
+    return a;
+}
+
+// Polyline along a reference circle / arc, for the hover highlight.
+std::vector<glm::vec2> refCirclePoly(const Sketch::FaceReference::Circle& c) {
+    const int n = std::max(16, static_cast<int>(std::ceil(std::abs(c.sweep) / kRefTwoPi * 64.0f)));
+    std::vector<glm::vec2> poly;
+    poly.reserve(static_cast<size_t>(n) + 1);
+    for (int i = 0; i <= n; ++i) {
+        const float t = c.startAngle + c.sweep * (static_cast<float>(i) / n);
+        poly.push_back(c.center + glm::vec2(std::cos(t), std::sin(t)) * c.radius);
+    }
+    return poly;
+}
+} // namespace
+
+SketchTool::RefPick SketchTool::pickReference(glm::vec2 pos) const {
+    RefPick best;
+    if (!m_sketch) return best;
+    const auto& refs = m_sketch->getFaceReferences();
+    const float tol = std::max(tolStep() * 0.5f, 0.5f) * snapScale();
+    float bestD = tol;
+
+    for (size_t i = 0; i < refs.lines.size(); ++i) {
+        const glm::vec2 a = refs.lines[i].first, b = refs.lines[i].second;
+        const glm::vec2 ab = b - a;
+        const float len2 = glm::dot(ab, ab);
+        if (len2 < 1e-12f) continue;
+        const float t = glm::clamp(glm::dot(pos - a, ab) / len2, 0.0f, 1.0f);
+        const float d = glm::distance(a + ab * t, pos);
+        if (d < bestD) { bestD = d; best = {1, i}; }
+    }
+    for (size_t i = 0; i < refs.circles.size(); ++i) {
+        const auto& c = refs.circles[i];
+        const glm::vec2 r = pos - c.center;
+        const float d = std::abs(glm::length(r) - c.radius);
+        if (d >= bestD) continue;
+        if (c.sweep < kRefTwoPi - 1e-3f) {
+            // An arc: only its own span counts, not the rest of its circle.
+            const float rel = wrapPositive(std::atan2(r.y, r.x) - c.startAngle);
+            if (rel > c.sweep) continue;
+        }
+        bestD = d; best = {2, i};
+    }
+    if (best.kind == 0) {
+        // Standalone points (another sketch's loose points) only when no line
+        // or curve is under the cursor.
+        float pd = tol * 0.8f;
+        for (size_t i = 0; i < refs.points.size(); ++i) {
+            const float d = glm::distance(refs.points[i], pos);
+            if (d < pd) { pd = d; best = {3, i}; }
+        }
+    }
+    return best;
+}
+
+void SketchTool::updateReferenceHover(glm::vec2 pos) {
+    m_refHover.clear();
+    if (!m_sketch) return;
+    const auto& refs = m_sketch->getFaceReferences();
+    const RefPick p = pickReference(pos);
+    if (p.kind == 1) {
+        m_refHover.push_back({refs.lines[p.idx].first, refs.lines[p.idx].second});
+    } else if (p.kind == 2) {
+        m_refHover.push_back(refCirclePoly(refs.circles[p.idx]));
+    } else if (p.kind == 3) {
+        const glm::vec2 q = refs.points[p.idx];
+        const float h = std::max(tolStep() * 0.3f, 0.3f) * snapScale();
+        m_refHover.push_back({q + glm::vec2(-h, 0), q + glm::vec2(h, 0)});
+        m_refHover.push_back({q + glm::vec2(0, -h), q + glm::vec2(0, h)});
+    }
+}
+
+void SketchTool::handleReferenceTool(glm::vec2 pos) {
+    if (!m_sketch) return;
+    const RefPick p = pickReference(pos);
+    if (p.kind == 0) return;
+    const auto refs = m_sketch->getFaceReferences();   // copy: adding geometry never touches it, but be safe
+
+    // The point to use at `q`: an existing coincident sketch point, else a new one.
+    auto pointAt = [&](glm::vec2 q) {
+        int id = findExactCoincidentPoint(q, -1);
+        return id >= 0 ? id : m_sketch->addPoint(q);
+    };
+    auto lineExists = [&](int a, int b) {
+        for (const auto& l : m_sketch->getLines())
+            if ((l.startPointId == a && l.endPointId == b) ||
+                (l.startPointId == b && l.endPointId == a)) return true;
+        return false;
+    };
+    auto addLineAt = [&](glm::vec2 a, glm::vec2 b) {
+        const int ia = pointAt(a), ib = pointAt(b);
+        if (ia == ib || lineExists(ia, ib)) return;
+        m_sketch->addLine(ia, ib);
+    };
+
+    if (p.kind == 1) {
+        std::vector<size_t> take{p.idx};
+        if (m_lastDownAddedToSel) {
+            // Ctrl: the whole connected run of reference lines this one is in.
+            const float eps = 1e-3f;
+            std::vector<bool> used(refs.lines.size(), false);
+            used[p.idx] = true;
+            for (bool grew = true; grew;) {
+                grew = false;
+                for (size_t i = 0; i < refs.lines.size(); ++i) {
+                    if (used[i]) continue;
+                    for (size_t j : take) {
+                        const auto& A = refs.lines[i];
+                        const auto& B = refs.lines[j];
+                        if (glm::distance(A.first, B.first) < eps || glm::distance(A.first, B.second) < eps ||
+                            glm::distance(A.second, B.first) < eps || glm::distance(A.second, B.second) < eps) {
+                            used[i] = true; take.push_back(i); grew = true; break;
+                        }
+                    }
+                }
+            }
+        }
+        for (size_t i : take) addLineAt(refs.lines[i].first, refs.lines[i].second);
+    } else if (p.kind == 2) {
+        const auto& c = refs.circles[p.idx];
+        const int ctr = pointAt(c.center);
+        if (c.sweep >= kRefTwoPi - 1e-3f) {
+            for (const auto& e : m_sketch->getCircles())
+                if (e.centerPointId == ctr && std::abs(e.radius - c.radius) < 1e-4) return;
+            m_sketch->addCircle(ctr, c.radius);
+        } else {
+            const glm::vec2 s = c.center + glm::vec2(std::cos(c.startAngle), std::sin(c.startAngle)) * c.radius;
+            const float ea = c.startAngle + c.sweep;
+            const glm::vec2 e = c.center + glm::vec2(std::cos(ea), std::sin(ea)) * c.radius;
+            m_sketch->addArc(ctr, pointAt(s), pointAt(e), c.radius);
+        }
+    } else {
+        pointAt(refs.points[p.idx]);
+    }
+    m_refHover.clear();
 }
 
 void SketchTool::handleOffsetTool(glm::vec2 pos) {

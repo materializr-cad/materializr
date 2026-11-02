@@ -909,6 +909,7 @@ void Application::renderImTouchLayout() {
                         importers.push_back(&t); break;
                     case ToolAction::Trim:
                     case ToolAction::SketchOffset:
+                    case ToolAction::SketchReference:
                     case ToolAction::SketchFill:
                     case ToolAction::SketchCopy:
                     case ToolAction::SketchMirror:

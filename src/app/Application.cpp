@@ -2560,6 +2560,9 @@ void Application::handleToolAction(int action) {
         case ToolAction::SketchOffset:
             if (m_inSketchMode) toggleSketchMode(m_sketchTool.get(), SketchToolMode::Offset);
             break;
+        case ToolAction::SketchReference:
+            if (m_inSketchMode) toggleSketchMode(m_sketchTool.get(), SketchToolMode::Reference);
+            break;
         case ToolAction::SketchFill:
             if (m_inSketchMode) toggleSketchMode(m_sketchTool.get(), SketchToolMode::Fill);
             break;
@@ -7251,6 +7254,20 @@ void Application::editSketch(int sketchId) {
     m_dimPopupConsumedEsc = false;
     m_selection->clear();
     alignCameraToActiveSketch();
+}
+
+void Application::beginPushPull() {
+    cancelActiveIops();
+    if (m_ppCtl.beginPushPull(iopContext()) || !m_selection) return;
+    // Refused (the controller has already said why): when a sketch was the
+    // target, show where its contour is open, as Extrude and Lathe do.
+    for (const auto& e : m_selection->getSelection()) {
+        if ((e.type == SelectionType::Sketch || e.type == SelectionType::SketchRegion) &&
+            e.sketchId >= 0) {
+            flagOpenEnds(e.sketchId);
+            break;
+        }
+    }
 }
 
 void Application::refreshCoplanarReferences() {

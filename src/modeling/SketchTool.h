@@ -17,7 +17,7 @@ namespace materializr {
 // (Application::setActiveSketchMode) and the sketch toolbar hardcodes those
 // indices, so inserting a mode in the middle silently highlights the wrong
 // button -- Dimension would become 13 while the button still tests 12.
-enum class SketchToolMode { None, Select, Line, Circle, Rectangle, Arc, Spline, Polygon, Trim, Text, Svg, Mirror, Dimension, Airfoil, Offset, Point, Fill };
+enum class SketchToolMode { None, Select, Line, Circle, Rectangle, Arc, Spline, Polygon, Trim, Text, Svg, Mirror, Dimension, Airfoil, Offset, Point, Fill, Reference };
 
 enum class DimEntityKind { None, Point, Line, Circle, Arc };
 struct DimPick { DimEntityKind kind = DimEntityKind::None; int id = -1; };
@@ -287,6 +287,13 @@ public:
     // first commit or by clearOffsetSelection().
     int  offsetSelectionCount() const { return static_cast<int>(m_offsetOnly.size()); }
     void clearOffsetSelection() { m_offsetOnly.clear(); m_offsetChainHover.clear(); }
+
+    // Reference tool: copy geometry that lies ON the sketch plane - body edges,
+    // a body's cross-section, another sketch's lines and circles (the snap
+    // references gathered on entry, see PlaneReferences) - into this sketch as
+    // real elements. Click takes one line or circle; Ctrl+click takes the whole
+    // connected run of lines it belongs to.
+    const std::vector<std::vector<glm::vec2>>& getReferenceHover() const { return m_refHover; }
     void cancelOffset();
 
     // Rectangle's typed-value placement is two-stage: first Enter sets the
@@ -701,6 +708,11 @@ private:
     bool m_lastDownAddedToSel = false; // Ctrl state for the current click
     // The line the last Select click landed on, so a repeat click at the same
     // spot can walk to the next of several overlapping lines.
+    struct RefPick { int kind = 0; size_t idx = 0; };   // kind: 0 none, 1 line, 2 circle, 3 point
+    RefPick pickReference(glm::vec2 pos) const;
+    void updateReferenceHover(glm::vec2 pos);
+    void handleReferenceTool(glm::vec2 pos);
+    std::vector<std::vector<glm::vec2>> m_refHover;
     std::set<int> m_offsetOnly;   // see offsetSelectionCount()
     const std::set<int>* offsetOnly() const { return m_offsetOnly.empty() ? nullptr : &m_offsetOnly; }
     int       m_lastLinePickId = -1;

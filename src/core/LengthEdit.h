@@ -100,4 +100,32 @@ inline bool applyDimensionEdit(DimKind kind, bool isArc, const char* buf, double
     return true;
 }
 
+// Would typing character `c` leave MORE than `maxDecimals` digits after the
+// decimal point? The text field calls this per keystroke so a third decimal
+// place simply cannot be typed into a field that only honours two (it used to be
+// accepted and then silently rounded away - 0.005 became 0.01). `text` is the
+// field's current contents, `cursor` where the character would land and
+// [selStart, selEnd) the selection it would replace (equal = none).
+// Only digits typed AFTER a '.' are ever refused; everything else, including
+// unit letters and expression operators, passes.
+inline bool decimalDigitRefused(const char* text, int len, int cursor,
+                                int selStart, int selEnd, int maxDecimals,
+                                unsigned c) {
+    if (maxDecimals < 0 || c < '0' || c > '9' || !text) return false;
+    int dot = -1;
+    for (int i = 0; i < len; ++i)
+        if (text[i] == '.') { dot = i; break; }
+    if (dot < 0) return false;
+    const int lo = selStart < selEnd ? selStart : selEnd;
+    const int hi = selStart < selEnd ? selEnd : selStart;
+    const int at = (hi > lo) ? lo : cursor;       // a selection is replaced starting at its start
+    if (at <= dot) return false;                  // before the point: integer digits
+    int digits = 0;
+    for (int i = dot + 1; i < len && text[i] >= '0' && text[i] <= '9'; ++i) {
+        if (hi > lo && i >= lo && i < hi) continue;   // about to be overwritten
+        ++digits;
+    }
+    return digits >= maxDecimals;
+}
+
 } // namespace materializr
