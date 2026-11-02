@@ -138,7 +138,7 @@ TopoDS_Face singleWireFace(const Handle(Geom_Surface)& surf, TopoDS_Wire w) {
 TopoDS_Wire wrapWireOnCylinder(const TopoDS_Wire& w,
                                const Handle(Geom_CylindricalSurface)& cyl,
                                const gp_Pnt& O, const gp_Dir& sketchX,
-                               double uO) {
+                               const gp_Dir& sketchY, double uO) {
     const gp_Ax3& ax = cyl->Position();
     const gp_Pnt P = ax.Location();
     const gp_Dir Z = ax.Direction();
@@ -162,15 +162,31 @@ TopoDS_Wire wrapWireOnCylinder(const TopoDS_Wire& w,
     } catch (...) { return TopoDS_Wire(); }
     if (pts.size() < 3) return TopoDS_Wire();
 
+    // Which way u must run along the sketch's X so the wrap reads the same from
+    // outside as the sketch does from its front (not mirrored). The wrap maps
+    // sketch (s, t) -> (u, h); from outside it keeps handedness when
+    // d(u)/d(s) and d(h)/d(t) have the same sign relative to the surface's own
+    // (u, v) frame. That frame is NOT a constant: it depends on whether the
+    // cylinder's axis points along or against the sketch's Y (a Cylinder
+    // primitive stands up, a revolved one may point either way) and on the
+    // handedness of its Ax3. A fixed sign mirrored the text on the first.
+    double uSign = -1.0;
+    {
+        const gp_Vec X(ax.XDirection()), Y(ax.YDirection());
+        const gp_Vec Tu = X.Multiplied(-std::sin(uO)) + Y.Multiplied(std::cos(uO));
+        const gp_Vec Rf = X.Multiplied(std::cos(uO)) + Y.Multiplied(std::sin(uO));
+        const double q = Tu.Crossed(gp_Vec(Z)).Dot(Rf) >= 0.0 ? 1.0 : -1.0;
+        const double eh = gp_Vec(Z).Dot(gp_Vec(sketchY)) >= 0.0 ? 1.0 : -1.0;
+        uSign = q * eh;
+    }
+
     // Map to (u, v): u = uO + horizontal/r (continuous), v = axial height.
     std::vector<gp_Pnt2d> uv;
     uv.reserve(pts.size() + 1);
     for (const auto& pt : pts) {
         double s = gp_Vec(O, pt).Dot(gp_Vec(sketchX));
         double h = gp_Vec(P, pt).Dot(gp_Vec(Z));
-        // -s: the cylinder's u winds opposite the sketch's X, so without this the
-        // wrapped logo comes out mirrored.
-        uv.emplace_back(uO - s / r, h);
+        uv.emplace_back(uO + uSign * s / r, h);
     }
     if (uv.front().Distance(uv.back()) > 1e-9) uv.push_back(uv.front());
 
@@ -328,6 +344,7 @@ bool ProjectSketchOp::execute(Document& doc) {
         Handle(Geom_CylindricalSurface) cyl =
             Handle(Geom_CylindricalSurface)::DownCast(tsurf);
         const gp_Dir sketchX = pln.XAxis().Direction();
+        const gp_Dir sketchY = pln.YAxis().Direction();
         double uO = 0.0;
         if (!cyl.IsNull()) {
             const gp_Ax3& cax = cyl->Position();
@@ -340,7 +357,7 @@ bool ProjectSketchOp::execute(Document& doc) {
         auto projectWire = [&](const TopoDS_Wire& wir) -> TopoDS_Wire {
             return cyl.IsNull()
                 ? projectNearest(wir, m_targetFace, dir, org)
-                : wrapWireOnCylinder(wir, cyl, org, sketchX, uO);
+                : wrapWireOnCylinder(wir, cyl, org, sketchX, sketchY, uO);
         };
 
         // One stamp tool per region: project outer + hole wires, rebuild as

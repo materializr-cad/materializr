@@ -179,3 +179,44 @@ TEST(ExtrudeRecoveredProfile, FootprintCoveringOnlyOneRegionDoesNotEraseTheOther
     EXPECT_NEAR(vol(doc.getBody(bid)), expect, 1.0)
         << "the small circles were swapped for the footprint: " << vol(doc.getBody(bid));
 }
+
+// 1.8.0 beta report: a hole edited from 8 to 10 mm (1.56x the area) went back to
+// the old 8 mm footprint on redo, because the "area ballooned" guard saw the
+// bigger face. A resize replaces the whole boundary, so it must be followed.
+TEST(ExtrudeRecoveredProfile, GrowingARegionPastOnePointFiveTimesIsFollowed) {
+    Document doc;
+    auto sk = std::make_shared<Sketch>();
+    sk->setPlane(gp_Pln(gp_Ax3(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1), gp_Dir(1, 0, 0))));
+    const int centre = sk->addPoint({0.0f, 0.0f});
+    const int circle = sk->addCircle(centre, 4.0);
+    const int sid = doc.addSketch(sk, "Sketch 1");
+
+    const char* params =
+        "sketch=1;dist=5;dir=0;mode=0;target=-1;draft=0;"
+        "regions=0:0,0:2,0:-2,0:3.5,0:-3.5,3.5:0,-3.5:0,2.5:2.5,-2.5:2.5,2.5:-2.5,-2.5:-2.5";
+    auto op = std::make_unique<ExtrudeOp>();
+    ASSERT_TRUE(op->deserializeParams(params));
+    op->setSketchSource(sid);
+    ASSERT_TRUE(op->rebuildProfileFromSketch(doc));
+    ASSERT_TRUE(op->execute(doc));
+    int bid = -1;
+    for (int id : doc.getAllBodyIds()) bid = id;
+    ASSERT_GE(bid, 0);
+    const TopoDS_Shape original = doc.getBody(bid);
+
+    auto rop = std::make_unique<ExtrudeOp>();
+    ASSERT_TRUE(rop->deserializeParams(params));
+    rop->setSketchSource(sid);
+    Operation::ReloadState rs;
+    rs.created.push_back(bid);
+    rs.createdAfter.push_back({bid, original});
+    ASSERT_TRUE(rop->rehydrateFromReload(rs, doc));
+
+    sk->setCircleRadius(circle, 5.0);          // 8 mm -> 10 mm, area x1.56
+    ASSERT_TRUE(rop->rebuildProfileFromSketch(doc));
+    ASSERT_TRUE(rop->execute(doc));
+    int rbid = -1;
+    for (int id : doc.getAllBodyIds()) rbid = id;
+    EXPECT_NEAR(vol(doc.getBody(rbid)), M_PI * 25.0 * 5.0, 0.5)
+        << "the body kept the old radius: body volume " << vol(doc.getBody(rbid));
+}

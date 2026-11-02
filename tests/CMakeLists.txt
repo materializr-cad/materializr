@@ -295,6 +295,11 @@ add_executable(test_extrude_recovered_profile test_extrude_recovered_profile.cpp
 target_link_libraries(test_extrude_recovered_profile PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_extrude_recovered_profile COMMAND test_extrude_recovered_profile)
 
+# test_project_wrap_orientation - sketch wrapped on a cylinder is not mirrored
+add_executable(test_project_wrap_orientation test_project_wrap_orientation.cpp)
+target_link_libraries(test_project_wrap_orientation PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_project_wrap_orientation COMMAND test_project_wrap_orientation)
+
 # test_length_edit - the transactions behind every length widget (no ImGui)
 add_executable(test_length_edit test_length_edit.cpp)
 target_link_libraries(test_length_edit PRIVATE materializr_core gtest gtest_main)

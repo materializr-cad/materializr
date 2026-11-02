@@ -869,9 +869,8 @@ void EdgeOpController::renderEdgeOpPanel(const IopContext& ctx) {
     // positive (a radius / setback below 0.1 is only reachable via 0), but the
     // -10/-1/-0.1 buttons are offered so an overshoot can be walked back; they
     // stop at the 0.1 floor. 0 shows the original body mid-preview. Confirming
-    // at 0 still cancels - zero fillet = no fillet. Desktop only.
-    if (!imTouch &&
-        materializr::lengthStepperRow("edgeStep", &m_value,
+    // at 0 still cancels - zero fillet = no fillet.
+    if (materializr::lengthStepperRow("edgeStep", &m_value,
                                 /*allowNegative=*/true, 0.1f, 20.0f)) {
         m_value = std::max(m_value, 0.0f);   // a "-" press from 0 must not go negative
         materializr::formatLengthDigits(m_inputBuf, sizeof(m_inputBuf), m_value);
@@ -918,8 +917,7 @@ void EdgeOpController::renderEdgeOpPanel(const IopContext& ctx) {
                 ImGui::SameLine();
                 ImGui::Text("%s", materializr::unitSuffix());
             }
-            if (!imTouch &&
-                materializr::lengthStepperRow("edgeStep2", &m_value2,
+            if (materializr::lengthStepperRow("edgeStep2", &m_value2,
                                         /*allowNegative=*/true, 0.1f, 20.0f)) {
                 m_value2 = std::max(m_value2, 0.0f);
                 materializr::formatLengthDigits(m_inputBuf2, sizeof(m_inputBuf2), m_value2);

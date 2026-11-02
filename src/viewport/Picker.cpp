@@ -1,4 +1,5 @@
 #include "Picker.h"
+#include "../modeling/SeamEdges.h"
 #include "Camera.h"
 #include "../core/Document.h"
 #include <cstdio>
@@ -315,9 +316,16 @@ Picker::edgePolylines(const TopoDS_Shape& shape)
 {
     BodyCacheEntry& entry = bodyCache(shape);
     if (entry.haveEdges) return entry.edges;
+    // A round face's seam is not a feature of the part and is not drawn
+    // (EdgeRenderer), so it must not end up hovered or selected. It stays a
+    // CANDIDATE (findNearestEdge drops it only if it wins): a cursor next to a
+    // cylinder's silhouette is still nearer that seam than to an edge hidden
+    // behind the cylinder, and removing it let the hidden edge win.
+    const auto edgeFaces = materializr::edgeFaceMap(shape);
     for (TopExp_Explorer exp(shape, TopAbs_EDGE); exp.More(); exp.Next()) {
         EdgePolyline pl;
         pl.edge = TopoDS::Edge(exp.Current());
+        pl.seam = materializr::isSeamEdge(pl.edge, edgeFaces);
         try {
             BRepAdaptor_Curve curve(pl.edge);
             GCPnts_TangentialDeflection discretizer(curve, 0.1, 0.1);
@@ -348,6 +356,7 @@ void Picker::findNearestEdge(const TopoDS_Shape& shape, const glm::vec3& hitPt,
     glm::mat4 vp = camera.getProjectionMatrix() * camera.getViewMatrix();
     glm::vec2 mouse(screenX, screenY);
     screenDist = 1e6f;
+    bool nearestIsSeam = false;
 
     auto worldToScreen = [&](glm::vec3 p) -> glm::vec2 {
         glm::vec4 clip = vp * glm::vec4(p, 1.0f);
@@ -396,8 +405,13 @@ void Picker::findNearestEdge(const TopoDS_Shape& shape, const glm::vec3& hitPt,
                 if (occluded && d < kOcclusionCheckPx && occluded(wp)) continue;
                 screenDist = d;
                 nearestEdge = pl.edge;
+                nearestIsSeam = pl.seam;
             }
         }
+    }
+    if (nearestIsSeam) {   // the invisible seam won: nothing to pick here
+        nearestEdge.Nullify();
+        screenDist = 1e6f;
     }
 }
 

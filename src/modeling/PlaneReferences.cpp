@@ -40,8 +40,12 @@ public:
     explicit Collector(Sketch::FaceReference& refs) : m_refs(refs) {
         for (const auto& p : refs.points) m_points.insert(key(p));
         for (const auto& l : refs.lines) m_lines.insert(lineKey(l.first, l.second));
-        for (const auto& c : refs.circles)
-            m_circles.insert(key(c.center) ^ (std::int64_t(std::lround(c.radius * 1e3)) << 1));
+        for (const auto& c : refs.circles) m_circles.insert(circleKey(c));
+        for (const auto& s : refs.splines) {
+            std::int64_t k = static_cast<std::int64_t>(s.control.size());
+            for (const glm::vec2& q : s.control) k = k * 1000003LL ^ key(q);
+            m_splines.insert(k);
+        }
     }
     void point(glm::vec2 p) {
         if (m_refs.points.size() >= kMaxRefPoints) return;
@@ -53,22 +57,34 @@ public:
         point(0.5f * (a + b));
     }
     void circle(const Sketch::FaceReference::Circle& c) {
-        const std::int64_t k = key(c.center) ^ (std::int64_t(std::lround(c.radius * 1e3)) << 1);
-        if (m_circles.insert(k).second) { m_refs.circles.push_back(c); ++circles; }
+        if (m_circles.insert(circleKey(c)).second) { m_refs.circles.push_back(c); ++circles; }
     }
-    int points = 0, lines = 0, circles = 0;
+    void spline(Sketch::FaceReference::Spline s) {
+        if (s.control.size() < 2 || s.poly.size() < 2) return;
+        std::int64_t k = static_cast<std::int64_t>(s.control.size());
+        for (const glm::vec2& q : s.control) k = k * 1000003LL ^ key(q);
+        if (m_splines.insert(k).second) { m_refs.splines.push_back(std::move(s)); ++splines; }
+    }
+    int points = 0, lines = 0, circles = 0, splines = 0;
 
 private:
     static std::int64_t key(glm::vec2 p) {
         const std::int64_t x = std::llround(p.x * 1e3), y = std::llround(p.y * 1e3);
         return (x << 32) ^ (y & 0xffffffffLL);
     }
+    // Centre + radius + SPAN: a plane through a pipe returns each wall circle as
+    // two arcs, and keying on centre/radius alone dropped the second one.
+    static std::int64_t circleKey(const Sketch::FaceReference::Circle& c) {
+        std::int64_t k = key(c.center) ^ (std::int64_t(std::lround(c.radius * 1e3)) << 1);
+        k = k * 1000003LL ^ std::int64_t(std::llround(c.startAngle * 1e3));
+        return k * 1000003LL ^ std::int64_t(std::llround(c.sweep * 1e3));
+    }
     static std::int64_t lineKey(glm::vec2 a, glm::vec2 b) {
         const std::int64_t ka = key(a), kb = key(b);
         return ka < kb ? (ka * 1000003LL) ^ kb : (kb * 1000003LL) ^ ka;   // order-free
     }
     Sketch::FaceReference& m_refs;
-    std::unordered_set<std::int64_t> m_points, m_lines, m_circles;
+    std::unordered_set<std::int64_t> m_points, m_lines, m_circles, m_splines;
 };
 
 struct Frame {
@@ -140,6 +156,28 @@ void addEdge(const TopoDS_Edge& edge, const Frame& fr, Collector& out) {
     case GeomAbs_Ellipse:
         out.point(fr.project(curve.Ellipse().Location()));
         break;
+    case GeomAbs_BSplineCurve:
+    case GeomAbs_BezierCurve: {
+        // A free-form edge lying in the plane (every sample on it, not just the
+        // ends and middle already tested): offer the WHOLE curve, not only its
+        // points. Tilted-out-of-plane curves fall through to point sampling.
+        constexpr int kN = 48;
+        Sketch::FaceReference::Spline sp;
+        bool flat = true;
+        for (int i = 0; i <= kN && flat; ++i) {
+            gp_Pnt p;
+            curve.D0(f + (l - f) * (double(i) / kN), p);
+            if (std::abs(fr.dist(p)) > kPlaneTol) { flat = false; break; }
+            sp.poly.push_back(fr.project(p));
+        }
+        if (flat) {
+            constexpr int kCtrl = 12;
+            for (int i = 0; i <= kCtrl; ++i)
+                sp.control.push_back(sp.poly[static_cast<size_t>(i) * kN / kCtrl]);
+            out.spline(std::move(sp));
+        }
+        break;
+    }
     default:
         break;
     }
@@ -280,8 +318,16 @@ PlaneReferenceStats addSketchPlaneReferences(Sketch& sk,
                                               static_cast<float>(a.radius)));
             }
         }
-        for (const auto& sp : o->getSplines())
+        for (const auto& sp : o->getSplines()) {
             for (glm::vec2 q : o->sampleSpline2D(sp, 6)) out.point(toMine(q));
+            // The curve itself too: copied by running a new spline through the
+            // same control points.
+            Sketch::FaceReference::Spline rs;
+            for (int id : sp.controlPointIds)
+                if (const SketchPoint* cp = o->getPoint(id)) rs.control.push_back(toMine(cp->pos));
+            for (glm::vec2 q : o->sampleSpline2D(sp, 12)) rs.poly.push_back(toMine(q));
+            out.spline(std::move(rs));
+        }
     }
     st.points = out.points; st.lines = out.lines; st.circles = out.circles;
     sk.setFaceReferences(std::move(refs));

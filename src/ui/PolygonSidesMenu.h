@@ -30,7 +30,15 @@ inline int polygonSidesMenuItems() {
     // is one click.
     static int custom = 9;
     ImGui::TextUnformatted(tr("Custom..."));
-    ImGui::SetNextItemWidth(110.0f);
+    // Sized from the live frame height, not a fixed 110 px: InputInt's -/+
+    // buttons are each one frame tall, and in touch mode (big frames) they
+    // swallowed the whole fixed width, leaving the number with no room.
+    {
+        const ImGuiStyle& st = ImGui::GetStyle();
+        const float buttons = 2.0f * (ImGui::GetFrameHeight() + st.ItemInnerSpacing.x);
+        const float digits = ImGui::CalcTextSize("128").x + 2.0f * st.FramePadding.x;
+        ImGui::SetNextItemWidth(std::max(110.0f, buttons + digits));
+    }
     // Not EnterReturnsTrue: InputInt reports a +/- button press as "committed"
     // under that flag too, which started the polygon on the first click of +.
     // Enter is read directly instead, only while the number field has the

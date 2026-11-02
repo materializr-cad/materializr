@@ -48,7 +48,14 @@ inline bool stepperRow(const char* id, float* value, bool allowNegative,
     const float h = std::max(ImGui::GetFrameHeight(), 34.0f);
 
     auto button = [&](const char* label) -> bool {
-        if (!first) ImGui::SameLine();
+        if (!first) {
+            // Wrap instead of overflowing: seven buttons are wider than a
+            // narrow op panel, most of all at touch scale.
+            const ImGuiStyle& st = ImGui::GetStyle();
+            const float w = ImGui::CalcTextSize(label).x + 2.0f * st.FramePadding.x;
+            const float right = ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x;
+            if (ImGui::GetItemRectMax().x + st.ItemSpacing.x + w <= right) ImGui::SameLine();
+        }
         first = false;
         return ImGui::Button(label, ImVec2(0.0f, h));
     };

@@ -14,12 +14,13 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 - percent: 19
 - px/ui: 5
 - ratio: 7
-- seconds: 4
+- seconds: 5
 - unitless: 10
 
 | dim | file | code |
 |---|---|---|
-| percent | src/app/Application_Dialogs.cpp | `if (ImGui::SliderInt("##uiScaleUser", &pct, 75, 250, "%d%%",` |
+| seconds | src/app/Application_Dialogs.cpp | `if (ImGui::SliderInt(materializr::tr("Interval (min)"), &m_autosaveIntervalMin, 1, 30, "%d min")) changed = tr` |
+| percent | src/app/Application_Dialogs.cpp | `if (ImGui::SliderInt("##uiScaleUser", &pct, 50, 250, "%d%%",` |
 | seconds | src/app/Application_Dialogs.cpp | `if (ImGui::SliderFloat(materializr::tr("Fillet time limit"),` |
 | px/ui | src/app/Application_Dialogs.cpp | `if (ImGui::SliderFloat(materializr::tr("Selection line width"), &m_selectionLineWidth, 1.0f, 10.0f, "%.1f px")` |
 | px/ui | src/app/Application_Dialogs.cpp | `if (ImGui::SliderFloat(materializr::tr("Sketch line width"), &m_sketchLineWidth, 1.0f, 6.0f, "%.1f px")) {` |
@@ -113,16 +114,16 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | CONVERTED | src/app/EdgeOpController.cpp | `if (materializr::amountLengthField("edgeAmt", isFillet ? "Radius" : "Distance", &m_value, /*allowSign=*/false,` |
 | CONVERTED | src/app/EdgeOpController.cpp | `(void)materializr::parseLength(m_inputBuf, m_value);` |
 | CONVERTED | src/app/EdgeOpController.cpp | `if (materializr::parseLength(m_inputBuf, parsed) &&` |
-| CONVERTED | src/app/EdgeOpController.cpp | `materializr::lengthStepperRow("edgeStep", &m_value,` |
+| CONVERTED | src/app/EdgeOpController.cpp | `if (materializr::lengthStepperRow("edgeStep", &m_value,` |
 | CONVERTED | src/app/EdgeOpController.cpp | `if (materializr::amountLengthField("edgeAmt2", materializr::tr("Distance B"), &m_value2, /*allowSign=*/false, ` |
 | CONVERTED | src/app/EdgeOpController.cpp | `(void)materializr::parseLength(m_inputBuf2, m_value2);` |
 | CONVERTED | src/app/EdgeOpController.cpp | `if (materializr::parseLength(m_inputBuf2, p2) &&` |
-| CONVERTED | src/app/EdgeOpController.cpp | `materializr::lengthStepperRow("edgeStep2", &m_value2,` |
+| CONVERTED | src/app/EdgeOpController.cpp | `if (materializr::lengthStepperRow("edgeStep2", &m_value2,` |
 | CONVERTED | src/app/EdgeOpController.cpp | `(void)materializr::parseLength(m_inputBuf, m_value);` |
 | CONVERTED | src/app/ExtrudeController.cpp | `if (materializr::amountLengthField("extAmt", materializr::tr("Distance"), &m_distance, /*allowSign=*/true)) {` |
 | CONVERTED | src/app/ExtrudeController.cpp | `(void)materializr::parseLength(m_inputBuf, m_distance);` |
 | CONVERTED | src/app/ExtrudeController.cpp | `if (materializr::parseLength(m_inputBuf, parsed) &&` |
-| CONVERTED | src/app/ExtrudeController.cpp | `materializr::lengthStepperRow("extrudeStep", &m_distance,` |
+| CONVERTED | src/app/ExtrudeController.cpp | `if (materializr::lengthStepperRow("extrudeStep", &m_distance,` |
 | CONVERTED | src/app/ExtrudeController.cpp | `(void)materializr::parseLength(m_inputBuf, m_distance);` |
 | CONVERTED | src/app/FaceOpControllers.cpp | `if (materializr::amountLengthField("shellAmt", nullptr, &m_thickness, /*allowSign=*/false, 0.1f, 20.0f)) {` |
 | CONVERTED | src/app/FaceOpControllers.cpp | `(void)materializr::parseLength(m_inputBuf, m_thickness);` |
@@ -157,7 +158,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | CONVERTED | src/app/PushPullController.cpp | `if (materializr::amountLengthField("ppAmt", m_st.symmetric ? "Per side" : "Distance", &m_st.distance, /*allowS` |
 | CONVERTED | src/app/PushPullController.cpp | `(void)materializr::parseLength(m_st.inputBuf, m_st.distance);` |
 | CONVERTED | src/app/PushPullController.cpp | `if (materializr::parseLength(m_st.inputBuf, parsed) &&` |
-| CONVERTED | src/app/PushPullController.cpp | `materializr::lengthStepperRow("ppStep", &m_st.distance,` |
+| CONVERTED | src/app/PushPullController.cpp | `if (materializr::lengthStepperRow("ppStep", &m_st.distance,` |
 | CONVERTED | src/app/PushPullController.cpp | `(void)materializr::parseLength(m_st.inputBuf, m_st.distance);` |
 | CONVERTED | src/app/SplitController.cpp | `if (materializr::lengthStepperRow("splitOffset", &m_offset, /*allowNegative=*/true,` |
 | CONVERTED | src/app/SplitController.cpp | `materializr::amountLengthField("splitOffsetAmt", nullptr, &m_offset, /*allowSign=*/true, -lim, lim))` |
@@ -261,7 +262,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 
 - CONVERTED: 1
 - allowed-by-hand: 93
-- comment: 304
+- comment: 307
 - diagnostic: 13
 - identifier/other: 9
 
@@ -501,6 +502,8 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | comment | src/modeling/ChamferOp.cpp | `// A setback that lands EXACTLY on a neighbouring edge (a 1 mm chamfer` |
 | comment | src/modeling/ChamferOp.cpp | `// on the 1 mm shoulder between a 22 and a 20 mm diameter) consumes the` |
 | diagnostic | src/modeling/ChamferOp.cpp | `"neighbouring face exactly - built %.0e mm "` |
+| comment | src/modeling/ExtrudeOp.cpp | `// boundary (a hole going from 8 to 10 mm leaves no part of the old circle), so` |
+| comment | src/modeling/ExtrudeOp.cpp | `// from 8 to 10 mm is 1.56x the area and must be FOLLOWED.` |
 | comment | src/modeling/ExtrudeOp.cpp | `// from 8 mm to 6 mm and the samples between the two radii no longer` |
 | comment | src/modeling/ExtrudeOp.cpp | `// land anywhere, so the cut kept its OLD 8 mm hole while the sketch` |
 | comment | src/modeling/FilletOp.cpp | `// robot dog cover.mzr, body "Extrude", its 114 mm top edge:` |
@@ -628,6 +631,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | comment | src/modeling/SketchTool.h | `// visibly-0.01 mm grid still inferred/snapped at whatever coarser` |
 | comment | src/modeling/SketchTool.h | `// base preset was chosen - "I'm zoomed in to a 0.01 mm grid and it's` |
 | comment | src/modeling/SketchTool.h | `// still sticking to 0.1 mm" (Steve, 2026-09-26). Only follow the` |
+| comment | src/modeling/SketchTool.h | `// 0.3-0.5 mm (which at a 0.001 mm view is hundreds of pixels: clicks landed` |
 | comment | src/modeling/SketchTool.h | `// on the drawing (a 90-degree corner versus a 6 mm fillet run). The cursor's` |
 | comment | src/modeling/SketchTool.h | `// display->mm on the way in, so under inches a typed 180 deg arrived as` |
 | comment | src/modeling/SketchTool.h | `// or diameter (2-point mode) to whole grid units, so a 1 mm grid can't` |

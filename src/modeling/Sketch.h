@@ -371,6 +371,14 @@ public:
             float sweep;
         };
         std::vector<Circle> circles;
+        // In-plane free-form curves (another sketch's splines, a body's B-spline
+        // edges). `control` are the points a copied spline is built through;
+        // `poly` is a dense polyline of the same curve for picking / hover.
+        struct Spline {
+            std::vector<glm::vec2> control;
+            std::vector<glm::vec2> poly;
+        };
+        std::vector<Spline> splines;
     };
     void setFaceReferences(FaceReference refs) { m_faceRefs = std::move(refs); }
     const FaceReference& getFaceReferences() const { return m_faceRefs; }

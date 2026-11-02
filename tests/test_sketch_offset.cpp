@@ -1121,3 +1121,42 @@ TEST(SketchOffsetWalk, ARestrictedRunStopsWhereTheSelectionStops) {
     EXPECT_EQ(ch.segs.size(), 2u);
     expectContiguous(ch);
 }
+
+// Select first, then choose Offset: the selection IS the pick. It used to ask
+// for the very same elements to be clicked again - and for separate (unconnected)
+// ones a click then offset only the one clicked (1.8.0 beta report).
+TEST(SketchOffsetTool, PreselectedSeparateLinesGoStraightToDistanceAndAllOffset) {
+    Sketch sk;
+    const int a0 = sk.addPoint({0.0f, 0.0f}),  a1 = sk.addPoint({10.0f, 0.0f});
+    const int b0 = sk.addPoint({0.0f, 20.0f}), b1 = sk.addPoint({10.0f, 20.0f});
+    const int la = sk.addLine(a0, a1), lb = sk.addLine(b0, b1);
+    SketchTool tool;
+    tool.setSketch(&sk);
+    tool.setMode(SketchToolMode::Select);
+    tool.setSelection({}, {la, lb});
+    tool.setMode(SketchToolMode::Offset);
+
+    EXPECT_EQ(tool.getOffsetPhase(), SketchTool::OffsetPhase::Distance)
+        << "a pre-selection must not need re-selecting";
+    ASSERT_TRUE(tool.hasOffsetChain());
+
+    tool.setOffsetDistance(3.0f);
+    ASSERT_TRUE(tool.offsetReady());
+    const size_t before = sk.getLines().size();
+    std::set<int> pts, els;
+    tool.commitOffset(pts, els);
+    EXPECT_EQ(sk.getLines().size(), before + 2u) << "both separate lines must be offset";
+}
+
+TEST(SketchOffsetTool, PreselectedConnectedLinesFormOneChain) {
+    Sketch sk;
+    makeSquare(sk, 10.0f);
+    SketchTool tool;
+    tool.setSketch(&sk);
+    tool.setMode(SketchToolMode::Select);
+    tool.setSelection({}, {sk.getLines()[0].id, sk.getLines()[1].id});
+    tool.setMode(SketchToolMode::Offset);
+    EXPECT_EQ(tool.getOffsetPhase(), SketchTool::OffsetPhase::Distance);
+    tool.setOffsetDistance(2.0f);
+    EXPECT_TRUE(tool.offsetReady());
+}

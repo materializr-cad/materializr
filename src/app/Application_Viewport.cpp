@@ -1134,6 +1134,29 @@ void Application::renderViewport() {
                 if (auto sk = m_document->getSketch(sid)) drawFills(*sk);
             }
             if (m_inSketchMode && m_activeSketch) drawFills(*m_activeSketch);
+
+            // Every closed contour of the sketch being edited gets a faint tint:
+            // the cue that a loop is closed and ready to extrude, beside the
+            // open-end markers. Never a main-thread fuse - a cold cache builds
+            // off-thread and the tint appears when it lands; huge sketches (a
+            // text/SVG import with hundreds of edges) are left alone.
+            if (m_inSketchMode && m_activeSketch && m_activeSketch->elementCount() <= 600) {
+                Sketch& sk = *m_activeSketch;
+                if (sk.regionsCached() || (m_regionWorker && m_regionWorker->ensure(sk))) {
+                    if (m_autoFillSketch != &sk || m_autoFillKey != sk.regionKey()) {
+                        m_autoFillFaces.clear();
+                        const auto regions = sk.buildRegions();   // cache hit
+                        for (int idx : sk.drawnRegions(regions))
+                            if (!regions[idx].face.IsNull()) m_autoFillFaces.push_back(regions[idx].face);
+                        m_autoFillSketch = &sk;
+                        m_autoFillKey = sk.regionKey();
+                    }
+                    if (!m_autoFillFaces.empty())
+                        m_sketchRenderer->renderFacesFill(m_autoFillFaces, fillColor, 0.12f, view, proj);
+                }
+            } else {
+                m_autoFillSketch = nullptr;
+            }
         }
 
         // Render all stored sketches (visible only) plus the active sketch.

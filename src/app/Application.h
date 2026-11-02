@@ -1284,8 +1284,24 @@ private:
     // Autosave: once the project has been saved at least once (has a path on
     // disk), save it again automatically on close (Application::closeProject)
     // so quitting/closing a dirty tab doesn't need the save prompt. Toggled in
-    // File > Settings. No longer a periodic timer - see closeProject().
+    // File > Settings.
     bool m_autosaveEnabled = false;
+    // Optional, off by default: ALSO re-save the project every N minutes while
+    // it has unsaved changes (see the autosave block in Application::run).
+    bool m_autosavePeriodic = false;
+    // Settings > Sketch: deleting a sketch also deletes the bodies its
+    // extrude / lathe steps CREATED (never bodies it merely cut). Off by default.
+    bool m_deleteSketchRemovesBodies = false;
+    std::vector<int> bodiesCreatedFromSketch(int sketchId) const;
+    int m_autosaveIntervalMin = 5;
+    double m_lastAutosaveTime = 0.0;
+
+    // Soft shading on the closed contours of the sketch being edited, so a loop
+    // that is really closed reads as a surface (cached per sketch geometry; see
+    // the draw block in renderViewport).
+    std::vector<TopoDS_Face> m_autoFillFaces;
+    const Sketch* m_autoFillSketch = nullptr;
+    uint64_t m_autoFillKey = 0;
 
     // Invert the cube-drag → orbit direction (Settings).
     bool m_invertCubeDrag = false;

@@ -411,6 +411,7 @@ Application::Application(bool safeMode, float uiScaleOverride)
     m_itemsPanel->setCombineSketchesCallback(
         [this](const std::vector<int>& ids) { combineSketches(ids); });
     m_itemsPanel->setRotatePlaneCallback([this](int planeId) { beginRotatePlaneAboutAxis(planeId); });
+    m_itemsPanel->setMovePlaneCallback([this](int) { handleToolAction(static_cast<int>(ToolAction::Move)); });
     m_itemsPanel->setMeshTraceCallback([this](int bodyId) { beginMeshTraceSetup(bodyId); });
     m_propertiesPanel->setRotatePlaneCallback([this](int planeId) { beginRotatePlaneAboutAxis(planeId); });
     m_propertiesPanel->setAttachRefImageCallback(
@@ -743,6 +744,15 @@ bool Application::switchToSession(size_t idx) {
 void Application::closeSession(size_t idx) {
     if (idx >= m_sessions.size()) return;
     const bool wasActive = (idx == m_activeSession);
+    // Closing the tab you are sketching in ends that sketch with it. The sketch
+    // session lives on the Application, not on the session, so without this it
+    // outlived the tab: the next New Project came up with the same sketch open
+    // (and its crash-recovery draft still on disk).
+    if (wasActive && m_inSketchMode) {
+        exitSketchMode();
+        materializr::clearSketchDraft();
+        m_lastDraftElemCount = -1;
+    }
     // The preview cancel reaches the closing session through m_document, which
     // keeps pointing into it until applySessionState repoints it below, so it
     // must happen BEFORE the erase (doing it after dereferenced freed memory).
@@ -1823,6 +1833,7 @@ void Application::loadAppSettings() {
         m_msaaSamples             = 0;   // disable multisample buffers entirely
         m_meshQuality             = 0;   // Low - coarsest tessellation
         m_autosaveEnabled         = false;
+        m_autosavePeriodic        = false;
         m_autoOpenLastProject     = false;
         m_checkForUpdatesOnLaunch = false;
         std::fprintf(stdout,
@@ -2086,6 +2097,9 @@ AppSettings Application::currentSettings() const {
     s.animateCamera = m_animateCamera;
     s.mouseSensitivity = m_viewport->getCamera().getMouseSensitivity();
     s.autosaveEnabled = m_autosaveEnabled;
+    s.autosavePeriodic = m_autosavePeriodic;
+    s.deleteSketchRemovesBodies = m_deleteSketchRemovesBodies;
+    s.autosaveIntervalMin = m_autosaveIntervalMin;
     s.invertCubeDrag = m_invertCubeDrag;
     s.doubleClickTimeSec = m_doubleClickTime;
     s.filletProbeSeconds = m_filletProbeSeconds;
@@ -2202,6 +2216,9 @@ void Application::applyAppSettings(const AppSettings& s) {
     m_animateCamera = s.animateCamera;
     m_viewport->getCamera().setMouseSensitivity(s.mouseSensitivity);
     m_autosaveEnabled = s.autosaveEnabled;
+    m_autosavePeriodic = s.autosavePeriodic;
+    m_deleteSketchRemovesBodies = s.deleteSketchRemovesBodies;
+    m_autosaveIntervalMin = s.autosaveIntervalMin;
     m_invertCubeDrag = s.invertCubeDrag;
     m_doubleClickTime = s.doubleClickTimeSec;
     if (ImGui::GetCurrentContext())
@@ -5795,8 +5812,35 @@ void Application::duplicateSketch(int sketchId) {
     }
 }
 
+// Bodies that an applied extrude / push-pull / lathe built from this sketch
+// CREATED and that still exist. Bodies such steps only modified (a Subtract
+// cutting into a bigger part) are deliberately not included.
+std::vector<int> Application::bodiesCreatedFromSketch(int sketchId) const {
+    std::vector<int> out;
+    if (!m_history || !m_document) return out;
+    const std::vector<int> alive = m_document->getAllBodyIds();
+    for (int i = 0; i <= m_history->currentStep() && i < m_history->stepCount(); ++i) {
+        const Operation* op = m_history->getStep(i);
+        if (!op || !op->isEnabled() || !materializr::opBuiltFromSketch(op, sketchId)) continue;
+        for (int id : op->captureDiff().created)
+            if (std::find(alive.begin(), alive.end(), id) != alive.end() &&
+                std::find(out.begin(), out.end(), id) == out.end())
+                out.push_back(id);
+    }
+    return out;
+}
+
 void Application::deleteSketch(int sketchId) {
     if (!m_document || !m_history) return;
+    if (m_deleteSketchRemovesBodies) {
+        // Own undo step per body, pushed before the sketch's, so undo walks
+        // back through the sketch first and then each body.
+        for (int bodyId : bodiesCreatedFromSketch(sketchId)) {
+            auto del = std::make_unique<DeleteOp>();
+            del->setBodyId(bodyId);
+            m_history->pushOperation(std::move(del), *m_document);
+        }
+    }
     auto op = std::make_unique<DeleteSketchOp>();
     op->setSketchId(sketchId);
     if (m_history->pushOperation(std::move(op), *m_document)) {
@@ -8441,21 +8485,37 @@ void Application::run() {
             if (m_confirmedClose) break;
         }
 
-        // Autosave no longer runs on a timer here (removed 2026-09-12): a
-        // periodic saveProjectQuick() re-serializes the WHOLE project
-        // (full undo history, real-save fidelity, Balanced compression) on
-        // the main thread - on a project with a lot of accumulated history
-        // and an imported STL, that blocked the UI for several seconds,
-        // recurring every interval for as long as the project stayed dirty
-        // (Steve's report: "stuttering then recovering" on a project with
-        // 159 history steps). Crash protection doesn't need this: the
-        // separate crash-recovery sidecar (writeProjectRecoveryIfDue,
-        // above) already snapshots on the same cadence-ish schedule to a
-        // throwaway file and - since it dropped full history from its own
-        // write - stays fast regardless of project size. What "autosave"
-        // actually still does is save-on-close (Application::closeProject,
-        // gated on the same m_autosaveEnabled flag): a real, full-fidelity
-        // save, but only once, at a moment the user is already leaving.
+        // Periodic autosave (opt-in: Settings > General, off by default; the
+        // on-close save in Application::closeProject is separate). A timer
+        // save is a full-fidelity saveProjectQuick() on the main thread, which
+        // stalled the UI for seconds on projects with long histories (why the
+        // timer was removed 2026-09-12), so it is now opt-in and holds off
+        // whenever a save could hurt or be disruptive. MUST run before the
+        // idle short-circuit below, and uses the platform wall clock: the
+        // ImGui clock is frozen while we aren't rendering. Only for projects
+        // already on disk with pending changes; measured from the last save.
+        if (m_autosavePeriodic && !m_currentProjectPath.empty()) {
+            const double now = platformTicksNs() / 1e9;
+            if (!isDirty()) {
+                m_lastAutosaveTime = now;
+            } else if (now - m_lastAutosaveTime >= m_autosaveIntervalMin * 60.0) {
+                // Below the history tip a save would silently truncate the redo
+                // tail; mid-tool/sketch a save would cancel or serialize a live
+                // preview. Hold off and retry each frame until the user is clear.
+                const bool hold = (m_history && m_history->canRedo()) ||
+                                  anyInteractivePreviewActive() || m_inSketchMode ||
+                                  m_edgeCtl.active();
+                if (!hold) {
+                    try { saveProjectQuick(); }
+                    catch (...) {
+                        std::fprintf(stderr, "[Autosave] failed - skipped\n");
+                    }
+                    m_lastAutosaveTime = now;
+                }
+            }
+        } else {
+            m_lastAutosaveTime = platformTicksNs() / 1e9;
+        }
 
         // Only a BACKGROUNDED window skips rendering now - foreground idle
         // renders at the floor rate above (see kIdleFloorMs; the old idle

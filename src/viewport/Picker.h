@@ -141,7 +141,7 @@ private:
     //    nearest-edge search pays a screen projection per segment instead of
     //    GCPnts_TangentialDeflection over every edge (0.6-2 ms per frame on
     //    ordinary parts, far more on a thread's helices).
-    struct EdgePolyline { TopoDS_Edge edge; std::vector<glm::vec3> pts; };
+    struct EdgePolyline { TopoDS_Edge edge; std::vector<glm::vec3> pts; bool seam = false; };
     struct BodyCacheEntry {
         TopoDS_Shape shape;
         bool haveBox = false;

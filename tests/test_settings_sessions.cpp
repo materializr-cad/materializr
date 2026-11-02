@@ -316,7 +316,7 @@ TEST(SettingsSessions, UiScaleAndGridCellRoundTripAndClamp) {
         return SettingsIO::load(p);
     };
     EXPECT_FLOAT_EQ(2.5f,  loadWith("uiScaleUser", "1.5", "9").uiScaleUser);
-    EXPECT_FLOAT_EQ(0.75f, loadWith("uiScaleUser", "9", "0.1").uiScaleUser);
+    EXPECT_FLOAT_EQ(0.5f,  loadWith("uiScaleUser", "9", "0.1").uiScaleUser);
     EXPECT_FLOAT_EQ(1.0f,  loadWith("uiScaleUser", "0.1", "0").uiScaleUser);
     EXPECT_FLOAT_EQ(1.0f,  loadWith("uiScaleUser", "0", "nan").uiScaleUser);
     EXPECT_FLOAT_EQ(40.0f, loadWith("gridMinCellPx", "12", "500").gridMinCellPx);

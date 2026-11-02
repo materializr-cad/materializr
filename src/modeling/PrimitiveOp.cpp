@@ -1,6 +1,7 @@
 #include "ui/LengthField.h"
 #include "core/Units.h"
 #include "PrimitiveOp.h"
+#include <cmath>
 
 #include <BRepPrimAPI_MakeBox.hxx>
 #include <BRepPrimAPI_MakeCylinder.hxx>
@@ -78,8 +79,14 @@ bool PrimitiveOp::execute(Document& doc) {
                 if (m_radius < 0.0 || m_topRadius < 0.0 || m_height <= 0.0 ||
                     (m_radius <= 0.0 && m_topRadius <= 0.0))
                     return false;
-                s = BRepPrimAPI_MakeCone(axisAt(m_ox, m_oy, m_oz),
-                                         m_radius, m_topRadius, m_height).Shape();
+                // BRepPrimAPI_MakeCone refuses equal radii (it throws), so a
+                // "cone" like that was silently dropped: build the cylinder.
+                if (std::abs(m_radius - m_topRadius) < 1e-9)
+                    s = BRepPrimAPI_MakeCylinder(axisAt(m_ox, m_oy, m_oz),
+                                                 m_radius, m_height).Shape();
+                else
+                    s = BRepPrimAPI_MakeCone(axisAt(m_ox, m_oy, m_oz),
+                                             m_radius, m_topRadius, m_height).Shape();
                 break;
             case Kind::Torus:
                 // R > r is the geometric strict minimum: R = r is the horn-

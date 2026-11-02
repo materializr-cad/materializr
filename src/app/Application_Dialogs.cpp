@@ -173,7 +173,12 @@ void Application::renderSettings() {
                     ImGui::SeparatorText(materializr::tr("Autosave"));
                     if (ImGui::Checkbox(materializr::tr("Autosave on close"), &m_autosaveEnabled)) changed = true;
                     ImGui::TextWrapped("%s", materializr::tr("Saves the project automatically when you close it or quit, once it has been saved to a file at least once - no prompt needed. Crash recovery is separate and always on."));
-                    if (m_autosaveEnabled && m_currentProjectPath.empty()) {
+                    if (ImGui::Checkbox(materializr::tr("Also autosave every few minutes"), &m_autosavePeriodic)) changed = true;
+                    ImGui::TextWrapped("%s", materializr::tr("Re-saves the project on a timer while it has unsaved changes, once it has been saved to a file at least once. Waits while a tool, a sketch or an undone step is open. Large projects can pause briefly while saving."));
+                    ImGui::BeginDisabled(!m_autosavePeriodic);
+                    if (ImGui::SliderInt(materializr::tr("Interval (min)"), &m_autosaveIntervalMin, 1, 30, "%d min")) changed = true;
+                    ImGui::EndDisabled();
+                    if ((m_autosaveEnabled || m_autosavePeriodic) && m_currentProjectPath.empty()) {
                         ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s", materializr::tr("Save the project once to start autosaving."));
                     }
 
@@ -277,11 +282,11 @@ void Application::renderSettings() {
                     // the same scale, so they stay in proportion. Baked at
                     // startup like Touch mode, hence the restart note.
                     ImGui::SeparatorText(materializr::tr("Interface scale"));
-                    ImGui::BeginDisabled(materializr::touchMode() || m_cliUiScale > 0.0f);
+                    ImGui::BeginDisabled(m_cliUiScale > 0.0f);
                     {
                         int pct = static_cast<int>(m_uiScaleUser * 100.0f + 0.5f);
                         ImGui::SetNextItemWidth(materializr::uiSz(200, 0).x);
-                        if (ImGui::SliderInt("##uiScaleUser", &pct, 75, 250, "%d%%",
+                        if (ImGui::SliderInt("##uiScaleUser", &pct, 50, 250, "%d%%",
                                              ImGuiSliderFlags_AlwaysClamp)) {
                             m_uiScaleUser = static_cast<float>(pct) / 100.0f;
                         }
@@ -294,10 +299,8 @@ void Application::renderSettings() {
                         }
                     }
                     ImGui::EndDisabled();
-                    ImGui::TextWrapped("%s", materializr::tr("Makes the whole interface larger or smaller: text, buttons, spacing and panels together. 100% is the size picked for your display. Takes effect on restart."));
-                    if (materializr::touchMode()) {
-                        ImGui::TextDisabled("%s", materializr::tr("Touch mode sets its own size, so this is off while Touch mode is on."));
-                    } else if (m_cliUiScale > 0.0f) {
+                    ImGui::TextWrapped("%s", materializr::tr("Makes the whole interface larger or smaller: text, buttons, spacing and panels together. 100% is the size picked for your display (in Touch mode, the finger-sized default). Takes effect on restart."));
+                    if (m_cliUiScale > 0.0f) {
                         ImGui::TextDisabled("%s", materializr::tr("This launch was started with --ui-scale, which takes priority."));
                     } else if (std::abs(m_uiScaleUser - m_uiScaleApplied) > 1e-4f) {
                         ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.2f, 1.0f), "%s", materializr::tr("Restart Materializr to apply the new size, then use Reset panel layout if the panels look cramped."));
@@ -423,6 +426,10 @@ void Application::renderSettings() {
                 // constraints are always on the right-click "Add Constraint"
                 // menu. This tab keeps the toolbar-tooltip toggle.
                 if (ImGui::BeginTabItem(materializr::tr("Sketch###Sketch"))) {
+                    ImGui::SeparatorText(materializr::tr("Deleting sketches"));
+                    if (ImGui::Checkbox(materializr::tr("Deleting a sketch also deletes the bodies built from it"), &m_deleteSketchRemovesBodies)) changed = true;
+                    ImGui::TextWrapped("%s", materializr::tr("Off (default): the bodies stay, as plain solids, when you delete the sketch they were extruded or lathed from. On: the bodies that sketch created are deleted with it (bodies it only cut into are kept). Each is its own undo step."));
+                    ImGui::Spacing();
                     ImGui::SeparatorText(materializr::tr("Drawing inferences"));
                     ImGui::TextWrapped("%s", materializr::tr("As you draw, coloured ghost guides show alignment (perpendicular, parallel, on-axis, on-midpoint, etc.) and the cursor snaps. Full adds hover-to-charge references (dwell on a point / midpoint / face vertex to align from it). Reduced is the classic guides only, no hover-charging. Off is grid + endpoint only. Constraints live on the sketch right-click \"Add Constraint\" menu."));
 
@@ -1083,6 +1090,10 @@ void Application::renderRotatePanel() {
         endSession();
         return;
     }
+    if (isPlane && !m_planeGizmoArmed && !m_planeOpActive) {   // see renderMovePanel
+        endSession();
+        return;
+    }
 
     // An Apply has fully drained once the queue is empty and the gizmo commit is
     // done; whatever it pushed onto history becomes one Revert step.
@@ -1191,8 +1202,12 @@ void Application::renderMovePanel() {
         m_movePending = false;
     };
     const bool isPlane = m_selection && m_selection->primaryType() == SelectionType::Plane;
+    // A plane's gizmo exists only once Move is chosen (m_planeGizmoArmed), and the
+    // typed Apply is carried out THROUGH that gizmo. Showing the panel for a merely
+    // selected plane gave a field whose Apply did nothing and then stayed disabled.
     if (m_inSketchMode || !m_gizmo || m_gizmo->getMode() != GizmoMode::Translate ||
         m_selection->navigationOnly() ||
+        (isPlane && !m_planeGizmoArmed && !m_planeOpActive) ||
         !(m_selection->hasSelectedBodies() || isPlane)) {
         endSession();
         return;
@@ -4861,30 +4876,16 @@ bool Application::applyRevolve() {
     if (m_revolveSketchId < 0) return false;
     auto sk = m_document->getSketch(m_revolveSketchId);
     if (!sk) return false;
-    auto regions = sk->buildRegions();
-    // Pick the outermost region (largest outer bbox) - its face carries any
-    // inner boundaries as holes. Matches RevolveOp::rebuildProfileFromSketch
-    // so reloads re-derive the same profile.
-    int bestIdx = -1;
-    double bestDiag = -1.0;
-    for (size_t i = 0; i < regions.size(); ++i) {
-        if (regions[i].face.IsNull() || regions[i].outerWire.IsNull()) continue;
-        Bnd_Box bb;
-        BRepBndLib::Add(regions[i].outerWire, bb);
-        if (bb.IsVoid()) continue;
-        double x0, y0, z0, x1, y1, z1;
-        bb.Get(x0, y0, z0, x1, y1, z1);
-        double dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
-        double diag = dx * dx + dy * dy + dz * dz;
-        if (diag > bestDiag) { bestDiag = diag; bestIdx = static_cast<int>(i); }
-    }
-    if (bestIdx < 0) {
+    // Every solid region of the sketch, not just the biggest: two separate
+    // closed contours lathe together (see RevolveOp::profileFromSketch).
+    const TopoDS_Shape profile = RevolveOp::profileFromSketch(*sk);
+    if (profile.IsNull()) {
         std::fprintf(stderr, "[Revolve] sketch has no closed region to revolve\n");
         return false;
     }
 
     auto op = std::make_unique<RevolveOp>();
-    op->setProfile(regions[bestIdx].face);
+    op->setProfile(profile);
     op->setSketchSource(m_revolveSketchId); // for reload profile re-derivation
     op->setAxis(gp_Ax1(axisOrigin, axisDir));
     op->setAngle(static_cast<double>(m_revolveAngle));

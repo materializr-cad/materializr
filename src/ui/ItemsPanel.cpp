@@ -625,6 +625,17 @@ bool ItemsPanel::renderContent() {
                     if (ImGui::MenuItem(materializr::tr("Rename"))) {
                         beginRename();
                     }
+                    if (ImGui::MenuItem(materializr::tr("Move..."))) {
+                        // Select it (the gizmo follows the selection), then let
+                        // the host arm Move exactly as the toolbar's Move does.
+                        if (m_selection) {
+                            SelectionEntry entry;
+                            entry.type = SelectionType::Plane;
+                            entry.planeId = id;
+                            m_selection->select(entry);
+                        }
+                        if (m_movePlane) m_movePlane(id);
+                    }
                     if (ImGui::MenuItem(materializr::tr("Flip Normal"))) {
                         m_document->flipPlaneNormal(id);
                         if (m_markDirty) m_markDirty();

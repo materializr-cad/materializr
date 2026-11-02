@@ -92,6 +92,9 @@ struct AppSettings {
     // snappier. Persisted so the user doesn't have to re-set it every launch.
     float mouseSensitivity  = 1.0f;
     bool autosaveEnabled    = false; // save automatically on project/tab close
+    bool deleteSketchRemovesBodies = false; // deleting a sketch also deletes the bodies it created
+    bool autosavePeriodic   = false; // also re-save a saved project every autosaveIntervalMin
+    int  autosaveIntervalMin = 5;
     bool invertCubeDrag     = false; // ViewCube drag-to-orbit direction
     // Max seconds between two clicks for them to register as a double-click
     // (ImGui default 0.30). Trackpad users often double-tap slower than a

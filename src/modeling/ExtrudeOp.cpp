@@ -58,6 +58,10 @@ void ExtrudeOp::setProfile(const TopoDS_Shape& wire) {
 // Sketch::buildProfileShape) so the cascade reproduces the original shape.
 
 #include <BRepClass_FaceClassifier.hxx>
+#include <BRepAdaptor_Curve.hxx>
+#include <BRepExtrema_DistShapeShape.hxx>
+#include <BRepBuilderAPI_MakeVertex.hxx>
+#include <TopoDS_Wire.hxx>
 #include <BRepTools.hxx>
 #include <gp_Pln.hxx>
 #include <ElSLib.hxx>
@@ -164,6 +168,32 @@ std::vector<std::pair<double,double>> footprintPoints(
     }
     return pts;
 }
+
+// True when part of `old`'s outer boundary still runs along `now`'s boundary.
+// That is what a MERGE looks like (a dividing line was deleted: the region keeps
+// its other sides and swallows its neighbour). A RESIZE replaces the whole
+// boundary (a hole going from 8 to 10 mm leaves no part of the old circle), so
+// there nothing is shared and the sketch's face is the answer.
+bool sharesBoundary(const TopoDS_Face& old, const TopoDS_Face& now) {
+    try {
+        const TopoDS_Wire ow = BRepTools::OuterWire(old);
+        const TopoDS_Wire nw = BRepTools::OuterWire(now);
+        if (ow.IsNull() || nw.IsNull()) return false;
+        int total = 0, onNew = 0;
+        for (TopExp_Explorer ex(ow, TopAbs_EDGE); ex.More(); ex.Next()) {
+            BRepAdaptor_Curve c(TopoDS::Edge(ex.Current()));
+            for (int i = 0; i <= 8; ++i) {
+                gp_Pnt p = c.Value(c.FirstParameter() + (c.LastParameter() - c.FirstParameter()) * (i / 8.0));
+                BRepExtrema_DistShapeShape d(BRepBuilderAPI_MakeVertex(p).Vertex(), nw);
+                ++total;
+                if (d.IsDone() && d.Value() < 1e-3) ++onNew;
+            }
+        }
+        return total > 0 && onNew >= std::max(2, total / 8);
+    } catch (...) {
+        return true;   // can't tell: keep the old, conservative behaviour
+    }
+}
 } // namespace
 
 bool ExtrudeOp::rebuildProfileFromSketch(Document& doc) {
@@ -225,6 +255,7 @@ bool ExtrudeOp::rebuildProfileFromSketch(Document& doc) {
             };
             for (size_t k = 0; k < keptFaces.size(); ++k) {
                 double aOrig = 0.0;
+                std::vector<TopoDS_Face> sharedFaces;
                 for (TopExp_Explorer ox(m_recoveredProfile, TopAbs_FACE); ox.More(); ox.Next()) {
                     const TopoDS_Face& of = TopoDS::Face(ox.Current());
                     bool shares = false;
@@ -234,10 +265,17 @@ bool ExtrudeOp::rebuildProfileFromSketch(Document& doc) {
                         BRepClass_FaceClassifier cls(of, p, 1e-4);
                         if (cls.State() == TopAbs_IN) { shares = true; break; }
                     }
-                    if (shares) aOrig += areaOf(of);
+                    if (shares) { aOrig += areaOf(of); sharedFaces.push_back(of); }
                 }
                 const double aNow = areaOf(keptFaces[k]);
-                if (aOrig > 1e-9 && aNow > aOrig * 1.5) {
+                // A bigger face only counts as ballooning when it still shares
+                // part of the old boundary (see sharesBoundary): a hole resized
+                // from 8 to 10 mm is 1.56x the area and must be FOLLOWED.
+                bool merged = false;
+                if (aOrig > 1e-9 && aNow > aOrig * 1.5)
+                    for (const auto& of : sharedFaces)
+                        if (sharesBoundary(of, keptFaces[k])) { merged = true; break; }
+                if (merged) {
                     std::fprintf(stderr, "[Extrude] matched region area %.0f far "
                                  "exceeds the original footprint %.0f - using the "
                                  "saved footprint profile\n", aNow, aOrig);

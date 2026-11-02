@@ -6,6 +6,7 @@
 #include <gp_Pnt.hxx>
 #include <gp_Dir.hxx>
 #include <string>
+namespace materializr { class Sketch; }
 
 enum class RevolveMode { NewBody, Union, Subtract, Intersect };
 
@@ -29,6 +30,11 @@ public:
     // exactly what the Revolve popup used at creation time. Returns false if
     // there's no source sketch, it's gone, or it has no closed region.
     bool rebuildProfileFromSketch(Document& doc);
+    // The profile a sketch lathes as: every SOLID region (a ring's hole stays a
+    // hole; a contour drawn inside that hole is solid again), as one face or a
+    // compound of faces. Null when the sketch has no closed region. Shared by
+    // the Lathe popup and the reload re-derivation so both pick the same set.
+    static TopoDS_Shape profileFromSketch(const materializr::Sketch& sk);
 
     // Getters
     double getAngle() const { return m_angle; }

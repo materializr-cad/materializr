@@ -908,9 +908,12 @@ float Window::uiScale() const {
     float s = uiScaleDetected();
     // One place, after detection, so every consumer (font atlas, style,
     // uiSz widgets, toolbar, cursor, default dock widths) sees the same number
-    // and nothing can scale on its own. Touch has its own scale and --ui-scale
-    // is an exact override, so neither is multiplied.
-    if (!materializr::touchMode() && m_uiScaleOverride <= 0.0f)
+    // and nothing can scale on its own. --ui-scale is an exact override, so it
+    // is not multiplied. Touch mode sets its own BASE size but the user's
+    // multiplier still applies on top: a high-density tablet or a headset
+    // finds the touch-sized controls too big (or too small) and must not have
+    // to give up touch input to change that.
+    if (m_uiScaleOverride <= 0.0f)
         s *= m_uiScaleUser;
     return std::min(std::max(s, 0.5f), 4.0f);
 }

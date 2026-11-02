@@ -701,7 +701,7 @@ void ProjectSketchController::panelBody(const IopContext& ctx,
 
     ImGui::TextDisabled("%s", materializr::trFormat("Depth: %s", materializr::fmtLength(m_depth)).c_str());
     if (materializr::lengthStepperRow("projDepthStep", &m_depth,
-                                /*allowNegative=*/false, 0.1f, 10.0f)) {
+                                /*allowNegative=*/true, 0.1f, 10.0f)) {
         changed = true;
     }
     if (ctx.cornerCommitUi &&
@@ -982,7 +982,7 @@ void ScaleFaceController::panelBody(const IopContext& ctx, bool& changed) {
     ImGui::TextDisabled("%s", materializr::tr("Or drag the two arrows on the face."));
     ImGui::TextDisabled("%s", materializr::trFormat("Length: %s", materializr::fmtLength(m_len)).c_str());
     if (materializr::lengthStepperRow("lenStep", &m_len,
-                                /*allowNegative=*/false, 0.5f,
+                                /*allowNegative=*/true, 0.5f,
                                 std::max(m_lenMax, 1.0f)))
         changed = true;
     if (ctx.cornerCommitUi &&

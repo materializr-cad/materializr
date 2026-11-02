@@ -1,4 +1,5 @@
 #include "SketchTool.h"
+#include <iterator>
 #include "SketchConstraints.h"
 #include "TextSketchOp.h"
 #include "../touch_mode.h"
@@ -49,6 +50,7 @@ void SketchTool::setMode(SketchToolMode mode) {
     } else if (mode != SketchToolMode::Offset) {
         m_offsetOnly.clear();
     }
+    const bool enteringOffset = mode == SketchToolMode::Offset && m_mode != SketchToolMode::Offset;
     m_mode = mode;
     m_refHover.clear();
     // Leaving select/move: drop element highlights so they don't linger as
@@ -69,6 +71,9 @@ void SketchTool::setMode(SketchToolMode mode) {
     m_rectDimH = 0.0f;
     m_mirrorActive = false; // switching tools aborts any in-progress mirror
     cancelOffset();         // ... and any in-progress offset
+    // A selection made before choosing Offset IS the pick: go straight to the
+    // distance step instead of asking for the same elements to be clicked again.
+    if (enteringOffset && !m_offsetOnly.empty()) beginOffsetFromSelection();
     // Entering or leaving Dimension mode always starts a fresh pick sequence.
     clearDimState();
 }
@@ -86,6 +91,7 @@ void SketchTool::flagNewElements(int firstId) {
         case SketchToolMode::Arc:
         case SketchToolMode::Spline:
         case SketchToolMode::Polygon:
+        case SketchToolMode::Reference:
             m_sketch->setConstructionSince(firstId, true);
             break;
         default:
@@ -835,7 +841,7 @@ void SketchTool::updateHoverCharge(double tNow, glm::vec2 cursor) {
     // charged it at coarse grid steps (zoomed out) - "latching to edges I
     // never hovered". Charging is a deliberate act: tighter catch, and the
     // linger tolerance below is a small fraction of a cell.
-    const float band = std::max(0.4f, tolStep() * 0.6f);
+    const float band = pickTol(0.6f, 0.4f);
     ChargedRef best;
     float bestD = band;
     for (const auto& pt : m_sketch->getPoints()) {
@@ -895,7 +901,7 @@ void SketchTool::updateHoverCharge(double tNow, glm::vec2 cursor) {
     // and same sourceId; FacePoint and FaceLineMid match by position
     // since they have no id.
     const double dwell = 0.30;
-    const float  moveTol = std::max(0.25f, tolStep() * 0.25f);
+    const float  moveTol = pickTol(0.25f, 0.25f);
     bool sameCandidate =
         m_hoverCandidate.kind == best.kind &&
         ((best.sourceId >= 0 && m_hoverCandidate.sourceId == best.sourceId) ||
@@ -2414,7 +2420,7 @@ void SketchTool::handleSelectTool(glm::vec2 pos) {
     int nearCircle = -1;
     int nearArc = -1;
     int nearSpline = -1;
-    const float tol = std::max(tolStep() * 0.5f, 0.5f) * snapScale(); // sketch units (wider on touch)
+    const float tol = pickTol(0.5f, 0.5f) * snapScale(); // sketch units (wider on touch)
     if (nearPt < 0) {
         // Line segments. Lines drawn on top of one another sit at the same
         // distance from the click, so the nearest one is a coin toss that always
@@ -2759,7 +2765,7 @@ float SketchTool::rimBreakBand(bool wholeSelection) const {
     // the rim through any normal repositioning and only lets go if the line is
     // hauled somewhere else entirely. Dragging the point alone gets a tight one,
     // so a deliberate pull detaches immediately.
-    const float tight = std::max(tolStep() * 0.75f, 0.5f) * snapScale();
+    const float tight = pickTol(0.75f, 0.5f) * snapScale();
     return wholeSelection ? std::max(tight * 8.0f, 4.0f * tolStep()) : tight;
 }
 
@@ -4198,7 +4204,7 @@ void applyTrim(Sketch& sketch, const TrimAction& a) {
 
 void SketchTool::handleTrimTool(glm::vec2 pos) {
     if (!m_sketch) return;
-    float threshold = std::max(0.3f, tolStep() * 0.5f);
+    float threshold = pickTol(0.5f, 0.3f);
     TrimAction a = planTrim(*m_sketch, pos, threshold);
     if (!a.valid()) return;
     applyTrim(*m_sketch, a);
@@ -4211,7 +4217,7 @@ void SketchTool::handleTrimTool(glm::vec2 pos) {
 void SketchTool::computeTrimHover(glm::vec2 pos) {
     m_trimHoverPoints.clear();
     if (!m_sketch) return;
-    float threshold = std::max(0.3f, tolStep() * 0.5f);
+    float threshold = pickTol(0.5f, 0.3f);
     TrimAction a = planTrim(*m_sketch, pos, threshold);
     if (a.valid()) densifyTrimPreview(*m_sketch, a, m_trimHoverPoints);
 }
@@ -4532,12 +4538,12 @@ void SketchTool::updateOffsetHover(glm::vec2 pos) {
     m_offsetChainHover.clear();
     if (!m_sketch) return;
     if (m_offsetSuppressHover) {
-        if (glm::length(pos - m_offsetCommitPos) < std::max(1.0f, tolStep() * 2.0f))
+        if (glm::length(pos - m_offsetCommitPos) < pickTol(2.0f, 1.0f))
             return;
         m_offsetSuppressHover = false;
     }
     // Same catch range Trim picks with, so the two hover the same way.
-    const float threshold = std::max(0.3f, tolStep() * 0.5f);
+    const float threshold = pickTol(0.5f, 0.3f);
     OffsetChain ch = walkOffsetChain(*m_sketch, pos, threshold, offsetOnly());
     if (ch.valid()) densifyChain(ch, m_offsetChainHover);
 }
@@ -4551,10 +4557,98 @@ void SketchTool::updateOffsetDistance(glm::vec2 pos) {
 void SketchTool::recomputeOffsetPreview() {
     m_offsetPreview.clear();
     m_offsetResult = OffsetResult{};
+    m_offsetExtraRes.assign(m_offsetExtra.size(), OffsetResult{});
     if (!m_offsetChain.valid() || std::abs(m_offsetDistance) < 1e-6f) return;
     m_offsetResult = offsetChain(m_offsetChain, m_offsetDistance, m_offsetCorners);
     pruneOffset(m_offsetResult, m_offsetChain, m_offsetDistance);
     if (m_offsetResult.valid) densifySegs(m_offsetResult.segs, m_offsetPreview);
+    for (size_t i = 0; i < m_offsetExtra.size(); ++i) {
+        const float d = m_offsetDistance * m_offsetExtraSign[i];
+        m_offsetExtraRes[i] = offsetChain(m_offsetExtra[i], d, m_offsetCorners);
+        pruneOffset(m_offsetExtraRes[i], m_offsetExtra[i], d);
+        if (m_offsetExtraRes[i].valid) densifySegs(m_offsetExtraRes[i].segs, m_offsetPreview);
+    }
+}
+
+namespace {
+// +1 counter-clockwise, -1 clockwise (open chains: +1).
+float chainWinding(const OffsetChain& ch) {
+    if (!ch.closed) return 1.0f;
+    std::vector<std::vector<glm::vec2>> polys;
+    densifyChain(ch, polys);
+    double a = 0.0;
+    for (const auto& p : polys)
+        for (size_t i = 0; i < p.size(); ++i) {
+            const glm::vec2 u = p[i], v = p[(i + 1) % p.size()];
+            a += static_cast<double>(u.x) * v.y - static_cast<double>(v.x) * u.y;
+        }
+    return a >= 0.0 ? 1.0f : -1.0f;
+}
+} // namespace
+
+// The elements selected when Offset was chosen become the chain(s) to offset.
+// Each separate connected run (elements touching end to end) is one chain; the
+// first drives the distance, the rest follow it. Returns false when nothing in
+// the selection can be offset (the tool then waits for a click as before).
+bool SketchTool::beginOffsetFromSelection() {
+    if (!m_sketch || m_offsetOnly.empty()) return false;
+    const float threshold = pickTol(0.5f, 0.3f);
+    std::vector<OffsetChain> chains;
+    std::set<int> covered;
+    auto probe = [&](glm::vec2 q) {
+        OffsetChain ch = walkOffsetChain(*m_sketch, q, threshold, offsetOnly());
+        if (!ch.valid()) return;
+        for (const auto& s : ch.segs) covered.insert(s.sourceId);
+        chains.push_back(std::move(ch));
+    };
+    for (int id : m_offsetOnly) {
+        if (covered.count(id)) continue;
+        // A point guaranteed to sit ON the element.
+        if (const SketchLine* l = [&]() -> const SketchLine* {
+                for (const auto& e : m_sketch->getLines()) if (e.id == id) return &e;
+                return nullptr; }()) {
+            const SketchPoint* a = m_sketch->getPoint(l->startPointId);
+            const SketchPoint* b = m_sketch->getPoint(l->endPointId);
+            if (a && b) probe(0.5f * (a->pos + b->pos));
+        } else if (const SketchCircle* c = [&]() -> const SketchCircle* {
+                for (const auto& e : m_sketch->getCircles()) if (e.id == id) return &e;
+                return nullptr; }()) {
+            if (const SketchPoint* p = m_sketch->getPoint(c->centerPointId))
+                probe(p->pos + glm::vec2(static_cast<float>(c->radius), 0.0f));
+        } else if (const SketchArc* ar = [&]() -> const SketchArc* {
+                for (const auto& e : m_sketch->getArcs()) if (e.id == id) return &e;
+                return nullptr; }()) {
+            const SketchPoint* ct = m_sketch->getPoint(ar->centerPointId);
+            const SketchPoint* s = m_sketch->getPoint(ar->startPointId);
+            const SketchPoint* e = m_sketch->getPoint(ar->endPointId);
+            if (ct && s && e) {
+                float a0 = std::atan2(s->pos.y - ct->pos.y, s->pos.x - ct->pos.x);
+                float a1 = std::atan2(e->pos.y - ct->pos.y, e->pos.x - ct->pos.x);
+                while (a1 <= a0) a1 += 2.0f * 3.14159265f;
+                const float am = 0.5f * (a0 + a1);
+                probe(ct->pos + glm::vec2(std::cos(am), std::sin(am)) * static_cast<float>(ar->radius));
+            }
+        } else if (const SketchSpline* sp = [&]() -> const SketchSpline* {
+                for (const auto& e : m_sketch->getSplines()) if (e.id == id) return &e;
+                return nullptr; }()) {
+            const auto poly = m_sketch->sampleSpline2D(*sp, 6);
+            if (!poly.empty()) probe(poly[poly.size() / 2]);
+        }
+    }
+    if (chains.empty()) return false;
+    m_offsetChain = std::move(chains.front());
+    m_offsetExtra.assign(std::make_move_iterator(chains.begin() + 1), std::make_move_iterator(chains.end()));
+    m_offsetExtraSign.clear();
+    for (const auto& ch : m_offsetExtra)
+        m_offsetExtraSign.push_back(chainWinding(ch) * chainWinding(m_offsetChain));
+    m_offsetExtraRes.assign(m_offsetExtra.size(), OffsetResult{});
+    m_offsetChainHover.clear();
+    m_offsetPhase = OffsetPhase::Distance;
+    m_offsetDistance = 0.0f;
+    m_offsetResult = OffsetResult{};
+    m_offsetPreview.clear();
+    m_isPlacing = true;   // the host's two-step Escape applies, as after a click-pick
+    return true;
 }
 
 void SketchTool::setOffsetDistance(float d) {
@@ -4590,7 +4684,7 @@ SketchTool::RefPick SketchTool::pickReference(glm::vec2 pos) const {
     RefPick best;
     if (!m_sketch) return best;
     const auto& refs = m_sketch->getFaceReferences();
-    const float tol = std::max(tolStep() * 0.5f, 0.5f) * snapScale();
+    const float tol = pickTol(0.5f, 0.5f) * snapScale();
     float bestD = tol;
 
     for (size_t i = 0; i < refs.lines.size(); ++i) {
@@ -4614,6 +4708,17 @@ SketchTool::RefPick SketchTool::pickReference(glm::vec2 pos) const {
         }
         bestD = d; best = {2, i};
     }
+    for (size_t i = 0; i < refs.splines.size(); ++i) {
+        const auto& poly = refs.splines[i].poly;
+        for (size_t k = 0; k + 1 < poly.size(); ++k) {
+            const glm::vec2 a = poly[k], ab = poly[k + 1] - poly[k];
+            const float len2 = glm::dot(ab, ab);
+            if (len2 < 1e-12f) continue;
+            const float t = glm::clamp(glm::dot(pos - a, ab) / len2, 0.0f, 1.0f);
+            const float d = glm::distance(a + ab * t, pos);
+            if (d < bestD) { bestD = d; best = {4, i}; }
+        }
+    }
     if (best.kind == 0) {
         // Standalone points (another sketch's loose points) only when no line
         // or curve is under the cursor.
@@ -4635,9 +4740,11 @@ void SketchTool::updateReferenceHover(glm::vec2 pos) {
         m_refHover.push_back({refs.lines[p.idx].first, refs.lines[p.idx].second});
     } else if (p.kind == 2) {
         m_refHover.push_back(refCirclePoly(refs.circles[p.idx]));
+    } else if (p.kind == 4) {
+        m_refHover.push_back(refs.splines[p.idx].poly);
     } else if (p.kind == 3) {
         const glm::vec2 q = refs.points[p.idx];
-        const float h = std::max(tolStep() * 0.3f, 0.3f) * snapScale();
+        const float h = pickTol(0.3f, 0.3f) * snapScale();
         m_refHover.push_back({q + glm::vec2(-h, 0), q + glm::vec2(h, 0)});
         m_refHover.push_back({q + glm::vec2(0, -h), q + glm::vec2(0, h)});
     }
@@ -4665,46 +4772,91 @@ void SketchTool::handleReferenceTool(glm::vec2 pos) {
         if (ia == ib || lineExists(ia, ib)) return;
         m_sketch->addLine(ia, ib);
     };
-
-    if (p.kind == 1) {
-        std::vector<size_t> take{p.idx};
-        if (m_lastDownAddedToSel) {
-            // Ctrl: the whole connected run of reference lines this one is in.
-            const float eps = 1e-3f;
-            std::vector<bool> used(refs.lines.size(), false);
-            used[p.idx] = true;
-            for (bool grew = true; grew;) {
-                grew = false;
-                for (size_t i = 0; i < refs.lines.size(); ++i) {
-                    if (used[i]) continue;
-                    for (size_t j : take) {
-                        const auto& A = refs.lines[i];
-                        const auto& B = refs.lines[j];
-                        if (glm::distance(A.first, B.first) < eps || glm::distance(A.first, B.second) < eps ||
-                            glm::distance(A.second, B.first) < eps || glm::distance(A.second, B.second) < eps) {
-                            used[i] = true; take.push_back(i); grew = true; break;
-                        }
-                    }
-                }
-            }
-        }
-        for (size_t i : take) addLineAt(refs.lines[i].first, refs.lines[i].second);
-    } else if (p.kind == 2) {
-        const auto& c = refs.circles[p.idx];
+    auto arcEnds = [](const Sketch::FaceReference::Circle& c) {
+        const float ea = c.startAngle + c.sweep;
+        return std::make_pair(
+            c.center + glm::vec2(std::cos(c.startAngle), std::sin(c.startAngle)) * c.radius,
+            c.center + glm::vec2(std::cos(ea), std::sin(ea)) * c.radius);
+    };
+    auto addCircleRef = [&](const Sketch::FaceReference::Circle& c) {
         const int ctr = pointAt(c.center);
         if (c.sweep >= kRefTwoPi - 1e-3f) {
             for (const auto& e : m_sketch->getCircles())
                 if (e.centerPointId == ctr && std::abs(e.radius - c.radius) < 1e-4) return;
             m_sketch->addCircle(ctr, c.radius);
         } else {
-            const glm::vec2 s = c.center + glm::vec2(std::cos(c.startAngle), std::sin(c.startAngle)) * c.radius;
-            const float ea = c.startAngle + c.sweep;
-            const glm::vec2 e = c.center + glm::vec2(std::cos(ea), std::sin(ea)) * c.radius;
-            m_sketch->addArc(ctr, pointAt(s), pointAt(e), c.radius);
+            const auto [s, e] = arcEnds(c);
+            const int is = pointAt(s), ie = pointAt(e);
+            for (const auto& ar : m_sketch->getArcs())
+                if (ar.centerPointId == ctr && ((ar.startPointId == is && ar.endPointId == ie) ||
+                                                (ar.startPointId == ie && ar.endPointId == is))) return;
+            m_sketch->addArc(ctr, is, ie, c.radius);
         }
-    } else {
-        pointAt(refs.points[p.idx]);
+    };
+    auto addSplineRef = [&](const Sketch::FaceReference::Spline& sp) {
+        std::vector<int> ids;
+        for (glm::vec2 q : sp.control) {
+            const int id = pointAt(q);
+            if (ids.empty() || ids.back() != id) ids.push_back(id);
+        }
+        if (ids.size() >= 2) m_sketch->addSpline(ids);
+    };
+
+    // Ctrl: take the whole connected run the picked curve belongs to - lines,
+    // arcs and splines joined end to end (a pipe wall is a line AND an arc, so a
+    // lines-only walk stopped at the first corner). Nodes: 0 line, 1 arc, 2 spline.
+    if (m_lastDownAddedToSel && p.kind != 3) {
+        struct Node { int type; size_t idx; glm::vec2 a, b; };
+        std::vector<Node> nodes;
+        int seed = -1;
+        for (size_t i = 0; i < refs.lines.size(); ++i) {
+            if (p.kind == 1 && p.idx == i) seed = static_cast<int>(nodes.size());
+            nodes.push_back({0, i, refs.lines[i].first, refs.lines[i].second});
+        }
+        for (size_t i = 0; i < refs.circles.size(); ++i) {
+            if (refs.circles[i].sweep >= kRefTwoPi - 1e-3f) {
+                if (p.kind == 2 && p.idx == i) seed = -2;   // a full circle is its own run
+                continue;
+            }
+            if (p.kind == 2 && p.idx == i) seed = static_cast<int>(nodes.size());
+            const auto [s, e] = arcEnds(refs.circles[i]);
+            nodes.push_back({1, i, s, e});
+        }
+        for (size_t i = 0; i < refs.splines.size(); ++i) {
+            if (p.kind == 4 && p.idx == i) seed = static_cast<int>(nodes.size());
+            nodes.push_back({2, i, refs.splines[i].poly.front(), refs.splines[i].poly.back()});
+        }
+        if (seed >= 0) {
+            const float eps = 1e-3f;
+            std::vector<bool> used(nodes.size(), false);
+            std::vector<size_t> run{static_cast<size_t>(seed)};
+            used[static_cast<size_t>(seed)] = true;
+            for (size_t k = 0; k < run.size(); ++k) {
+                const Node A = nodes[run[k]];
+                for (size_t i = 0; i < nodes.size(); ++i) {
+                    if (used[i]) continue;
+                    const Node& B = nodes[i];
+                    if (glm::distance(A.a, B.a) < eps || glm::distance(A.a, B.b) < eps ||
+                        glm::distance(A.b, B.a) < eps || glm::distance(A.b, B.b) < eps) {
+                        used[i] = true; run.push_back(i);
+                    }
+                }
+            }
+            for (size_t n : run) {
+                const Node& nd = nodes[n];
+                if (nd.type == 0) addLineAt(refs.lines[nd.idx].first, refs.lines[nd.idx].second);
+                else if (nd.type == 1) addCircleRef(refs.circles[nd.idx]);
+                else addSplineRef(refs.splines[nd.idx]);
+            }
+            m_refHover.clear();
+            return;
+        }
     }
+
+    if (p.kind == 1)      addLineAt(refs.lines[p.idx].first, refs.lines[p.idx].second);
+    else if (p.kind == 2) addCircleRef(refs.circles[p.idx]);
+    else if (p.kind == 4) addSplineRef(refs.splines[p.idx]);
+    else                  pointAt(refs.points[p.idx]);
     m_refHover.clear();
 }
 
@@ -4712,7 +4864,7 @@ void SketchTool::handleOffsetTool(glm::vec2 pos) {
     if (!m_sketch) return;
 
     if (m_offsetPhase == OffsetPhase::Pick) {
-        const float threshold = std::max(0.3f, tolStep() * 0.5f);
+        const float threshold = pickTol(0.5f, 0.3f);
         OffsetChain ch = walkOffsetChain(*m_sketch, pos, threshold, offsetOnly());
         if (!ch.valid()) return; // missed, or landed on something unofferable
         m_offsetChain = std::move(ch);
@@ -4736,13 +4888,14 @@ void SketchTool::commitOffset(std::set<int>& outPoints, std::set<int>& outElemen
     m_offsetCommitRequested = false;
     if (!m_sketch || !m_offsetResult.valid) return;
     m_offsetOnly.clear(); // the selection was for this one; the next pick is free
-    applyOffset(*m_sketch, m_offsetResult,
-                // EXACT: offset endpoints are generated, so committing the
-                // same preview must give the same connectivity at any zoom.
-                [this](glm::vec2 p) { return findExactCoincidentPoint(p, -1); },
-                outPoints, outElements,
+    // EXACT: offset endpoints are generated, so committing the same preview
+    // must give the same connectivity at any zoom.
+    auto weld = [this](glm::vec2 p) { return findExactCoincidentPoint(p, -1); };
+    applyOffset(*m_sketch, m_offsetResult, weld, outPoints, outElements,
                 // "Draw as construction" on = flip each element's type.
                 m_constructionDraw);
+    for (const auto& r : m_offsetExtraRes)
+        if (r.valid) applyOffset(*m_sketch, r, weld, outPoints, outElements, m_constructionDraw);
     // Back to Pick, tool still active: offsetting several chains in a row is
     // the normal way to use this (Trim likewise stays active after a click).
     const glm::vec2 where = m_currentPos;
@@ -4760,6 +4913,9 @@ void SketchTool::cancelOffset() {
     m_offsetPhase = OffsetPhase::Pick;
     m_offsetChain = OffsetChain{};
     m_offsetResult = OffsetResult{};
+    m_offsetExtra.clear();
+    m_offsetExtraRes.clear();
+    m_offsetExtraSign.clear();
     m_offsetDistance = 0.0f;
     m_offsetCommitRequested = false;
     m_offsetChainHover.clear();
@@ -4802,7 +4958,7 @@ DimPick SketchTool::hitTestDimEntity(glm::vec2 pos) const {
             return {DimEntityKind::Point, nearPt};
         }
     }
-    const float tol = std::max(tolStep() * 0.5f, 0.5f) * snapScale();
+    const float tol = pickTol(0.5f, 0.5f) * snapScale();
     // Lines (segment distance), skipping fromText - same math as handleSelectTool.
     float bestD = 0.0f; int bestLine = -1;
     for (const auto& l : m_sketch->getLines()) {

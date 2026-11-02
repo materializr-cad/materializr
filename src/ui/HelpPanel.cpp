@@ -83,8 +83,9 @@ void HelpPanel::render() {
 
     section("Saving and autosave",
         "Ctrl+S saves; the project includes bodies, colours, sketches and the "
-        "operation history. Settings → Autosave enables a periodic re-save "
-        "once the project has a file on disk. Application preferences "
+        "operation history. Settings → Autosave can save on close, and "
+        "optionally every few minutes, once the project has a file on disk. "
+        "Application preferences "
         "(theme, mouse buttons, orbit mode) are stored separately under your "
         "user config directory so they follow you between projects.");
 

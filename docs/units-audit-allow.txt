@@ -232,6 +232,8 @@ src/modeling/ChamferOp.cpp: // mask a dead middle: ChFi3d blended a few mm at ea
 src/modeling/ChamferOp.cpp: // A setback that lands EXACTLY on a neighbouring edge (a 1 mm chamfer
 src/modeling/ChamferOp.cpp: // on the 1 mm shoulder between a 22 and a 20 mm diameter) consumes the
 src/modeling/ChamferOp.cpp: "neighbouring face exactly - built %.0e mm "
+src/modeling/ExtrudeOp.cpp: // boundary (a hole going from 8 to 10 mm leaves no part of the old circle), so
+src/modeling/ExtrudeOp.cpp: // from 8 to 10 mm is 1.56x the area and must be FOLLOWED.
 src/modeling/ExtrudeOp.cpp: // from 8 mm to 6 mm and the samples between the two radii no longer
 src/modeling/ExtrudeOp.cpp: // land anywhere, so the cut kept its OLD 8 mm hole while the sketch
 src/modeling/FilletOp.cpp: // robot dog cover.mzr, body "Extrude", its 114 mm top edge:
@@ -359,6 +361,7 @@ src/modeling/SketchTool.h: // finer than that 0.1 mm floor. Without this, zoomin
 src/modeling/SketchTool.h: // visibly-0.01 mm grid still inferred/snapped at whatever coarser
 src/modeling/SketchTool.h: // base preset was chosen - "I'm zoomed in to a 0.01 mm grid and it's
 src/modeling/SketchTool.h: // still sticking to 0.1 mm" (Steve, 2026-09-26). Only follow the
+src/modeling/SketchTool.h: // 0.3-0.5 mm (which at a 0.001 mm view is hundreds of pixels: clicks landed
 src/modeling/SketchTool.h: // on the drawing (a 90-degree corner versus a 6 mm fillet run). The cursor's
 src/modeling/SketchTool.h: // display->mm on the way in, so under inches a typed 180 deg arrived as
 src/modeling/SketchTool.h: // or diameter (2-point mode) to whole grid units, so a 1 mm grid can't

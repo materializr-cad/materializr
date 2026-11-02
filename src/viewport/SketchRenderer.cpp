@@ -1,5 +1,6 @@
 #include "gl_common.h"
 #include "SketchRenderer.h"
+#include <memory>
 #include "modeling/AirfoilImport.h"
 #include "modeling/Sketch.h"
 #include "modeling/SketchTool.h"
@@ -205,13 +206,24 @@ void SketchRenderer::renderCachedStatic(const Sketch* sketch, const glm::mat4& v
         // persistent buffer.
         std::vector<CapturedPass> caps;
         m_capture = &caps;
-        drawLines(sketch, vp);
-        drawCircles(sketch, vp);
-        drawArcs(sketch, vp);
-        drawSplines(sketch, vp);
-        drawPolygons(sketch, vp);
-        drawPoints(sketch, vp);
-        drawMidpointDots(sketch, vp);
+        // A sketch that is not being edited shows only its real geometry:
+        // construction lines are scaffolding for drawing it, and left on screen
+        // they read as part of the model once the sketch is closed. (Redrawn
+        // while it is the active sketch, which takes the live path below.)
+        std::unique_ptr<Sketch> visible;
+        const Sketch* src = sketch;
+        if (sketch->hasConstructionGeometry()) {
+            visible = std::make_unique<Sketch>(sketch->withoutConstruction());
+            src = visible.get();
+            buildPointLut(src);
+        }
+        drawLines(src, vp);
+        drawCircles(src, vp);
+        drawArcs(src, vp);
+        drawSplines(src, vp);
+        drawPolygons(src, vp);
+        drawPoints(src, vp);
+        drawMidpointDots(src, vp);
         m_capture = nullptr;
 
         e.passes.reserve(caps.size());

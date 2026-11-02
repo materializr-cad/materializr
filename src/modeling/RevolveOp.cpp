@@ -22,6 +22,10 @@
 #include <BRepGProp.hxx>
 #include <GProp_GProps.hxx>
 #include <TopExp_Explorer.hxx>
+#include <BRep_Builder.hxx>
+#include <TopoDS_Compound.hxx>
+#include <vector>
+#include <algorithm>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -243,29 +247,75 @@ bool RevolveOp::undo(Document& doc) {
     }
 }
 
+TopoDS_Shape RevolveOp::profileFromSketch(const materializr::Sketch& sk) {
+    auto regions = sk.buildRegions();
+    const size_t n = regions.size();
+
+    // A region's nesting depth: how many other regions it is the hole-fill of.
+    // Region R fills a hole of Q when R's outer boundary IS one of Q's hole
+    // wires (same box). Even depth = solid, odd = the hole itself. Two
+    // separate contours both sit at depth 0, so both lathe; a ring's hole disc
+    // is depth 1 and is skipped, exactly as when only the outermost region was
+    // taken.
+    auto box = [](const TopoDS_Shape& w, double v[6]) {
+        Bnd_Box bb; BRepBndLib::Add(w, bb);
+        if (bb.IsVoid()) return false;
+        bb.Get(v[0], v[1], v[2], v[3], v[4], v[5]);
+        return true;
+    };
+    auto sameBox = [&](const TopoDS_Shape& a, const TopoDS_Shape& b) {
+        double x[6], y[6];
+        if (!box(a, x) || !box(b, y)) return false;
+        for (int i = 0; i < 6; ++i)
+            if (std::abs(x[i] - y[i]) > 1e-4) return false;
+        return true;
+    };
+    // Only what the user drew: a sketch on a body face also carries the host
+    // face's leftover, which would otherwise swallow the drawn contour as its hole.
+    // (Only for such sketches - drawnRegions() also misses a contour that shares
+    // an edge with another one, which is real geometry to lathe.)
+    std::vector<bool> inSet(n, true);
+    if (!sk.getSourceFace().IsNull()) {
+        const std::vector<int> drawn = sk.drawnRegions(regions);
+        if (!drawn.empty()) {
+            std::fill(inSet.begin(), inSet.end(), false);
+            for (int i : drawn) if (i >= 0 && static_cast<size_t>(i) < n) inSet[static_cast<size_t>(i)] = true;
+        }
+    }
+    std::vector<int> parent(n, -1);
+    for (size_t r = 0; r < n; ++r) {
+        if (!inSet[r] || regions[r].face.IsNull() || regions[r].outerWire.IsNull()) continue;
+        for (size_t q = 0; q < n && parent[r] < 0; ++q) {
+            if (q == r || !inSet[q]) continue;
+            for (const auto& h : regions[q].holeWires)
+                if (sameBox(regions[r].outerWire, h)) { parent[r] = static_cast<int>(q); break; }
+        }
+    }
+    BRep_Builder bld;
+    TopoDS_Compound comp;
+    bld.MakeCompound(comp);
+    int count = 0;
+    TopoDS_Shape only;
+    for (size_t r = 0; r < n; ++r) {
+        if (!inSet[r] || regions[r].face.IsNull() || regions[r].outerWire.IsNull()) continue;
+        int depth = 0;
+        for (int q = parent[r]; q >= 0 && depth < 64; q = parent[static_cast<size_t>(q)]) ++depth;
+        if (depth % 2 != 0) continue;
+        bld.Add(comp, regions[r].face);
+        only = regions[r].face;
+        ++count;
+    }
+    if (count == 0) return TopoDS_Shape();
+    return count == 1 ? only : TopoDS_Shape(comp);
+}
+
 bool RevolveOp::rebuildProfileFromSketch(Document& doc) {
     if (m_sketchId < 0) return false;
     auto sk = doc.getSketch(m_sketchId);
     if (!sk) return false;
-    auto regions = sk->buildRegions();
-    // Outermost region (largest outer bbox) - mirrors the Revolve popup's
-    // creation pick, so a reload re-derives the same profile (its face
-    // carries any inner boundaries as holes).
-    int bestIdx = -1;
-    double bestDiag = -1.0;
-    for (size_t i = 0; i < regions.size(); ++i) {
-        if (regions[i].face.IsNull() || regions[i].outerWire.IsNull()) continue;
-        Bnd_Box bb;
-        BRepBndLib::Add(regions[i].outerWire, bb);
-        if (bb.IsVoid()) continue;
-        double x0, y0, z0, x1, y1, z1;
-        bb.Get(x0, y0, z0, x1, y1, z1);
-        double dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
-        double diag = dx * dx + dy * dy + dz * dz;
-        if (diag > bestDiag) { bestDiag = diag; bestIdx = static_cast<int>(i); }
-    }
-    if (bestIdx < 0) return false;
-    m_profile = regions[bestIdx].face;
+    TopoDS_Shape prof = profileFromSketch(*sk);
+    if (prof.IsNull()) return false;
+    m_profile = prof;
     return true;
 }
 

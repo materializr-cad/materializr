@@ -408,6 +408,17 @@ public:
         return result;
     }
 
+    // A click's pick radius: `frac` of the pointing step, but never below
+    // `floorMm` - EXCEPT that the floor itself is capped at a few pixels, so
+    // zooming in tightens the catch range instead of leaving it a fixed
+    // 0.3-0.5 mm (which at a 0.001 mm view is hundreds of pixels: clicks landed
+    // on geometry far from the cursor).
+    float pickTol(float frac, float floorMm) const {
+        constexpr float kPickFloorPx = 10.0f;
+        if (m_mmPerPixel > 0.0f) floorMm = std::min(floorMm, kPickFloorPx * m_mmPerPixel);
+        return std::max(tolStep() * frac, floorMm);
+    }
+
     // The lattice points snap to - scaled by zoom, so it changes as you zoom.
     // Also moves the tolerance step, so a caller that only ever sets this one
     // behaves exactly as this class did before the two were separated. The
@@ -708,7 +719,7 @@ private:
     bool m_lastDownAddedToSel = false; // Ctrl state for the current click
     // The line the last Select click landed on, so a repeat click at the same
     // spot can walk to the next of several overlapping lines.
-    struct RefPick { int kind = 0; size_t idx = 0; };   // kind: 0 none, 1 line, 2 circle, 3 point
+    struct RefPick { int kind = 0; size_t idx = 0; };   // kind: 0 none, 1 line, 2 circle, 3 point, 4 spline
     RefPick pickReference(glm::vec2 pos) const;
     void updateReferenceHover(glm::vec2 pos);
     void handleReferenceTool(glm::vec2 pos);
@@ -813,6 +824,14 @@ private:
     OffsetPhase   m_offsetPhase = OffsetPhase::Pick;
     OffsetChain   m_offsetChain;      // captured on the Pick-phase click
     OffsetResult  m_offsetResult;     // live, recomputed as the cursor moves
+    // Offset from a pre-selection that spans several separate chains: the other
+    // chains ride along with the primary one. `m_offsetExtraSign` keeps each on
+    // the same side as the primary (outward stays outward for closed loops), so
+    // Flip and a typed distance move them all together.
+    std::vector<OffsetChain>  m_offsetExtra;
+    std::vector<OffsetResult> m_offsetExtraRes;
+    std::vector<float>        m_offsetExtraSign;
+    bool beginOffsetFromSelection();
     OffsetCorners m_offsetCorners = OffsetCorners::Round;
     float         m_offsetDistance = 0.0f;   // signed: + is right of travel
     bool          m_offsetCommitRequested = false;

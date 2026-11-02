@@ -88,7 +88,7 @@ void applyKv(const std::map<std::string, std::string>& kv, AppSettings& s) {
     // Written so a nan (or zero/negative) falls to 1.0 rather than slipping
     // through min/max.
     if (!(s.uiScaleUser > 0.0f)) s.uiScaleUser = 1.0f;
-    if (s.uiScaleUser < 0.75f)   s.uiScaleUser = 0.75f;
+    if (s.uiScaleUser < 0.5f)    s.uiScaleUser = 0.5f;
     if (s.uiScaleUser > 2.5f)    s.uiScaleUser = 2.5f;
     readBool(kv, "touchMode",            s.touchMode);
     // Interface layout. Legacy first (older builds wrote the coupled bool
@@ -122,6 +122,9 @@ void applyKv(const std::map<std::string, std::string>& kv, AppSettings& s) {
     readBool(kv, "animateCamera",        s.animateCamera);
     readFloat(kv, "mouseSensitivity",    s.mouseSensitivity);
     readBool(kv, "autosaveEnabled",      s.autosaveEnabled);
+    readBool(kv, "autosavePeriodic",     s.autosavePeriodic);
+    readBool(kv, "deleteSketchRemovesBodies", s.deleteSketchRemovesBodies);
+    readIntClamped(kv, "autosaveIntervalMin", s.autosaveIntervalMin, 1, 60);
     readBool(kv, "invertCubeDrag",       s.invertCubeDrag);
     readFloat(kv, "doubleClickTimeSec",  s.doubleClickTimeSec);
     readFloat(kv, "filletProbeSeconds",  s.filletProbeSeconds);
@@ -456,6 +459,9 @@ bool SettingsIO::save(const std::string& path, const AppSettings& s) {
     ofs << "animateCamera = "       << (s.animateCamera ? "true" : "false") << "\n";
     ofs << "mouseSensitivity = "    << s.mouseSensitivity    << "\n";
     ofs << "autosaveEnabled = "     << (s.autosaveEnabled ? "true" : "false") << "\n";
+    ofs << "autosavePeriodic = "    << (s.autosavePeriodic ? "true" : "false") << "\n";
+    ofs << "deleteSketchRemovesBodies = " << (s.deleteSketchRemovesBodies ? "true" : "false") << "\n";
+    ofs << "autosaveIntervalMin = " << s.autosaveIntervalMin << "\n";
     ofs << "invertCubeDrag = "      << (s.invertCubeDrag ? "true" : "false") << "\n";
     ofs << "doubleClickTimeSec = "  << s.doubleClickTimeSec  << "\n";
     ofs << "filletProbeSeconds = "  << s.filletProbeSeconds  << "\n";
@@ -592,6 +598,9 @@ bool SettingsIO::exportJson(const std::string& path, const AppSettings& s) {
     ofs << "  \"animateCamera\": "           << b(s.animateCamera)      << ",\n";
     ofs << "  \"mouseSensitivity\": "        << s.mouseSensitivity      << ",\n";
     ofs << "  \"autosaveEnabled\": "         << b(s.autosaveEnabled)    << ",\n";
+    ofs << "  \"autosavePeriodic\": "        << b(s.autosavePeriodic)   << ",\n";
+    ofs << "  \"deleteSketchRemovesBodies\": " << b(s.deleteSketchRemovesBodies) << ",\n";
+    ofs << "  \"autosaveIntervalMin\": "     << s.autosaveIntervalMin   << ",\n";
     ofs << "  \"invertCubeDrag\": "          << b(s.invertCubeDrag)     << ",\n";
     ofs << "  \"doubleClickTimeSec\": "      << s.doubleClickTimeSec    << ",\n";
     ofs << "  \"filletProbeSeconds\": "      << s.filletProbeSeconds    << ",\n";

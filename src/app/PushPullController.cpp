@@ -815,10 +815,8 @@ void PushPullController::renderPushPullPanel(const IopContext& ctx) {
 
     // Quick-nudge stepper (replaces the slider). Symmetric sweeps both ways, so
     // a negative distance is meaningless there - drop the minus buttons and
-    // clamp positive while ticked. 0 clears the change. Desktop only -
-    // im-touch stays a single well.
-    if (!imTouch &&
-        materializr::lengthStepperRow("ppStep", &m_st.distance,
+    // clamp positive while ticked. 0 clears the change.
+    if (materializr::lengthStepperRow("ppStep", &m_st.distance,
                                 /*allowNegative=*/!m_st.symmetric,
                                 m_st.symmetric ? 0.1f : -50.0f, 50.0f)) {
         m_st.distanceRaw = m_st.distance;
