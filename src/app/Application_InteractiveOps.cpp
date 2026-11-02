@@ -2107,6 +2107,23 @@ void Application::commitPrimitivePopup() {
             e.bodyId = ids.back();
             m_selection->select(e);
         }
+        // Bring the new solid into frame. Left where it was, a primitive is
+        // routinely far too big or too small for the current view and the user
+        // has to rescale by hand every time. Everything visible is fitted (so
+        // adding a part next to others keeps them all in view); the viewing
+        // direction is kept, only the distance and centre change.
+        Bnd_Box all;
+        for (int id : m_document->getAllBodyIds()) {
+            if (!m_document->isBodyVisible(id)) continue;
+            try { BRepBndLib::Add(m_document->getBody(id), all); } catch (...) {}
+        }
+        if (!all.IsVoid() && m_viewport) {
+            double x0, y0, z0, x1, y1, z1;
+            all.Get(x0, y0, z0, x1, y1, z1);
+            m_viewport->getCamera().zoomToFit(
+                glm::vec3(static_cast<float>(x0), static_cast<float>(y0), static_cast<float>(z0)),
+                glm::vec3(static_cast<float>(x1), static_cast<float>(y1), static_cast<float>(z1)));
+        }
     }
     m_primitivePopupActive = false;
 }

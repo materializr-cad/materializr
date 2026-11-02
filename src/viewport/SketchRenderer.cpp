@@ -166,8 +166,18 @@ void SketchRenderer::drawBuffer(const PassBuf& p, const glm::mat4& vp) {
     // Mirrors uploadAndDraw's state setup, minus the CPU regen + upload.
     glUseProgram(m_program);
     glUniformMatrix4fv(m_locMVP, 1, GL_FALSE, glm::value_ptr(vp));
-    glUniform3fv(m_locColor, 1, glm::value_ptr(p.color));
-    glUniform1f(m_locAlpha, 1.0f);
+    if (m_dimStatic) {
+        // An inactive sketch beside the one being edited: the same blue lines
+        // and yellow points, desaturated and darkened so the active sketch's
+        // saturated colours are the only bright ones on screen.
+        const float luma = glm::dot(p.color, glm::vec3(0.299f, 0.587f, 0.114f));
+        const glm::vec3 muted = glm::mix(p.color, glm::vec3(luma), 0.55f) * 0.75f;
+        glUniform3fv(m_locColor, 1, glm::value_ptr(muted));
+        glUniform1f(m_locAlpha, 0.7f);
+    } else {
+        glUniform3fv(m_locColor, 1, glm::value_ptr(p.color));
+        glUniform1f(m_locAlpha, 1.0f);
+    }
     glBindVertexArray(p.vao);
     glLineWidth(p.width);
     if (m_locPointSize >= 0)

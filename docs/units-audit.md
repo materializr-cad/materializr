@@ -263,7 +263,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 
 - CONVERTED: 1
 - allowed-by-hand: 93
-- comment: 300
+- comment: 302
 - diagnostic: 13
 - identifier/other: 9
 
@@ -452,6 +452,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | diagnostic | src/app/ExtrudeController.cpp | `std::fprintf(stdout, "Subtracted %.1f mm from %d of %zu bodies\n",` |
 | diagnostic | src/app/ExtrudeController.cpp | `std::fprintf(stdout, "Extruded %.1f mm\n", m_distance);` |
 | diagnostic | src/app/ExtrudeController.cpp | `std::fprintf(stdout, "Subtracted %.1f mm from body %d\n",` |
+| comment | src/app/FaceOpControllers.cpp | `// still stops them at the 0.1 mm floor - a wall is never negative).` |
 | comment | src/app/FaceOpControllers.cpp | `// Snap to 0.1 mm - wall thicknesses are almost always in tenths, and a` |
 | comment | src/app/FaceOpControllers.cpp | `// free-floating 3.47 mm slider value is just noise.` |
 | comment | src/app/FaceOpControllers.cpp | `// in DISPLAY units. "%.2f" wrote mm into it and also fixed the` |
@@ -533,6 +534,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | allowed-by-hand | src/modeling/PatchOp.cpp | `ImGui::TextDisabled(materializr::tr("Fit: gap %.4f mm, tangency %.2f deg"),` |
 | comment | src/modeling/PatchOp.h | `double tol3d       = 1e-4;   // G0: max gap to the boundary, mm` |
 | comment | src/modeling/PatchOp.h | `double g0Error() const { return m_g0Error; }  // mm` |
+| comment | src/modeling/PlaneReferences.cpp | `constexpr double kPlaneTol = 1e-3;     // mm: "lies on the plane"` |
 | comment | src/modeling/PrimitiveOp.h | `// Box: XYZ extents in mm.` |
 | comment | src/modeling/PushPullOp.cpp | `// BRepAlgoAPI_Cut of coincident faces yields ~1e-3 mm³ of noise). Such` |
 | comment | src/modeling/PushPullOp.cpp | `// leave ~1e-3 mm³ slivers, and the plug/hole pair can` |

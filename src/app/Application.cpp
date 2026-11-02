@@ -82,6 +82,7 @@ inline void resetFpuForOcct() {
 #include "ui/MeasureTool.h"
 #include "ui/UpdateChecker.h"
 #include "modeling/Sketch.h"
+#include "modeling/PlaneReferences.h"
 #include "viewport/GridScale.h"
 #include "modeling/ThreadOp.h"
 #include "modeling/CopyOp.h"
@@ -3549,8 +3550,9 @@ void Application::handleShortcuts() {
             //      Spline mid-stream, etc.). The sketch stays active so
             //      the user can resume drawing.
             //   2nd press (or 1st press when nothing is in progress) →
-            //      exit sketch mode entirely (same as Finish Sketch but
-            //      without an explicit click).
+            //      back to the Select tool if another tool is active;
+            //   next press (Select already active) → exit sketch mode
+            //      entirely (same as Finish Sketch but without a click).
             // Dimension mode is picking entities, not "placing" a shape -
             // isPlacing() never goes true for it, so without this branch
             // Escape here always fell straight through to exitSketchMode()
@@ -3586,6 +3588,11 @@ void Application::handleShortcuts() {
                 recordSketchMutation([&] { m_sketchTool->onConfirm(); });
             } else if (m_sketchTool && m_sketchTool->isPlacing()) {
                 m_sketchTool->onCancel();
+            } else if (m_sketchTool && m_sketchTool->getMode() != SketchToolMode::Select) {
+                // Idle drawing tool: the first Esc puts it down (back to
+                // Select), the second finishes the sketch - the convention
+                // from other CAD packages (#159).
+                m_sketchTool->setMode(SketchToolMode::Select);
             } else {
                 exitSketchMode();
             }
@@ -5819,6 +5826,7 @@ void Application::enterSketchMode() {
     m_sketchEntryHistoryStep = m_history ? m_history->currentStep() : -1;
     m_sketchUndoFloorStep = m_sketchEntryHistoryStep;
     if (m_history) m_history->setUndoFloor(m_sketchUndoFloorStep);  // no undo past sketch entry
+    refreshCoplanarReferences();
     m_toolbar->setSketchMode(true);
     // Fresh sketch session: drop any stale Dimension edit-popup state left
     // over from a previous session (e.g. Esc/undo left m_dimEditingId set
@@ -5849,6 +5857,7 @@ void Application::enterSketchOnPlane(const gp_Pln& plane) {
     m_sketchEntryHistoryStep = m_history ? m_history->currentStep() : -1;
     m_sketchUndoFloorStep = m_sketchEntryHistoryStep;
     if (m_history) m_history->setUndoFloor(m_sketchUndoFloorStep);  // no undo past sketch entry
+    refreshCoplanarReferences();
     m_toolbar->setSketchMode(true);
     // Fresh sketch session: drop any stale Dimension edit-popup state left
     // over from a previous session (e.g. Esc/undo left m_dimEditingId set
@@ -6523,6 +6532,7 @@ void Application::enterSketchOnFace(const TopoDS_Face& face, int sourceBodyId) {
     m_sketchEntryHistoryStep = m_history ? m_history->currentStep() : -1;
     m_sketchUndoFloorStep = m_sketchEntryHistoryStep;
     if (m_history) m_history->setUndoFloor(m_sketchUndoFloorStep);  // no undo past sketch entry
+    refreshCoplanarReferences();
     m_toolbar->setSketchMode(true);
     // Fresh sketch session: drop any stale Dimension edit-popup state left
     // over from a previous session (e.g. Esc/undo left m_dimEditingId set
@@ -7230,6 +7240,7 @@ void Application::editSketch(int sketchId) {
         ? materializr::sketchUndoFloor(*m_history, *m_document, sketchId)
         : m_sketchEntryHistoryStep;
     if (m_history) m_history->setUndoFloor(m_sketchUndoFloorStep);  // no undo past this
+    refreshCoplanarReferences();
     m_toolbar->setSketchMode(true);
     // Fresh sketch session: drop any stale Dimension edit-popup state left
     // over from a previous session (e.g. Esc/undo left m_dimEditingId set
@@ -7240,6 +7251,28 @@ void Application::editSketch(int sketchId) {
     m_dimPopupConsumedEsc = false;
     m_selection->clear();
     alignCameraToActiveSketch();
+}
+
+void Application::refreshCoplanarReferences() {
+    if (!m_activeSketch || !m_document) return;
+    std::vector<TopoDS_Shape> bodies;
+    for (int id : m_document->getAllBodyIds()) {
+        if (!m_document->isBodyVisible(id)) continue;
+        try { bodies.push_back(m_document->getBody(id)); } catch (...) {}
+    }
+    const auto st = materializr::addBodyPlaneReferences(*m_activeSketch, bodies);
+    std::vector<std::shared_ptr<Sketch>> keep;   // hold them while their pointers are in use
+    std::vector<const Sketch*> others;
+    for (int sid : m_document->getAllSketchIds()) {
+        if (sid == m_activeSketchId || !m_document->isSketchVisible(sid)) continue;
+        if (auto sk = m_document->getSketch(sid)) { keep.push_back(sk); others.push_back(sk.get()); }
+    }
+    const auto ss = materializr::addSketchPlaneReferences(*m_activeSketch, others);
+    if (materializr::isVerbose())
+        std::fprintf(stderr, "[Sketch] plane references: bodies +%d pts +%d lines +%d circles%s%s; "
+                             "sketches +%d pts +%d lines +%d circles\n",
+                     st.points, st.lines, st.circles, st.crossSection ? " (cross-section)" : "",
+                     st.skippedHeavy ? " (heavy body skipped)" : "", ss.points, ss.lines, ss.circles);
 }
 
 void Application::flagOpenEnds(int sketchId, double seconds) {

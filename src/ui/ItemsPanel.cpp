@@ -436,8 +436,15 @@ bool ItemsPanel::renderContent() {
                     }
                 }
 
+                // Double-click OPENS the sketch for editing, as it does in other
+                // CAD packages; rename lives in the context menu. The sketch
+                // already being drawn can't be re-entered mid-edit, so there
+                // the double-click still renames (#158).
                 if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)) {
-                    beginRename();
+                    if (m_editSketch && !(m_sketchModeActive && id == m_activeSketchId))
+                        m_editSketch(id);
+                    else
+                        beginRename();
                 }
 
                 if (ImGui::BeginPopupContextItem("SketchContextMenu")) {

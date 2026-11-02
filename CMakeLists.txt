@@ -384,6 +384,7 @@ add_executable(materializr
     src/modeling/MateSolver.cpp
     src/modeling/SketchTool.cpp
     src/modeling/SketchOffset.cpp
+    src/modeling/PlaneReferences.cpp
     src/modeling/SketchEditOp.cpp
     src/viewport/Viewport.cpp
     src/viewport/Camera.cpp

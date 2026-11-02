@@ -29,6 +29,10 @@ public:
     // Width (px) for committed sketch geometry - user setting (Sketch line
     // width). Point markers scale with it too. See uploadAndDraw / drawLines.
     void setLineWidth(float w) { m_lineWidth = w; }
+    // While a sketch is open for editing, draw the OTHER visible sketches
+    // (the static, tool-less path) in muted colours so they read as reference
+    // and the active sketch's bright blue and yellow stand out.
+    void setDimInactive(bool on) { m_dimStatic = on; }
 
     void render(const Sketch* sketch, const SketchTool* tool,
                 const glm::mat4& view, const glm::mat4& projection,
@@ -151,6 +155,7 @@ private:
 
     std::map<const void*, SketchCacheEntry> m_sketchCache;
     std::vector<CapturedPass>* m_capture = nullptr; // uploadAndDraw redirect
+    bool m_dimStatic = false; // see setDimInactive()
     std::unordered_map<int, const struct SketchPoint*> m_pointLut;
     const void* m_lutSketch = nullptr; // sketch the LUT was built from
 

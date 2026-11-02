@@ -141,6 +141,11 @@ private:
     // few seconds - what an Extrude / Push / Lathe that was refused for lack of
     // a closed profile points at.
     void flagOpenEnds(int sketchId, double seconds = 4.0);
+    // Add the geometry already lying ON the active sketch's plane - body edges
+    // and vertices, the cross-section where the plane cuts a body, and points
+    // and lines of other visible sketches on the same plane - to its snap
+    // references. Once per sketch entry (#155).
+    void refreshCoplanarReferences();
     void renderTransientToast();
     std::string m_toastText;
     double m_toastExpiry = 0.0;   // < 0: not yet drawn, armed on first draw

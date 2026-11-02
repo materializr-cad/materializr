@@ -98,7 +98,7 @@ void ShortcutsPanel::render() {
     };
     addBound(sketch, m_bindings, "Sketch");
     sketch.push_back(fixedRow("Backspace",    "Remove the last spline point or stamp"));
-    sketch.push_back(fixedRow("Esc",          "Cancel the shape; again to leave the sketch"));
+    sketch.push_back(fixedRow("Esc",          "Cancel the shape; again for Select; again to leave the sketch"));
     sketch.push_back(fixedRow("Double-click", "Finish the spline being drawn"));
     sketch.push_back(fixedRow("Right-click",  "Constraints menu (needs a selection)"));
     mouse = {

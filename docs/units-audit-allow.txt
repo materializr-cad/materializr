@@ -184,6 +184,7 @@ src/app/EdgeOpController.cpp: // Minimum 1 mm visible even at value 0 so the han
 src/app/ExtrudeController.cpp: std::fprintf(stdout, "Subtracted %.1f mm from %d of %zu bodies\n",
 src/app/ExtrudeController.cpp: std::fprintf(stdout, "Extruded %.1f mm\n", m_distance);
 src/app/ExtrudeController.cpp: std::fprintf(stdout, "Subtracted %.1f mm from body %d\n",
+src/app/FaceOpControllers.cpp: // still stops them at the 0.1 mm floor - a wall is never negative).
 src/app/FaceOpControllers.cpp: // Snap to 0.1 mm - wall thicknesses are almost always in tenths, and a
 src/app/FaceOpControllers.cpp: // free-floating 3.47 mm slider value is just noise.
 src/app/FaceOpControllers.cpp: // in DISPLAY units. "%.2f" wrote mm into it and also fixed the
@@ -262,6 +263,7 @@ src/modeling/MoveHoleOp.cpp: // measured on a Ø10 hole it left a 14 mm-wide ope
 src/modeling/PatchOp.cpp: ImGui::TextDisabled(materializr::tr("Fit: gap %.4f mm, tangency %.2f deg"),
 src/modeling/PatchOp.h: double tol3d       = 1e-4;   // G0: max gap to the boundary, mm
 src/modeling/PatchOp.h: double g0Error() const { return m_g0Error; }  // mm
+src/modeling/PlaneReferences.cpp: constexpr double kPlaneTol = 1e-3;     // mm: "lies on the plane"
 src/modeling/PrimitiveOp.h: // Box: XYZ extents in mm.
 src/modeling/PushPullOp.cpp: // BRepAlgoAPI_Cut of coincident faces yields ~1e-3 mm³ of noise). Such
 src/modeling/PushPullOp.cpp: // leave ~1e-3 mm³ slivers, and the plug/hole pair can

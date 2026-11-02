@@ -5569,8 +5569,9 @@ void Application::renderOffsetToolPanel() {
             } else {
                 ImGui::TextDisabled("%s", materializr::tr(
                     "Hover a line, arc or circle - the whole connected chain "
-                    "highlights. Click to choose it. To offset just some "
-                    "segments, select them first, then choose Offset."));
+                    "highlights. Click to choose it."));
+                ImGui::TextDisabled("%s", materializr::tr(
+                    "To offset just some segments, select them first, then choose Offset."));
             }
         } else {
             ImGui::TextDisabled("%s", materializr::tr(

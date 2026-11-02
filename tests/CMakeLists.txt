@@ -43,6 +43,7 @@ add_library(materializr_core STATIC
     ${CMAKE_SOURCE_DIR}/src/modeling/AirfoilImport.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/SketchTool.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/SketchOffset.cpp
+    ${CMAKE_SOURCE_DIR}/src/modeling/PlaneReferences.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/SketchEditOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/DuplicateSketchOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/DeleteSketchOp.cpp
@@ -501,6 +502,11 @@ add_test(NAME test_sketch_select_delete_polygon COMMAND test_sketch_select_delet
 add_executable(test_sketch_pick_overlap test_sketch_pick_overlap.cpp)
 target_link_libraries(test_sketch_pick_overlap PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_sketch_pick_overlap COMMAND test_sketch_pick_overlap)
+
+# test_plane_references - body outline / cross-section / other sketches on the plane become snap references
+add_executable(test_plane_references test_plane_references.cpp)
+target_link_libraries(test_plane_references PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_plane_references COMMAND test_plane_references)
 
 # Face-sketch grid direction: world-aligned edge beats the longest diagonal
 add_executable(test_sketch_plane_axis test_sketch_plane_axis.cpp)

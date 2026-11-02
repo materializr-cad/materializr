@@ -1136,7 +1136,9 @@ void Application::renderViewport() {
             if (m_inSketchMode && m_activeSketch) drawFills(*m_activeSketch);
         }
 
-        // Render all stored sketches (visible only) plus the active sketch
+        // Render all stored sketches (visible only) plus the active sketch.
+        // While one is open the others are drawn muted (#157).
+        m_sketchRenderer->setDimInactive(m_inSketchMode && m_activeSketch != nullptr);
         for (int sid : m_document->getAllSketchIds()) {
             if (!m_document->isSketchVisible(sid)) continue;
             if (m_inSketchMode && sid == m_activeSketchId) continue; // drawn below with tool
@@ -1145,6 +1147,7 @@ void Application::renderViewport() {
                 m_sketchRenderer->render(sk.get(), nullptr, view, proj, nullptr);
             }
         }
+        m_sketchRenderer->setDimInactive(false);
         if (m_inSketchMode && m_activeSketch) {
             // Keep the tool's snap step in sync with the user-chosen grid. The
             // grid itself is the infinite world grid above (now aligned to the

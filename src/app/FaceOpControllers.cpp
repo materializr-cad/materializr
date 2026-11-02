@@ -239,8 +239,10 @@ void ShellController::panelBody(const IopContext& ctx, bool& changed) {
     ImGui::Text("%s", materializr::unitSuffix());
     }
 
+    // allowNegative: the -10 / -1 / -0.1 buttons step the wall DOWN (the range
+    // still stops them at the 0.1 mm floor - a wall is never negative).
     if (materializr::lengthStepperRow("shellStep", &m_thickness,
-                                /*allowNegative=*/false, 0.1f, 20.0f)) {
+                                /*allowNegative=*/true, 0.1f, 20.0f)) {
         // Snap to 0.1 mm - wall thicknesses are almost always in tenths, and a
         // free-floating 3.47 mm slider value is just noise.
         m_thickness = std::round(m_thickness * 10.0f) / 10.0f;
