@@ -5,6 +5,12 @@ All notable changes to Materializr are documented here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **iPad layout on iPadOS 27 (#150).** In a window, or after switching apps, a
+  landscape window could be laid out as portrait, with the screen half black and
+  the bottom of the UI cut off.
+
 ## [1.8.0-beta.1] - 2026-11-01
 
 Desktop beta (Settings ▸ Include pre-release builds). Feedback welcome.
