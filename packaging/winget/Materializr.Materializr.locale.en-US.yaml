@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.12.0.schema.json
 
 PackageIdentifier: Materializr.Materializr
-PackageVersion: 1.7.5
+PackageVersion: 1.7.7
 PackageLocale: en-US
 Publisher: Materializr
 PublisherUrl: https://github.com/materializr-cad
@@ -33,26 +33,30 @@ Tags:
 - opencascade
 - svg
 ReleaseNotes: |-
-  Materializr 1.7.5
-  Sketching and laser work: fill regions for engraving, rebindable keyboard shortcuts, a Trim that cuts splines, and a round of fixes from tester reports.
+  Materializr 1.7.7
+  A first pass at sketch construction geometry, a whole-interface scale slider, more control over the sketch grid, and a round of fixes from tester reports.
   Added
-  - Fill tool for laser engraving: click a closed sketch region to fill it, again to clear it; fills never affect modeling, and SVG/DXF export writes them (optionally in grey) so laser software can treat them separately
-  - Rebindable keyboard shortcuts: Settings > Navigation lists 18 shortcuts to click and rebind
-  - Custom polygon sides: any side count from 3 to 128
-  - Camera glide into a sketch plane (Settings > Navigation > Animate camera moves turns it off)
+  - Construction geometry (early version): a Construction button in the sketch tools turns selected lines, circles, arcs and splines into construction, or makes what you draw next construction; it draws dashed and teal and never affects the shape, extrudes or SVG/DXF export
+  - Interface scale slider (Settings > Appearance, 75% to 250%) scales text, buttons, spacing and panels together; takes effect on restart
+  - Scale grid with zoom switch and a Step switch size slider in the snap popup under the ViewCube
+  - Grid rendering (experimental) in Settings > Rendering: workarounds for a grid that shimmers with anti-aliasing on some GPU drivers
+  - Android: Full screen switch (Settings > Appearance)
   Changed
-  - Trim cuts splines and polygon edges instead of removing them whole, splines also act as cutters, and hover previews exactly what a click removes
-  - Seam lines on round faces are no longer drawn
-  - Chamfer and Fillet keep your selection and panel after a rejected size, and the stepper gains -0.1, -1 and -10 buttons
-  - The startup tab no longer carries a stray demo cube
+  - Rectangle and Circle choose their origin (Corner/Center, Center/2-Point) from a menu when you click the active tool again, replacing the extra Draw from button
+  - Buttons that open a menu are marked with a small corner wedge
+  - Sketch grid steps pass through 0.5 and 5 as you zoom (0.1, 0.5, 1, 5, 10); inch and foot grids keep whole steps
+  - Frame rate follows your display; the VSync option is gone
+  - The Working window draws over the last frame instead of blanking the viewport
+  - Construction Plane stays open after a gizmo drag, with Apply and Cancel; the move is kept through undo and reload
+  - Editing a sketch on a very heavy model rebuilds the body once when you finish the sketch instead of after every edit
+  - Camera: leaving orthographic view no longer rolls or snaps
   Fixed
-  - Push/Pull on a whole sketch no longer cuts or raises the entire face behind it
-  - Deleting circles, arcs and splines works, and deleting from a sketch now updates bodies built from it, including Lathe; undo and redo follow
-  - Undoing a sketch edit could jump forward through steps just undone
-  - Typed Extrude and Push/Pull distances are exact; Enter with grid snap on no longer rounds 0.2 to nothing
-  - Chamfer with a setback exactly equal to the neighbouring face no longer fails
-  - Scaling a body could close the app on the next autosave
-  - Edge selection works just outside a silhouette edge, and rim selection of circles works with drawing aids off
-ReleaseNotesUrl: https://github.com/materializr-cad/materializr/releases/tag/v1.7.5
+  - Lathe / Cut: a body picked after opening the dialog is no longer ignored
+  - Android: the status bar stays visible and the menu bar sits below it on edge-to-edge tablets; with Full screen on, no blank strip is left
+  - Android/iOS: the Working window sits over the last frame instead of a grey screen
+  - Select-tool measurement labels show in the modern and touch layouts right after the app starts
+  Thanks
+  - Thanks to Iron47 on Discord for the bug reports that went into this release
+ReleaseNotesUrl: https://github.com/materializr-cad/materializr/releases/tag/v1.7.7
 ManifestType: defaultLocale
 ManifestVersion: 1.12.0
