@@ -59,6 +59,17 @@ No `--prerelease` flag → it becomes the `/releases/latest`, so every stable us
 is offered it, and beta testers (who were on `1.3.0-beta.N`) are offered the
 final `1.3.0` since `beta.N < final`.
 
+## Asset names
+
+Every platform asset carries the version, read from `CMakeLists.txt` (the
+`project()` VERSION plus `MATERIALIZR_VERSION_SUFFIX`):
+`Materializr-<version>-<arch>.AppImage` (+ `.zsync`),
+`Materializr-<version>-Setup.exe`, `Materializr-<version>-windows-x64.zip`,
+`Materializr-<version>-arm64.dmg`, and the sideload APKs. So bump
+`CMakeLists.txt` BEFORE tagging, or the files are named for the old version.
+The winget `InstallerUrl` follows the same pattern
+(`.../vX.Y.Z/Materializr-X.Y.Z-Setup.exe`).
+
 ## Notes
 
 - Pre-releases still appear on the public Releases page (collapsed under

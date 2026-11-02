@@ -21,9 +21,9 @@ modeling, threads, SVG & text engraving, STEP/STL/SVG/DXF/OBJ/3MF exchange.
 
 | Platform | File | How |
 |---|---|---|
-| Linux (x86_64 / aarch64) | `Materializr-*.AppImage` | `chmod +x` it and run - no install |
-| Windows | `Materializr-Setup.exe` | run the installer |
-| Windows (portable) | `Materializr-windows-x64.zip` | unzip anywhere, run `materializr.exe` |
+| Linux (x86_64 / aarch64) | `Materializr-<version>-<arch>.AppImage` | `chmod +x` it and run - no install |
+| Windows | `Materializr-<version>-Setup.exe` | run the installer |
+| Windows (portable) | `Materializr-<version>-windows-x64.zip` | unzip anywhere, run `materializr.exe` |
 | iPad | [on the App Store](https://apps.apple.com/us/app/materializr/id6787741207) | install from the App Store |
 | Android (Google Play) | [on Google Play](https://play.google.com/store/apps/details?id=org.ravenhold.materializr) | install + auto-update from the Play Store; tablets recommended |
 | Android (F-Droid) | [on F-Droid](https://f-droid.org/packages/com.materializr.app/) | install + auto-update from the F-Droid app; tablets recommended |

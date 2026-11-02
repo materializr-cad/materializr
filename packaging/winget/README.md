@@ -22,9 +22,9 @@ SmartScreen reputation from the download volume.
 
 ## Submitting a new version
 
-1. **Get the installer SHA256** of the released `Materializr-Setup.exe`:
+1. **Get the installer SHA256** of the released `Materializr-X.Y.Z-Setup.exe`:
    ```sh
-   curl -sL -o Setup.exe https://github.com/materializr-cad/materializr/releases/download/vX.Y.Z/Materializr-Setup.exe
+   curl -sL -o Setup.exe https://github.com/materializr-cad/materializr/releases/download/vX.Y.Z/Materializr-X.Y.Z-Setup.exe
    sha256sum Setup.exe        # uppercase it for the manifest
    ```
 2. **Bump** `PackageVersion`, the `InstallerUrl` tag, `InstallerSha256`, and the
@@ -42,7 +42,7 @@ SmartScreen reputation from the download volume.
    [`wingetcreate`](https://github.com/microsoft/winget-create) on Windows:
    ```pwsh
    wingetcreate update Materializr.Materializr --version X.Y.Z `
-     --urls https://github.com/materializr-cad/materializr/releases/download/vX.Y.Z/Materializr-Setup.exe `
+     --urls https://github.com/materializr-cad/materializr/releases/download/vX.Y.Z/Materializr-X.Y.Z-Setup.exe `
      --submit
    ```
    …or fork the repo, copy these files to that path, and open a PR by hand.

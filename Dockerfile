@@ -166,12 +166,13 @@ RUN printf '#!/bin/bash\nHERE="$(dirname "$(readlink -f "$0")")"\nexport APPIMAG
 # -u embeds gh-releases-zsync update info AND emits a .zsync control file alongside
 # the AppImage, so AppImageUpdate / Gear Lever can do delta auto-updates from the
 # GitHub "latest" release. cd /output so the generated .zsync lands beside it.
+ARG APP_VERSION=""
 RUN mkdir -p /output \
     && ARCH=$(uname -m) \
     && cd /output \
     && appimagetool --appimage-extract-and-run \
         -u "gh-releases-zsync|materializr-cad|materializr|latest|Materializr-*${ARCH}.AppImage.zsync" \
-        /AppDir Materializr-${ARCH}.AppImage
+        /AppDir "Materializr-${APP_VERSION:+${APP_VERSION}-}${ARCH}.AppImage"
 
 # ─── Export stage ────────────────────────────────────────────────────────────
 

@@ -156,16 +156,31 @@ jobs:
           }
           Write-Host "materializr.exe --help exited 0"
 
+      # Version in the file names (Materializr-1.8.0-beta.1-windows-x64.zip,
+      # Materializr-1.8.0-beta.1-Setup.exe), read from CMakeLists.txt like the
+      # Linux and macOS builds and restricted to version characters.
+      - name: Compute version
+        id: ver
+        shell: pwsh
+        run: |
+          $t = Get-Content CMakeLists.txt -Raw
+          $v = [regex]::Match($t, '(?m)^project\(Materializr VERSION ([0-9.]+)').Groups[1].Value
+          $s = [regex]::Match($t, '(?m)^set\(MATERIALIZR_VERSION_SUFFIX "([0-9A-Za-z.+-]*)"').Groups[1].Value
+          if (-not $v) { throw "could not read the version from CMakeLists.txt" }
+          "ver=$v$s" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
       - name: Create portable zip
         shell: pwsh
-        run: Compress-Archive -Path staging/Materializr/* -DestinationPath Materializr-windows-x64.zip -Force
+        env:
+          VER: ${{ steps.ver.outputs.ver }}
+        run: Compress-Archive -Path staging/Materializr/* -DestinationPath "Materializr-$env:VER-windows-x64.zip" -Force
 
       - name: Upload portable artifact
         uses: actions/upload-artifact@v4
         with:
           name: Materializr-windows-x64-portable
           retention-days: ${{ github.event_name == 'pull_request' && 2 || 90 }}
-          path: Materializr-windows-x64.zip
+          path: Materializr-${{ steps.ver.outputs.ver }}-windows-x64.zip
 
       # APPVERSION goes through the environment, not through `${{ }}` inline in
       # the command line. Actions expands `${{ }}` textually BEFORE pwsh parses
@@ -178,11 +193,12 @@ jobs:
         shell: pwsh
         env:
           APPVERSION: ${{ github.ref_name }}
+          VER: ${{ steps.ver.outputs.ver }}
         run: |
           choco install nsis -y --no-progress
           & "C:\Program Files (x86)\NSIS\makensis.exe" `
             "/DSTAGING=$PWD\staging\Materializr" `
-            "/DOUTFILE=$PWD\Materializr-Setup.exe" `
+            "/DOUTFILE=$PWD\Materializr-$env:VER-Setup.exe" `
             "/DAPPVERSION=$env:APPVERSION" `
             packaging\windows\installer.nsi
 
@@ -191,12 +207,12 @@ jobs:
         with:
           name: Materializr-windows-x64-installer
           retention-days: ${{ github.event_name == 'pull_request' && 2 || 90 }}
-          path: Materializr-Setup.exe
+          path: Materializr-${{ steps.ver.outputs.ver }}-Setup.exe
 
       - name: Attach to GitHub Release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            Materializr-windows-x64.zip
-            Materializr-Setup.exe
+            Materializr-${{ steps.ver.outputs.ver }}-windows-x64.zip
+            Materializr-${{ steps.ver.outputs.ver }}-Setup.exe

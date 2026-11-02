@@ -57,7 +57,22 @@ jobs:
       - name: Verify Docker
         run: docker version
 
+      # The version goes into the file name (Materializr-1.8.0-beta.1-x86_64.
+      # AppImage) so a download is identifiable. Read from CMakeLists.txt - the
+      # single source of truth that also feeds the app and the macOS .dmg - and
+      # restricted to version characters, since the value is used in a path.
+      # The AppImage update info glob (Materializr-*<arch>.AppImage.zsync)
+      # already matches a version in the middle.
+      - name: Compute version
+        id: ver
+        run: |
+          base=$(grep -oP '^project\(Materializr VERSION \K[0-9.]+' CMakeLists.txt)
+          suffix=$(grep -oP '^set\(MATERIALIZR_VERSION_SUFFIX "\K[0-9A-Za-z.+-]*' CMakeLists.txt || true)
+          echo "ver=${base}${suffix}" >> "$GITHUB_OUTPUT"
+
       - name: Build AppImage
+        env:
+          APP_VERSION: ${{ steps.ver.outputs.ver }}
         run: ./scripts/build-appimage.sh
 
       - name: Show output
@@ -69,8 +84,8 @@ jobs:
           name: Materializr-linux-${{ matrix.arch }}
           retention-days: ${{ github.event_name == 'pull_request' && 2 || 90 }}
           path: |
-            dist/Materializr-${{ matrix.arch }}.AppImage
-            dist/Materializr-${{ matrix.arch }}.AppImage.zsync
+            dist/Materializr-${{ steps.ver.outputs.ver }}-${{ matrix.arch }}.AppImage
+            dist/Materializr-${{ steps.ver.outputs.ver }}-${{ matrix.arch }}.AppImage.zsync
 
       # The .zsync MUST ship beside the AppImage on the release: AppImageUpdate /
       # Gear Lever read the embedded gh-releases-zsync info, then fetch this
@@ -80,5 +95,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/Materializr-${{ matrix.arch }}.AppImage
-            dist/Materializr-${{ matrix.arch }}.AppImage.zsync
+            dist/Materializr-${{ steps.ver.outputs.ver }}-${{ matrix.arch }}.AppImage
+            dist/Materializr-${{ steps.ver.outputs.ver }}-${{ matrix.arch }}.AppImage.zsync
