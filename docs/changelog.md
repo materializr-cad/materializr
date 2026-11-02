@@ -5,6 +5,70 @@ All notable changes to Materializr are documented here. Format loosely follows
 
 ## [Unreleased]
 
+## [1.8.0-beta.1] - 2026-11-01
+
+Desktop beta (Settings ▸ Include pre-release builds). Feedback welcome.
+
+### Added
+
+- **Reference tool** in the sketch tools. Copies geometry that lies on the
+  sketch plane into the sketch as real elements: edges of a body, the outline
+  where the plane cuts through a body, and lines, circles and points of another
+  sketch on the same plane. Click takes one line or circle (hover shows it in
+  cyan); Ctrl+click takes the whole connected run of lines.
+- **Snapping to what is already on the plane.** On entering a sketch, the cursor
+  can now snap to body edges and corners lying on the sketch plane, to the
+  cross-section where the plane cuts a body (bodies up to 400 faces), and to
+  points and lines of other visible sketches on the same plane.
+- **Shell with several openings, or none.** Click as many faces as you like
+  while the Shell panel is open to leave them all open; select a body and choose
+  Shell with no faces for a sealed internal void.
+- **Open ends show.** Extrude, Push/Pull and Lathe refused for a sketch with no
+  closed contour now say so and blink the free ends red. The Lathe window lists
+  what blocks Apply and stays open if the build fails.
+- **Window and crossing selection.** Drag left to right to select only what is
+  fully inside the box; right to left selects anything it touches (the box turns
+  green). In sketches and in 3D.
+- **Offset from a selection.** Select segments first, then choose Offset, to
+  offset just those instead of the whole connected contour.
+- **-10 / -1 / -0.1 / +0.1 / +1 / +10 buttons** on the primitive popups (and
+  -10 / -1 / -0.1 on Shell's thickness).
+- Version numbers in the Linux and Windows download names, like macOS and
+  Android already had.
+
+### Changed
+
+- While a sketch is open, the other visible sketches are drawn muted so the one
+  you are editing stands out.
+- Double-clicking a sketch in the Items panel opens it for editing (rename is in
+  the right-click menu).
+- Esc in a sketch with an idle tool switches to Select first; a second Esc
+  finishes the sketch.
+- In the Classic layout the active tool button is filled with the accent colour
+  instead of a thin grey border.
+- A new primitive frames everything visible.
+- Length fields typed into as text (Extrude, Push/Pull, Fillet, Chamfer, Shell)
+  no longer accept a digit the display unit does not show.
+- Offset keeps the construction setting of what it copies (Construction on flips
+  it); clicking one of several overlapping lines picks the construction one
+  first and a second click cycles to the next.
+
+### Fixed
+
+- **A Lathe that vanished after editing its sketch.** If an edit made a step
+  impossible (a profile dragged across the Lathe axis), the model switched the
+  step and everything built on it off, and kept them off after the edit was
+  undone. They are now retried the next time the sketch changes.
+- **A hole resized in its sketch did not change the body**, and other holes
+  disappeared after reopening the file (a cut through a curved body).
+- Deleting a sketch point left its lines behind, pointing at nothing; it now
+  takes them with it.
+- Zooming far into a sketch could clip everything away and leave the view broken
+  until Home was pressed.
+- Ctrl+Z in a reopened sketch now undoes that sketch's earlier edits.
+- A closed outline with something attached at one corner offsets as one closed
+  outline.
+
 ## [1.7.7] - 2026-10-31
 
 ### Added
