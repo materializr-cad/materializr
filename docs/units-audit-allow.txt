@@ -232,6 +232,8 @@ src/modeling/ChamferOp.cpp: // mask a dead middle: ChFi3d blended a few mm at ea
 src/modeling/ChamferOp.cpp: // A setback that lands EXACTLY on a neighbouring edge (a 1 mm chamfer
 src/modeling/ChamferOp.cpp: // on the 1 mm shoulder between a 22 and a 20 mm diameter) consumes the
 src/modeling/ChamferOp.cpp: "neighbouring face exactly - built %.0e mm "
+src/modeling/ExtrudeOp.cpp: // from 8 mm to 6 mm and the samples between the two radii no longer
+src/modeling/ExtrudeOp.cpp: // land anywhere, so the cut kept its OLD 8 mm hole while the sketch
 src/modeling/FilletOp.cpp: // robot dog cover.mzr, body "Extrude", its 114 mm top edge:
 src/modeling/FilletOp.cpp: // was "I can't fillet beyond about 1.5 mm" on an edge where 2.5, 3, 5
 src/modeling/FilletOp.cpp: // and 8 mm all worked.

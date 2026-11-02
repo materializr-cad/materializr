@@ -86,3 +86,96 @@ TEST(ExtrudeRecoveredProfile, SeedMissFallsBackToFootprintNotAllRegions) {
         << "seed miss swept the wrong regions (ALL-regions catastrophe): "
            "body volume " << vol(doc.getBody(rbid));
 }
+
+// A hole resized in its sketch must be followed by the body. The extrude's
+// recorded region points are a grid over the ORIGINAL region; shrinking the
+// circle leaves some of them outside every face, and that used to make the
+// rebuild fall back to the saved (old-size) footprint - the 8 mm hole stayed
+// 8 mm while the sketch said 6.
+TEST(ExtrudeRecoveredProfile, ShrinkingARegionIsFollowedNotRefused) {
+    Document doc;
+    auto sk = std::make_shared<Sketch>();
+    sk->setPlane(gp_Pln(gp_Ax3(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1), gp_Dir(1, 0, 0))));
+    const int centre = sk->addPoint({0.0f, 0.0f});
+    const int circle = sk->addCircle(centre, 4.0);
+    const int sid = doc.addSketch(sk, "Sketch 1");
+
+    // Region points the way a real extrude records them: a grid over the disc,
+    // including points between radius 3 and 4.
+    const char* params =
+        "sketch=1;dist=5;dir=0;mode=0;target=-1;draft=0;"
+        "regions=0:0,0:2,0:-2,0:3.5,0:-3.5,3.5:0,-3.5:0,2.5:2.5,-2.5:2.5,2.5:-2.5,-2.5:-2.5";
+    auto op = std::make_unique<ExtrudeOp>();
+    ASSERT_TRUE(op->deserializeParams(params));
+    op->setSketchSource(sid);
+    ASSERT_TRUE(op->rebuildProfileFromSketch(doc));
+    ASSERT_TRUE(op->execute(doc));
+    int bid = -1;
+    for (int id : doc.getAllBodyIds()) bid = id;
+    ASSERT_GE(bid, 0);
+    const TopoDS_Shape original = doc.getBody(bid);
+    EXPECT_NEAR(vol(original), M_PI * 16.0 * 5.0, 0.5);
+
+    // Reload-style op, with the saved footprint populated.
+    auto rop = std::make_unique<ExtrudeOp>();
+    ASSERT_TRUE(rop->deserializeParams(params));
+    rop->setSketchSource(sid);
+    Operation::ReloadState rs;
+    rs.created.push_back(bid);
+    rs.createdAfter.push_back({bid, original});
+    ASSERT_TRUE(rop->rehydrateFromReload(rs, doc));
+
+    sk->setCircleRadius(circle, 3.0);          // 8 mm -> 6 mm
+    ASSERT_TRUE(rop->rebuildProfileFromSketch(doc));
+    ASSERT_TRUE(rop->execute(doc));
+    int rbid = -1;
+    for (int id : doc.getAllBodyIds()) rbid = id;
+    EXPECT_NEAR(vol(doc.getBody(rbid)), M_PI * 9.0 * 5.0, 0.5)
+        << "the body kept the old radius: body volume " << vol(doc.getBody(rbid));
+}
+
+// A footprint recovered from a cut through a curved body covers only SOME of
+// the cut's regions. The ring of small holes must not be swapped out for it.
+TEST(ExtrudeRecoveredProfile, FootprintCoveringOnlyOneRegionDoesNotEraseTheOthers) {
+    Document doc;
+    auto sk = std::make_shared<Sketch>();
+    sk->setPlane(gp_Pln(gp_Ax3(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1), gp_Dir(1, 0, 0))));
+    sk->addCircle(sk->addPoint({0.0f, 0.0f}), 4.0);      // the only one the footprint knows
+    sk->addCircle(sk->addPoint({20.0f, 0.0f}), 3.0);
+    sk->addCircle(sk->addPoint({-20.0f, 0.0f}), 3.0);
+    const int sid = doc.addSketch(sk, "Sketch 1");
+
+    // A body whose planar footprint on z=0 is ONLY the central disc (the small
+    // holes' caps would lie off the plane on a curved body).
+    TopoDS_Shape disc;
+    {
+        auto one = std::make_shared<Sketch>();
+        one->setPlane(sk->getPlane());
+        one->addCircle(one->addPoint({0.0f, 0.0f}), 4.0);
+        Document d2; const int s2 = d2.addSketch(one, "S");
+        auto e = std::make_unique<ExtrudeOp>();
+        e->setSketchSource(s2); e->setDistance(5.0); e->setMode(ExtrudeMode::NewBody);
+        ASSERT_TRUE(e->rebuildProfileFromSketch(d2));
+        ASSERT_TRUE(e->execute(d2));
+        for (int id : d2.getAllBodyIds()) disc = d2.getBody(id);
+    }
+
+    const char* params =
+        "sketch=1;dist=5;dir=0;mode=0;target=-1;draft=0;"
+        "regions=0:0,0:2,2:0,20:0,19:0,21:0,-20:0,-19:0,-21:0";
+    auto rop = std::make_unique<ExtrudeOp>();
+    ASSERT_TRUE(rop->deserializeParams(params));
+    rop->setSketchSource(sid);
+    Operation::ReloadState rs;
+    rs.created.push_back(1);
+    rs.createdAfter.push_back({1, disc});
+    ASSERT_TRUE(rop->rehydrateFromReload(rs, doc));
+
+    ASSERT_TRUE(rop->rebuildProfileFromSketch(doc));
+    ASSERT_TRUE(rop->execute(doc));
+    int bid = -1;
+    for (int id : doc.getAllBodyIds()) bid = id;
+    const double expect = (M_PI * 16.0 + 2.0 * M_PI * 9.0) * 5.0;
+    EXPECT_NEAR(vol(doc.getBody(bid)), expect, 1.0)
+        << "the small circles were swapped for the footprint: " << vol(doc.getBody(bid));
+}

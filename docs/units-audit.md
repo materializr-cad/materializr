@@ -263,7 +263,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 
 - CONVERTED: 1
 - allowed-by-hand: 93
-- comment: 302
+- comment: 304
 - diagnostic: 13
 - identifier/other: 9
 
@@ -503,6 +503,8 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | comment | src/modeling/ChamferOp.cpp | `// A setback that lands EXACTLY on a neighbouring edge (a 1 mm chamfer` |
 | comment | src/modeling/ChamferOp.cpp | `// on the 1 mm shoulder between a 22 and a 20 mm diameter) consumes the` |
 | diagnostic | src/modeling/ChamferOp.cpp | `"neighbouring face exactly - built %.0e mm "` |
+| comment | src/modeling/ExtrudeOp.cpp | `// from 8 mm to 6 mm and the samples between the two radii no longer` |
+| comment | src/modeling/ExtrudeOp.cpp | `// land anywhere, so the cut kept its OLD 8 mm hole while the sketch` |
 | comment | src/modeling/FilletOp.cpp | `// robot dog cover.mzr, body "Extrude", its 114 mm top edge:` |
 | comment | src/modeling/FilletOp.cpp | `// was "I can't fillet beyond about 1.5 mm" on an edge where 2.5, 3, 5` |
 | comment | src/modeling/FilletOp.cpp | `// and 8 mm all worked.` |

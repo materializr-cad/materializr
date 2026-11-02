@@ -188,48 +188,77 @@ bool ExtrudeOp::rebuildProfileFromSketch(Document& doc) {
         // just the surviving fragments would silently shrink the body, so the
         // historically-exact recovered profile wins instead (below).
         std::vector<bool> hit(m_regionPts.size(), false);
+        std::vector<std::vector<size_t>> faceHits;   // per KEPT face: recorded points inside it
+        std::vector<TopoDS_Face> keptFaces;
         for (TopExp_Explorer fx(profile, TopAbs_FACE); fx.More(); fx.Next()) {
             const TopoDS_Face& f = TopoDS::Face(fx.Current());
-            bool mine = false;
+            std::vector<size_t> mineIdx;
             for (size_t pi = 0; pi < m_regionPts.size(); ++pi) {
                 gp_Pnt p = ElSLib::Value(m_regionPts[pi].first,
                                          m_regionPts[pi].second, pln);
                 BRepClass_FaceClassifier cls(f, p, 1e-4);
-                if (cls.State() == TopAbs_IN) { mine = true; hit[pi] = true; }
+                if (cls.State() == TopAbs_IN) { mineIdx.push_back(pi); hit[pi] = true; }
             }
-            if (mine) { bb.Add(keep, f); ++kept; }
+            if (!mineIdx.empty()) {
+                bb.Add(keep, f); ++kept;
+                keptFaces.push_back(f);
+                faceHits.push_back(std::move(mineIdx));
+            }
         }
         size_t matched = 0;
         for (bool h : hit) if (h) ++matched;
-        // Area sanity: if the ORIGINAL region's boundary lines were later
-        // deleted, its area gets absorbed into a bigger region - every point
-        // still matches, but the selected region is far larger than what was
-        // extruded. Compare areas against the saved footprint and prefer it
-        // when the match balloons.
-        if (kept > 0 && matched == m_regionPts.size() &&
-            !m_recoveredProfile.IsNull()) {
+        // Area sanity: if a region's boundary lines were later deleted, its
+        // area gets absorbed into a bigger region - its recorded points still
+        // match, but the selected face is far larger than what was extruded.
+        // Judged PER FACE against the saved footprint faces that share its
+        // recorded points, and only where the footprint covers it: a cut
+        // through a curved body leaves a footprint on the sketch plane for
+        // only SOME of its regions (a ring of holes through a dome: just the
+        // one on the flat top), so comparing the whole selection to the
+        // footprint's total made every other hole look like ballooning and
+        // swapped them all out for the one.
+        if (kept > 0 && !m_recoveredProfile.IsNull()) {
             auto areaOf = [](const TopoDS_Shape& s) {
                 GProp_GProps g;
                 BRepGProp::SurfaceProperties(s, g);
                 return g.Mass();
             };
-            double aKeep = areaOf(keep), aOrig = areaOf(m_recoveredProfile);
-            if (aOrig > 1e-9 && aKeep > aOrig * 1.5) {
-                std::fprintf(stderr, "[Extrude] matched region area %.0f far "
-                             "exceeds the original footprint %.0f - using the "
-                             "saved footprint profile\n", aKeep, aOrig);
-                m_profile = m_recoveredProfile;
-                return true;
+            for (size_t k = 0; k < keptFaces.size(); ++k) {
+                double aOrig = 0.0;
+                for (TopExp_Explorer ox(m_recoveredProfile, TopAbs_FACE); ox.More(); ox.Next()) {
+                    const TopoDS_Face& of = TopoDS::Face(ox.Current());
+                    bool shares = false;
+                    for (size_t pi : faceHits[k]) {
+                        gp_Pnt p = ElSLib::Value(m_regionPts[pi].first,
+                                                 m_regionPts[pi].second, pln);
+                        BRepClass_FaceClassifier cls(of, p, 1e-4);
+                        if (cls.State() == TopAbs_IN) { shares = true; break; }
+                    }
+                    if (shares) aOrig += areaOf(of);
+                }
+                const double aNow = areaOf(keptFaces[k]);
+                if (aOrig > 1e-9 && aNow > aOrig * 1.5) {
+                    std::fprintf(stderr, "[Extrude] matched region area %.0f far "
+                                 "exceeds the original footprint %.0f - using the "
+                                 "saved footprint profile\n", aNow, aOrig);
+                    m_profile = m_recoveredProfile;
+                    return true;
+                }
             }
         }
-        if (kept > 0 && matched < m_regionPts.size() &&
-            !m_recoveredProfile.IsNull()) {
-            std::fprintf(stderr, "[Extrude] only %zu/%zu recorded region "
-                         "points found - using the saved footprint profile\n",
-                         matched, m_regionPts.size());
-            m_profile = m_recoveredProfile;
-            return true;
-        }
+        // A PARTIAL match (some recorded points no longer inside any face) is
+        // followed, not refused: the surviving faces ARE the sketch's answer.
+        // This used to fall back to the saved footprint, but the recorded
+        // points are a grid sampled over the original regions - shrink a hole
+        // from 8 mm to 6 mm and the samples between the two radii no longer
+        // land anywhere, so the cut kept its OLD 8 mm hole while the sketch
+        // showed 6 (and deleting one of several holes likewise left it
+        // standing). Only when NOTHING matches (the region moved away or was
+        // deleted wholesale, below) does the footprint stand in.
+        if (kept > 0 && matched < m_regionPts.size())
+            std::fprintf(stderr, "[Extrude] %zu/%zu recorded region points "
+                         "still inside the sketch - following its current "
+                         "regions\n", matched, m_regionPts.size());
         if (kept > 0) {
             m_profile = kept == 1 ? TopoDS_Shape(TopExp_Explorer(keep, TopAbs_FACE).Current())
                                   : TopoDS_Shape(keep);
