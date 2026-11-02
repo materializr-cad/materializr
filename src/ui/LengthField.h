@@ -100,8 +100,11 @@ inline std::string trFormat(const char* fmt, const A&... a) {
 // millimetres is exactly {10, 1, 0.1} - the behaviour that was already there.
 // Bounds stay millimetres and keep stepperRow's clamp semantics (a bound only
 // stops motion TOWARDS it), so call sites pass what they always passed.
+// `showZero` = false drops the 0 button, for a value where zero is not a useful
+// reset (a primitive's size).
 inline bool lengthStepperRow(const char* id, float* mm, bool allowNegative,
-                             float minMm, float maxMm, float zeroMm = 0.0f) {
+                             float minMm, float maxMm, float zeroMm = 0.0f,
+                             bool showZero = true) {
     const double s = unitInfo(currentUnit()).step;
     const double mags[3] = { 10.0 * s, s, 0.1 * s };   // DISPLAY units
     bool changed = false;
@@ -128,7 +131,7 @@ inline bool lengthStepperRow(const char* id, float* mm, bool allowNegative,
             std::snprintf(buf, sizeof(buf), "-%g", m);
             step(buf, -m);
         }
-    {
+    if (showZero) {
         char zbuf[24];
         std::snprintf(zbuf, sizeof(zbuf), "%g", toDisplay(zeroMm));
         if (button(zbuf)) { *mm = zeroMm; changed = true; }
@@ -138,6 +141,18 @@ inline bool lengthStepperRow(const char* id, float* mm, bool allowNegative,
         step(buf, mags[i]);
     }
     ImGui::PopID();
+    return changed;
+}
+
+// For the double-valued members (primitive sizes and origins).
+inline bool lengthStepperRow(const char* id, double* mm, bool allowNegative,
+                             double minMm, double maxMm, double zeroMm = 0.0,
+                             bool showZero = true) {
+    float f = static_cast<float>(*mm);
+    const bool changed = lengthStepperRow(id, &f, allowNegative, static_cast<float>(minMm),
+                                          static_cast<float>(maxMm),
+                                          static_cast<float>(zeroMm), showZero);
+    if (changed) *mm = static_cast<double>(f);
     return changed;
 }
 

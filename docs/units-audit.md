@@ -7,7 +7,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 
 ## Controls by dimension
 
-- CONVERTED: 153
+- CONVERTED: 151
 - absolute-mm: 2
 - angle: 38
 - count: 1
@@ -88,9 +88,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | CONVERTED | src/app/Application_Dialogs.cpp | `if (materializr::lengthField("##offsetDist", &mag,` |
 | CONVERTED | src/app/Application_Dialogs.cpp | `materializr::amountLengthField(label, label, v);` |
 | CONVERTED | src/app/Application_Dialogs.cpp | `materializr::lengthField(label, v);` |
-| CONVERTED | src/app/Application_Dialogs.cpp | `materializr::lengthField("X", &m_primitivePopupOrigin[0]);` |
-| CONVERTED | src/app/Application_Dialogs.cpp | `materializr::lengthField("Y", &m_primitivePopupOrigin[1]);` |
-| CONVERTED | src/app/Application_Dialogs.cpp | `materializr::lengthField("Z", &m_primitivePopupOrigin[2]);` |
+| CONVERTED | src/app/Application_Dialogs.cpp | `materializr::lengthStepperRow("##step", v, /*allowNegative=*/true,` |
 | ratio | src/app/Application_Dialogs.cpp | `ImGui::SliderFloat(materializr::tr("Accuracy"), &m_stlDialogAccuracy, 0.0f, 1.0f, "%.2f");` |
 | CONVERTED | src/app/Application_Dialogs.cpp | `if (materializr::lengthField(materializr::trFormat("Thickness (%s)", materializr::unitSuffix()).c_str(), &m_un` |
 | angle | src/app/Application_Dialogs.cpp | `if (ImGui::SliderFloat(materializr::tr("Curve detail"), &m_unfoldMaxBevelDeg, 2.0f, 40.0f, "%.0f°"))` |

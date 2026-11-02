@@ -5652,11 +5652,20 @@ void Application::renderPrimitivePopup() {
     ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Dimensions"));
     // im-touch: number-pad amount fields (the native keyboard froze iOS);
     // other layouts keep the typed InputDouble spinners.
-    auto dimField = [&](const char* label, double* v) {
-        if (imTouchLayout())
+    // Desktop: a -10 / -1 / -0.1 / +0.1 / +1 / +10 row under each field, like
+    // the other tools - the field's own -/+ only step one unit at a time.
+    // Sizes get no 0 button (zero is not a useful size); origins keep it.
+    auto dimField = [&](const char* label, double* v, bool isOrigin = false) {
+        if (imTouchLayout()) {
             materializr::amountLengthField(label, label, v);
-        else
-            materializr::lengthField(label, v);
+            return;
+        }
+        materializr::lengthField(label, v);
+        ImGui::PushID(label);
+        materializr::lengthStepperRow("##step", v, /*allowNegative=*/true,
+                                      isOrigin ? -1.0e6 : 0.0, 1.0e6,
+                                      0.0, /*showZero=*/isOrigin);
+        ImGui::PopID();
     };
     switch (k) {
     case 0: // Box
@@ -5685,9 +5694,9 @@ void Application::renderPrimitivePopup() {
 
     ImGui::Spacing();
     ImGui::TextColored(materializr::accentText(), "%s", materializr::trFormat("Origin (%s)", materializr::unitSuffix()).c_str());
-    materializr::lengthField("X", &m_primitivePopupOrigin[0]);
-    materializr::lengthField("Y", &m_primitivePopupOrigin[1]);
-    materializr::lengthField("Z", &m_primitivePopupOrigin[2]);
+    dimField("X", &m_primitivePopupOrigin[0], /*isOrigin=*/true);
+    dimField("Y", &m_primitivePopupOrigin[1], /*isOrigin=*/true);
+    dimField("Z", &m_primitivePopupOrigin[2], /*isOrigin=*/true);
     ImGui::TextDisabled("%s", materializr::tr("Box origin = corner; the rest use it as the axis base / centre."));
 
     // Geometric validity check - must mirror the bounds in PrimitiveOp::

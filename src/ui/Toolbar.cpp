@@ -2,6 +2,7 @@
 #include "Toolbar.h"
 #include "TouchIcons.h"
 #include "TouchWidgets.h"
+#include "TouchTheme.h"
 #include "PolygonSidesMenu.h"
 #include "../core/SelectionManager.h"
 #include "../core/History.h"
@@ -25,6 +26,34 @@
 #include "../i18n.h"
 
 namespace materializr {
+
+namespace {
+// The classic layout's lit tool button. A thin grey border was all that
+// separated the active tool from its neighbours, so you had to look closely to
+// tell which was on; the modern layout fills it with the accent colour. Same
+// here: accent fill and border, dark-on-accent text (touchui::accentFill/
+// onAccent follow the light/dark theme). Scope-bound so every early return
+// pops what it pushed.
+struct ActiveToolStyle {
+    bool on;
+    explicit ActiveToolStyle(bool active) : on(active) {
+        if (!on) return;
+        const ImVec4 fill = touchui::accentFill();
+        auto shade = [&](float k) { return ImVec4(fill.x * k, fill.y * k, fill.z * k, fill.w); };
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 2.0f);
+        ImGui::PushStyleColor(ImGuiCol_Button,        fill);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, shade(1.06f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive,  shade(0.92f));
+        ImGui::PushStyleColor(ImGuiCol_Text,          touchui::onAccent());
+        ImGui::PushStyleColor(ImGuiCol_Border,        touchui::accentDeep());
+    }
+    ~ActiveToolStyle() {
+        if (!on) return;
+        ImGui::PopStyleColor(5);
+        ImGui::PopStyleVar();
+    }
+};
+} // namespace
 
 Toolbar::Toolbar() = default;
 
@@ -707,17 +736,8 @@ ToolAction Toolbar::renderSketchTools() {
     // the currently active mode. Caller checks the return value to set
     // `action`. Mode id matches SketchToolMode enum (see Toolbar.h).
     auto skBtn = [&](const char* label, int modeId) -> bool {
-        bool active = (m_activeSketchMode == modeId);
-        if (active) {
-            ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 2.0f);
-            ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
-        }
-        bool clicked = ImGui::Button(materializr::tr(label), ImVec2(-1, bh(30)));
-        if (active) {
-            ImGui::PopStyleColor();
-            ImGui::PopStyleVar();
-        }
-        return clicked;
+        ActiveToolStyle lit(m_activeSketchMode == modeId);
+        return ImGui::Button(materializr::tr(label), ImVec2(-1, bh(30)));
     };
 
     // A button that opens a menu: the corner wedge says so, so the menu is not
@@ -775,15 +795,13 @@ ToolAction Toolbar::renderSketchTools() {
     // the Primitives menu), instead of typing it into a dialog. The chosen
     // count sets the tool's sides and activates polygon placement.
     {
-        bool active = (m_activeSketchMode == 7);
-        if (active) {
-            ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 2.0f);
-            ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+        bool polyClicked;
+        {
+            ActiveToolStyle lit(m_activeSketchMode == 7);
+            polyClicked = ImGui::Button(materializr::tr("Polygon"), ImVec2(-1, bh(30)));
         }
-        if (ImGui::Button(materializr::tr("Polygon"), ImVec2(-1, bh(30))))
-            ImGui::OpenPopup("PolygonSidesMenu");
+        if (polyClicked) ImGui::OpenPopup("PolygonSidesMenu");
         menuMark();
-        if (active) { ImGui::PopStyleColor(); ImGui::PopStyleVar(); }
         tip(materializr::tr("Regular polygon: pick the number of sides, then click the centre and drag for size / rotation."));
         if (ImGui::BeginPopup("PolygonSidesMenu")) {
             if (int sides = polygonSidesMenuItems(); sides >= 3) {
@@ -814,13 +832,11 @@ ToolAction Toolbar::renderSketchTools() {
     // Construction: lit while "draw as construction" is on. Same border as an
     // active tool so the state reads at a glance.
     {
-        if (m_constructionDraw) {
-            ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 2.0f);
-            ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.5f, 0.5f, 0.5f, 1.0f));
+        {
+            ActiveToolStyle lit(m_constructionDraw);
+            if (ImGui::Button(materializr::tr("Construction"), ImVec2(-1, bh(30))))
+                action = ToolAction::SketchConstruction;
         }
-        if (ImGui::Button(materializr::tr("Construction"), ImVec2(-1, bh(30))))
-            action = ToolAction::SketchConstruction;
-        if (m_constructionDraw) { ImGui::PopStyleColor(); ImGui::PopStyleVar(); }
         tip(materializr::tr("Construction geometry: reference lines that help you draw but are not part of the shape - they never affect extrudes or exports. With elements selected, click to turn them into construction (or back). Otherwise click to draw the next shapes as construction."));
     }
 
