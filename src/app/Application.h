@@ -1730,6 +1730,13 @@ private:
         for (auto* c : m_iops) if (c->draggingHandle()) return true;
         return false;
     }
+    // An active controller that wants a click to be a stray: selection clicks
+    // are off while one is live, except for the ones that read the selection.
+    bool anyIopBlocksSelectionClicks() const {
+        for (auto* c : m_iops)
+            if (c->active() && !c->wantsSelectionClicks()) return true;
+        return false;
+    }
     // A controller owns the viewport's left-drag (it draws handles there).
     bool anyIopWantsViewportInput() const {
         for (auto* c : m_iops)

@@ -262,8 +262,8 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 ## `mm` literals by class
 
 - CONVERTED: 1
-- allowed-by-hand: 92
-- comment: 298
+- allowed-by-hand: 93
+- comment: 299
 - diagnostic: 13
 - identifier/other: 9
 
@@ -542,7 +542,9 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | diagnostic | src/modeling/RevolveOp.cpp | `std::fprintf(stderr, "[Lathe] exact boolean unusable; fuzzy (0.01 mm) result kept\n");` |
 | comment | src/modeling/ScaleFaceOp.cpp | `// they were converted display->mm on commit, so typing 100 under inches` |
 | allowed-by-hand | src/modeling/SewOp.cpp | `ImGui::TextDisabled(materializr::tr("Joined at %.4f mm."), m_tolUsed);` |
+| comment | src/modeling/ShellOp.cpp | `// cavity (measured on 7.9.3: a 20 mm box at 2 mm gives the 16 mm inner cube,` |
 | allowed-by-hand | src/modeling/ShellOp.cpp | `"body (thickness %.3f mm).\n", m_thickness);` |
+| allowed-by-hand | src/modeling/ShellOp.cpp | `"[Shell] sealed hollow failed at thickness %.3f mm - the "` |
 | allowed-by-hand | src/modeling/ShellOp.cpp | `"[Shell] failed at thickness %.3f mm - the wall is too thick, "` |
 | comment | src/modeling/Sketch.cpp | `// these a later dimension (e.g. a 2 mm gap to another edge) lets the naive` |
 | comment | src/modeling/Sketch.cpp | `// point pair a handful of mm apart (anywhere someone clicks close` |

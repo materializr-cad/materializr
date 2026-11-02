@@ -20,6 +20,10 @@ public:
     void setThickness(double t);
     void addFaceToRemove(const TopoDS_Face& face);
     void clearFacesToRemove();
+    // `picked` as a face of `base`: itself if it already is one, else the face
+    // that matches its normal and plane (a face picked on a preview of the
+    // body is not a face of the body the op is applied to). Null if none fits.
+    static TopoDS_Face matchFace(const TopoDS_Shape& base, const TopoDS_Face& picked);
 
     // Getters
     int getBodyId() const { return m_bodyId; }

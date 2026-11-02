@@ -451,6 +451,10 @@ std::vector<Toolbar::RailTool> Toolbar::railTools() const {
         add(MZ_ICON_LATHE,  "Revolve", ToolAction::Revolve, false,
             "Rotate the body around an axis (watch a fan spin or a hinge open).");
         if (m_selection->selectedBodyCount() == 1)
+            add(MZ_ICON_SHELL, "Shell", ToolAction::Shell, false,
+                "Hollow the body into a sealed shell. Click faces afterwards to "
+                "leave them open.");
+        if (m_selection->selectedBodyCount() == 1)
             add(MZ_ICON_UNFOLD, "Unfold", ToolAction::Unfold, false,
                 "Flatten the body into a 2D cut pattern (SVG / tiled PDF).");
         add(MZ_ICON_REPAIR, "Merge Faces", ToolAction::MergeFaces, false,

@@ -224,6 +224,19 @@ public:
     // the two phases must not be mixed up.
     virtual void drawGizmos3D(const IopGizmo3D& g) const { (void)g; }
 
+    // The op reads the viewport SELECTION while its panel is open (Shell: the
+    // picked faces are the openings), so clicks must still select. Default
+    // off: every other panel-only op treats a click as a stray and ignores it.
+    virtual bool wantsSelectionClicks() const { return false; }
+
+protected:
+    // Extra text appended to the op's key, for state the op doesn't serialise
+    // before it has run. The dispatch skips a launch whose key matches the one
+    // on screen, and a ShellOp's faces are only written once it has executed -
+    // so opening a different face left the key unchanged and the preview stuck.
+    virtual std::string previewKeySalt() const { return {}; }
+public:
+
     // True while a handle is latched. The viewport suppresses camera orbit and
     // face picking on this - previously read off ScaleFace's dragAxis()
     // directly, which only worked because exactly one controller had a gizmo.
@@ -357,9 +370,9 @@ private:
     // The key of what the gesture asks for now: the fresh op's serialized
     // parameters, empty when there is nothing to preview (buildOp gave null).
     // A fresh op serializes its body id and scalars only (sub-shape indices
-    // are resolved by execute), which suffices because every opted-in
-    // controller fixes its faces/edges in onBegin: within a gesture only the
-    // scalars move.
+    // are resolved by execute), which suffices because most opted-in
+    // controllers fix their faces/edges in onBegin: within a gesture only the
+    // scalars move. One that changes them mid-gesture adds previewKeySalt().
     std::string snapshotPreviewKey(const IopContext& ctx);
 
     bool m_active = false;

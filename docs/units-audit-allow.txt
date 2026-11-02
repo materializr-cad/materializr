@@ -271,7 +271,9 @@ src/modeling/ResizeCylindricalOp.cpp: "[Resize] fuse: bodyVol %.3f → %.3f mm³
 src/modeling/RevolveOp.cpp: std::fprintf(stderr, "[Lathe] exact boolean unusable; fuzzy (0.01 mm) result kept\n");
 src/modeling/ScaleFaceOp.cpp: // they were converted display->mm on commit, so typing 100 under inches
 src/modeling/SewOp.cpp: ImGui::TextDisabled(materializr::tr("Joined at %.4f mm."), m_tolUsed);
+src/modeling/ShellOp.cpp: // cavity (measured on 7.9.3: a 20 mm box at 2 mm gives the 16 mm inner cube,
 src/modeling/ShellOp.cpp: "body (thickness %.3f mm).\n", m_thickness);
+src/modeling/ShellOp.cpp: "[Shell] sealed hollow failed at thickness %.3f mm - the "
 src/modeling/ShellOp.cpp: "[Shell] failed at thickness %.3f mm - the wall is too thick, "
 src/modeling/Sketch.cpp: // these a later dimension (e.g. a 2 mm gap to another edge) lets the naive
 src/modeling/Sketch.cpp: // point pair a handful of mm apart (anywhere someone clicks close

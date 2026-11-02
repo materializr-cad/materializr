@@ -18,7 +18,9 @@ class MoveFaceOp;
 namespace materializr {
 
 // ─── Shell ───────────────────────────────────────────────────────────────────
-// Hollow a body, removing the picked face; thickness in the popup.
+// Hollow a body; thickness in the popup. Every picked face is opened, and with
+// none picked the body is hollowed into a sealed void. While the panel is open,
+// each face clicked in the viewport is added to the openings (see syncOpenings).
 class ShellController : public InteractiveOpController {
 protected:
     const char* title() const override { return "Shell"; }
@@ -28,6 +30,10 @@ protected:
     void panelBody(const IopContext& ctx, bool& changed) override;
     void onCleanup() override;
     float panelWidth() const override { return 300.0f; }
+    bool wantsSelectionClicks() const override { return true; }
+    std::string previewKeySalt() const override {
+        return ";openings=" + std::to_string(m_openingsRev);
+    }
     // The drag previews on a worker, but the commit re-runs the offset on the
     // main thread: 2761 ms on a 300-hole plate, with no window and no way
     // out. Once the preview has proved slow enough to go off-thread, run the
@@ -40,7 +46,13 @@ protected:
     bool wantsDeferredCommit(const IopContext& ctx) const override;
 
 private:
-    TopoDS_Face m_face;
+    // Fold newly selected faces into the opening set (additive - see the
+    // definition). Returns true when the set grew, so the preview must re-run.
+    bool syncOpenings(const IopContext& ctx);
+
+    std::vector<TopoDS_Face> m_faces;     // faces to open; empty = sealed hollow
+    std::vector<TopoDS_Face> m_lastSel;   // selected faces on this body at the last sync
+    int m_openingsRev = 0;                // bumps whenever m_faces changes; see previewKeySalt
     float m_thickness = 1.0f;
     char m_inputBuf[32] = "1.0";
     bool m_inputFocus = true;

@@ -1644,6 +1644,8 @@ inline const TrEntry kEsCatalogue[] = {
     { "Three-finger tap", "Toque con tres dedos" },
     { "Orbit, or drive the running tool", "Orbitar, o manejar la herramienta en curso" },
     { "Pan or pinch-zoom", "Desplazar o zoom con pellizco" },
+    { "Sealed hollow. Click faces to open them.", "Hueco sellado. Haz clic en las caras para abrirlas." },
+    { "Hollow the body into a sealed shell. Click faces afterwards to leave them open.", "Vac\xc3""\xad""a el cuerpo en una c\xc3""\xa1""scara sellada. Despu\xc3""\xa9""s haz clic en las caras que quieras dejar abiertas." },
 };
 inline constexpr int kEsCount =
     static_cast<int>(sizeof(kEsCatalogue) / sizeof(kEsCatalogue[0]));
@@ -3283,6 +3285,8 @@ inline const TrEntry kPtCatalogue[] = {
     { "Three-finger tap", "Toque com tr\xc3""\xaa""s dedos" },
     { "Orbit, or drive the running tool", "Orbitar, ou controlar a ferramenta em execu\xc3""\xa7""\xc3""\xa3""o" },
     { "Pan or pinch-zoom", "Panor\xc3""\xa2""mica ou zoom por pin\xc3""\xa7""a" },
+    { "Sealed hollow. Click faces to open them.", "Oco selado. Clique nas faces para abri-las." },
+    { "Hollow the body into a sealed shell. Click faces afterwards to leave them open.", "Esvazie o corpo em uma casca selada. Depois clique nas faces que quer deixar abertas." },
 };
 inline constexpr int kPtCount =
     static_cast<int>(sizeof(kPtCatalogue) / sizeof(kPtCatalogue[0]));
@@ -4922,6 +4926,8 @@ inline const TrEntry kFrCatalogue[] = {
     { "Three-finger tap", "Appui \xc3""\xa0"" trois doigts" },
     { "Orbit, or drive the running tool", "Orbite, ou pilote l'outil en cours" },
     { "Pan or pinch-zoom", "Panoramique ou zoom par pincement" },
+    { "Sealed hollow. Click faces to open them.", "Creux scell\xc3""\xa9"". Cliquez sur des faces pour les ouvrir." },
+    { "Hollow the body into a sealed shell. Click faces afterwards to leave them open.", "\xc3""\x89""vide le corps en une coque scell\xc3""\xa9""e. Cliquez ensuite sur les faces \xc3""\xa0"" laisser ouvertes." },
 };
 inline constexpr int kFrCount =
     static_cast<int>(sizeof(kFrCatalogue) / sizeof(kFrCatalogue[0]));
@@ -6561,6 +6567,8 @@ inline const TrEntry kDeCatalogue[] = {
     { "Three-finger tap", "Tippen mit drei Fingern" },
     { "Orbit, or drive the running tool", "Orbit, oder das laufende Werkzeug steuern" },
     { "Pan or pinch-zoom", "Schwenken oder Zoomen durch Zusammenziehen" },
+    { "Sealed hollow. Click faces to open them.", "Geschlossener Hohlraum. Fl\xc3""\xa4""chen anklicken, um sie zu \xc3""\xb6""ffnen." },
+    { "Hollow the body into a sealed shell. Click faces afterwards to leave them open.", "H\xc3""\xb6""hlt den K\xc3""\xb6""rper zu einer geschlossenen Schale aus. Danach Fl\xc3""\xa4""chen anklicken, die offen bleiben sollen." },
 };
 inline constexpr int kDeCount =
     static_cast<int>(sizeof(kDeCatalogue) / sizeof(kDeCatalogue[0]));
@@ -8200,6 +8208,8 @@ inline const TrEntry kItCatalogue[] = {
     { "Three-finger tap", "Tocco con tre dita" },
     { "Orbit, or drive the running tool", "Orbita, o controlla lo strumento in corso" },
     { "Pan or pinch-zoom", "Panoramica o zoom a pizzico" },
+    { "Sealed hollow. Click faces to open them.", "Cavit\xc3""\xa0"" sigillata. Fai clic sulle facce per aprirle." },
+    { "Hollow the body into a sealed shell. Click faces afterwards to leave them open.", "Svuota il corpo in un guscio sigillato. Poi fai clic sulle facce da lasciare aperte." },
 };
 inline constexpr int kItCount =
     static_cast<int>(sizeof(kItCatalogue) / sizeof(kItCatalogue[0]));

@@ -20,6 +20,9 @@
 #include <GeomAbs_SurfaceType.hxx>
 #include <Standard_ErrorHandler.hxx> // OCC_CATCH_SIGNALS
 #include <TopoDS.hxx>
+#include <TopoDS_Iterator.hxx>
+#include <TopoDS_Solid.hxx>
+#include <BRep_Builder.hxx>
 #include <TopExp_Explorer.hxx>
 #include <gp_Vec.hxx>
 #include <algorithm>
@@ -62,6 +65,79 @@ bool faceInShape(const TopoDS_Face& face, const TopoDS_Shape& shape) {
     for (TopExp_Explorer ex(shape, TopAbs_FACE); ex.More(); ex.Next())
         if (ex.Current().IsSame(face)) return true;
     return false;
+}
+
+// The face of `shape` that best matches an outward normal and a point on it:
+// it must face (nearly) the same way, and of those the one whose plane is
+// nearest the point wins.
+TopoDS_Face bestMatchingFace(const TopoDS_Shape& shape, const gp_Dir& normal, const gp_Pnt& point) {
+    TopoDS_Face best; double bestScore = -1e18;
+    for (TopExp_Explorer ex(shape, TopAbs_FACE); ex.More(); ex.Next()) {
+        TopoDS_Face f = TopoDS::Face(ex.Current());
+        gp_Dir n; gp_Pnt p;
+        if (!faceNormalPoint(f, n, p)) continue;
+        double dot = n.Dot(normal);
+        if (dot < 0.9) continue; // must face (nearly) the same way
+        // Distance from the anchor point to this face's plane along n.
+        double planeDist = std::abs(gp_Vec(p, point).Dot(gp_Vec(n)));
+        // Prefer best alignment, then nearest plane.
+        double score = dot - 0.01 * planeDist;
+        if (score > bestScore) { bestScore = score; best = f; }
+    }
+    return best;
+}
+
+// A sealed hollow: the body keeps every shell it has and gains one more, an
+// inward offset of its outer skin, reversed so it reads as a void. OCCT's
+// MakeThickSolid will not build this itself - handed an EMPTY closing-face
+// list it returns only the shrunk solid (or bare shell), not a wall around a
+// cavity (measured on 7.9.3: a 20 mm box at 2 mm gives the 16 mm inner cube,
+// 4096 mm3, not the 3904 mm3 hollow). So take that inner skin and fit it into
+// the original as an internal void by hand. Arc join only: the intersection
+// join is the one that spins on filleted bodies (see execute()).
+bool buildSealedHollow(const TopoDS_Shape& body, double thickness,
+                       const Message_ProgressRange& range, TopoDS_Shape& out) {
+    TopoDS_Solid solid;
+    int solids = 0;
+    for (TopExp_Explorer ex(body, TopAbs_SOLID); ex.More(); ex.Next()) {
+        solid = TopoDS::Solid(ex.Current());
+        ++solids;
+    }
+    if (solids != 1) return false;   // a compound of several solids: no single skin to offset
+    try {
+        OCC_CATCH_SIGNALS
+        TopTools_ListOfShape none;
+        BRepOffsetAPI_MakeThickSolid mk;
+        mk.MakeThickSolidByJoin(solid, none, -thickness, 1.0e-3, BRepOffset_Skin,
+                                Standard_False, Standard_False, GeomAbs_Arc,
+                                Standard_False, range);
+        mk.Build();
+        if (!mk.IsDone() || mk.Shape().IsNull()) return false;
+
+        TopoDS_Shape innerShell;
+        int innerShells = 0;
+        for (TopExp_Explorer ex(mk.Shape(), TopAbs_SHELL); ex.More(); ex.Next()) {
+            innerShell = ex.Current();
+            ++innerShells;
+        }
+        if (innerShells != 1) return false;   // the wall swallowed the body, or split it
+
+        BRep_Builder bb;
+        TopoDS_Solid hollow;
+        bb.MakeSolid(hollow);
+        for (TopoDS_Iterator it(solid); it.More(); it.Next())
+            bb.Add(hollow, it.Value());
+        bb.Add(hollow, innerShell.Reversed());
+
+        const double v0 = shapeVolume(solid);
+        const double v = shapeVolume(hollow);
+        if (!(v > 0.0 && v < v0 * 0.99)) return false;   // no void, or inside out
+        if (!BRepCheck_Analyzer(hollow).IsValid()) return false;
+        out = hollow;
+        return true;
+    } catch (...) {
+        return false;
+    }
 }
 
 } // namespace
@@ -114,24 +190,20 @@ bool ShellOp::rebindFaces(const TopoDS_Shape& shape) {
     if (m_faceAnchors.empty()) return false;
     TopTools_ListOfShape rebound;
     for (const FaceAnchor& a : m_faceAnchors) {
-        TopoDS_Face best; double bestScore = -1e18;
-        for (TopExp_Explorer ex(shape, TopAbs_FACE); ex.More(); ex.Next()) {
-            TopoDS_Face f = TopoDS::Face(ex.Current());
-            gp_Dir n; gp_Pnt p;
-            if (!faceNormalPoint(f, n, p)) continue;
-            double dot = n.Dot(a.normal);
-            if (dot < 0.9) continue; // must face (nearly) the same way
-            // Distance from the anchor point to this face's plane along n.
-            double planeDist = std::abs(gp_Vec(p, a.point).Dot(gp_Vec(n)));
-            // Prefer best alignment, then nearest plane.
-            double score = dot - 0.01 * planeDist;
-            if (score > bestScore) { bestScore = score; best = f; }
-        }
+        TopoDS_Face best = bestMatchingFace(shape, a.normal, a.point);
         if (best.IsNull()) return false;
         rebound.Append(best);
     }
     m_facesToRemove = rebound;
     return true;
+}
+
+TopoDS_Face ShellOp::matchFace(const TopoDS_Shape& base, const TopoDS_Face& picked) {
+    if (base.IsNull() || picked.IsNull()) return {};
+    if (faceInShape(picked, base)) return picked;
+    gp_Dir n; gp_Pnt p;
+    if (!faceNormalPoint(picked, n, p)) return {};
+    return bestMatchingFace(base, n, p);
 }
 
 void ShellOp::captureFaceRefs(const Document& doc, const TopoDS_Shape& shape) {
@@ -320,6 +392,25 @@ bool ShellOp::execute(Document& doc) {
             return CleanFail;
         };
 
+        // Nothing to open: a sealed hollow, built from the inner skin rather
+        // than by MakeThickSolid (which can't, see buildSealedHollow).
+        if (m_facesToRemove.IsEmpty()) {
+            TopoDS_Shape sealed;
+            if (!buildSealedHollow(m_previousShape, m_thickness,
+                                   progress.IsNull() ? Message_ProgressRange()
+                                                     : attempts.Next(),
+                                   sealed)) {
+                if (!progress.IsNull() && progress->cancelled()) return false;
+                std::fprintf(stderr,
+                    "[Shell] sealed hollow failed at thickness %.3f mm - the "
+                    "wall is too thick for this body.\n", m_thickness);
+                return false;
+            }
+            if (!progress.IsNull() && progress->cancelled()) return false;
+            doc.updateBody(m_bodyId, sealed);
+            return true;
+        }
+
         TopoDS_Shape result;
         Outcome arc = tryShell(Standard_False, GeomAbs_Arc, result);
         // A cancelled offset comes back not-done, which is indistinguishable
@@ -365,6 +456,9 @@ bool ShellOp::undo(Document& doc) {
 
 std::string ShellOp::description() const {
     int faceCount = m_facesToRemove.Size();
+    if (faceCount == 0)
+        return "Shell thickness " + materializr::fmtLength(m_thickness) +
+               " (sealed)";
     return "Shell thickness " + materializr::fmtLength(m_thickness) +
            " (" + std::to_string(faceCount) + " open face(s))";
 }

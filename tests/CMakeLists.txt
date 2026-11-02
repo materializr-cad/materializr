@@ -707,6 +707,11 @@ add_executable(test_shell test_shell.cpp)
 target_link_libraries(test_shell PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_shell COMMAND test_shell)
 
+# test_shell_sealed - zero-opening (sealed hollow) and multi-opening Shell
+add_executable(test_shell_sealed test_shell_sealed.cpp)
+target_link_libraries(test_shell_sealed PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_shell_sealed COMMAND test_shell_sealed)
+
 # probe_rebuild - repro: does fillet re-execution stack a phantom fillet
 add_executable(probe_rebuild probe_rebuild.cpp)
 target_link_libraries(probe_rebuild PRIVATE materializr_core)

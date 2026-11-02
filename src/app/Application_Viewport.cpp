@@ -5211,13 +5211,12 @@ void Application::renderViewport() {
                     // existence and change ids mid-frame - a click can land
                     // in the gap and select nothing, the stale id, or the
                     // sketch region behind the preview ("the pulled face is
-                    // unclickable"). Controller iops (Shell/Taper/Scale/
-                    // Projection) keep clicks: their previews don't churn
-                    // the document, and Projection's live region scoping
-                    // NEEDS clicks while its panel is open.
+                    // unclickable"). Controller iops don't churn
+                    // the document. Shell reads the selection while its
+                    // panel is open (wantsSelectionClicks), so it keeps them.
                     const bool clickSelectionAllowed =
                         !m_ppCtl.active() && !m_extrudeCtl.active() &&
-                        !m_patternActive && !anyIopActive() &&
+                        !m_patternActive && !anyIopBlocksSelectionClicks() &&
                         !m_threadActive &&
                         !m_moveModeToggle &&  // Move (nav lock): taps don't select
                         !shiftPanGesture;     // Shift+Left is a pan, not a pick

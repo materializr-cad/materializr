@@ -91,7 +91,7 @@ std::string InteractiveOpController::updateSnapshotInline(const IopContext& ctx)
     std::string key;
     try {
         std::unique_ptr<Operation> op = buildOp(ctx);
-        if (op) key = op->serializeParams();
+        if (op) key = op->serializeParams() + previewKeySalt();
         if (op && op->execute(ctx.doc)) {
             m_previewOk = true;
         } else {
@@ -127,7 +127,7 @@ void InteractiveOpController::updateSnapshotAsync(const IopContext& ctx) {
 std::string InteractiveOpController::snapshotPreviewKey(const IopContext& ctx) {
     try {
         std::unique_ptr<Operation> op = buildOp(ctx);
-        return op ? op->serializeParams() : std::string();
+        return op ? op->serializeParams() + previewKeySalt() : std::string();
     } catch (...) {
         return std::string();
     }
@@ -144,7 +144,7 @@ void InteractiveOpController::launchSnapshotPreviewIfWanted(const IopContext& ct
         m_dispatch.retracted();
         return;
     }
-    const std::string key = op->serializeParams();
+    const std::string key = op->serializeParams() + previewKeySalt();
     if (!m_dispatch.shouldLaunch(key)) return;
     // Captured before the op is moved into the job, and against m_snapshot,
     // which is exactly the shape the worker copies and starts from.
