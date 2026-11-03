@@ -2262,6 +2262,57 @@ void Application::renderThreadPanel() {
     ImGui::End();
 }
 
+void Application::renderSweepPanel() {
+    if (!m_sweepActive) return;
+    ImGui::SetNextWindowPos(ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - 300,
+                                    ImGui::GetWindowPos().y + 50),
+                            ImGuiCond_Appearing);
+    ImGui::SetNextWindowSize(uiSz(300, 0), ImGuiCond_Appearing);
+    ImGui::Begin("Sweep", nullptr,
+        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
+        ImGuiWindowFlags_AlwaysAutoResize);
+
+    auto sketchLabel = [&](int id) {
+        std::string label = "Sketch " + std::to_string(id);
+        if (m_document)
+            if (auto sk = m_document->getSketch(id)) {
+                label = sk->getName();
+                if (label == "Sketch") label += " " + std::to_string(id);
+            }
+        return label;
+    };
+    bool changed = false;
+    ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Sweep"));
+    ImGui::TextWrapped(materializr::tr("Profile: %s"), sketchLabel(m_sweepProfileSketch).c_str());
+    ImGui::TextWrapped(materializr::tr("Path: %s"), sketchLabel(m_sweepPathSketch).c_str());
+    if (ImGui::Button(materializr::tr("Swap profile and path"))) {
+        std::swap(m_sweepProfileSketch, m_sweepPathSketch);
+        changed = true;
+    }
+    ImGui::SetItemTooltip("%s", materializr::tr("Use the other sketch as the profile."));
+    ImGui::Separator();
+    if (ImGui::Checkbox(materializr::tr("Keep the profile square to the path"), &m_sweepPerpendicular))
+        changed = true;
+    ImGui::SetItemTooltip("%s", materializr::tr("On: the profile is turned square to the path so the tube keeps the size you drew. Off: it is swept at whatever angle it was drawn."));
+    ImGui::TextDisabled("%s", materializr::tr("The profile is carried to the nearest end of the path."));
+    if (!m_sweepFailure.empty()) {
+        ImGui::Spacing();
+        ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.3f, 1.0f), "%s", materializr::tr(m_sweepFailure.c_str()));
+    }
+    ImGui::Separator();
+    const bool canApply = m_sweepPreview.applied();
+    ImGui::BeginDisabled(!canApply);
+    bool applyClicked = ImGui::Button(materializr::tr("Apply"), materializr::uiSz(120, 0));
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    bool cancelClicked = ImGui::Button(materializr::tr("Cancel"), materializr::uiSz(120, 0));
+    const bool escPressed = ImGui::IsKeyPressed(ImGuiKey_Escape, false);
+    if (changed) updateSweep();
+    if (applyClicked && canApply) commitSweep();
+    else if (cancelClicked || escPressed) cancelSweep();
+    ImGui::End();
+}
+
 void Application::renderLoftPanel() {
     if (!m_loftActive) return;
 

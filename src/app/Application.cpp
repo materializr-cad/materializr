@@ -8817,6 +8817,7 @@ void Application::run() {
                     case InteractiveOp::LinearPattern:  beginPattern(PatternKind::Linear); break;
                     case InteractiveOp::RadialPattern:  beginPattern(PatternKind::Radial); break;
                     case InteractiveOp::Loft:           beginLoft();           break;
+                    case InteractiveOp::Sweep:          beginSweep();          break;
                     case InteractiveOp::BoundaryFill:   beginBoundaryFill();   break;
                     case InteractiveOp::Patch:          beginPatch();          break;
                     case InteractiveOp::Sew:            beginSew();            break;
@@ -8956,6 +8957,7 @@ void Application::run() {
             renderMirrorToolPanel();
             renderOffsetToolPanel();
             renderLoftPanel();
+            renderSweepPanel();
             renderBoundaryFillPanel();
             renderPatchPanel();
             renderRefImagePanel();

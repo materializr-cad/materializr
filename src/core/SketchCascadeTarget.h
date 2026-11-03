@@ -6,6 +6,7 @@
 #include "../modeling/PushPullOp.h"
 #include "../modeling/RevolveOp.h"
 #include "../modeling/SketchEditOp.h"
+#include "../modeling/SweepOp.h"
 #include "../modeling/SketchTransformOp.h"
 #include <functional>
 #include <set>
@@ -141,18 +142,24 @@ inline int rederiveSketchDrivenOps(History& history, Document& doc, int sketchId
             if (rv->getSketchId() != sketchId) continue;
             ++matched;
             if (rv->rebuildProfileFromSketch(doc) && earliest < 0) earliest = i;
+        } else if (auto* sw = dynamic_cast<SweepOp*>(op)) {
+            if (sw->getProfileSketchId() != sketchId && sw->getPathSketchId() != sketchId) continue;
+            ++matched;
+            if (sw->rebuildFromSketches(doc) && earliest < 0) earliest = i;
         }
     }
     if (matchedOut) *matchedOut = matched;
     return earliest;
 }
 
-// True when `op` is an extrude / push-pull / lathe built from `sketchId`.
+// True when `op` is an extrude / push-pull / lathe / sweep built from `sketchId`.
 inline bool opBuiltFromSketch(const Operation* op, int sketchId) {
     if (auto* ext = dynamic_cast<const ExtrudeOp*>(op))
         return ext->getSketchId() == sketchId;
     if (auto* rv = dynamic_cast<const RevolveOp*>(op))
         return rv->getSketchId() == sketchId;
+    if (auto* sw = dynamic_cast<const SweepOp*>(op))
+        return sw->getProfileSketchId() == sketchId || sw->getPathSketchId() == sketchId;
     if (auto* pp = dynamic_cast<const PushPullOp*>(op)) {
         for (int t = 0; t < pp->targetCount(); ++t)
             if (pp->getSketchIdAt(t) == sketchId) return true;

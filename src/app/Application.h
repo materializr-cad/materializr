@@ -1936,6 +1936,21 @@ private:
     };
     std::vector<LoftRail> m_loftRails;
 
+    // ── Sweep: closed profile sketch swept along a path sketch ──
+    // beginSweep sorts the selected sketches into profile and path, then one
+    // SweepOp is toggled against the document as a live preview (like Loft).
+    bool m_sweepActive = false;
+    int  m_sweepProfileSketch = -1;
+    int  m_sweepPathSketch = -1;
+    bool m_sweepPerpendicular = true;
+    std::string m_sweepFailure;               // why the preview could not be built
+    materializr::LiveOpPreview m_sweepPreview;
+    void beginSweep();
+    void updateSweep();
+    void commitSweep();
+    void cancelSweep();
+    void renderSweepPanel();
+
     void beginLoft();          // reads selection, snapshots wires, pushes initial preview
     void updateLoft();         // re-push preview with current params
     void commitLoft();

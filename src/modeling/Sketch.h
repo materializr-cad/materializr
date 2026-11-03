@@ -213,7 +213,13 @@ public:
     // following degree-1 endpoints. Null wire when the sketch has no open
     // chain. Used for guided-loft rails; consumers resample by height/length,
     // so polyline fidelity is ample.
-    TopoDS_Wire buildOpenWire() const;
+    //
+    // `exact`: build real edges instead - straight lines, circular arcs and
+    // B-spline fits through the spline control points, the same curves the
+    // closed-region builder emits. A sweep needs this: along a path sampled into
+    // dozens of tiny straight segments the pipe builder fails, and a smooth bend
+    // should come out smooth.
+    TopoDS_Wire buildOpenWire(bool exact = false) const;
 
     // Whole-profile shape for "extrude everything this sketch encloses":
     // closed wires grouped even-odd by containment depth - every

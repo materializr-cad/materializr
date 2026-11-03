@@ -613,6 +613,11 @@ add_executable(test_mirror_origin test_mirror_origin.cpp)
 target_link_libraries(test_mirror_origin PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_mirror_origin COMMAND test_mirror_origin)
 
+# test_sweep - a profile swept along a path (#167)
+add_executable(test_sweep test_sweep.cpp)
+target_link_libraries(test_sweep PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_sweep COMMAND test_sweep)
+
 # test_stl_import - STL triangle soup sews into a clean 6-face solid (parked feature)
 add_executable(test_stl_import test_stl_import.cpp)
 target_link_libraries(test_stl_import PRIVATE materializr_core gtest gtest_main)

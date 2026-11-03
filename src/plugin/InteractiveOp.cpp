@@ -10,6 +10,7 @@ const char* interactiveOpName(InteractiveOp op) {
         case InteractiveOp::RadialPattern:     return "RadialPattern";
         case InteractiveOp::Loft:              return "Loft";
         case InteractiveOp::LoftPickSecond:    return "LoftPickSecond";
+        case InteractiveOp::Sweep:             return "Sweep";
         case InteractiveOp::BoundaryFill:      return "BoundaryFill";
         case InteractiveOp::Patch:             return "Patch";
         case InteractiveOp::Sew:               return "Sew";

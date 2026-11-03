@@ -856,7 +856,7 @@ void Application::renderViewport() {
         const bool anyInteractiveOpActive =
             m_inSketchMode || m_extrudeCtl.active() || m_edgeCtl.active() ||
             m_ppCtl.active() || anyIopActive() ||
-            m_patternActive || m_loftActive || m_planeOpActive ||
+            m_patternActive || m_loftActive || m_sweepActive || m_planeOpActive ||
             m_sketchPatternActive || m_revolveActive;
         bool gizmoShown = false;
         if (m_selection->hasSelectedBodies() && !m_selection->navigationOnly() &&
@@ -997,7 +997,7 @@ void Application::renderViewport() {
         const bool blockedByOtherOp =
             m_inSketchMode || m_extrudeCtl.active() || m_edgeCtl.active() ||
             m_ppCtl.active() || anyIopActive() ||
-            m_patternActive || m_loftActive || m_sketchPatternActive;
+            m_patternActive || m_loftActive || m_sweepActive || m_sketchPatternActive;
         // Construction-axis gizmo - Move only. Same arming pattern as
         // planes: implicit during the Construction Axis popup
         // (m_axisOpActive), opt-in via W/E after commit.

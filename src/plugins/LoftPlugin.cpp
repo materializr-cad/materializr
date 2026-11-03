@@ -94,6 +94,26 @@ REGISTER_PLUGIN(Loft, [](materializr::PluginContext& ctx) {
         materializr::SelectionContext::HasSketches, 400,
         action, nullptr, tooltip});
 
+    // Sweep: a closed profile along a path, constant section - the pipe a loft
+    // cannot make. Same selection contexts as Loft; Application::beginSweep sorts
+    // the selected sketches into profile and path.
+    auto sweepAction = [](materializr::PluginContext& c) {
+        c.requestInteractiveOp(materializr::InteractiveOp::Sweep);
+    };
+    const char* sweepTip =
+        "Sweep a closed profile along a path into a tube or rail of constant "
+        "section. Select two sketches - the closed profile (a circle, say) and "
+        "the open curve to follow - then click Sweep.\n\n"
+        "The profile does not have to touch the path or sit square to it: it is "
+        "carried to the nearest end of the path and turned square to it. Use "
+        "Loft instead when the shape should grow or shrink along the way.";
+    ctx.registerToolbarButton({"Sweep", "Sweep",
+        materializr::SelectionContext::HasSketches, 410,
+        sweepAction, nullptr, sweepTip});
+    ctx.registerToolbarButton({"Sweep", "Sweep",
+        materializr::SelectionContext::HasSketchRegions, 410,
+        sweepAction, nullptr, sweepTip});
+
     ctx.registerToolbarButton({"Loft", "Loft",
         materializr::SelectionContext::HasSketchRegions, 400,
         action, nullptr, tooltip});

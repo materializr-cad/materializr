@@ -30,6 +30,8 @@ enum class InteractiveOp {
     Loft,
     LoftPickSecond,    // banner hint: pick the second sketch
 
+    Sweep,             // profile sketch + path sketch -> constant-section body
+
     BoundaryFill,
     Patch,
     Sew,

@@ -24,6 +24,7 @@
 #include "modeling/SketchTool.h"
 #include "modeling/ExtrudeOp.h"
 #include "modeling/RevolveOp.h"
+#include "modeling/SweepOp.h"
 #include "modeling/PushPullOp.h"
 #include "modeling/MoveFaceOp.h"
 #include "modeling/MoveHoleOp.h"
@@ -1092,6 +1093,92 @@ void Application::commitLoft() {
     m_loftRailsMode = false;
 }
 
+// ─── Sweep (interactive popup) ──────────────────────────────────────────────
+//
+// SweepPlugin (in LoftPlugin.cpp) fires requestInteractiveOp(Sweep). beginSweep
+// sorts the selected sketches into a closed PROFILE and a PATH: the closed one is
+// the profile and the open one the path; with two closed sketches the first
+// picked is the profile (Swap in the panel flips them). One SweepOp is then
+// toggled against the document as the live preview, committed on Apply.
+
+void Application::beginSweep() {
+    if (refuseMeshSelection("Sweep")) return;
+    if (!m_selection || !m_document) return;
+
+    std::vector<int> sketchIds;
+    for (const auto& e : m_selection->getSelection()) {
+        if ((e.type == SelectionType::Sketch || e.type == SelectionType::SketchRegion) &&
+            e.sketchId >= 0 &&
+            std::find(sketchIds.begin(), sketchIds.end(), e.sketchId) == sketchIds.end())
+            sketchIds.push_back(e.sketchId);
+    }
+    if (sketchIds.size() != 2) {
+        showToast(materializr::tr("Sweep needs exactly two sketches: a closed profile and the "
+                                  "path it follows. Ctrl-click both, then click Sweep."), 6.0);
+        return;
+    }
+    // Closed = it has a region to sweep; open = it has a chain to follow.
+    auto isClosed = [&](int id) {
+        auto sk = m_document->getSketch(id);
+        return sk && !RevolveOp::profileFromSketch(*sk).IsNull();
+    };
+    auto isOpen = [&](int id) {
+        auto sk = m_document->getSketch(id);
+        return sk && !sk->buildOpenWire(true).IsNull();
+    };
+    int profile = sketchIds[0], path = sketchIds[1];
+    const bool c0 = isClosed(sketchIds[0]), c1 = isClosed(sketchIds[1]);
+    if (c0 && !c1 && isOpen(sketchIds[1])) { profile = sketchIds[0]; path = sketchIds[1]; }
+    else if (c1 && !c0 && isOpen(sketchIds[0])) { profile = sketchIds[1]; path = sketchIds[0]; }
+    else if (!c0 && !c1) {
+        showToast(materializr::tr("Neither sketch is a closed shape - the profile has to be a "
+                                  "closed loop such as a circle."), 6.0);
+        return;
+    }
+    m_sweepProfileSketch = profile;
+    m_sweepPathSketch = path;
+    m_sweepPerpendicular = true;
+    m_sweepFailure.clear();
+    m_sweepPreview.clear(*m_document);
+    m_sweepActive = true;
+    updateSweep();
+}
+
+void Application::updateSweep() {
+    if (!m_sweepActive || !m_history || !m_document) return;
+    auto trackBodies = trackBodyChanges(); // marks what this edit changed
+    // Retract the applied preview so the new parameters land on a clean document.
+    m_sweepPreview.retract(*m_document);
+    auto* held = dynamic_cast<SweepOp*>(m_sweepPreview.op());
+    if (!held) {
+        m_sweepPreview.hold(std::make_unique<SweepOp>(), *m_document);
+        held = static_cast<SweepOp*>(m_sweepPreview.op());
+    }
+    held->setSketchSources(m_sweepProfileSketch, m_sweepPathSketch);
+    held->setKeepPerpendicular(m_sweepPerpendicular);
+    if (!held->rebuildFromSketches(*m_document)) {
+        m_sweepFailure = materializr::tr("The first sketch has to be a closed shape and the "
+                                         "second an open curve (or another closed shape).");
+        return;
+    }
+    if (m_sweepPreview.apply(*m_document)) m_sweepFailure.clear();
+    else m_sweepFailure = held->lastFailure();
+}
+
+void Application::commitSweep() {
+    auto trackBodies = trackBodyChanges(); // marks what this edit changed
+    m_sweepPreview.commit(*m_history, *m_document);
+    m_sweepActive = false;
+    markDirty();
+}
+
+void Application::cancelSweep() {
+    auto trackBodies = trackBodyChanges();
+    m_sweepPreview.clear(*m_document);
+    m_sweepActive = false;
+    m_sweepFailure.clear();
+}
+
 // ─── Cascade: re-execute Extrudes that consumed a just-edited sketch ───────
 //
 // Triggered by SketchEditedEvent. Walks the live history forward and, for
@@ -1131,6 +1218,9 @@ const std::map<int, std::set<int>>& Application::sketchBodyLinks() const {
                 if (pp->getSketchIdAt(t) >= 0) srcSketches.insert(pp->getSketchIdAt(t));
         } else if (auto* rv = dynamic_cast<const RevolveOp*>(op)) {
             if (rv->getSketchId() >= 0) srcSketches.insert(rv->getSketchId());
+        } else if (auto* sw = dynamic_cast<const SweepOp*>(op)) {
+            if (sw->getProfileSketchId() >= 0) srcSketches.insert(sw->getProfileSketchId());
+            if (sw->getPathSketchId() >= 0) srcSketches.insert(sw->getPathSketchId());
         }
         if (srcSketches.empty()) continue;
         // Bodies this step touched = created + modified.

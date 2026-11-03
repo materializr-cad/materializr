@@ -1092,33 +1092,40 @@ Sketch Sketch::withoutConstruction() const {
     return out;
 }
 
-TopoDS_Wire Sketch::buildOpenWire() const {
-    if (hasConstructionGeometry()) return withoutConstruction().buildOpenWire();
+TopoDS_Wire Sketch::buildOpenWire(bool exact) const {
+    if (hasConstructionGeometry()) return withoutConstruction().buildOpenWire(exact);
     struct ChainEdge {
         int a = -1, b = -1;                 // endpoint point-ids
         std::vector<glm::vec2> pts;         // samples a → b (inclusive)
         bool used = false;
         double len = 0.0;
+        int kind = 0;                       // 0 line, 1 arc, 2 spline (exact mode)
+        int idx = -1;                       // index into m_lines / m_arcs / m_splines
+        float sA = 0.0f, eA = 0.0f;         // arc angles, CCW from sA
     };
     std::vector<ChainEdge> edges;
 
-    auto pushEdge = [&](int a, int b, std::vector<glm::vec2> pts) {
+    auto pushEdge = [&](int a, int b, std::vector<glm::vec2> pts, int kind, int idx,
+                        float sA = 0.0f, float eA = 0.0f) {
         if (pts.size() < 2) return;
         ChainEdge e;
         e.a = a; e.b = b; e.pts = std::move(pts);
+        e.kind = kind; e.idx = idx; e.sA = sA; e.eA = eA;
         for (size_t i = 1; i < e.pts.size(); ++i)
             e.len += glm::length(e.pts[i] - e.pts[i - 1]);
         if (e.len > 1e-9) edges.push_back(std::move(e));
     };
 
-    for (const auto& ln : m_lines) {
+    for (size_t li = 0; li < m_lines.size(); ++li) {
+        const auto& ln = m_lines[li];
         if (ln.isConstruction) continue;
         const SketchPoint* a = getPoint(ln.startPointId);
         const SketchPoint* b = getPoint(ln.endPointId);
         if (!a || !b) continue;
-        pushEdge(ln.startPointId, ln.endPointId, {a->pos, b->pos});
+        pushEdge(ln.startPointId, ln.endPointId, {a->pos, b->pos}, 0, static_cast<int>(li));
     }
-    for (const auto& arc : m_arcs) {
+    for (size_t ai = 0; ai < m_arcs.size(); ++ai) {
+        const auto& arc = m_arcs[ai];
         if (arc.isConstruction) continue;
         const SketchPoint* c = getPoint(arc.centerPointId);
         const SketchPoint* a = getPoint(arc.startPointId);
@@ -1135,15 +1142,16 @@ TopoDS_Wire Sketch::buildOpenWire() const {
             pts.emplace_back(c->pos.x + std::cos(ang) * static_cast<float>(arc.radius),
                              c->pos.y + std::sin(ang) * static_cast<float>(arc.radius));
         }
-        pushEdge(arc.startPointId, arc.endPointId, std::move(pts));
+        pushEdge(arc.startPointId, arc.endPointId, std::move(pts), 1, static_cast<int>(ai), sA, eA);
     }
-    for (const auto& sp : m_splines) {
+    for (size_t si = 0; si < m_splines.size(); ++si) {
+        const auto& sp = m_splines[si];
         if (sp.isConstruction || sp.controlPointIds.size() < 2) continue;
         // Closed splines belong to the region machinery, not rails.
         if (sp.controlPointIds.front() == sp.controlPointIds.back()) continue;
         auto pts = sampleSpline2D(sp);
         pushEdge(sp.controlPointIds.front(), sp.controlPointIds.back(),
-                 std::move(pts));
+                 std::move(pts), 2, static_cast<int>(si));
     }
     if (edges.empty()) return {};
 
@@ -1154,11 +1162,13 @@ TopoDS_Wire Sketch::buildOpenWire() const {
     // Walk from every degree-1 node, following unused edges; keep the longest
     // chain by 2D length.
     std::vector<glm::vec2> best;
+    std::vector<std::pair<const ChainEdge*, int>> bestSeq;   // edge, point it is entered from
     double bestLen = -1.0;
     for (const auto& [startPt, deg] : degree) {
         if (deg != 1) continue;
         for (auto& e : edges) e.used = false;
         std::vector<glm::vec2> chain;
+        std::vector<std::pair<const ChainEdge*, int>> seq;
         double len = 0.0;
         int at = startPt;
         for (;;) {
@@ -1167,6 +1177,7 @@ TopoDS_Wire Sketch::buildOpenWire() const {
                 if (!e.used && (e.a == at || e.b == at)) { next = &e; break; }
             if (!next) break;
             next->used = true;
+            seq.emplace_back(next, at);
             len += next->len;
             std::vector<glm::vec2> run = next->pts;
             if (next->b == at) std::reverse(run.begin(), run.end());
@@ -1177,9 +1188,60 @@ TopoDS_Wire Sketch::buildOpenWire() const {
         if (chain.size() >= 2 && len > bestLen) {
             bestLen = len;
             best = std::move(chain);
+            bestSeq = std::move(seq);
         }
     }
     if (best.size() < 2) return {};
+
+    if (exact) {
+        // Real edges, walked in chain order from the end the chain starts at.
+        BRepBuilderAPI_MakeWire wm;
+        for (const auto& [e, from] : bestSeq) {
+            const bool rev = (from == e->b);
+            try {
+                if (e->kind == 0) {
+                    const SketchLine& ln = m_lines[e->idx];
+                    const SketchPoint* pa = getPoint(ln.startPointId);
+                    const SketchPoint* pb = getPoint(ln.endPointId);
+                    gp_Pnt p1 = sketchToWorld(rev ? pb->pos : pa->pos);
+                    gp_Pnt p2 = sketchToWorld(rev ? pa->pos : pb->pos);
+                    BRepBuilderAPI_MakeEdge mk(p1, p2);
+                    if (!mk.IsDone()) return {};
+                    wm.Add(mk.Edge());
+                } else if (e->kind == 1) {
+                    const SketchArc& arc = m_arcs[e->idx];
+                    const SketchPoint* c0 = getPoint(arc.centerPointId);
+                    const SketchPoint* pa = getPoint(arc.startPointId);
+                    const SketchPoint* pb = getPoint(arc.endPointId);
+                    const float aMid = 0.5f * (e->sA + e->eA);
+                    gp_Pnt mid = sketchToWorld(glm::vec2(
+                        c0->pos.x + std::cos(aMid) * static_cast<float>(arc.radius),
+                        c0->pos.y + std::sin(aMid) * static_cast<float>(arc.radius)));
+                    GC_MakeArcOfCircle am(sketchToWorld(rev ? pb->pos : pa->pos), mid,
+                                          sketchToWorld(rev ? pa->pos : pb->pos));
+                    if (!am.IsDone()) return {};
+                    BRepBuilderAPI_MakeEdge mk(am.Value());
+                    if (!mk.IsDone()) return {};
+                    wm.Add(mk.Edge());
+                } else {
+                    std::vector<glm::vec2> samp = e->pts;
+                    if (rev) std::reverse(samp.begin(), samp.end());
+                    thinSamplesForFit(samp);
+                    if (samp.size() < 2) return {};
+                    TColgp_Array1OfPnt arr(1, static_cast<int>(samp.size()));
+                    for (size_t k = 0; k < samp.size(); ++k)
+                        arr.SetValue(static_cast<int>(k) + 1, sketchToWorld(samp[k]));
+                    GeomAPI_PointsToBSpline fit(arr, std::min(3, static_cast<int>(samp.size()) - 1), 8,
+                                                GeomAbs_C2, 1.0e-3);
+                    if (!fit.IsDone()) return {};
+                    BRepBuilderAPI_MakeEdge mk(fit.Curve());
+                    if (!mk.IsDone()) return {};
+                    wm.Add(mk.Edge());
+                }
+            } catch (...) { return {}; }
+        }
+        return wm.IsDone() ? wm.Wire() : TopoDS_Wire();
+    }
 
     BRepBuilderAPI_MakePolygon poly;
     for (const auto& p2 : best) poly.Add(sketchToWorld(p2));
