@@ -5,6 +5,39 @@ All notable changes to Materializr are documented here. Format loosely follows
 
 ## [Unreleased]
 
+## [1.8.0-beta.3] - 2026-11-03
+
+Desktop beta (Settings ▸ Include pre-release builds). Fixes from the beta.2
+reports, and a new Sweep tool.
+
+### Added
+
+- **Sweep** (Loft group). Carries a closed sketch profile along a sketch path
+  with a constant cross-section, for pipes, rails and channels. Guided Loft
+  still tapers between sections; use Sweep when the width must stay the same.
+- **Update model from sketches** in the Edit menu, for a project whose bodies
+  have fallen behind their sketches.
+- **Mirror through the origin** for bodies (YZ, XY, XZ planes) and for sketches.
+- The camera glides to a new primitive instead of jumping.
+
+### Fixed
+
+- **Editing a sketch now updates the body made from it.** Adding a circle,
+  typing a dimension, Trim, Offset, Mirror, toggling construction and deleting
+  an element all reached the body only after an Undo and Redo, and a saved file
+  reopened out of date. Projects saved by beta.2 or earlier are brought up to
+  date when opened.
+- **A contour added to a sketch is picked up** by the Extrude or Push/Pull built
+  from it (the most recent feature on that sketch adopts it).
+- **Undoing the delete of a construction plane or axis** restores it.
+- **Deleting a sketch together with its bodies is one Undo step**, and the
+  sketch returns to its place in the list.
+- **A closed contour with a crescent shape was not tinted.**
+- **Click zone at maximum zoom** no longer covers the whole window.
+- The +/- steppers stop at their limits.
+- Push/Pull on a sketch whose body is gone no longer extrudes within the sketch
+  plane.
+
 ## [1.8.0-beta.2] - 2026-11-02
 
 Desktop beta (Settings ▸ Include pre-release builds). Mostly fixes from the
