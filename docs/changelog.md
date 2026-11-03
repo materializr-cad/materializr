@@ -5,8 +5,50 @@ All notable changes to Materializr are documented here. Format loosely follows
 
 ## [Unreleased]
 
+## [1.8.0-beta.2] - 2026-11-02
+
+Desktop beta (Settings ▸ Include pre-release builds). Mostly fixes from the
+beta.1 reports.
+
+### Added
+
+- **Autosave every few minutes (optional).** Settings ▸ General ▸ "Also autosave
+  every few minutes" (off by default, 1 to 30 minutes) for projects already
+  saved to a file. It waits while a tool, a sketch or an edge operation is in
+  progress. Saving on close is unchanged.
+- **Deleting a sketch can delete the bodies built from it** (Settings ▸ Sketch,
+  off by default). Each body is its own undo step.
+- **Closed contours are tinted** in the sketch you are editing, so it is clear
+  which outlines are closed. Open ends are still marked as before.
+- **Reference tool:** Ctrl+click follows a run of lines, arcs and splines; a
+  spline is referenced as a whole curve; with Construction on, referenced
+  geometry comes in as construction.
+- **Offset** from a selection goes straight to the distance, and several
+  separate chains offset together.
+- **Move...** in the right-click menu of a construction plane.
+- **Interface scale works in touch mode** (50 to 250%), and the +/- steppers now
+  show in the touch layouts for Extrude, Fillet, Chamfer and Push/Pull. The
+  Length and Project depth steppers have minus buttons.
+
 ### Fixed
 
+- **Reference tool missed a wall of a pipe.** One of the two arcs of a section
+  circle was dropped.
+- **Undo, then Redo, of a resized hole** could leave the hole at the old size
+  and remove the other holes in the sketch.
+- **Lathe used only one of two contours** in a sketch; every closed contour is
+  revolved now.
+- **Text from Project on a cylinder came out mirrored.**
+- **Moving a construction plane:** the typed Move and Rotate panels did nothing
+  until Move was started; they now wait for it, and Move is in the plane's menu.
+- A cone with equal top and bottom radii builds a cylinder instead of nothing.
+- The click zone for sketch elements shrinks as you zoom in, so a click no
+  longer picks something far from the cursor.
+- The seam line of a round face can no longer be selected.
+- Construction geometry of a sketch you are not editing is hidden.
+- Closing a tab while sketching in it really closes the project.
+- The Polygon "Custom" field was too narrow to read in touch mode, and stepper
+  rows overflowed on narrow panels.
 - **iPad layout on iPadOS 27 (#150).** In a window, or after switching apps, a
   landscape window could be laid out as portrait, with the screen half black and
   the bottom of the UI cut off.

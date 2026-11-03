@@ -6,7 +6,7 @@ project(Materializr VERSION 1.8.0 LANGUAGES CXX)
 # as e.g. "1.3.0-beta.1" - that way the in-app update check (which is semver
 # pre-release aware) doesn't nag a beta tester to "update" to the build they're
 # already running, and hands off cleanly to the final 1.3.0.
-set(MATERIALIZR_VERSION_SUFFIX "-beta.1")
+set(MATERIALIZR_VERSION_SUFFIX "-beta.2")
 
 # macOS: deliberately do NOT pin CMAKE_OSX_DEPLOYMENT_TARGET. The bundled Homebrew
 # OpenCASCADE/SDL3 dylibs are built for the build host's macOS, so they - not our
