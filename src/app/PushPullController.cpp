@@ -53,6 +53,17 @@ bool faceIsPlanar(const TopoDS_Face& face) {
     return tester.IsPlanar();
 }
 
+// The body a sketch is anchored to, or -1 when that body no longer exists. A
+// sketch outlives its host (delete the body, undo past it, restore an older edit
+// step): the stale id then sent the push down the fuse-into-existing path, which
+// failed doc.getBody() and skipped the target - Push did nothing at all
+// (1.8.0.b2_4). A sketch whose host is gone is free-floating.
+int liveHostBody(const Document& doc, int host) {
+    if (host < 0) return -1;
+    try { (void)doc.getBody(host); } catch (...) { return -1; }
+    return host;
+}
+
 // A body dense enough that a real boolean per drag frame is unaffordable.
 constexpr int kDenseFaceCount = 250;
 } // namespace
@@ -132,7 +143,7 @@ int PushPullController::onBegin(const IopContext& ctx) {
             // behave like a free-floating sketch and make its own body.
             t.sourceBodyId = sketch->isDetachedFromBody()
                                  ? -1
-                                 : sketch->getSourceBody();
+                                 : liveHostBody(ctx.doc, sketch->getSourceBody());
             t.profile = regions[e.subShapeIndex].face;
             if (t.profile.IsNull()) continue;
             t.anchor = regions[e.subShapeIndex].representativePoint;
@@ -191,7 +202,7 @@ int PushPullController::onBegin(const IopContext& ctx) {
                 t.regionIndex = ri;
                 t.sourceBodyId = sketch->isDetachedFromBody()
                                      ? -1
-                                     : sketch->getSourceBody();
+                                     : liveHostBody(ctx.doc, sketch->getSourceBody());
                 t.profile = regions[ri].face;
                 t.anchor = regions[ri].representativePoint;
                 t.hasAnchor = true;

@@ -1160,3 +1160,31 @@ TEST(SketchOffsetTool, PreselectedConnectedLinesFormOneChain) {
     tool.setOffsetDistance(2.0f);
     EXPECT_TRUE(tool.offsetReady());
 }
+
+// 11-3-26: three separate lines, selected, then Offset - only the first two were
+// offset. Every separate chain follows the first.
+TEST(SketchOffsetTool, ThreeSeparateLinesAllOffset) {
+    Sketch sk;
+    int p[6];
+    p[0] = sk.addPoint({0.0f, 0.0f});  p[1] = sk.addPoint({20.0f, 0.0f});
+    p[2] = sk.addPoint({0.0f, 10.0f}); p[3] = sk.addPoint({20.0f, 10.0f});
+    p[4] = sk.addPoint({0.0f, 20.0f}); p[5] = sk.addPoint({20.0f, 20.0f});
+    const int l1 = sk.addLine(p[0], p[1]), l2 = sk.addLine(p[2], p[3]), l3 = sk.addLine(p[4], p[5]);
+    for (float mmPerPx : {0.0f, 0.04f}) {      // no scale yet, and a real zoom
+        Sketch s2 = sk;
+        SketchTool tool;
+        tool.setSketch(&s2);
+        tool.setPixelScale(mmPerPx);
+        tool.setMode(SketchToolMode::Select);
+        tool.setSelection({}, {l1, l2, l3});
+        tool.setMode(SketchToolMode::Offset);
+        ASSERT_TRUE(tool.hasOffsetChain());
+        tool.setOffsetDistance(3.0f);
+        ASSERT_TRUE(tool.offsetReady());
+        const size_t before = s2.getLines().size();
+        std::set<int> pts, els;
+        tool.commitOffset(pts, els);
+        EXPECT_EQ(s2.getLines().size(), before + 3u)
+            << "all three lines must be offset (mm/px " << mmPerPx << ")";
+    }
+}

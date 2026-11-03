@@ -510,6 +510,12 @@ void Application::renderEditMenuItems() {
                         !histLocked && m_history->canRedo())) {
         redoWithCascade();
     }
+    ImGui::Separator();
+    // Re-run every feature from its sketch: the fix for a project saved while a
+    // body did not match its sketch (#170).
+    if (ImGui::MenuItem(materializr::tr("Update model from sketches"), nullptr, false, !histLocked))
+        resyncModelToSketches(/*manual=*/true);
+    ImGui::SetItemTooltip("%s", materializr::tr("Rebuild every feature from its sketch, so bodies match the sketches again."));
 }
 
 void Application::renderConstructionMenuItems() {

@@ -982,6 +982,22 @@ void Application::renderMirrorPopup() {
         if (ImGui::Button(materializr::tr("Y axis"), materializr::uiSz(150, 0))) { mirrorAxis(1); ImGui::CloseCurrentPopup(); }
         if (ImGui::Button(materializr::tr("Z axis"), materializr::uiSz(150, 0))) { mirrorAxis(2); ImGui::CloseCurrentPopup(); }
         ImGui::Separator();
+        // About the world origin, not the body's own edge: the copy lands where a
+        // part and its twin sit either side of the origin (#153). Named in the
+        // user's Z-up axes, like the AI mirror tool: world Y is "up" here.
+        ImGui::TextDisabled("%s", materializr::tr("Through the origin"));
+        auto mirrorOrigin = [&](MirrorPlane plane) {
+            auto trackBodies = trackBodyChanges(); // re-tessellate only what changes
+            auto op = std::make_unique<MirrorOp>();
+            op->setBody(m_mirrorBodyId);
+            op->setPlane(plane);
+            op->setKeepOriginal(true);
+            m_history->pushOperation(std::move(op), *m_document);
+        };
+        if (ImGui::Button(materializr::tr("X = 0 plane"), materializr::uiSz(150, 0))) { mirrorOrigin(MirrorPlane::YZ); ImGui::CloseCurrentPopup(); }
+        if (ImGui::Button(materializr::tr("Y = 0 plane"), materializr::uiSz(150, 0))) { mirrorOrigin(MirrorPlane::XY); ImGui::CloseCurrentPopup(); }
+        if (ImGui::Button(materializr::tr("Z = 0 plane"), materializr::uiSz(150, 0))) { mirrorOrigin(MirrorPlane::XZ); ImGui::CloseCurrentPopup(); }
+        ImGui::Separator();
         if (ImGui::Button(materializr::tr("Across a face…"), materializr::uiSz(150, 0))) {
             m_mirrorPickFace = true; // next planar face click defines the mirror plane
             ImGui::CloseCurrentPopup();
@@ -5473,6 +5489,11 @@ void Application::renderMirrorToolPanel() {
         ImGui::SameLine();
         if (ImGui::Button(materializr::tr("Horizontal")))
             m_sketchTool->setMirrorAngle(0.0f);
+        // Pin the line to the sketch origin, so a part and its twin sit either
+        // side of the sketch's own axes (#153). Combine with Vertical/Horizontal.
+        ImGui::SameLine();
+        if (ImGui::Button(materializr::tr("Through origin")))
+            m_sketchTool->setMirrorAnchor(glm::vec2(0.0f, 0.0f));
         ImGui::SameLine();
         float degs = m_sketchTool->getMirrorAngle() * 180.0f / static_cast<float>(M_PI);
         // Normalise to [0,180) - a line's direction and its reverse are the same.

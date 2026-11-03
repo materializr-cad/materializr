@@ -327,6 +327,7 @@ add_executable(materializr
     src/modeling/CombineSketchesOp.cpp
     src/modeling/DuplicateSketchOp.cpp
     src/modeling/DeleteSketchOp.cpp
+    src/modeling/DeleteConstructionOp.cpp
     src/modeling/MoveHoleOp.cpp
     src/modeling/ReplayOp.cpp
     src/modeling/OperationFactory.cpp

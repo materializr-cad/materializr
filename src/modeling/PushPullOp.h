@@ -80,7 +80,13 @@ public:
     bool hasAnySketchSource() const;
     int getSketchIdAt(int targetIndex) const;
     int targetCount() const { return static_cast<int>(m_targets.size()); }
-    bool rebuildProfileFromSketch(Document& doc, int sketchId);
+    // `adoptNewRegions`: also take on contours drawn in the sketch since this op
+    // was made (see m_knownPts) - one more target each, with this op's distance
+    // and host. Only the sketch-edit cascade asks for it, and only when this is
+    // the LATEST step built from the sketch: with several, one of them has to own
+    // it and building it more than once is wrong. A reload never does (the saved
+    // bodies already say what was pushed).
+    bool rebuildProfileFromSketch(Document& doc, int sketchId, bool adoptNewRegions = false);
 
     bool execute(Document& doc) override;
     bool undo(Document& doc) override;
@@ -142,6 +148,11 @@ private:
     // Region count seen at the last rebuildProfileFromSketch, per sketch (not
     // serialized): tells a region dragged off its anchor from a deleted one.
     std::map<int, int> m_lastRegionCount;
+    // Per source sketch: points inside every drawn region at the time this op
+    // first ran (Sketch::drawnRegionSamples). A region of the current sketch that
+    // holds none of them was drawn afterwards. Serialized as `kp<sketchId>=`; a
+    // file without them (older) simply never adopts.
+    std::map<int, std::vector<glm::vec2>> m_knownPts;
     // Reload support for FACE-driven targets: per-target ordinal index of the
     // profile face within the source body's pre-op shape (see
     // SubShapeIndex.h). 0 = not a face target / not resolvable.

@@ -47,6 +47,7 @@ add_library(materializr_core STATIC
     ${CMAKE_SOURCE_DIR}/src/modeling/SketchEditOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/DuplicateSketchOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/DeleteSketchOp.cpp
+    ${CMAKE_SOURCE_DIR}/src/modeling/DeleteConstructionOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/MoveHoleOp.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/SketchSolver.cpp
     ${CMAKE_SOURCE_DIR}/src/modeling/Mate.cpp
@@ -601,6 +602,16 @@ add_test(NAME test_duplicate_sketch COMMAND test_duplicate_sketch)
 add_executable(test_delete_sketch test_delete_sketch.cpp)
 target_link_libraries(test_delete_sketch PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_delete_sketch COMMAND test_delete_sketch)
+
+# test_region_adoption - a contour drawn after a Push/Pull or Extrude was made is added to it
+add_executable(test_region_adoption test_region_adoption.cpp)
+target_link_libraries(test_region_adoption PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_region_adoption COMMAND test_region_adoption)
+
+# test_mirror_origin - mirror a body about the world origin planes (#153)
+add_executable(test_mirror_origin test_mirror_origin.cpp)
+target_link_libraries(test_mirror_origin PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_mirror_origin COMMAND test_mirror_origin)
 
 # test_stl_import - STL triangle soup sews into a clean 6-face solid (parked feature)
 add_executable(test_stl_import test_stl_import.cpp)

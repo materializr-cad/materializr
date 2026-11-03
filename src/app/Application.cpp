@@ -98,6 +98,7 @@ inline void resetFpuForOcct() {
 #include "modeling/CombineSketchesOp.h"
 #include "modeling/DuplicateSketchOp.h"
 #include "modeling/DeleteSketchOp.h"
+#include "modeling/DeleteConstructionOp.h"
 #include "modeling/TransformOp.h"
 #include "core/Units.h"
 #include "core/Material.h"
@@ -436,10 +437,8 @@ Application::Application(bool safeMode, float uiScaleOverride)
                     solver.solve(*m_activeSketch);
                 }
             });
-            if (m_eventBus && m_activeSketchId >= 0)
-                m_eventBus->publish(SketchEditedEvent{m_activeSketchId});
-            // The bodies this sketch drives are re-derived (and marked) by
-            // cascadeFromSketchEdit on the event above; no full rebuild.
+            // The bodies this sketch drives are re-derived (and marked) by the
+            // cascade recordSketchMutation requests; no full rebuild.
             markDirty();
         });
     // If no system file-dialog helper exists, Open/Save/Export would otherwise
@@ -2814,9 +2813,6 @@ void Application::handleToolAction(int action) {
                             m_activeSketch->setElementConstruction(id, !allConstruction);
                     });
                     markDirty();
-                    // The flag decides what is part of the shape, so a body
-                    // driven by this sketch has to follow.
-                    if (m_activeSketchId >= 0) requestSketchCascade(m_activeSketchId);
                 } else {
                     m_sketchTool->setConstructionDraw(!m_sketchTool->getConstructionDraw());
                 }
@@ -3692,8 +3688,8 @@ void Application::handleShortcuts() {
                     if (!already) bodiesToDelete.push_back(entry.bodyId);
                 }
             }
-            for (int pid : planesToDelete) { m_document->removePlane(pid); markDirty(); }
-            for (int aid : axesToDelete)   { m_document->removeAxis(aid);  markDirty(); }
+            for (int pid : planesToDelete) { deleteConstructionEntity(m_history, *m_document, false, pid); markDirty(); }
+            for (int aid : axesToDelete)   { deleteConstructionEntity(m_history, *m_document, true,  aid); markDirty(); }
             if (!planesToDelete.empty() || !axesToDelete.empty())
                 m_selection->clear();
             for (int bodyId : bodiesToDelete) {
@@ -4829,6 +4825,14 @@ bool Application::loadProjectAt(const std::string& path) {
     m_currentProjectName.clear();   // callers adopting a doc URI set it after
     markSaved();
     m_meshesDirty = true;
+    // Builds up to 1.8.0-beta.2 let edits made through the sketch tools (a new
+    // circle, a typed dimension, trim, offset, mirror) skip the model, so a file
+    // saved from one can hold a body that does not match its sketch (#170). Follow
+    // the sketches once after opening such a file; it is silent unless a body
+    // actually changes, and a replay that cannot follow leaves the model as saved.
+    if (!result.savedByVersion.empty() &&
+        UpdateChecker::compareVersions(result.savedByVersion, "1.8.0-beta.2") <= 0)
+        resyncModelToSketches(/*manual=*/false);
     // Home view = the ViewCube Home button: default isometric orientation AND
     // zoom-to-fit the loaded geometry (computed from the OCCT body bounds, which
     // are ready now). Plain Camera::reset() only sets a fixed (5,5,5) eye that
@@ -5832,17 +5836,13 @@ std::vector<int> Application::bodiesCreatedFromSketch(int sketchId) const {
 
 void Application::deleteSketch(int sketchId) {
     if (!m_document || !m_history) return;
-    if (m_deleteSketchRemovesBodies) {
-        // Own undo step per body, pushed before the sketch's, so undo walks
-        // back through the sketch first and then each body.
-        for (int bodyId : bodiesCreatedFromSketch(sketchId)) {
-            auto del = std::make_unique<DeleteOp>();
-            del->setBodyId(bodyId);
-            m_history->pushOperation(std::move(del), *m_document);
-        }
-    }
     auto op = std::make_unique<DeleteSketchOp>();
     op->setSketchId(sketchId);
+    // The bodies go in the same step, so one Undo restores the sketch and
+    // everything built from it.
+    if (m_deleteSketchRemovesBodies)
+        for (int bodyId : bodiesCreatedFromSketch(sketchId))
+            op->addBodyDelete(bodyId);
     if (m_history->pushOperation(std::move(op), *m_document)) {
         if (m_selection) m_selection->clear();
         markDirty();
@@ -7085,7 +7085,17 @@ void Application::recordSketchMutation(const std::function<void()>& mutator) {
     // document - so a save later can serialise the snapshots even if the live
     // pointer has since been replaced (which silently froze delete steps).
     op->setSketchId(m_document->findSketchId(m_activeSketch.get()));
+    const bool onlyFills = op->onlyFillsChanged();
     m_history->pushExecuted(std::move(op), *m_document);
+    // Every edit made through here changes what a body built from this sketch
+    // (extrude, push/pull, lathe) is derived from - a new circle, a typed
+    // dimension, a trim, an offset, a mirror. Only the gizmo / drag / panel
+    // paths used to publish that, so the rest left the body showing the sketch
+    // as it was until an Undo-Redo happened to re-run the cascade (and a file
+    // saved in that state reopened with the stale body). A Fill-tool step moves
+    // no geometry, so it has nothing to push.
+    if (!onlyFills && m_activeSketchId >= 0)
+        requestSketchCascade(m_activeSketchId);
 }
 
 void Application::sketchChainBack() {
@@ -7132,7 +7142,6 @@ void Application::deleteSelectedSketchElements() {
     const auto spl = m_sketchTool->getSelectedSplines();
     if (pts.empty() && lns.empty() && crc.empty() && arcs.empty() && spl.empty())
         return;
-    const unsigned revBefore = m_history ? m_history->revision() : 0u;
     recordSketchMutation([&]{
         // One combined-batch call, not separate per-category loops:
         // removeElements resolves polygon ownership across the WHOLE
@@ -7153,12 +7162,8 @@ void Application::deleteSelectedSketchElements() {
         m_activeSketch->pruneOrphanPoints();
     });
     m_sketchTool->clearElementSelection();
-    // Deleting geometry is an edit like a drag or a dimension change: a body
-    // built from this sketch (extrude, push/pull, lathe) has to follow it. Only
-    // when the delete actually recorded a step.
-    if (m_eventBus && m_activeSketchId >= 0 && m_history &&
-        m_history->revision() != revBefore)
-        m_eventBus->publish(SketchEditedEvent{m_activeSketchId});
+    // The body built from this sketch follows the delete through the cascade
+    // recordSketchMutation requests.
     markDirty();
 }
 

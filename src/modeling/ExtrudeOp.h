@@ -39,7 +39,10 @@ public:
     // return true so the caller can re-execute() against the new wires.
     // Returns false if there's no source sketch, the sketch is gone, or the
     // current sketch has no closed profile to build a face from.
-    bool rebuildProfileFromSketch(Document& doc);
+    // `adoptNewRegions`: also extrude contours drawn in the sketch since this
+    // extrude was made (see m_knownPts). Only the sketch-edit cascade asks, and
+    // only for the sketch's latest feature; a reload never does.
+    bool rebuildProfileFromSketch(Document& doc, bool adoptNewRegions = false);
 
     // Operation interface
     bool execute(Document& doc) override;
@@ -101,6 +104,11 @@ private:
     // re-deriving the same final compound). Captured at execute; persisted
     // (regions=); derived from the saved body's footprint for old files.
     std::vector<std::pair<double,double>> m_regionPts;
+    // Points inside EVERY drawn region of the sketch when this extrude was made
+    // (Sketch::drawnRegionSamples) - the used ones and the ones left out. A
+    // region of the current sketch holding none of them was drawn afterwards.
+    // Persisted (known=); absent in older files, which then never adopt.
+    std::vector<std::pair<double,double>> m_knownPts;
     // Transient (rebuilt on every load): the saved body's footprint faces,
     // translated onto the sketch plane. Used as the profile when the
     // recorded regions no longer exist in the sketch's current state (the

@@ -28,7 +28,9 @@
 #include <imgui.h>
 #include <imgui_internal.h>   // GetActiveID - same include the viewport already uses
 
+#include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 #include <string>
 #include <type_traits>
 
@@ -217,13 +219,77 @@ struct LengthEdit {
 // never drifts, and a unit switch shows correctly on the next frame. Step and
 // precision come from the unit table; there are deliberately no step/fmt
 // parameters to get wrong.
+namespace detail {
+// ImGui::InputDouble with the decimal cap (#160). InputDouble hands its text
+// field no callback, so a third decimal could be typed and was then rounded away
+// on commit; this is InputScalar's own layout (a text field plus -/+ step
+// buttons, same ID scope) with decimalCapFilter on the text. Desktop only - the
+// touch pad has its own entry. `active` reports the TEXT field, which is what a
+// caller's IsItemActive() read after InputDouble gave.
+inline bool cappedStepperInput(const char* label, double* v, double step, double stepFast,
+                               const char* fmt, ImGuiInputTextFlags flags, int decimals,
+                               bool* active) {
+    ImGuiWindow* window = ImGui::GetCurrentWindow();
+    if (window->SkipItems) { if (active) *active = false; return false; }
+    ImGuiContext& g = *GImGui;
+    ImGuiStyle& style = g.Style;
+    char buf[64];
+    std::snprintf(buf, sizeof buf, fmt, *v);
+
+    bool changed = false;
+    const float btn = ImGui::GetFrameHeight();
+    ImGui::BeginGroup();
+    ImGui::PushID(label);
+    ImGui::SetNextItemWidth(std::max(1.0f, ImGui::CalcItemWidth() - (btn + style.ItemInnerSpacing.x) * 2));
+    // As InputScalar: the data is compared, not the string, so no edit is marked
+    // for an untouched value.
+    g.NextItemData.ItemFlags |= ImGuiItemFlags_NoMarkEdited;
+    ImGui::InputText("", buf, sizeof buf,
+                     flags | ImGuiInputTextFlags_AutoSelectAll | ImGuiInputTextFlags_CharsScientific |
+                         ImGuiInputTextFlags_CallbackCharFilter,
+                     decimalCapFilter, &decimals);
+    if (ImGui::IsItemEdited()) {
+        const double parsed = std::strtod(buf, nullptr);
+        if (parsed != *v) { *v = parsed; changed = true; }
+    }
+    if (active) *active = ImGui::IsItemActive();
+
+    const ImVec2 backupPad = style.FramePadding;
+    style.FramePadding.x = style.FramePadding.y;
+    ImGui::PushItemFlag(ImGuiItemFlags_ButtonRepeat, true);
+    const double inc = g.IO.KeyCtrl ? stepFast : step;
+    ImGui::SameLine(0, style.ItemInnerSpacing.x);
+    if (ImGui::ButtonEx("-", ImVec2(btn, btn))) { *v -= inc; changed = true; }
+    ImGui::SameLine(0, style.ItemInnerSpacing.x);
+    if (ImGui::ButtonEx("+", ImVec2(btn, btn))) { *v += inc; changed = true; }
+    ImGui::PopItemFlag();
+    style.FramePadding = backupPad;
+
+    const char* labelEnd = ImGui::FindRenderedTextEnd(label);
+    if (label != labelEnd) {
+        ImGui::SameLine(0, style.ItemInnerSpacing.x);
+        ImGui::TextEx(label, labelEnd);
+    }
+    ImGui::PopID();
+    ImGui::EndGroup();
+    if (changed) ImGui::MarkItemEdited(g.LastItemData.ID);
+    return changed;
+}
+} // namespace detail
+
 inline LengthEdit lengthField(const char* label, double* mm, ImGuiInputTextFlags flags = 0) {
     const UnitInfo& u = unitInfo(currentUnit());
     char fmt[8];
     std::snprintf(fmt, sizeof fmt, "%%.%df", u.decimals);
     double disp = toDisplay(*mm);
-    const bool changed = inputNumber(label, &disp, u.step, u.step * 10.0, fmt, flags);
-    const bool active  = ImGui::IsItemActive();   // valid: the item just submitted IS this field
+    bool changed, active;
+    if (touchMode()) {
+        changed = inputNumber(label, &disp, u.step, u.step * 10.0, fmt, flags);
+        active  = ImGui::IsItemActive();   // valid: the item just submitted IS this field
+    } else {
+        changed = detail::cappedStepperInput(label, &disp, u.step, u.step * 10.0, fmt, flags,
+                                             u.decimals, &active);
+    }
     if (changed) *mm = lengthFieldCommit(disp);
     return { changed, active };
 }

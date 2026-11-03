@@ -23,6 +23,7 @@
 #include "CombineSketchesOp.h"
 #include "DuplicateSketchOp.h"
 #include "DeleteSketchOp.h"
+#include "DeleteConstructionOp.h"
 #include "RevolveOp.h"
 #include "ConstructionPlaneOp.h"
 #include "ConstructionAxisOp.h"
@@ -122,6 +123,9 @@ std::unique_ptr<Operation> create(const std::string& typeId) {
     // Sketch deletion: the sketch is gone from the saved list, so this reloads
     // as an inert step (rehydrateFromReload declines).
     if (typeId == "delete_sketch") return std::make_unique<DeleteSketchOp>();
+    // Construction plane / axis deletion: gone from the saved lists too, so the
+    // blob carries the literal an undo re-adds.
+    if (typeId == "delete_construction") return std::make_unique<DeleteConstructionOp>();
 
     return nullptr;
 }

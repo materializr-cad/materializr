@@ -345,6 +345,25 @@ void Camera::zoomToFit(glm::vec3 min, glm::vec3 max)
     m_position = center + direction * distance;
 }
 
+void Camera::animateToFit(glm::vec3 min, glm::vec3 max, float seconds)
+{
+    finishAnimation();
+    finishBlend();
+    const glm::vec3 center = (min + max) * 0.5f;
+    const float radius = glm::length(max - min) * 0.5f;
+    const glm::vec3 direction = glm::normalize(m_position - m_target);
+
+    // Same destination zoomToFit would land on.
+    if (m_orthographic) {
+        const float orthoSize = std::max(radius * 1.1f, 0.01f);
+        const float dist = std::max(glm::length(m_position - m_target), radius * 2.0f);
+        animateTo(center + direction * dist, center, m_up, true, orthoSize, seconds);
+        return;
+    }
+    const float distance = radius / std::sin(glm::radians(m_fov) * 0.5f);
+    animateTo(center + direction * distance, center, m_up, false, m_orthoSize, seconds);
+}
+
 void Camera::setPosition(glm::vec3 pos)
 {
     finishAnimation();

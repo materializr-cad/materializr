@@ -66,6 +66,7 @@
 #include "modeling/SketchSolver.h"
 #include "modeling/SketchTool.h"
 #include "modeling/ExtrudeOp.h"
+#include "modeling/DeleteConstructionOp.h"
 #include "modeling/ReplayOp.h"
 #include "modeling/SketchTransformOp.h"
 #include "modeling/PushPullOp.h"
@@ -3561,11 +3562,10 @@ void Application::renderViewport() {
                                 if (m_sketchSolver) m_sketchSolver->solve(*m_activeSketch);
                             });
                             markDirty();
-                            // No mesh flag: this path changes sketch geometry only and
-                            // never reaches a body (it neither publishes SketchEditedEvent
-                            // nor calls cascadeFromSketchEdit). The old flag re-tessellated
-                            // every visible body on every dimension keystroke to redraw
-                            // meshes that had not changed.
+                            // No mesh flag: recordSketchMutation requests the cascade,
+                            // which re-meshes only the bodies it actually changes (the
+                            // old flag re-tessellated every visible body on every
+                            // dimension keystroke).
                             m_dimEditingId = -1;
                             ImGui::CloseCurrentPopup();
                         }
@@ -7538,7 +7538,7 @@ void Application::renderViewport() {
         }
         ImGui::Separator();
         if (ImGui::MenuItem(materializr::tr("Delete"))) {
-            m_document->removePlane(pid);
+            deleteConstructionEntity(m_history, *m_document, false, pid);
             if (m_selection) m_selection->clear();
             m_contextMenuPlaneId = -1;
         }

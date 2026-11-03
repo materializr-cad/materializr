@@ -501,6 +501,24 @@ TEST(GridSnap, InteractiveWeldRadiusIsCapped) {
         << "9 mm at 1 mm/px is 9 px - outside the aim radius";
 }
 
+// 11-3-26: zoomed all the way in on a point there was no spot left in the window
+// to click that did not pick it - the radius had a fixed 0.3 mm floor, hundreds
+// of pixels at that zoom. It is a screen distance, floor included.
+TEST(GridSnap, PickRadiusShrinksWithTheZoomAllTheWayIn) {
+    Sketch sk;
+    SketchTool t;
+    t.setSketch(&sk);
+    const glm::vec2 p(10.0f, 10.0f);
+    const int id = sk.addPoint(p);
+    t.setPixelScale(0.0005f);   // 1 px = 0.0005 mm
+    EXPECT_EQ(id, t.coincidentPoint(p + glm::vec2(0.003f, 0.0f), -1))
+        << "6 px away is inside the aim radius";
+    EXPECT_EQ(-1, t.coincidentPoint(p + glm::vec2(0.1f, 0.0f), -1))
+        << "200 px away must not pick the point";
+    EXPECT_EQ(-1, t.coincidentPoint(p + glm::vec2(0.3f, 0.0f), -1))
+        << "the old 0.3 mm floor was 600 px at this zoom";
+}
+
 // Before the viewport has pushed a scale, m_mmPerPixel is 0. The floor is what
 // keeps the radius sane on that first frame rather than collapsing to zero.
 TEST(GridSnap, WeldRadiusSurvivesTheFirstFrameWithNoPixelScale) {

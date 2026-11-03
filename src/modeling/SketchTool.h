@@ -413,10 +413,19 @@ public:
     // zooming in tightens the catch range instead of leaving it a fixed
     // 0.3-0.5 mm (which at a 0.001 mm view is hundreds of pixels: clicks landed
     // on geometry far from the cursor).
+    //
+    // Capped at kPickMaxPx on screen as well: tolStep() honours the user's own
+    // step outright once it clears a few pixels, and that step does not shrink
+    // with the zoom - so at the deepest zoom a 0.5 mm radius covered the whole
+    // window, and there was no spot left to click that did not pick the point
+    // (11-3-26).
+    static constexpr float kPickFloorPx = 10.0f;
+    static constexpr float kPickMaxPx = 16.0f;
     float pickTol(float frac, float floorMm) const {
-        constexpr float kPickFloorPx = 10.0f;
         if (m_mmPerPixel > 0.0f) floorMm = std::min(floorMm, kPickFloorPx * m_mmPerPixel);
-        return std::max(tolStep() * frac, floorMm);
+        float tol = std::max(tolStep() * frac, floorMm);
+        if (m_mmPerPixel > 0.0f) tol = std::min(tol, kPickMaxPx * m_mmPerPixel);
+        return tol;
     }
 
     // The lattice points snap to - scaled by zoom, so it changes as you zoom.

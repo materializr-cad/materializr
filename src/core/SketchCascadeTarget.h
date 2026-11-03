@@ -104,17 +104,30 @@ inline bool syncGhostSketches(const History& history, Document& doc,
 // forward instead of back (the "stuck in an undo/redo loop" report). A step
 // above the tip is rebuilt anyway when redo re-applies the sketch edit that
 // feeds it, which runs this again.
+inline bool opBuiltFromSketch(const Operation* op, int sketchId);   // below
+
 inline int rederiveSketchDrivenOps(History& history, Document& doc, int sketchId,
                                    int* matchedOut = nullptr) {
     int earliest = -1, matched = 0;
     const int applied = history.currentStep();
+    // A contour drawn after a feature was made is added to that feature. With
+    // several features built from one sketch (an extrude of one loop, a push of
+    // another) the MOST RECENT one takes it - it is what the user was last doing
+    // with the sketch - and the rest leave it alone: every one of them taking it
+    // would build it several times. (A lathe takes every region anyway, so when
+    // it is the latest nothing else adopts.)
+    int latestFeature = -1;
+    for (int i = 0; i <= applied && i < history.stepCount(); ++i) {
+        const Operation* op = history.getStep(i);
+        if (op && op->isEnabled() && opBuiltFromSketch(op, sketchId)) latestFeature = i;
+    }
     for (int i = 0; i <= applied && i < history.stepCount(); ++i) {
         Operation* op = const_cast<Operation*>(history.getStep(i));
         if (!op || !op->isEnabled()) continue;
         if (auto* ext = dynamic_cast<ExtrudeOp*>(op)) {
             if (ext->getSketchId() != sketchId) continue;
             ++matched;
-            if (ext->rebuildProfileFromSketch(doc) && earliest < 0) earliest = i;
+            if (ext->rebuildProfileFromSketch(doc, i == latestFeature) && earliest < 0) earliest = i;
         } else if (auto* pp = dynamic_cast<PushPullOp*>(op)) {
             bool refs = false;
             const int tc = pp->targetCount();
@@ -122,7 +135,7 @@ inline int rederiveSketchDrivenOps(History& history, Document& doc, int sketchId
                 if (pp->getSketchIdAt(t) == sketchId) { refs = true; break; }
             if (!refs) continue;
             ++matched;
-            if (pp->rebuildProfileFromSketch(doc, sketchId) && earliest < 0)
+            if (pp->rebuildProfileFromSketch(doc, sketchId, i == latestFeature) && earliest < 0)
                 earliest = i;
         } else if (auto* rv = dynamic_cast<RevolveOp*>(op)) {
             if (rv->getSketchId() != sketchId) continue;

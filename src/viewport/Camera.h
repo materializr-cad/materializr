@@ -50,6 +50,9 @@ public:
 
     /// Frame the camera to fit a bounding box in view.
     void zoomToFit(glm::vec3 min, glm::vec3 max);
+    /// zoomToFit that glides there (animateTo) instead of teleporting: same view
+    /// direction, same framing at the end - only the way it arrives differs.
+    void animateToFit(glm::vec3 min, glm::vec3 max, float seconds = 0.35f);
 
     /// Get the current camera position.
     glm::vec3 getPosition() const { return m_position; }

@@ -8,6 +8,7 @@
 #include "../core/History.h"
 #include "../core/SelectionManager.h"
 #include "../modeling/DeleteOp.h"
+#include "../modeling/DeleteConstructionOp.h"
 #include "../modeling/SeparateBodyOp.h"
 #include <imgui.h>
 #include <cfloat>
@@ -644,7 +645,7 @@ bool ItemsPanel::renderContent() {
                         if (m_rotatePlane) m_rotatePlane(id);
                     }
                     if (ImGui::MenuItem(materializr::tr("Delete"))) {
-                        m_document->removePlane(id);
+                        deleteConstructionEntity(m_history, *m_document, false, id);
                         if (m_selection) m_selection->clear();
                         m_renamingId = -1;
                         ImGui::EndPopup();
@@ -732,7 +733,7 @@ bool ItemsPanel::renderContent() {
                         if (m_markDirty) m_markDirty();
                     }
                     if (ImGui::MenuItem(materializr::tr("Delete"))) {
-                        m_document->removeAxis(id);
+                        deleteConstructionEntity(m_history, *m_document, true, id);
                         if (m_selection) m_selection->clear();
                         m_renamingId = -1;
                         ImGui::EndPopup();

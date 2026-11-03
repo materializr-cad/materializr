@@ -811,7 +811,19 @@ private:
     // `budgetMs` > 0 (an in-sketch edit, see requestSketchCascade): give up once
     // the replay runs past it, roll the model back untouched and return false -
     // the caller defers the sketch to Finish. Otherwise always returns true.
-    bool cascadeFromSketchEdit(int sketchId, double budgetMs = -1.0);
+    //
+    // `resync`: an automatic re-sync of a model that was saved out of step with
+    // its sketches (see resyncModelToSketches). It must never surprise the user:
+    // a step that cannot follow is NOT disabled and nothing is toasted - the
+    // replay simply rolls back and the model stays as it was saved.
+    bool cascadeFromSketchEdit(int sketchId, double budgetMs = -1.0, bool resync = false);
+    // Re-run every feature built from a sketch, so a body saved while it did not
+    // match its sketch (a 1.8.0-beta.2 and earlier bug: edits made through the
+    // sketch tools never reached the body until an Undo/Redo) follows it again.
+    // `manual` = the Edit menu command: say what happened either way. Otherwise
+    // (the automatic pass after opening such a file) it is silent unless the model
+    // actually changed. Runs between frames behind the progress card.
+    void resyncModelToSketches(bool manual);
     // The one entry point for a sketch edit that should move the body. Outside
     // sketch mode it cascades now. Inside it, a model that has already proved
     // slow only notes the sketch for Finish; otherwise the cascade runs with

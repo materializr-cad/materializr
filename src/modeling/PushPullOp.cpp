@@ -7,6 +7,8 @@
 #include <cstdlib>
 
 #include <BRepPrimAPI_MakePrism.hxx>
+#include <BRepAdaptor_Surface.hxx>
+#include <GeomAbs_SurfaceType.hxx>
 #include <BRepBuilderAPI_Copy.hxx>
 #include <BRepBuilderAPI_Transform.hxx>
 #include <BRepAlgoAPI_Fuse.hxx>
@@ -176,7 +178,7 @@ int PushPullOp::getSketchIdAt(int targetIndex) const {
 // sketch. Used by the cascade walker after a constraint commit. Returns
 // true if at least one profile was rebuilt - caller should then re-execute
 // the op so the body shape catches up.
-bool PushPullOp::rebuildProfileFromSketch(Document& doc, int sketchId) {
+bool PushPullOp::rebuildProfileFromSketch(Document& doc, int sketchId, bool adoptNewRegions) {
     if (sketchId < 0) return false;
     auto sk = doc.getSketch(sketchId);
     if (!sk) return false;
@@ -250,6 +252,37 @@ bool PushPullOp::rebuildProfileFromSketch(Document& doc, int sketchId) {
             }
         }
         any = true;
+    }
+
+    // Contours drawn since this op was made: the push/pull is a feature of the
+    // sketch, so a new closed shape in it gets the same distance and host. Only
+    // regions NO target claims, and none of the points recorded at the start
+    // fall in.
+    if (adoptNewRegions) {
+        const auto kit = m_knownPts.find(sketchId);
+        int tmpl = -1;
+        for (size_t i = 0; i < m_targets.size() && tmpl < 0; ++i)
+            if (i < m_sketchSourceIds.size() && m_sketchSourceIds[i] == sketchId) tmpl = static_cast<int>(i);
+        if (kit != m_knownPts.end() && !kit->second.empty() && tmpl >= 0) {
+            const int host = m_targets[tmpl].sourceBodyId;
+            for (int idx : sk->regionsMissingFrom(regions, kit->second)) {
+                if (owner[idx] >= 0 || regions[idx].face.IsNull()) continue;
+                Target t;
+                t.profile = regions[idx].face;
+                t.sourceBodyId = host;
+                m_targets.push_back(std::move(t));
+                m_sketchSourceIds.push_back(sketchId);
+                m_sketchSourceRegions.push_back(idx);
+                m_sketchSourceAnchors.push_back(regions[idx].representativePoint);
+                m_hasAnchor.push_back(1);
+                if (m_faceIndices.size() + 1 == m_targets.size()) m_faceIndices.push_back(0);
+                if (m_targetRefs.size() + 1 == m_targets.size()) m_targetRefs.emplace_back();
+                owner[idx] = static_cast<int>(m_targets.size()) - 1;
+                std::fprintf(stderr, "[PushPull] adopted a contour drawn since the push "
+                             "(sketch %d, region %d)\n", sketchId, idx);
+                any = true;
+            }
+        }
     }
     return any;
 }
@@ -391,6 +424,15 @@ bool PushPullOp::execute(Document& doc) {
     m_prevFaceIds.clear();
     m_reuseIdx = 0; // walks m_reuseBodyIds as each free-floating output is emitted
     if (m_targets.empty() || std::abs(m_distance) < 1e-6) return false;
+
+    // What the source sketch(es) held when this op first ran - so a contour
+    // drawn later can be told from the ones that were already there.
+    for (size_t i = 0; i < m_sketchSourceIds.size(); ++i) {
+        const int sid = m_sketchSourceIds[i];
+        if (sid < 0 || m_knownPts.count(sid)) continue;
+        if (auto sk = doc.getSketch(sid))
+            m_knownPts[sid] = sk->drawnRegionSamples(sk->buildRegions());
+    }
 
     // A result the preview worker computed on copies of these bodies: apply
     // it as-is (see setPrecomputed). Bodies the op may touch but the worker
@@ -687,7 +729,20 @@ bool PushPullOp::execute(Document& doc) {
                         doc.getBody(tgt.sourceBodyId), tgt.profile, center, faceNormal);
                 }
             }
-        } catch (...) {}
+        } catch (...) {
+            // The normal could not be read. The old (0,0,1) default is IN the
+            // plane of any sketch standing on an XZ / YZ plane, so the prism came
+            // out flat in the sketch's own plane (1.8.0.b2_4). A planar profile
+            // knows its own normal.
+            try {
+                BRepAdaptor_Surface bs(tgt.profile);
+                if (bs.GetType() == GeomAbs_Plane) {
+                    gp_Dir pn = bs.Plane().Axis().Direction();
+                    if (tgt.profile.Orientation() == TopAbs_REVERSED) pn.Reverse();
+                    faceNormal = gp_Vec(pn);
+                }
+            } catch (...) {}
+        }
 
         // Sign of distance determines prism direction & boolean mode
         double dir = m_distance >= 0.0 ? 1.0 : -1.0;
@@ -990,6 +1045,15 @@ std::string PushPullOp::serializeParams() const {
             blob += ";tr" + std::to_string(i) + "=" + m_targetRefs[i].serialize();
         }
     }
+    // Points inside every drawn region when the op first ran, per sketch.
+    for (const auto& [sid, pts] : m_knownPts) {
+        if (pts.empty()) continue;
+        blob += ";kp" + std::to_string(sid) + "=";
+        for (size_t i = 0; i < pts.size(); ++i) {
+            std::snprintf(buf, sizeof(buf), "%s%.4f:%.4f", i ? "," : "", pts[i].x, pts[i].y);
+            blob += buf;
+        }
+    }
     return blob;
 }
 
@@ -1032,7 +1096,24 @@ bool PushPullOp::deserializeParams(const std::string& blob) {
         if (end == std::string::npos) end = blob.size();
         std::string key = blob.substr(pos, eq - pos);
         std::string val = blob.substr(eq + 1, end - eq - 1);
-        if (key.size() >= 3 && key[0] == 't' && key[1] == 'r') {
+        if (key.size() >= 3 && key[0] == 'k' && key[1] == 'p') {
+            const int sid = std::atoi(key.c_str() + 2);
+            auto& pts = m_knownPts[sid];
+            pts.clear();
+            size_t q = 0;
+            while (q < val.size() && pts.size() < 4096) {
+                const size_t c2 = val.find(',', q);
+                const std::string tok = val.substr(q, c2 == std::string::npos ? std::string::npos : c2 - q);
+                const size_t col = tok.find(':');
+                if (col != std::string::npos)
+                    pts.emplace_back(static_cast<float>(std::atof(tok.c_str())),
+                                     static_cast<float>(std::atof(tok.c_str() + col + 1)));
+                if (c2 == std::string::npos) break;
+                q = c2 + 1;
+            }
+            any = true;
+        }
+        else if (key.size() >= 3 && key[0] == 't' && key[1] == 'r') {
             int idx = std::atoi(key.c_str() + 2);
             if (idx >= 0 && idx < count)
                 m_targetRefs[idx] = materializr::topo::Ref::parse(val);

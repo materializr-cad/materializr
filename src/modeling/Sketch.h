@@ -255,6 +255,19 @@ public:
     // would otherwise take the entire face along with the drawn circle.
     std::vector<int> drawnRegions(const std::vector<Region>& regions) const;
 
+    // Points spread over the inside of every DRAWN region (sketch-plane 2D, up to
+    // `perRegion` each; see drawnRegions). An op that records them when it is made
+    // can later tell a contour drawn AFTERWARDS - one holding none of them - from
+    // the ones that were already there. Empty past `maxRegions` regions (a
+    // text / SVG import), where per-region bookkeeping is not worth it.
+    std::vector<glm::vec2> drawnRegionSamples(const std::vector<Region>& regions,
+                                              int perRegion = 12,
+                                              size_t maxRegions = 80) const;
+    // Indices of the DRAWN regions holding none of `known` - the contours added
+    // since `known` was taken.
+    std::vector<int> regionsMissingFrom(const std::vector<Region>& regions,
+                                        const std::vector<glm::vec2>& known) const;
+
     // True when buildRegions() would be a cache HIT (valid cache + current
     // geometry hash). Lets the per-frame hover pick skip sketches whose
     // regions would need the heavy OCCT fuse - a freshly-unhidden complex

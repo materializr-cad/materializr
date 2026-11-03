@@ -1845,6 +1845,42 @@ void densifyWire2D(const TopoDS_Wire& wire, const gp_Pln& plane,
 }
 
 // Standard ray-cast point-in-polygon (winding-independent, counts crossings).
+//
+// A point STRICTLY inside a region (outer wire minus holes), for the cases where
+// the area centroid is not: a ring's lies in its hole, a crescent's outside its
+// own band. Horizontal scanlines through the densified loops; the midpoint of
+// the widest span between an entry and an exit (even-odd across outer and hole
+// loops alike) is as far from the boundary as the sampling can find. Returns
+// false for a degenerate region with no span.
+bool interiorPoint2D(const std::vector<std::vector<glm::vec2>>& loops, glm::vec2& out) {
+    float ymin = 1e30f, ymax = -1e30f;
+    for (const auto& l : loops)
+        for (const auto& p : l) { ymin = std::min(ymin, p.y); ymax = std::max(ymax, p.y); }
+    if (!(ymax > ymin)) return false;
+    float bestW = 0.0f;
+    constexpr int kScanlines = 24;
+    std::vector<float> xs;
+    for (int k = 0; k < kScanlines; ++k) {
+        const float y = ymin + (ymax - ymin) * (static_cast<float>(k) + 0.5f) / kScanlines;
+        xs.clear();
+        for (const auto& l : loops) {
+            const size_t n = l.size();
+            for (size_t i = 0, j = n - 1; i < n; j = i++) {
+                const glm::vec2& a = l[i];
+                const glm::vec2& b = l[j];
+                if ((a.y > y) == (b.y > y)) continue;
+                xs.push_back(a.x + (b.x - a.x) * (y - a.y) / (b.y - a.y));
+            }
+        }
+        std::sort(xs.begin(), xs.end());
+        for (size_t i = 0; i + 1 < xs.size(); i += 2) {
+            const float w = xs[i + 1] - xs[i];
+            if (w > bestW) { bestW = w; out = glm::vec2(0.5f * (xs[i] + xs[i + 1]), y); }
+        }
+    }
+    return bestW > 1e-6f;
+}
+
 // Tolerance (mm) the region build treats two edges as coincident at. Sketch
 // points are float32, so a sketch line drawn along a host-face edge lands a
 // few 1e-6 mm to 1e-4 mm off it - not exactly on it, which is the one case
@@ -2479,7 +2515,25 @@ std::vector<Sketch::Region> Sketch::buildRegionsUncached(
             rep = toSketch2D(props.CentreOfMass());
         } catch (...) {}
         if (region.outerWire.IsNull() || !isPointInRegion(region, rep)) {
-            if (!region.outerWire.IsNull()) rep = sampleWirePoint(region.outerWire, m_plane);
+            if (!region.outerWire.IsNull()) {
+                // A point ON the outer wire was the fallback, and a thin crescent's
+                // first edge is its end cap: the point sat exactly on the boundary,
+                // where the containment tests disagree with themselves - so
+                // drawnRegions() lost the region (Sketch 2 of 11-3-26 b2_2 got one
+                // tint of two). Prefer a point genuinely inside.
+                std::vector<std::vector<glm::vec2>> loops(1);
+                densifyWire2D(region.outerWire, m_plane, loops[0]);
+                for (const auto& hw : region.holeWires) {
+                    loops.emplace_back();
+                    densifyWire2D(hw, m_plane, loops.back());
+                }
+                glm::vec2 inside(0);
+                if (loops[0].size() >= 3 && interiorPoint2D(loops, inside) &&
+                    isPointInRegion(region, inside))
+                    rep = inside;
+                else
+                    rep = sampleWirePoint(region.outerWire, m_plane);
+            }
         }
         region.representativePoint = rep;
 
@@ -2507,6 +2561,67 @@ std::vector<int> Sketch::drawnRegions(const std::vector<Region>& regions) const 
         }
     }
     return out;
+}
+
+namespace {
+// Outer loop + hole loops of a region, densified once for repeated tests.
+struct RegionPolys {
+    std::vector<glm::vec2> outer;
+    std::vector<std::vector<glm::vec2>> holes;
+    bool contains(glm::vec2 p) const {
+        if (!pointInPolygon2D(outer, p)) return false;
+        for (const auto& h : holes)
+            if (pointInPolygon2D(h, p)) return false;
+        return true;
+    }
+};
+RegionPolys regionPolys(const Sketch::Region& r, const gp_Pln& pln) {
+    RegionPolys rp;
+    densifyWire2D(r.outerWire, pln, rp.outer);
+    for (const auto& h : r.holeWires) {
+        rp.holes.emplace_back();
+        densifyWire2D(h, pln, rp.holes.back());
+    }
+    return rp;
+}
+} // namespace
+
+std::vector<glm::vec2> Sketch::drawnRegionSamples(const std::vector<Region>& regions,
+                                                  int perRegion, size_t maxRegions) const {
+    std::vector<glm::vec2> out;
+    if (regions.empty() || regions.size() > maxRegions) return out;
+    const double fr[5] = {0.5, 0.25, 0.75, 0.125, 0.875};
+    for (int idx : drawnRegions(regions)) {
+        const Region& r = regions[idx];
+        const RegionPolys rp = regionPolys(r, m_plane);
+        if (rp.outer.size() < 3) continue;
+        glm::vec2 lo = rp.outer[0], hi = rp.outer[0];
+        for (const auto& q : rp.outer) { lo = glm::min(lo, q); hi = glm::max(hi, q); }
+        int added = 0;
+        if (rp.contains(r.representativePoint)) { out.push_back(r.representativePoint); ++added; }
+        for (double a : fr)
+            for (double b : fr) {
+                if (added >= perRegion) break;
+                const glm::vec2 p(lo.x + (hi.x - lo.x) * static_cast<float>(a),
+                                  lo.y + (hi.y - lo.y) * static_cast<float>(b));
+                if (rp.contains(p)) { out.push_back(p); ++added; }
+            }
+    }
+    return out;
+}
+
+std::vector<int> Sketch::regionsMissingFrom(const std::vector<Region>& regions,
+                                            const std::vector<glm::vec2>& known) const {
+    std::vector<int> fresh;
+    for (int idx : drawnRegions(regions)) {
+        const RegionPolys rp = regionPolys(regions[idx], m_plane);
+        if (rp.outer.size() < 3) continue;
+        bool held = false;
+        for (const auto& k : known)
+            if (rp.contains(k)) { held = true; break; }
+        if (!held) fresh.push_back(idx);
+    }
+    return fresh;
 }
 
 bool Sketch::isPointInRegion(const Region& region, glm::vec2 p) const {

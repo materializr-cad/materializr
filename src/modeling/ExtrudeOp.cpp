@@ -196,13 +196,55 @@ bool sharesBoundary(const TopoDS_Face& old, const TopoDS_Face& now) {
 }
 } // namespace
 
-bool ExtrudeOp::rebuildProfileFromSketch(Document& doc) {
+bool ExtrudeOp::rebuildProfileFromSketch(Document& doc, bool adoptNewRegions) {
     if (m_sketchId < 0) return false;
     auto sk = doc.getSketch(m_sketchId);
     if (!sk) return false;
 
     TopoDS_Shape profile = sk->buildProfileShape();
     if (profile.IsNull()) return false;
+
+    // Contours drawn since this extrude was made are part of the feature now: it
+    // sweeps every region that held one of its recorded points PLUS every region
+    // holding none of the points recorded at the start. Worked out per REGION,
+    // not per profile island: a circle added around the extruded one leaves the
+    // original a hole in the sketch's even-odd profile, but the disc is still the
+    // region that was extruded.
+    if (adoptNewRegions && !m_regionPts.empty() && !m_knownPts.empty()) {
+        std::vector<glm::vec2> known;
+        known.reserve(m_knownPts.size());
+        for (const auto& p : m_knownPts)
+            known.emplace_back(static_cast<float>(p.first), static_cast<float>(p.second));
+        const auto regions = sk->buildRegions();
+        const std::vector<int> fresh = sk->regionsMissingFrom(regions, known);
+        if (!fresh.empty()) {
+            BRep_Builder bb;
+            TopoDS_Compound all;
+            bb.MakeCompound(all);
+            int usedRegions = 0, taken = 0;
+            for (int idx : sk->drawnRegions(regions)) {
+                if (regions[idx].face.IsNull()) continue;
+                bool wanted = std::find(fresh.begin(), fresh.end(), idx) != fresh.end();
+                bool used = false;
+                for (const auto& p : m_regionPts)
+                    if (sk->isPointInRegion(regions[idx],
+                                            glm::vec2(static_cast<float>(p.first),
+                                                      static_cast<float>(p.second)))) {
+                        used = true;
+                        break;
+                    }
+                if (used) ++usedRegions;
+                if (used || wanted) { bb.Add(all, regions[idx].face); ++taken; }
+            }
+            if (usedRegions > 0 && taken > 0) {
+                std::fprintf(stderr, "[Extrude] adopted %zu contour(s) drawn since the "
+                             "extrude\n", fresh.size());
+                m_profile = taken == 1 ? TopoDS_Shape(TopExp_Explorer(all, TopAbs_FACE).Current())
+                                       : unifyProfile(all);
+                return true;
+            }
+        }
+    }
 
     // Select only the regions this extrude ORIGINALLY used (#53). Without
     // recorded points, keep the whole profile (old behaviour / old files
@@ -438,7 +480,15 @@ bool ExtrudeOp::execute(Document& doc) {
                         }
                     }
                 }
-                if (!pts.empty()) m_regionPts = std::move(pts);
+                if (!pts.empty()) {
+                    m_regionPts = std::move(pts);
+                    // ... and what else the sketch held, so a contour drawn
+                    // later can be told from one deliberately left out.
+                    m_knownPts.clear();
+                    if (auto sk = doc.getSketch(m_sketchId))
+                        for (const glm::vec2& q : sk->drawnRegionSamples(sk->buildRegions()))
+                            m_knownPts.push_back({q.x, q.y});
+                }
             }
         }
 
@@ -699,6 +749,15 @@ std::string ExtrudeOp::serializeParams() const {
             blob += pb;
         }
     }
+    if (!m_knownPts.empty()) {
+        blob += ";known=";
+        char pb[64];
+        for (size_t i = 0; i < m_knownPts.size(); ++i) {
+            std::snprintf(pb, sizeof(pb), "%s%.4f:%.4f", i ? "," : "",
+                          m_knownPts[i].first, m_knownPts[i].second);
+            blob += pb;
+        }
+    }
     // The footprint a boolean-mode reload recovers with a full cut between the
     // step's before/after bodies. It only depends on saved data, so save the
     // OUTCOME and the next load skips the cut: the profile when it worked, an
@@ -779,6 +838,22 @@ bool ExtrudeOp::deserializeParams(const std::string& rawBlob) {
         else if (key == "mode")   { m_mode = static_cast<ExtrudeMode>(i); any = true; }
         else if (key == "target") { m_targetBodyId = i; any = true; }
         else if (key == "draft")  { m_draftAngle = d; any = true; }
+        else if (key == "known") {
+            m_knownPts.clear();
+            size_t q = 0;
+            while (q < val.size() && m_knownPts.size() < 4096) {
+                size_t c = val.find(',', q);
+                std::string tokp = val.substr(q, c == std::string::npos
+                                                     ? std::string::npos : c - q);
+                size_t col = tokp.find(':');
+                if (col != std::string::npos)
+                    m_knownPts.push_back({std::atof(tokp.c_str()),
+                                          std::atof(tokp.c_str() + col + 1)});
+                if (c == std::string::npos) break;
+                q = c + 1;
+            }
+            any = true;
+        }
         else if (key == "regions") {
             m_regionPts.clear();
             size_t q = 0;

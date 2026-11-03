@@ -1231,7 +1231,7 @@ std::string Application::linkHintFor(bool isBody, int id) const {
            materializr::tr(" - editing this sketch updates it.");
 }
 
-bool Application::cascadeFromSketchEdit(int sketchId, double budgetMs) {
+bool Application::cascadeFromSketchEdit(int sketchId, double budgetMs, bool resync) {
     if (sketchId < 0 || !m_history || !m_document) return true;
     // A detached sketch has been deliberately broken out of unison with its
     // body (moved on its own in 3D) - editing it must NOT retro-drive the body.
@@ -1261,7 +1261,7 @@ bool Application::cascadeFromSketchEdit(int sketchId, double budgetMs) {
     if (earliest < 0) {
         std::fprintf(stderr, "[Cascade] sketchId=%d: %d matched, none re-derivable\n",
                      sketchId, matched);
-        if (matched > 0) {
+        if (matched > 0 && !resync) {
             // A body IS driven by this sketch, but its profile couldn't be
             // re-derived from the new geometry - tell the user instead of
             // silently leaving the sketch changed and the body stale.
@@ -1339,7 +1339,7 @@ bool Application::cascadeFromSketchEdit(int sketchId, double budgetMs) {
     // and tell the user exactly which feature to re-apply (#53). Bounded -
     // if several steps fail we stop rather than gut the history.
     std::vector<int> disabledSteps;
-    while (!ok && m_history->lastEditFailStep() >= 0 &&
+    while (!ok && !resync && m_history->lastEditFailStep() >= 0 &&
            disabledSteps.size() < 8) {
         const int bad = m_history->lastEditFailStep();
         Operation* op = const_cast<Operation*>(m_history->getStep(bad));
@@ -1374,7 +1374,9 @@ bool Application::cascadeFromSketchEdit(int sketchId, double budgetMs) {
     m_document->clearCascadeSketchOverrides();
     std::fprintf(stderr, "[Cascade] sketchId=%d replay from step %d: %s\n",
                  sketchId, earliest, ok ? "applied" : "reverted");
-    if (!ok) {
+    if (resync) {
+        // Silent: the caller compares the bodies and reports.
+    } else if (!ok) {
         const Operation* culprit = m_history->lastEditFailStep() >= 0
             ? m_history->getStep(m_history->lastEditFailStep()) : nullptr;
         showToast(culprit
@@ -1418,6 +1420,50 @@ bool Application::cascadeFromSketchEdit(int sketchId, double budgetMs) {
     m_lastCascadeMs = std::chrono::duration<double, std::milli>(
         std::chrono::steady_clock::now() - cascadeStart).count();
     return true;
+}
+
+void Application::resyncModelToSketches(bool manual) {
+    if (!m_document || !m_history) return;
+    std::vector<int> sketches;
+    for (const auto& [sid, bodies] : sketchBodyLinks())
+        if (!bodies.empty() && m_document->getSketch(sid)) sketches.push_back(sid);
+    if (sketches.empty()) {
+        if (manual)
+            showToast(materializr::tr("No feature is built from a sketch, so there is nothing to update."), 4.0);
+        return;
+    }
+    Document* doc = m_document;
+    m_deferredHeavy.queue([this, doc, sketches = std::move(sketches), manual]() {
+        if (doc != m_document) return;   // the user moved to another tab first
+        renderProgressFrame(-1.0f, materializr::tr("Updating the model..."));
+        auto volumeOf = [](const TopoDS_Shape& s) {
+            try { GProp_GProps g; BRepGProp::VolumeProperties(s, g); return g.Mass(); }
+            catch (...) { return 0.0; }
+        };
+        std::map<int, double> before;
+        for (int id : m_document->getAllBodyIds()) before[id] = volumeOf(m_document->getBody(id));
+        for (int sid : sketches)
+            if (m_document->getSketch(sid)) cascadeFromSketchEdit(sid, -1.0, /*resync=*/true);
+        // A replay hands every body a fresh shape, so shapes cannot say whether
+        // anything changed; volumes can.
+        int changed = 0;
+        std::set<int> now;
+        for (int id : m_document->getAllBodyIds()) {
+            now.insert(id);
+            auto it = before.find(id);
+            if (it == before.end()) { ++changed; continue; }
+            const double v = volumeOf(m_document->getBody(id));
+            if (std::abs(v - it->second) > 1e-6 * std::max(1.0, std::abs(it->second))) ++changed;
+        }
+        for (const auto& [id, v] : before) if (!now.count(id)) ++changed;
+        if (changed > 0) {
+            markDirty();
+            showToast(materializr::trFormat("Updated %d body(ies) to match their sketches - this "
+                                            "project was saved while they were out of step.", changed), 9.0);
+        } else if (manual) {
+            showToast(materializr::tr("The model already matches its sketches."), 4.0);
+        }
+    });
 }
 
 void Application::cancelLoft() {
@@ -2120,7 +2166,9 @@ void Application::commitPrimitivePopup() {
         if (!all.IsVoid() && m_viewport) {
             double x0, y0, z0, x1, y1, z1;
             all.Get(x0, y0, z0, x1, y1, z1);
-            m_viewport->getCamera().zoomToFit(
+            // Glide there rather than cut: a primitive can change the framing
+            // completely and the jump loses where everything went.
+            m_viewport->getCamera().animateToFit(
                 glm::vec3(static_cast<float>(x0), static_cast<float>(y0), static_cast<float>(z0)),
                 glm::vec3(static_cast<float>(x1), static_cast<float>(y1), static_cast<float>(z1)));
         }

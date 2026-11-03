@@ -2361,12 +2361,16 @@ int SketchTool::findCoincidentPoint(glm::vec2 pos, int excludeId) const {
     // (304.8-based vs 1-based), the closing click snaps elsewhere, and 0.3 mm
     // cannot bridge the gap: "I can't close out a sketch to extrude."
     //
-    // Same shape as tolStep()'s screen term, and the 0.3 mm stays as a floor so
-    // a deeply zoomed-in view keeps its old precision (and so the radius is
-    // still sane on the first frame, before the viewport has pushed a scale).
+    // Same shape as tolStep()'s screen term. The 0.3 mm floor keeps the radius
+    // sane on the first frame, before the viewport has pushed a scale - but once
+    // there is one it is capped in pixels too: left at 0.3 mm it was hundreds of
+    // pixels at the deepest zoom, and a click ANYWHERE in the window picked the
+    // nearest point (11-3-26).
+    float floorMm = 0.3f;
+    if (m_mmPerPixel > 0.0f) floorMm = std::min(floorMm, kPickFloorPx * m_mmPerPixel);
     const float threshold =
-        std::max(0.3f, std::min(kWeldRadiusPx * m_mmPerPixel,
-                                kWeldRadiusCapMm)) * snapScale();
+        std::max(floorMm, std::min(kWeldRadiusPx * m_mmPerPixel,
+                                   kWeldRadiusCapMm)) * snapScale();
     // Return the NEAREST point within the radius, not the first one found. On
     // dense or small-scale geometry (e.g. an SVG imported small, whose spline
     // control points sit within the weld radius of each other) "first in range"

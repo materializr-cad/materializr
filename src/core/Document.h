@@ -270,8 +270,12 @@ public:
     // Insert/replace a sketch under a SPECIFIC id (mirrors putBody). Used by
     // project load to preserve saved sketch ids so SketchEditOps - and extrude/
     // push-pull ops - that reference a sketch by id rebind correctly on reload.
+    // `atIndex` >= 0 re-inserts a sketch that is not in the list at that
+    // position (clamped), so a restored sketch lands back where it was in the
+    // Items panel instead of at the end. sketchPosition() reads it.
+    int sketchPosition(int id) const { return findSketchIndex(id); }
     void putSketch(int id, std::shared_ptr<materializr::Sketch> sketch,
-                   const std::string& name = "");
+                   const std::string& name = "", int atIndex = -1);
     void removeSketch(int id);
     std::shared_ptr<materializr::Sketch> getSketch(int id) const;
     std::string getSketchName(int id) const;

@@ -1,6 +1,12 @@
 #include "DeleteSketchOp.h"
 #include <cstdio>
 
+void DeleteSketchOp::addBodyDelete(int bodyId) {
+    auto del = std::make_unique<DeleteOp>();
+    del->setBodyId(bodyId);
+    m_bodyDeletes.push_back(std::move(del));
+}
+
 bool DeleteSketchOp::execute(Document& doc) {
     if (m_sketchId < 0) return false;
     auto sk = doc.getSketch(m_sketchId);
@@ -8,15 +14,33 @@ bool DeleteSketchOp::execute(Document& doc) {
     m_sketch = sk;
     m_name = doc.getSketchName(m_sketchId);
     m_visible = doc.isSketchVisible(m_sketchId);
+    m_position = doc.sketchPosition(m_sketchId);
+    // A body that is already gone (an earlier step removed it) is simply not
+    // part of this delete.
+    for (auto& del : m_bodyDeletes) del->execute(doc);
     doc.removeSketch(m_sketchId);
     return true;
 }
 
 bool DeleteSketchOp::undo(Document& doc) {
     if (m_sketchId < 0 || !m_sketch) return false;
-    doc.putSketch(m_sketchId, m_sketch, m_name);
+    doc.putSketch(m_sketchId, m_sketch, m_name, m_position);
     doc.setSketchVisible(m_sketchId, m_visible);
+    // In the order they were deleted, not the reverse: the bodies are independent
+    // of each other, and putBody appends, so the original order of the Items list
+    // only survives if they go back the way they left.
+    for (auto& del : m_bodyDeletes) del->undo(doc);
     return true;
+}
+
+OperationDiff DeleteSketchOp::captureDiff() const {
+    OperationDiff d;
+    for (const auto& del : m_bodyDeletes) {
+        OperationDiff c = del->captureDiff();
+        d.deletedBefore.insert(d.deletedBefore.end(), c.deletedBefore.begin(),
+                               c.deletedBefore.end());
+    }
+    return d;
 }
 
 std::string DeleteSketchOp::description() const {

@@ -262,7 +262,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 
 - CONVERTED: 1
 - allowed-by-hand: 93
-- comment: 307
+- comment: 309
 - diagnostic: 13
 - identifier/other: 9
 
@@ -604,7 +604,8 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | comment | src/modeling/SketchTool.cpp | `// A weld radius is a SCREEN distance. As a fixed 0.3 mm it shrank with the` |
 | comment | src/modeling/SketchTool.cpp | `// welded. Change the lattice underfoot and it stops - switching feet -> mm` |
 | comment | src/modeling/SketchTool.cpp | `// (304.8-based vs 1-based), the closing click snaps elsewhere, and 0.3 mm` |
-| comment | src/modeling/SketchTool.cpp | `// Same shape as tolStep()'s screen term, and the 0.3 mm stays as a floor so` |
+| comment | src/modeling/SketchTool.cpp | `// Same shape as tolStep()'s screen term. The 0.3 mm floor keeps the radius` |
+| comment | src/modeling/SketchTool.cpp | `// there is one it is capped in pixels too: left at 0.3 mm it was hundreds of` |
 | comment | src/modeling/SketchTool.cpp | `// It used to be a hand-rolled scan at 1e-4 mm, which is exact equality` |
 | comment | src/modeling/SketchTool.cpp | `// sketch to extrude" after switching feet -> mm, then as "I can't close` |
 | comment | src/modeling/SketchTool.h | `// current geometry value: mm for distances, RADIUS in mm for Radius (UI` |
@@ -632,6 +633,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | comment | src/modeling/SketchTool.h | `// base preset was chosen - "I'm zoomed in to a 0.01 mm grid and it's` |
 | comment | src/modeling/SketchTool.h | `// still sticking to 0.1 mm" (Steve, 2026-09-26). Only follow the` |
 | comment | src/modeling/SketchTool.h | `// 0.3-0.5 mm (which at a 0.001 mm view is hundreds of pixels: clicks landed` |
+| comment | src/modeling/SketchTool.h | `// with the zoom - so at the deepest zoom a 0.5 mm radius covered the whole` |
 | comment | src/modeling/SketchTool.h | `// on the drawing (a 90-degree corner versus a 6 mm fillet run). The cursor's` |
 | comment | src/modeling/SketchTool.h | `// display->mm on the way in, so under inches a typed 180 deg arrived as` |
 | comment | src/modeling/SketchTool.h | `// or diameter (2-point mode) to whole grid units, so a 1 mm grid can't` |
@@ -695,7 +697,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 ## `Operation::description()` captions
 
 - CONVERTED: 17
-- no-length: 24
+- no-length: 25
 - stored-string: 3
 
 | verdict | file | class |
@@ -711,6 +713,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | CONVERTED | src/modeling/ConstructionPlaneOp.cpp | `ConstructionPlaneOp` |
 | CONVERTED | src/modeling/CopyOp.cpp | `CopyOp` |
 | no-length | src/modeling/DefeatureOp.cpp | `DefeatureOp` |
+| no-length | src/modeling/DeleteConstructionOp.cpp | `DeleteConstructionOp` |
 | no-length | src/modeling/DeleteOp.cpp | `DeleteOp` |
 | no-length | src/modeling/DeleteSketchOp.cpp | `DeleteSketchOp` |
 | no-length | src/modeling/DuplicateSketchOp.cpp | `DuplicateSketchOp` |

@@ -237,3 +237,22 @@ TEST(CameraZoom, OrthoZoomKeepsTheFocusPointFixedOnScreen) {
     EXPECT_NEAR(before.x, after.x, 1e-3f);
     EXPECT_NEAR(before.y, after.y, 1e-3f);
 }
+
+// 11-3-26: framing a new primitive teleported the camera. animateToFit glides,
+// and lands exactly where zoomToFit would have.
+TEST(CameraAnimation, AnimateToFitGlidesAndLandsWhereZoomToFitDoes) {
+    const glm::vec3 lo(-10, 0, -10), hi(30, 20, 10);
+    Camera jump, glide;
+    jump.zoomToFit(lo, hi);
+    const glm::vec3 start = glide.getPosition();
+    glide.animateToFit(lo, hi, 0.3f);
+    EXPECT_TRUE(glide.isAnimating());
+    glide.tick(0.1f);
+    EXPECT_GT(glm::length(glide.getPosition() - start), kEps) << "it started moving";
+    EXPECT_GT(glm::length(glide.getPosition() - jump.getPosition()), 0.5f) << "and has not arrived";
+
+    runToEnd(glide, 0.3f);
+    EXPECT_FALSE(glide.isAnimating());
+    EXPECT_NEAR(glm::length(glide.getPosition() - jump.getPosition()), 0.0f, 1e-2f);
+    EXPECT_NEAR(glm::length(glide.getTarget() - jump.getTarget()), 0.0f, 1e-2f);
+}

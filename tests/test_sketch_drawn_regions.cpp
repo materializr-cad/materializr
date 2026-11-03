@@ -14,6 +14,7 @@
 #include <gp_Pln.hxx>
 #include <glm/glm.hpp>
 #include <algorithm>
+#include <cmath>
 
 using materializr::Sketch;
 
@@ -82,4 +83,42 @@ TEST(SketchDrawnRegions, EmptyInputGivesEmpty) {
     Sketch sk;
     sk.setPlane(xyPlane());
     EXPECT_TRUE(sk.drawnRegions({}).empty());
+}
+
+// 11-3-26 (1.8.0.b2_2, Sketch 2): two thin crescents, each closed by a short
+// straight cap. The area centroid of a crescent is outside it, so the
+// representative point fell back to the middle of the wire's FIRST edge - the
+// cap - i.e. exactly ON the boundary, where the point-in-polygon test is a coin
+// toss. One crescent lost its tint; both were perfectly good regions.
+TEST(SketchDrawnRegions, ThinCrescentsGetAnInteriorRepresentativePoint) {
+    Sketch sk;
+    sk.setPlane(xyPlane());
+    const int c = sk.addPoint({0, 0});
+    const float yc = 4.58f;
+    auto crescent = [&](float sign) {
+        // outer r=20 / inner r=19, from x=-a..+a, closed by two horizontal caps
+        const float xo = std::sqrt(20.0f * 20.0f - yc * yc);
+        const float xi = std::sqrt(19.0f * 19.0f - yc * yc);
+        const float y = sign * yc;
+        const int o1 = sk.addPoint({-xo, y}), o2 = sk.addPoint({xo, y});
+        const int i1 = sk.addPoint({-xi, y}), i2 = sk.addPoint({xi, y});
+        if (sign < 0) {
+            sk.addArc(c, o1, o2, 20.0);
+            sk.addArc(c, i1, i2, 19.0);
+        } else {
+            sk.addArc(c, o2, o1, 20.0);
+            sk.addArc(c, i2, i1, 19.0);
+        }
+        sk.addLine(o1, i1);
+        sk.addLine(o2, i2);
+    };
+    crescent(-1.0f);
+    crescent(+1.0f);
+
+    auto regions = sk.buildRegions();
+    ASSERT_EQ(regions.size(), 2u);
+    for (const auto& r : regions)
+        EXPECT_TRUE(sk.isPointInRegion(r, r.representativePoint))
+            << "representative point must be inside its region, not on its edge";
+    EXPECT_EQ(sk.drawnRegions(regions).size(), 2u) << "both closed contours are drawn";
 }

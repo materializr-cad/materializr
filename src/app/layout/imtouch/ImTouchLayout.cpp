@@ -18,6 +18,7 @@
 #include "core/Operation.h"
 #include "core/SelectionManager.h"
 #include "modeling/DeleteOp.h"          // Items tree: body delete via History
+#include "modeling/DeleteConstructionOp.h" // plane / axis delete via History
 #include "modeling/SketchEditOp.h"      // timeline: Apply cascade targets
 #include "modeling/SketchTransformOp.h"
 #include "ui/UiTheme.h"                 // viewportTopChromeBottom
@@ -62,7 +63,8 @@ const char* stepIcon(const std::string& t) {
     if (t == "shell")                      return MZ_ICON_SHELL;
     if (t == "boolean")                    return MZ_ICON_SUBTRACT;
     if (t == "split_body")                 return MZ_ICON_TRIM;
-    if (t == "delete")                     return MZ_ICON_DELETE;
+    if (t == "delete" || t == "delete_construction")
+                                           return MZ_ICON_DELETE;
     if (t == "defeature")                  return MZ_ICON_REPAIR;
     if (t == "mirror")                     return MZ_ICON_MIRROR;
     if (t == "pattern")                    return MZ_ICON_PATTERN;
@@ -621,7 +623,7 @@ void Application::renderImTouchLayout() {
                             if (ImGui::MenuItem(materializr::tr("Rename")))
                                 startRename(4000000 + id, label);
                             if (ImGui::MenuItem(materializr::tr("Delete"))) {
-                                m_document->removePlane(id);
+                                deleteConstructionEntity(m_history, *m_document, false, id);
                                 if (m_selection) m_selection->clear();
                                 cgone = true;
                             }
@@ -652,7 +654,7 @@ void Application::renderImTouchLayout() {
                             if (ImGui::MenuItem(materializr::tr("Rename")))
                                 startRename(5000000 + id, label);
                             if (ImGui::MenuItem(materializr::tr("Delete"))) {
-                                m_document->removeAxis(id);
+                                deleteConstructionEntity(m_history, *m_document, true, id);
                                 if (m_selection) m_selection->clear();
                                 cgone = true;
                             }
