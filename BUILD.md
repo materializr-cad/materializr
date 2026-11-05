@@ -89,9 +89,10 @@ quarantined, so the first launch needs **System Settings ▸ Privacy & Security 
 
 The bundled dylibs are built for the macOS they were compiled on, so a
 locally built `.dmg` requires that macOS or newer - the script writes the true
-floor into `LSMinimumSystemVersion`. CI builds on the latest macOS runner with
-SDL3 source-built at `MACOSX_DEPLOYMENT_TARGET=14.0`, so the released `.dmg`
-targets **macOS 14+**; it is built, the bundle is launch-tested,
+floor into `LSMinimumSystemVersion`. CI builds on a pinned `macos-14` runner (so
+the Homebrew bottles are minos 14.0) with SDL3 source-built at
+`MACOSX_DEPLOYMENT_TARGET=14.0`, and fails if any bundled binary needs more than
+14.0, so the released `.dmg` targets **macOS 14+**; it is built, the bundle is launch-tested,
 and the artifact uploaded on pushes to `main` (`.github/workflows/macos.yml`).
 Not yet wired up: Intel/universal binaries and Developer-ID signing/notarization.
 
