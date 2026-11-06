@@ -17,7 +17,7 @@ namespace materializr {
 // (Application::setActiveSketchMode) and the sketch toolbar hardcodes those
 // indices, so inserting a mode in the middle silently highlights the wrong
 // button -- Dimension would become 13 while the button still tests 12.
-enum class SketchToolMode { None, Select, Line, Circle, Rectangle, Arc, Spline, Polygon, Trim, Text, Svg, Mirror, Dimension, Airfoil, Offset, Point, Fill, Reference };
+enum class SketchToolMode { None, Select, Line, Circle, Rectangle, Arc, Spline, Polygon, Trim, Text, Svg, Mirror, Dimension, Airfoil, Offset, Point, Fill, Reference, Corner };
 
 enum class DimEntityKind { None, Point, Line, Circle, Arc };
 struct DimPick { DimEntityKind kind = DimEntityKind::None; int id = -1; };
@@ -167,6 +167,34 @@ public:
     // popup without committing the placement, so the user can preview a new
     // count before clicking.
     int getPolygonSides() const { return m_polygonSides; }
+
+    // How the Polygon tool turns the cursor (and the panel) into a polygon.
+    // By default the size and the angle of vertex 0 follow the cursor, as they
+    // always did: the cursor is the circumscribed radius. The panel can read
+    // the size as a radius or a diameter, of the circle through the corners
+    // (circumscribed) or the one touching the sides (inscribed), and either
+    // value can be typed exactly instead of dragged.
+    struct PolygonSpec {
+        bool diameter = false;        // size is a diameter (else a radius)
+        bool inscribed = false;       // size is of the inscribed (side-touching) circle
+        bool hasSize = false;         // `size` was typed: it overrides the cursor
+        double size = 0.0;            //   in mm, in the sense above
+        bool hasAngle = false;        // `angleDeg` was typed: it overrides the cursor
+        double angleDeg = 0.0;        //   direction of vertex 0, degrees from sketch +X
+    };
+    PolygonSpec& polygonSpec() { return m_polygonSpec; }
+    const PolygonSpec& polygonSpec() const { return m_polygonSpec; }
+    // Circumscribed radius and vertex-0 angle (radians) for a cursor at `cursor`
+    // with the first click at `centre`, after the spec has had its say.
+    void polygonResolve(glm::vec2 centre, glm::vec2 cursor, float& circumRadius,
+                        float& rotationRad) const;
+    // The size as the spec reads it (radius or diameter, circum- or inscribed)
+    // for a circumscribed radius - what the panel shows while the size is
+    // still following the cursor.
+    double polygonSizeFor(double circumRadius) const;
+    // Place the polygon now, from the centre click and the current spec and
+    // cursor - the panel's Place button. False when nothing is being placed.
+    bool commitPolygonNow();
     void setPolygonSides(int n) { m_polygonSides = (n < 3) ? 3 : n; }
     // Text tool settings - the popup edits these; the click consumes them.
     const std::string& getTextString() const { return m_textString; }
@@ -294,6 +322,20 @@ public:
     // real elements. Click takes one line or circle; Ctrl+click takes the whole
     // connected run of lines it belongs to.
     const std::vector<std::vector<glm::vec2>>& getReferenceHover() const { return m_refHover; }
+
+    // Corner tool: click a corner where two lines meet to round it (fillet,
+    // `size` = radius) or bevel it (chamfer, `size` = setback along each line).
+    // The size and kind are set from the panel and stay until changed, so a run
+    // of clicks does a run of corners.
+    bool   cornerChamfer() const { return m_cornerChamfer; }
+    void   setCornerChamfer(bool c) { m_cornerChamfer = c; }
+    double cornerSize() const { return m_cornerSize; }
+    void   setCornerSize(double s) { m_cornerSize = s; }
+    // The corner a click would act on (-1 = none) and the size of its marker.
+    int    cornerHoverPoint() const { return m_cornerHover; }
+    float  cornerHoverRadius() const { return pickTol(0.3f, 0.3f); }
+    // Why the last click did nothing, or nullptr. Read-and-clear.
+    const char* consumeCornerRejection() { const char* r = m_cornerRejection; m_cornerRejection = nullptr; return r; }
     void cancelOffset();
 
     // Rectangle's typed-value placement is two-stage: first Enter sets the
@@ -732,6 +774,13 @@ private:
     RefPick pickReference(glm::vec2 pos) const;
     void updateReferenceHover(glm::vec2 pos);
     void handleReferenceTool(glm::vec2 pos);
+    int  pickCornerPoint(glm::vec2 pos) const;
+    void handleCornerTool(glm::vec2 pos);
+    bool   m_cornerChamfer = false;
+    double m_cornerSize = 2.0;
+    int    m_cornerHover = -1;
+    PolygonSpec m_polygonSpec;
+    const char* m_cornerRejection = nullptr;
     std::vector<std::vector<glm::vec2>> m_refHover;
     std::set<int> m_offsetOnly;   // see offsetSelectionCount()
     const std::set<int>* offsetOnly() const { return m_offsetOnly.empty() ? nullptr : &m_offsetOnly; }

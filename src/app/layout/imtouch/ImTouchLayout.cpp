@@ -912,6 +912,7 @@ void Application::renderImTouchLayout() {
                     case ToolAction::Trim:
                     case ToolAction::SketchOffset:
                     case ToolAction::SketchReference:
+                    case ToolAction::SketchCorner:
                     case ToolAction::SketchFill:
                     case ToolAction::SketchCopy:
                     case ToolAction::SketchMirror:

@@ -156,6 +156,8 @@ private:
     int  m_airfoilPointBudget = 40; // spline control points per surface
     void renderMirrorToolPanel(); // interactive mirror line controls (floating)
     void renderOffsetToolPanel(); // offset distance / side / corner style (floating)
+    void renderCornerToolPanel(); // sketch fillet / chamfer: kind + size (floating)
+    void renderPolygonToolPanel(); // polygon: radius/diameter, in/circumscribed, exact size + angle
     // Camera-upright default rotation for Text/SVG placement.
     void seedUprightPlacementAngle();
     void initRenderers();
@@ -619,6 +621,9 @@ private:
     // Make an independent copy of a sketch (Items panel → Duplicate Sketch).
     void duplicateSketch(int sketchId);
     void deleteSketch(int sketchId);   // undoable (DeleteSketchOp)
+    // Fillet / Chamfer asked for on a FACE selection: swap it for the edges
+    // around the face(s). False when there is no usable face selection.
+    bool selectEdgesAroundSelectedFaces();
     void enterSketchMode();
     void enterSketchOnPlane(const gp_Pln& plane);
     void enterSketchOnFace(const TopoDS_Face& face, int sourceBodyId = -1);
@@ -1172,6 +1177,8 @@ private:
     // Interactive mirror line manipulated by a sketch-style move/rotate gizmo.
     // Reuses the SketchGizmoHandle vocabulary (MoveX/MoveY/MoveFree/Rotate).
     SketchGizmoHandle m_mirrorGizmoHandle = SketchGizmoHandle::None;
+    // "Along a line": the next click on a sketch line puts the mirror line on it.
+    bool m_mirrorPickingLine = false;
     glm::vec2 m_mirrorGizmoStartAnchor{0.0f}; // mirror anchor at drag start
     glm::vec2 m_mirrorGizmoGrab{0.0f};        // sketch-space cursor at drag start
     float m_mirrorGizmoStartAngle = 0.0f;     // mirror angle at drag start
@@ -2229,6 +2236,7 @@ private:
     bool   m_primitivePopupActive = false;
     int    m_primitivePopupKind   = 0; // 0=Box,1=Cyl,2=Sphere,3=Cone,4=Torus
     double m_primitivePopupExtents[3]  = {10.0, 10.0, 10.0}; // box X/Y/Z
+    bool   m_primitiveUseDiameter      = false;               // radius fields read/typed as diameters
     double m_primitivePopupRadius      = 5.0;                 // cyl/sphere/cone bottom/torus major
     double m_primitivePopupHeight      = 10.0;                // cyl/cone
     double m_primitivePopupTopRadius   = 0.0;                 // cone tip

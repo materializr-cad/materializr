@@ -70,6 +70,8 @@ void SketchTool::setMode(SketchToolMode mode) {
     m_rectDimStage = 0;
     m_rectDimH = 0.0f;
     m_mirrorActive = false; // switching tools aborts any in-progress mirror
+    m_polygonSpec.hasSize = false;   // typed polygon values do not outlive the tool
+    m_polygonSpec.hasAngle = false;
     cancelOffset();         // ... and any in-progress offset
     // A selection made before choosing Offset IS the pick: go straight to the
     // distance step instead of asking for the same elements to be clicked again.
@@ -213,6 +215,10 @@ void SketchTool::onMouseDown(glm::vec2 pos, bool addToSel) {
             // is being aimed at, so snapping first would only pull the pick.
             handleReferenceTool(pos);
             break;
+        case SketchToolMode::Corner:
+            // Raw cursor too: it picks an existing vertex, it places nothing.
+            handleCornerTool(pos);
+            break;
         default:
             break;
     }
@@ -243,6 +249,12 @@ void SketchTool::onMouseMove(glm::vec2 pos) {
         m_currentPos = pos;
         m_activeInferences.clear();
         updateReferenceHover(pos);
+        return;
+    }
+    if (m_mode == SketchToolMode::Corner) {
+        m_currentPos = pos;
+        m_activeInferences.clear();
+        m_cornerHover = pickCornerPoint(pos);
         return;
     }
     // Offset: the Pick phase hit-tests with the RAW cursor (as Trim does), the
@@ -4226,6 +4238,34 @@ void SketchTool::computeTrimHover(glm::vec2 pos) {
     if (a.valid()) densifyTrimPreview(*m_sketch, a, m_trimHoverPoints);
 }
 
+void SketchTool::polygonResolve(glm::vec2 centre, glm::vec2 cursor, float& circumRadius,
+                                float& rotationRad) const {
+    const glm::vec2 delta = cursor - centre;
+    circumRadius = glm::length(delta);
+    rotationRad = (circumRadius > 1e-6f) ? std::atan2(delta.y, delta.x) : 0.0f;
+    const PolygonSpec& sp = m_polygonSpec;
+    if (sp.hasSize && sp.size > 0.0) {
+        const double radius = sp.diameter ? sp.size * 0.5 : sp.size;
+        // The inscribed circle touches the sides: its radius is the corner
+        // radius times cos(pi / sides).
+        const double k = sp.inscribed ? std::cos(M_PI / std::max(m_polygonSides, 3)) : 1.0;
+        circumRadius = static_cast<float>(radius / k);
+    }
+    if (sp.hasAngle) rotationRad = static_cast<float>(sp.angleDeg * M_PI / 180.0);
+}
+
+double SketchTool::polygonSizeFor(double circumRadius) const {
+    const double k = m_polygonSpec.inscribed ? std::cos(M_PI / std::max(m_polygonSides, 3)) : 1.0;
+    return circumRadius * k * (m_polygonSpec.diameter ? 2.0 : 1.0);
+}
+
+bool SketchTool::commitPolygonNow() {
+    if (m_mode != SketchToolMode::Polygon || !m_isPlacing || !m_sketch) return false;
+    const size_t before = m_sketch->getPolygons().size();
+    handlePolygonTool(m_currentPos);
+    return m_sketch->getPolygons().size() > before;
+}
+
 void SketchTool::handlePolygonTool(glm::vec2 pos) {
     if (!m_isPlacing) {
         // First click: set center
@@ -4237,12 +4277,14 @@ void SketchTool::handlePolygonTool(glm::vec2 pos) {
         // direction from center defines vertex 0's angle, so the first
         // vertex lands exactly under the (grid-snapped) cursor - same
         // "corner snaps to grid" behaviour the user gets with circles.
+        // A size / angle typed in the panel wins over the cursor.
+        float radius = 0.0f, rotationF = 0.0f;
+        polygonResolve(m_firstClick, pos, radius, rotationF);
         glm::vec2 delta = pos - m_firstClick;
-        float radius = glm::length(delta);
         if (radius > 1e-6f) {
             int existing = findCoincidentPoint(m_firstClick, -1);
             int centerId = (existing >= 0) ? existing : m_sketch->addPoint(m_firstClick);
-            double rotation = std::atan2(delta.y, delta.x);
+            double rotation = rotationF;
             // Diagnostic for the "first polygon comes out scrambled in the
             // wrong place" dogfood bug - logs what the tool THINKS it is
             // committing so the discrepancy point is identifiable.
@@ -4258,6 +4300,11 @@ void SketchTool::handlePolygonTool(glm::vec2 pos) {
 
         m_isPlacing = false;
         m_clickCount = 0;
+        // Typed values belong to the polygon just placed; the next one starts
+        // from the cursor again (the radius/diameter and circum/inscribed
+        // choices stay).
+        m_polygonSpec.hasSize = false;
+        m_polygonSpec.hasAngle = false;
     }
 }
 
@@ -4752,6 +4799,35 @@ void SketchTool::updateReferenceHover(glm::vec2 pos) {
         m_refHover.push_back({q + glm::vec2(-h, 0), q + glm::vec2(h, 0)});
         m_refHover.push_back({q + glm::vec2(0, -h), q + glm::vec2(0, h)});
     }
+}
+
+// The corner (a vertex where exactly two lines meet) nearest the cursor, within
+// the pick radius; -1 if none.
+int SketchTool::pickCornerPoint(glm::vec2 pos) const {
+    if (!m_sketch) return -1;
+    const float tol = pickTol(0.3f, 0.3f);
+    int best = -1;
+    float bestD = tol;
+    for (const auto& pt : m_sketch->getPoints()) {
+        if (pt.fromText) continue;
+        const float d = glm::length(pos - pt.pos);
+        if (d < bestD && m_sketch->isRoundableCorner(pt.id)) { bestD = d; best = pt.id; }
+    }
+    return best;
+}
+
+void SketchTool::handleCornerTool(glm::vec2 pos) {
+    if (!m_sketch) return;
+    m_cornerRejection = nullptr;
+    const int pid = pickCornerPoint(pos);
+    if (pid < 0) return;   // empty space: nothing to say
+    if (!m_sketch->roundCorner(pid, m_cornerSize, m_cornerChamfer)) {
+        m_cornerRejection = m_cornerChamfer
+            ? "Too big for this corner - the bevel has to fit on the shorter line."
+            : "Too big for this corner - the arc has to fit on the shorter line.";
+        return;
+    }
+    m_cornerHover = -1;
 }
 
 void SketchTool::handleReferenceTool(glm::vec2 pos) {

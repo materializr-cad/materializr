@@ -174,6 +174,7 @@ namespace materializr { namespace force_link { void linkAll(); } }
 #include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
 #include <TopTools_ListOfShape.hxx>
 #include <TopTools_MapOfShape.hxx>
+#include <TopTools_IndexedMapOfShape.hxx>
 #include <BRepBuilderAPI_Transform.hxx>
 #include <BRepBuilderAPI_GTransform.hxx>
 #include <gp_GTrsf.hxx>
@@ -2579,6 +2580,9 @@ void Application::handleToolAction(int action) {
         case ToolAction::SketchReference:
             if (m_inSketchMode) toggleSketchMode(m_sketchTool.get(), SketchToolMode::Reference);
             break;
+        case ToolAction::SketchCorner:
+            if (m_inSketchMode) toggleSketchMode(m_sketchTool.get(), SketchToolMode::Corner);
+            break;
         case ToolAction::SketchFill:
             if (m_inSketchMode) toggleSketchMode(m_sketchTool.get(), SketchToolMode::Fill);
             break;
@@ -2964,12 +2968,14 @@ void Application::handleToolAction(int action) {
             break;
 
         case ToolAction::Fillet: {
+            if (m_selection->selectedEdgeCount() == 0) selectEdgesAroundSelectedFaces();
             if (m_selection->selectedEdgeCount() >= 1)
                 beginInteractiveEdgeOp(EdgeOpType::Fillet);
             break;
         }
 
         case ToolAction::Chamfer: {
+            if (m_selection->selectedEdgeCount() == 0) selectEdgesAroundSelectedFaces();
             if (m_selection->selectedEdgeCount() >= 1)
                 beginInteractiveEdgeOp(EdgeOpType::Chamfer);
             break;
@@ -5834,15 +5840,73 @@ std::vector<int> Application::bodiesCreatedFromSketch(int sketchId) const {
     return out;
 }
 
+// Fillet / Chamfer on a FACE selection: the edges that run around it. Several
+// faces count as one patch, so an edge two selected faces share (the seam
+// between two halves of a split face) is inside the patch, not on its rim.
+// Seam and degenerate edges of a curved face are not real edges to round.
+// Replaces the face selection with the edge selection, which is what the
+// edge-op gesture reads (and what stays selected if it is cancelled).
+bool Application::selectEdgesAroundSelectedFaces() {
+    if (!m_selection || !m_document) return false;
+    int bodyId = -1;
+    std::vector<TopoDS_Face> faces;
+    for (const auto& e : m_selection->getSelection()) {
+        if (e.type != SelectionType::Face || e.shape.IsNull() || e.bodyId < 0) continue;
+        if (bodyId < 0) bodyId = e.bodyId;
+        if (e.bodyId == bodyId) faces.push_back(TopoDS::Face(e.shape));
+    }
+    if (bodyId < 0 || faces.empty()) return false;
+
+    TopTools_IndexedMapOfShape order;   // first-seen order, so the pick is stable
+    std::map<int, int> uses;            // map index -> how many selected faces hold it
+    for (const auto& f : faces) {
+        TopTools_IndexedMapOfShape own;
+        TopExp::MapShapes(f, TopAbs_EDGE, own);
+        for (int i = 1; i <= own.Extent(); ++i) {
+            const TopoDS_Edge ed = TopoDS::Edge(own(i));
+            if (BRep_Tool::Degenerated(ed) || BRep_Tool::IsClosed(ed, f)) continue;
+            ++uses[order.Add(ed)];
+        }
+    }
+    std::vector<SelectionEntry> rim;
+    for (int i = 1; i <= order.Extent(); ++i) {
+        if (uses[i] != 1) continue;
+        SelectionEntry ee;
+        ee.type = SelectionType::Edge;
+        ee.bodyId = bodyId;
+        ee.shape = order(i);
+        rim.push_back(ee);
+    }
+    if (rim.empty()) return false;
+    m_selection->clear();
+    for (const auto& ee : rim) m_selection->addToSelection(ee);
+    return true;
+}
+
 void Application::deleteSketch(int sketchId) {
     if (!m_document || !m_history) return;
     auto op = std::make_unique<DeleteSketchOp>();
     op->setSketchId(sketchId);
     // The bodies go in the same step, so one Undo restores the sketch and
     // everything built from it.
-    if (m_deleteSketchRemovesBodies)
-        for (int bodyId : bodiesCreatedFromSketch(sketchId))
+    if (m_deleteSketchRemovesBodies) {
+        const std::vector<int> made = bodiesCreatedFromSketch(sketchId);
+        for (int bodyId : made)
             op->addBodyDelete(bodyId);
+        // A step built from the sketch that only CUT into (or stamped onto) an
+        // existing body has no body of its own to delete: it is switched off in
+        // this same step, so the body it shaped is rebuilt without it.
+        for (int i = 0; i <= m_history->currentStep() && i < m_history->stepCount(); ++i) {
+            Operation* step = const_cast<Operation*>(m_history->getStep(i));
+            if (!step || !step->isEnabled() || !materializr::opBuiltFromSketch(step, sketchId))
+                continue;
+            const OperationDiff d = step->captureDiff();
+            bool madeBody = false;
+            for (int c : d.created)
+                if (std::find(made.begin(), made.end(), c) != made.end()) madeBody = true;
+            if (!madeBody && !d.modifiedBefore.empty()) op->addSuppressedStep(step);
+        }
+    }
     if (m_history->pushOperation(std::move(op), *m_document)) {
         if (m_selection) m_selection->clear();
         markDirty();
@@ -7706,11 +7770,14 @@ void Application::exitSketchMode() {
     } else if (m_activeSketchId < 0) {
         std::fprintf(stdout, "Sketch discarded (empty)\n");
     } else if (m_activeSketch) {
-        // An EXISTING sketch the user emptied during this edit: drop it from
-        // the document rather than leaving a blank entry in the Items panel.
-        m_document->removeSketch(m_activeSketchId);
-        markDirty();
+        // An EXISTING sketch the user emptied during this edit: drop it rather
+        // than leaving a blank entry in the Items panel - as an ordinary Delete
+        // Sketch, so it follows the same rules (what was built from it goes or
+        // is rebuilt) and one Undo brings it back.
         std::fprintf(stdout, "Sketch %d removed (emptied)\n", m_activeSketchId);
+        deleteSketch(m_activeSketchId);
+        if (m_document->getSketch(m_activeSketchId)) m_document->removeSketch(m_activeSketchId);
+        markDirty();
     }
 
     m_activeSketch.reset();
@@ -8956,6 +9023,8 @@ void Application::run() {
             renderAirfoilToolPanel();
             renderMirrorToolPanel();
             renderOffsetToolPanel();
+            renderCornerToolPanel();
+            renderPolygonToolPanel();
             renderLoftPanel();
             renderSweepPanel();
             renderBoundaryFillPanel();

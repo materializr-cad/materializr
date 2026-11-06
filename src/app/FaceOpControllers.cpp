@@ -557,6 +557,7 @@ std::unique_ptr<Operation> ProjectSketchController::buildOp(
     op->setDepth(static_cast<double>(m_depth));
     op->setMode(m_mode == 1 ? ProjectSketchOp::Mode::Emboss
                             : ProjectSketchOp::Mode::Engrave);
+    op->setMirror(m_mirror);
     return op;
 }
 
@@ -698,6 +699,17 @@ void ProjectSketchController::panelBody(const IopContext& ctx,
     if (ImGui::RadioButton(materializr::tr("Engrave"), &m_mode, 0)) changed = true;
     ImGui::SameLine();
     if (ImGui::RadioButton(materializr::tr("Emboss"), &m_mode, 1)) changed = true;
+
+    // Which way round the result reads. Depends on where the sketch sits
+    // relative to the body and which way you look at the face, so it is the
+    // user's call rather than a guess.
+    {
+        int dir = m_mirror ? 1 : 0;
+        if (ImGui::RadioButton(materializr::tr("As drawn"), &dir, 0)) changed = true;
+        ImGui::SameLine();
+        if (ImGui::RadioButton(materializr::tr("Mirrored"), &dir, 1)) changed = true;
+        m_mirror = dir == 1;
+    }
 
     ImGui::TextDisabled("%s", materializr::trFormat("Depth: %s", materializr::fmtLength(m_depth)).c_str());
     if (materializr::lengthStepperRow("projDepthStep", &m_depth,

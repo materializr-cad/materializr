@@ -7,7 +7,13 @@
 #include "modeling/DeleteSketchOp.h"
 #include "modeling/DeleteConstructionOp.h"
 #include "modeling/OperationFactory.h"
+#include "modeling/ExtrudeOp.h"
+#include "core/SketchCascadeTarget.h"
 #include <BRepPrimAPI_MakeBox.hxx>
+#include <BRepGProp.hxx>
+#include <GProp_GProps.hxx>
+#include <gp_Ax3.hxx>
+#include <gp_Pln.hxx>
 
 #include <gtest/gtest.h>
 #include <glm/glm.hpp>
@@ -161,4 +167,57 @@ TEST(DeleteConstruction, SurvivesSerializeRoundTrip) {
     ASSERT_NE(doc.getPlane(id), nullptr);
     EXPECT_EQ(doc.getPlaneName(id), "Back; plate=1");
     EXPECT_NEAR(doc.getPlane(id)->plane.Location().Y(), 7.0, 1e-9);
+}
+
+// 11-6-26: deleting the sketch a CUT was built from left the cut in the body (it
+// has no body of its own to delete). The cut is now switched off in the same
+// step, so the body is rebuilt without it; one Undo puts the sketch and the cut
+// back, Redo takes them away again.
+namespace {
+double volumeOf(const TopoDS_Shape& s) {
+    GProp_GProps g;
+    BRepGProp::VolumeProperties(s, g);
+    return g.Mass();
+}
+}
+
+TEST(DeleteSketch, ACutBuiltFromTheSketchIsSwitchedOffWithIt) {
+    Document doc;
+    History hist;
+    const int body = doc.addBody(BRepPrimAPI_MakeBox(20, 20, 20).Shape(), "Box");
+    const double whole = volumeOf(doc.getBody(body));
+
+    auto sk = std::make_shared<Sketch>();
+    sk->setPlane(gp_Pln(gp_Ax3(gp_Pnt(0, 0, 20), gp_Dir(0, 0, 1), gp_Dir(1, 0, 0))));
+    const int p0 = sk->addPoint({5, 5}), p1 = sk->addPoint({10, 5});
+    const int p2 = sk->addPoint({10, 10}), p3 = sk->addPoint({5, 10});
+    sk->addLine(p0, p1); sk->addLine(p1, p2); sk->addLine(p2, p3); sk->addLine(p3, p0);
+    const int sid = doc.addSketch(sk, "Cutter");
+
+    auto ext = std::make_unique<ExtrudeOp>();
+    ext->setSketchSource(sid);
+    ext->setDistance(-5);
+    ext->setMode(ExtrudeMode::Subtract);
+    ext->setTargetBody(body);
+    ASSERT_TRUE(ext->rebuildProfileFromSketch(doc));
+    ASSERT_TRUE(hist.pushOperation(std::move(ext), doc));
+    const double cut = volumeOf(doc.getBody(body));
+    ASSERT_LT(cut, whole - 1.0);
+
+    auto del = std::make_unique<DeleteSketchOp>();
+    del->setSketchId(sid);
+    del->addSuppressedStep(const_cast<Operation*>(hist.getStep(0)));
+    ASSERT_TRUE(hist.pushOperation(std::move(del), doc));
+    EXPECT_EQ(doc.getSketch(sid), nullptr);
+    EXPECT_FALSE(hist.getStep(0)->isEnabled());
+    EXPECT_NEAR(volumeOf(doc.getBody(body)), whole, 1e-6) << "body rebuilt without the cut";
+
+    ASSERT_TRUE(hist.undo(doc));
+    EXPECT_TRUE(hist.getStep(0)->isEnabled());
+    EXPECT_NE(doc.getSketch(sid), nullptr);
+    EXPECT_NEAR(volumeOf(doc.getBody(body)), cut, 1e-6) << "one Undo brings the cut back";
+
+    ASSERT_TRUE(hist.redo(doc));
+    EXPECT_FALSE(hist.getStep(0)->isEnabled());
+    EXPECT_NEAR(volumeOf(doc.getBody(body)), whole, 1e-6);
 }

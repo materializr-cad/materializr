@@ -339,6 +339,7 @@ src/modeling/SketchTool.cpp: // there is one it is capped in pixels too: left at
 src/modeling/SketchTool.cpp: // It used to be a hand-rolled scan at 1e-4 mm, which is exact equality
 src/modeling/SketchTool.cpp: // sketch to extrude" after switching feet -> mm, then as "I can't close
 src/modeling/SketchTool.h: // current geometry value: mm for distances, RADIUS in mm for Radius (UI
+src/modeling/SketchTool.h: double size = 0.0;            //   in mm, in the sense above
 src/modeling/SketchTool.h: // Unrotated text extents relative to the anchor (mm), pushed by the app
 src/modeling/SketchTool.h: // Actual glyph contours (anchor-relative, unrotated mm - same space as the
 src/modeling/SketchTool.h: // real-world size in mm, and the click lands on the LEADING EDGE.

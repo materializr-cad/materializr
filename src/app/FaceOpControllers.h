@@ -128,6 +128,7 @@ private:
     std::vector<int> m_regionFilter; // region subset from selection; empty = all
     float m_depth = 1.0f;
     int   m_mode = 0;               // 0=Engrave, 1=Emboss
+    bool  m_mirror = false;         // false = as drawn, true = mirrored
     int   m_cycleMode = 0;          // 0=all, 1=loops only, 2=islands only
 };
 

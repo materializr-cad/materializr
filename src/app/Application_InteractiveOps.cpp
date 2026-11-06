@@ -1221,6 +1221,8 @@ const std::map<int, std::set<int>>& Application::sketchBodyLinks() const {
         } else if (auto* sw = dynamic_cast<const SweepOp*>(op)) {
             if (sw->getProfileSketchId() >= 0) srcSketches.insert(sw->getProfileSketchId());
             if (sw->getPathSketchId() >= 0) srcSketches.insert(sw->getPathSketchId());
+        } else if (auto* pj = dynamic_cast<const ProjectSketchOp*>(op)) {
+            if (pj->getSketchId() >= 0) srcSketches.insert(pj->getSketchId());
         }
         if (srcSketches.empty()) continue;
         // Bodies this step touched = created + modified.

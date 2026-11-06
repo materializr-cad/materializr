@@ -823,6 +823,118 @@ void Sketch::removeElement(int id) {
         m_points.end());
 }
 
+namespace {
+// The two lines meeting at `pointId` and nothing else touching it, or false.
+struct CornerLines { int l0 = -1, l1 = -1, a = -1, b = -1; };
+}
+
+bool Sketch::isRoundableCorner(int pointId) const {
+    if (!getPoint(pointId)) return false;
+    int n = 0;
+    for (const auto& ln : m_lines)
+        if (ln.startPointId == pointId || ln.endPointId == pointId) ++n;
+    if (n != 2) return false;
+    for (const auto& a : m_arcs)
+        if (a.centerPointId == pointId || a.startPointId == pointId || a.endPointId == pointId) return false;
+    for (const auto& c : m_circles)
+        if (c.centerPointId == pointId) return false;
+    for (const auto& sp : m_splines)
+        if (std::find(sp.controlPointIds.begin(), sp.controlPointIds.end(), pointId) != sp.controlPointIds.end())
+            return false;
+    for (const auto& pg : m_polygons)
+        if (pg.centerPointId == pointId) return false;
+    return true;
+}
+
+bool Sketch::roundCorner(int pointId, double size, bool chamfer, std::vector<int>* createdIds) {
+    if (!(size > 0.0) || !isRoundableCorner(pointId)) return false;
+
+    CornerLines cl;
+    bool cons0 = false, cons1 = false;
+    for (const auto& ln : m_lines) {
+        if (ln.startPointId != pointId && ln.endPointId != pointId) continue;
+        const int other = ln.startPointId == pointId ? ln.endPointId : ln.startPointId;
+        if (cl.l0 < 0) { cl.l0 = ln.id; cl.a = other; cons0 = ln.isConstruction; }
+        else           { cl.l1 = ln.id; cl.b = other; cons1 = ln.isConstruction; }
+    }
+    const SketchPoint* P = getPoint(pointId);
+    const SketchPoint* A = getPoint(cl.a);
+    const SketchPoint* B = getPoint(cl.b);
+    if (!P || !A || !B || cl.a == cl.b) return false;
+
+    const glm::dvec2 p(P->pos), a(A->pos), b(B->pos);
+    glm::dvec2 u1 = a - p, u2 = b - p;
+    const double len1 = glm::length(u1), len2 = glm::length(u2);
+    if (len1 < 1e-6 || len2 < 1e-6) return false;
+    u1 /= len1; u2 /= len2;
+    const double theta = std::acos(std::clamp(glm::dot(u1, u2), -1.0, 1.0));
+    if (theta < 0.02 || theta > M_PI - 0.02) return false;   // (nearly) straight through, or folded back
+
+    // Setback from the corner to each tangent point.
+    const double t = chamfer ? size : size / std::tan(theta * 0.5);
+    if (t > len1 - 1e-4 || t > len2 - 1e-4) return false;
+
+    const glm::dvec2 t1 = p + u1 * t, t2 = p + u2 * t;
+
+    // A polygon's corner: the polygon record has no valid state with one corner
+    // cut, so it becomes plain lines first.
+    for (const auto& pg : m_polygons) {
+        if (std::find(pg.vertexPointIds.begin(), pg.vertexPointIds.end(), pointId) != pg.vertexPointIds.end()) {
+            explodePolygon(pg.id);
+            break;
+        }
+    }
+
+    removeElement(cl.l0);
+    removeElement(cl.l1);
+    removeElement(pointId);
+    // Constraints that named the corner or its two lines are meaningless now.
+    {
+        std::unordered_set<int> valid;
+        for (const auto& pt : m_points)   valid.insert(pt.id);
+        for (const auto& l : m_lines)     valid.insert(l.id);
+        for (const auto& c : m_circles)   valid.insert(c.id);
+        for (const auto& ar : m_arcs)     valid.insert(ar.id);
+        for (const auto& sp : m_splines)  valid.insert(sp.id);
+        for (const auto& pg : m_polygons) valid.insert(pg.id);
+        m_constraints.erase(
+            std::remove_if(m_constraints.begin(), m_constraints.end(),
+                [&](const Constraint& k) {
+                    return (k.entityA >= 0 && valid.find(k.entityA) == valid.end()) ||
+                           (k.entityB >= 0 && valid.find(k.entityB) == valid.end());
+                }),
+            m_constraints.end());
+    }
+
+    std::vector<int> made;
+    const int T1 = addPoint(glm::vec2(t1));
+    const int T2 = addPoint(glm::vec2(t2));
+    made.push_back(T1); made.push_back(T2);
+    const int n1 = addLine(cl.a, T1);
+    const int n2 = addLine(T2, cl.b);
+    if (cons0) setElementConstruction(n1, true);
+    if (cons1) setElementConstruction(n2, true);
+    made.push_back(n1); made.push_back(n2);
+
+    if (chamfer) {
+        const int bevel = addLine(T1, T2);
+        if (cons0 && cons1) setElementConstruction(bevel, true);
+        made.push_back(bevel);
+    } else {
+        const glm::dvec2 bis = glm::normalize(u1 + u2);
+        const glm::dvec2 c = p + bis * (size / std::sin(theta * 0.5));
+        const int C = addPoint(glm::vec2(c));
+        // Arcs run CCW from start to end; the fillet is the short way round.
+        const glm::dvec2 r1 = t1 - c, r2 = t2 - c;
+        const bool t1First = (r1.x * r2.y - r1.y * r2.x) > 0.0;
+        const int arc = t1First ? addArc(C, T1, T2, size) : addArc(C, T2, T1, size);
+        if (cons0 && cons1) setElementConstruction(arc, true);
+        made.push_back(C); made.push_back(arc);
+    }
+    if (createdIds) *createdIds = std::move(made);
+    return true;
+}
+
 bool Sketch::explodePolygon(int id) {
     auto it = std::find_if(m_polygons.begin(), m_polygons.end(),
         [id](const SketchPolygon& p) { return p.id == id; });

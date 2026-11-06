@@ -174,6 +174,20 @@ public:
     int pruneOrphanPoints();
     void clear();
 
+    // Round (fillet) or bevel (chamfer) the corner at `pointId` where exactly two
+    // straight lines meet and nothing else is attached. `size` is the fillet
+    // radius, or the chamfer's setback along each line. Both lines are shortened
+    // to the tangent points and joined by an arc (or a straight chamfer line);
+    // the corner point goes. A polygon's corner dissolves the polygon into its
+    // plain lines first, like Trim does. Returns false - and changes nothing -
+    // when the point is not such a corner, the lines are (nearly) collinear, or
+    // `size` does not fit on the shorter line. `createdIds`, when given, receives
+    // the new points and elements.
+    bool roundCorner(int pointId, double size, bool chamfer,
+                     std::vector<int>* createdIds = nullptr);
+    // Same test without changing anything: is `pointId` a corner roundCorner could act on?
+    bool isRoundableCorner(int pointId) const;
+
     // CONSTRUCTION GEOMETRY: reference lines, circles, arcs and splines that
     // help you draw but are not part of the shape. The contract is that they
     // have NO effect on anything the sketch produces - regions, profile wires,

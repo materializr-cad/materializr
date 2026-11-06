@@ -228,6 +228,9 @@ std::vector<Toolbar::RailTool> Toolbar::railTools() const {
         add(MZ_ICON_OFFSET,  "Offset",  ToolAction::SketchOffset, m_activeSketchMode == 14,
             "Offset a chain: tap an edge to take the whole connected run, then "
             "drag or type the distance. The side you are on picks the direction.");
+        add(MZ_ICON_FILLET,  "Corner",  ToolAction::SketchCorner, m_activeSketchMode == 18,
+            "Round (fillet) or bevel (chamfer) a corner where two lines meet: "
+            "set the size in the panel, then tap each corner.");
         add(MZ_ICON_COPY,    "Reference", ToolAction::SketchReference, m_activeSketchMode == 17,
             "Copy geometry that lies on this plane into the sketch: tap a body "
             "edge, a cross-section line or another sketch's line or circle. "
@@ -403,6 +406,13 @@ std::vector<Toolbar::RailTool> Toolbar::railTools() const {
                 "Cut a helical screw thread into the picked cylindrical face - "
                 "external on a boss, internal in a hole.");
         }
+        // Round / bevel every edge around the picked face(s) - the face twin of
+        // the edge-selection pair, so a face with dozens of edges (or the same
+        // face on both sides of a part) is one pick instead of one per edge.
+        add(MZ_ICON_FILLET,  "Fillet",  ToolAction::Fillet, false,
+            "Round every edge around the selected face(s) with a radius.");
+        add(MZ_ICON_CHAMFER, "Chamfer", ToolAction::Chamfer, false,
+            "Cut every edge around the selected face(s) to a flat bevel.");
         // "Edit Fillet / Chamfer" when the picked face was produced by one -
         // same ownsFace() probe as the classic Face Operations section.
         if (m_selection && m_history) {
@@ -824,6 +834,8 @@ ToolAction Toolbar::renderSketchTools() {
     tip(materializr::tr("Trim a sketch segment at the nearest intersections."));
     if (skBtn("Offset",   14))     action = ToolAction::SketchOffset;
     tip(materializr::tr("Offset a chain: click an edge to take the whole connected run, then move the cursor or type a distance. Which side you are on picks the direction."));
+    if (skBtn("Corner",   18))     action = ToolAction::SketchCorner;
+    tip(materializr::tr("Round (fillet) or bevel (chamfer) a corner where two lines meet: set the size in the panel, then click each corner."));
     if (skBtn("Reference", 17))    action = ToolAction::SketchReference;
     tip(materializr::tr("Copy geometry that lies on this plane into the sketch: click a body edge, a cross-section line, or another sketch's line or circle. Ctrl+click takes the whole connected run of lines."));
     if (skBtn("Fill",     16))     action = ToolAction::SketchFill;
@@ -1071,6 +1083,10 @@ ToolAction Toolbar::renderFaceTools() {
         "Cut a helical screw thread into the picked cylindrical face - "
         "external on a boss, internal in a hole. Pitch / depth / handedness "
         "in the popup.");
+    btn(ToolAction::Fillet, "Fillet",
+        "Round every edge around the picked face(s) with a radius, set in the popup.");
+    btn(ToolAction::Chamfer, "Chamfer",
+        "Bevel every edge around the picked face(s) to a flat cut, distance in the popup.");
     btn(ToolAction::Unfold, "Unfold Faces",
         "Flatten the SELECTED faces into a 2D pattern (cut + fold lines) for a "
         "laser/CNC/printed template. Pick the faces of one panel (e.g. a skin) "
@@ -1117,6 +1133,7 @@ ToolAction Toolbar::renderFaceTools() {
             ToolAction::SketchOnFace, ToolAction::PushPull, ToolAction::ExtrudeSketch,
             ToolAction::Shell, ToolAction::ScaleFace, ToolAction::Taper,
             ToolAction::RemoveFace, ToolAction::MergeFaces,
+            ToolAction::Fillet, ToolAction::Chamfer,
             ToolAction::ProjectSketch, ToolAction::EditDiameter,
             ToolAction::Thread, ToolAction::Unfold, ToolAction::EditFilletChamfer,
             // Move/Rotate come from the shared Transform row that render()

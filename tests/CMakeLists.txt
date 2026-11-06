@@ -598,6 +598,11 @@ add_executable(test_duplicate_sketch test_duplicate_sketch.cpp)
 target_link_libraries(test_duplicate_sketch PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_duplicate_sketch COMMAND test_duplicate_sketch)
 
+# test_sketch_corner - sketch fillet / chamfer of a two-line corner
+add_executable(test_sketch_corner test_sketch_corner.cpp)
+target_link_libraries(test_sketch_corner PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_sketch_corner COMMAND test_sketch_corner)
+
 # test_delete_sketch - sketch deletion goes through History and is undoable
 add_executable(test_delete_sketch test_delete_sketch.cpp)
 target_link_libraries(test_delete_sketch PRIVATE materializr_core gtest gtest_main)

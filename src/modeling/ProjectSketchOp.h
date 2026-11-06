@@ -32,8 +32,13 @@ public:
     void setRegionFilter(std::vector<int> indices, std::vector<glm::vec2> anchors);
     void setDepth(double d);
     void setMode(Mode m);
+    // Flip the projected shape left-to-right about its own centre line (as seen
+    // looking along the sketch normal). Off = project as drawn.
+    void setMirror(bool m) { m_mirror = m; }
+    bool getMirror() const { return m_mirror; }
 
     int    getBodyId() const { return m_bodyId; }
+    int    getSketchId() const { return m_sketchId; }
     double getDepth()  const { return m_depth; }
     Mode   getMode()   const { return m_mode; }
 
@@ -62,5 +67,6 @@ private:
     std::vector<glm::vec2> m_regionAnchors; // parallel to m_regionFilter, or empty (legacy)
     double m_depth = 1.0;
     Mode m_mode = Mode::Engrave;
+    bool m_mirror = false;
     TopoDS_Shape m_previousShape;   // for undo
 };

@@ -7,9 +7,9 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 
 ## Controls by dimension
 
-- CONVERTED: 151
+- CONVERTED: 157
 - absolute-mm: 2
-- angle: 38
+- angle: 39
 - count: 1
 - percent: 19
 - px/ui: 5
@@ -86,6 +86,13 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | CONVERTED | src/app/Application_Dialogs.cpp | `if (materializr::lengthSlider(materializr::trFormat("Chord (%s)", materializr::unitSuffix()).c_str(), &chord, ` |
 | seconds | src/app/Application_Dialogs.cpp | `if (ImGui::SliderInt(materializr::tr("Points per surface"), &budget, 8, 200) &&` |
 | CONVERTED | src/app/Application_Dialogs.cpp | `if (materializr::lengthSlider(materializr::trFormat("Width (%s)", materializr::unitSuffix()).c_str(), &w, 1.0f` |
+| CONVERTED | src/app/Application_Dialogs.cpp | `edited = materializr::amountLengthField("polySize", sizeLabel, &size);` |
+| CONVERTED | src/app/Application_Dialogs.cpp | `edited = materializr::lengthField(sizeLabel, &size).changed;` |
+| CONVERTED | src/app/Application_Dialogs.cpp | `edited \|= materializr::lengthStepperRow("##step", &size, /*allowNegative=*/true,` |
+| angle | src/app/Application_Dialogs.cpp | `angEdited = ImGui::InputDouble(materializr::tr("First corner angle (deg)"), &ang, 0.0, 0.0, "%.2f");` |
+| CONVERTED | src/app/Application_Dialogs.cpp | `materializr::amountLengthField("cornerSize", label, &size);` |
+| CONVERTED | src/app/Application_Dialogs.cpp | `materializr::lengthField(label, &size);` |
+| CONVERTED | src/app/Application_Dialogs.cpp | `materializr::lengthStepperRow("##cornerStep", &size, /*allowNegative=*/true,` |
 | CONVERTED | src/app/Application_Dialogs.cpp | `if (materializr::lengthField("##offsetDist", &mag,` |
 | CONVERTED | src/app/Application_Dialogs.cpp | `materializr::amountLengthField(label, label, v);` |
 | CONVERTED | src/app/Application_Dialogs.cpp | `materializr::lengthField(label, v);` |
@@ -262,7 +269,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 
 - CONVERTED: 1
 - allowed-by-hand: 93
-- comment: 309
+- comment: 310
 - diagnostic: 13
 - identifier/other: 9
 
@@ -609,6 +616,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | comment | src/modeling/SketchTool.cpp | `// It used to be a hand-rolled scan at 1e-4 mm, which is exact equality` |
 | comment | src/modeling/SketchTool.cpp | `// sketch to extrude" after switching feet -> mm, then as "I can't close` |
 | comment | src/modeling/SketchTool.h | `// current geometry value: mm for distances, RADIUS in mm for Radius (UI` |
+| comment | src/modeling/SketchTool.h | `double size = 0.0;            //   in mm, in the sense above` |
 | comment | src/modeling/SketchTool.h | `// Unrotated text extents relative to the anchor (mm), pushed by the app` |
 | comment | src/modeling/SketchTool.h | `// Actual glyph contours (anchor-relative, unrotated mm - same space as the` |
 | comment | src/modeling/SketchTool.h | `// real-world size in mm, and the click lands on the LEADING EDGE.` |

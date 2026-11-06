@@ -218,6 +218,20 @@ private:
     // obsolete cached geometry. `regenerated` means the document was rebuilt,
     // so cached bases are stale and must be dropped.
     void resolveMates(Document& doc, bool regenerated);
+
+    // Switch several steps on or off in ONE rebuild: roll back to the earliest
+    // applied one, flip the flags, re-execute forward in place. The batch form
+    // of setStepEnabled, for an op that owns a set of steps (see
+    // Operation::suppressedSteps). Returns the first step that could not
+    // recompute afterwards (-1 = all fine); that step is skipped, not undone.
+    int flipSteps(const std::vector<int>& indices, bool enabled, Document& doc);
+    // Index of `op` in the list, -1 if it is not there.
+    int indexOf(const Operation* op) const;
+    // Applies / lifts `owner`'s suppressed steps. Applying also pulls in any
+    // later step that can no longer rebuild without them (a fillet on the cut
+    // that just went), so nothing is left half-built behind an error banner.
+    void suppressStepsOf(Operation& owner, Document& doc);
+    void restoreStepsOf(Operation& owner, Document& doc);
     int m_undoFloor = -1;   // see setUndoFloor(): floor for in-sketch undo
     int m_lastEditFailStep = -1; // see lastEditFailStep()
     std::function<bool()> m_editAbort; // see setEditAbort()

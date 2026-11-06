@@ -2119,14 +2119,21 @@ void Application::renderViewport() {
                     // cursor). Show the circumradius (centre→vertex) as a
                     // radius dimension - the polygon analogue of the circle's
                     // diameter readout - tagged with the side count.
-                    glm::vec2 rvec = pe - ps;
-                    float r = glm::length(rvec);
+                    // The panel can retarget the size (radius / diameter, of the
+                    // circle through the corners or the one touching the sides) and
+                    // type it or the angle exactly - read it back the same way.
+                    float r = 0.0f, rot = 0.0f;
+                    m_sketchTool->polygonResolve(ps, pe, r, rot);
                     if (r > 1e-3f) {
+                        const auto& spec = m_sketchTool->polygonSpec();
                         char num[40];
-                        fmtLen(num, sizeof(num), r);
-                        std::snprintf(dbuf, sizeof(dbuf), "R %s \xC2\xB7 %d-gon",
+                        fmtLen(num, sizeof(num), static_cast<float>(m_sketchTool->polygonSizeFor(r)));
+                        std::snprintf(dbuf, sizeof(dbuf), "%s%s %s \xC2\xB7 %d-gon",
+                                      spec.diameter ? "\xC3\x98" : "R",   // diameter sign / R
+                                      spec.inscribed ? " (in)" : "",
                                       num, m_sketchTool->getPolygonSides());
-                        drawDim(sketch2world(ps), sketch2world(pe), dbuf);
+                        const glm::vec2 vtx = ps + glm::vec2(std::cos(rot), std::sin(rot)) * r;
+                        drawDim(sketch2world(ps), sketch2world(vtx), dbuf);
                     }
                 }
             }
@@ -4753,6 +4760,13 @@ void Application::renderViewport() {
                                     rederiveBodies.insert(sBodies.begin(), sBodies.end());
                                 }
                             }
+                            // A sketch moved ON ITS OWN carries what was built from it:
+                            // the body follows by re-derivation (cascade, run once the
+                            // SketchTransformOp below has landed) instead of being left
+                            // where it was with the link cut.
+                            for (int s : inDragSketches)
+                                if (!unisonSketches.count(s) && skLinks.count(s))
+                                    rederiveSketches.insert(s);
                             // Re-derived (linked) sketches must NOT be detached.
                             for (int s : rederiveSketches) detachSketches.erase(s);
 
@@ -6055,6 +6069,42 @@ void Application::renderViewport() {
                         float dxSq = distSegSq(mv, scV, exV), dySq = distSegSq(mv, scV, eyV);
                         float distRing = std::abs(distC - ringR);
                         float pickSq = pickPx * pickPx;
+                        // Pixels per sketch unit here, for tolerances in sketch space.
+                        const float pxPerUnit = glm::length(glm::vec2(sx.x - sc.x, sx.y - sc.y));
+                        // "Along a line": hover the sketch line nearest the cursor and,
+                        // on click, lay the mirror line on it. Only lines that are not
+                        // part of what is being mirrored would be a sensible axis, but
+                        // any line is allowed - a line mirrored across itself is a
+                        // no-op, which is easy to see and undo.
+                        bool pickingLine = m_mirrorPickingLine;
+                        if (pickingLine) {
+                            const float tol = (touch ? 24.0f : 12.0f) / std::max(pxPerUnit, 1e-3f);
+                            const materializr::SketchLine* bestL = nullptr;
+                            glm::vec2 bestA{0.0f}, bestB{0.0f};
+                            float bestD = tol;
+                            for (const auto& ln : m_activeSketch->getLines()) {
+                                const auto* a = m_activeSketch->getPoint(ln.startPointId);
+                                const auto* b = m_activeSketch->getPoint(ln.endPointId);
+                                if (!a || !b) continue;
+                                glm::vec2 ab = b->pos - a->pos;
+                                const float len2 = glm::dot(ab, ab);
+                                if (len2 < 1e-9f) continue;
+                                const float t = glm::clamp(glm::dot(sketchCoord - a->pos, ab) / len2, 0.0f, 1.0f);
+                                const float d = glm::length(sketchCoord - (a->pos + ab * t));
+                                if (d < bestD) { bestD = d; bestL = &ln; bestA = a->pos; bestB = b->pos; }
+                            }
+                            if (bestL) {
+                                ImVec2 pa, pb;
+                                if (mToImg(sk2w(bestA), pa) && mToImg(sk2w(bestB), pb))
+                                    ImGui::GetForegroundDrawList()->AddLine(pa, pb, IM_COL32(255, 220, 50, 255), 4.0f);
+                                if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                                    m_sketchTool->setMirrorAnchor(bestA);
+                                    m_sketchTool->setMirrorAngle(std::atan2(bestB.y - bestA.y, bestB.x - bestA.x));
+                                    m_mirrorPickingLine = false;
+                                }
+                            }
+                            if (ImGui::IsKeyPressed(ImGuiKey_Escape, false)) m_mirrorPickingLine = false;
+                        }
                         SketchGizmoHandle hover = SketchGizmoHandle::None;
                         if      (distC < centerR + pickPx * 0.6f)                 hover = SketchGizmoHandle::MoveFree;
                         else if (dxSq < pickSq && distC < armLen + 14.0f)         hover = SketchGizmoHandle::MoveX;
@@ -6065,7 +6115,7 @@ void Application::renderViewport() {
                                    // block only hit-tests + drags.
 
                         // Arm a handle on press.
-                        if (m_mirrorGizmoHandle == SketchGizmoHandle::None &&
+                        if (m_mirrorGizmoHandle == SketchGizmoHandle::None && !pickingLine &&
                             hover != SketchGizmoHandle::None && !io.KeyCtrl &&
                             ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
                             m_mirrorGizmoHandle = hover;

@@ -23,6 +23,8 @@
 #include <gp_Dir2d.hxx>
 #include <gp_Vec2d.hxx>
 #include <gp_Ax3.hxx>
+#include <gp_Ax2.hxx>
+#include <gp_Trsf.hxx>
 #include <algorithm>
 #include <vector>
 #include <cmath>
@@ -354,7 +356,49 @@ bool ProjectSketchOp::execute(Document& doc) {
             double ny = -gp_Vec(dir).Dot(gp_Vec(cax.YDirection()));
             uO = std::atan2(ny, nx);
         }
-        auto projectWire = [&](const TopoDS_Wire& wir) -> TopoDS_Wire {
+        // Mirrored: the whole selection is reflected about its own centre line
+        // (the plane through the middle of the chosen regions, normal to the
+        // sketch's X axis) before it is projected, so it lands where it was
+        // drawn but reads the other way round.
+        std::vector<int> wantedRegions;
+        for (size_t k = 0; k < m_regionFilter.size(); ++k) {
+            int idx = m_regionFilter[k];
+            if (k < m_regionAnchors.size()) {
+                const int byPoint = sketch->regionAtAnchor(regions, m_regionAnchors[k]);
+                if (byPoint >= 0) idx = byPoint;
+            }
+            wantedRegions.push_back(idx);
+        }
+        gp_Trsf mirrorTrsf;
+        if (m_mirror) {
+            double lo = 1e300, hi = -1e300;
+            for (size_t ri = 0; ri < regions.size(); ++ri) {
+                if (!wantedRegions.empty() &&
+                    std::find(wantedRegions.begin(), wantedRegions.end(),
+                              static_cast<int>(ri)) == wantedRegions.end())
+                    continue;
+                for (TopExp_Explorer ex(regions[ri].outerWire, TopAbs_EDGE); ex.More(); ex.Next()) {
+                    BRepAdaptor_Curve c(TopoDS::Edge(ex.Current()));
+                    const double a = c.FirstParameter(), b = c.LastParameter();
+                    for (int i = 0; i <= 16; ++i) {
+                        const double s = gp_Vec(org, c.Value(a + (b - a) * i / 16.0)).Dot(gp_Vec(sketchX));
+                        lo = std::min(lo, s); hi = std::max(hi, s);
+                    }
+                }
+            }
+            if (hi >= lo) {
+                const gp_Pnt centre = org.Translated(gp_Vec(sketchX) * (0.5 * (lo + hi)));
+                mirrorTrsf.SetMirror(gp_Ax2(centre, sketchX));
+            }
+        }
+        const bool doMirror = m_mirror && mirrorTrsf.Form() != gp_Identity;
+        auto projectWire = [&](const TopoDS_Wire& wir0) -> TopoDS_Wire {
+            TopoDS_Wire wir = wir0;
+            if (doMirror) {
+                try {
+                    wir = TopoDS::Wire(BRepBuilderAPI_Transform(wir0, mirrorTrsf, Standard_True).Shape());
+                } catch (...) { return TopoDS_Wire(); }
+            }
             return cyl.IsNull()
                 ? projectNearest(wir, m_targetFace, dir, org)
                 : wrapWireOnCylinder(wir, cyl, org, sketchX, sketchY, uO);
@@ -370,18 +414,6 @@ bool ProjectSketchOp::execute(Document& doc) {
         double toolVolume = 0.0;
         int skipped = 0;
         reportProgress(0.0f, "Projecting sketch onto face\xE2\x80\xA6");
-        // Which regions the filter names. A saved point finds its region
-        // whatever the numbering did since; a point that lands in no region
-        // (the sketch was edited away from it) keeps its index.
-        std::vector<int> wantedRegions;
-        for (size_t k = 0; k < m_regionFilter.size(); ++k) {
-            int idx = m_regionFilter[k];
-            if (k < m_regionAnchors.size()) {
-                const int byPoint = sketch->regionAtAnchor(regions, m_regionAnchors[k]);
-                if (byPoint >= 0) idx = byPoint;
-            }
-            wantedRegions.push_back(idx);
-        }
         for (size_t ri = 0; ri < regions.size(); ++ri) {
             if (!m_regionFilter.empty()) {
                 bool wanted = false;
@@ -581,6 +613,7 @@ std::string ProjectSketchOp::serializeParams() const {
     std::snprintf(buf, sizeof(buf), "body=%d;sketch=%d;depth=%.6f;mode=%d",
                   m_bodyId, m_sketchId, m_depth, static_cast<int>(m_mode));
     blob += buf;
+    if (m_mirror) blob += ";mirror=1";
     if (!m_regionFilter.empty()) {
         blob += ";regions=";
         for (size_t i = 0; i < m_regionFilter.size(); ++i) {
@@ -642,6 +675,7 @@ bool ProjectSketchOp::deserializeParams(const std::string& blob) {
                                                  : Mode::Engrave;
             any = true;
         }
+        else if (key == "mirror") { m_mirror = std::atoi(val.c_str()) != 0; any = true; }
         else if (key == "regions") {
             m_regionFilter.clear();
             size_t p = 0;

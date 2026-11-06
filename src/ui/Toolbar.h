@@ -53,7 +53,9 @@ enum class ToolAction {
     // Sketch construction geometry. With elements picked in Select mode it
     // flips them between real and construction; otherwise it toggles "draw as
     // construction" for the tools. Appended for the same no-shift reason.
-    SketchConstruction
+    SketchConstruction,
+    // Sketch corner tool: round (fillet) or bevel (chamfer) a corner of two lines.
+    SketchCorner
 };
 
 class Toolbar {

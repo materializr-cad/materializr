@@ -98,6 +98,7 @@ private:
     void drawTrimHover(const Sketch* sketch, const SketchTool* tool, const glm::mat4& vp);
     void drawOffsetPreview(const Sketch* sketch, const SketchTool* tool, const glm::mat4& vp);
     void drawReferenceHover(const Sketch* sketch, const SketchTool* tool, const glm::mat4& vp);
+    void drawCornerHover(const Sketch* sketch, const SketchTool* tool, const glm::mat4& vp);
     void drawMidpointDots(const Sketch* sketch, const glm::mat4& vp);
     void drawConstraints(const Sketch* sketch, const SketchSolver* solver, const glm::mat4& vp);
 

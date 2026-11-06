@@ -446,9 +446,12 @@ void EdgeOpController::writeEditedParams(const IopContext& ctx, float v,
 
 // ─── Commit / cancel ────────────────────────────────────────────────────────
 
-void EdgeOpController::finish(const IopContext& ctx) {
+void EdgeOpController::finish(const IopContext& ctx, bool keepSelection) {
     m_editPreview.clear();
-    ctx.selection.clear();
+    // A confirmed op has consumed its picks. A cancelled one has not: the body
+    // is back exactly as it was, and the user will want to retry with another
+    // value (or a smaller set) without re-picking every edge.
+    if (!keepSelection) ctx.selection.clear();
     // The body this gesture touched, not every visible one: commit() and
     // cancel() hold a BodyChangeScope over the document edit, and a create
     // gesture only ever changes its own body. An edit-mode replay marks its
@@ -599,7 +602,7 @@ void EdgeOpController::cancel(const IopContext& ctx) {
         ctx.doc.updateBody(bodyId(), snapshot());
     }
     refreshAllEdgeOpFaces(ctx.history, ctx.doc);   // body replayed - rebind
-    finish(ctx);
+    finish(ctx, /*keepSelection=*/m_editingIndex < 0);
 }
 
 // ─── Viewport handle ────────────────────────────────────────────────────────

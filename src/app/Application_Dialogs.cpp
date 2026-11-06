@@ -2352,6 +2352,7 @@ void Application::renderLoftPanel() {
             ImGui::TextWrapped(materializr::tr("Rail %zu: %s"), i + 1,
                                sketchLabel(m_loftRails[i].sketchId).c_str());
         ImGui::TextDisabled("%s", materializr::tr("The base profile shrinks/grows to follow the\nrails as it rises; rails meeting a single point\nclose to an apex."));
+        ImGui::TextDisabled("%s", materializr::tr("It stays centred over its base. To make a shape\nfollow a path, use Sweep."));
         ImGui::Separator();
         if (ImGui::Checkbox(materializr::tr("Solid (off = surface shell)"), &m_loftSolid))
             changed = true;
@@ -3549,6 +3550,7 @@ void Application::applySketchMove() {
     op->setSketch(sketchId);
     op->setTransform(trsf);
     bool ok = m_history->pushOperation(std::move(op), *m_document);
+    if (ok) cascadeFromSketchEdit(sketchId);   // what was built from it follows
     std::fprintf(stderr, "[SketchMove] apply sketch=%d delta=(%.3f, %.3f, %.3f) -> %s\n",
                  sketchId, m_sketchMove[0], m_sketchMove[1], m_sketchMove[2],
                  ok ? "ok" : "FAILED");
@@ -4580,7 +4582,8 @@ void Application::renderAlignFacePopup() {
             auto op = std::make_unique<SketchTransformOp>();
             op->setSketch(m_alignSketchId);
             op->setTransform(full);
-            m_history->pushOperation(std::move(op), *m_document);
+            if (m_history->pushOperation(std::move(op), *m_document))
+                cascadeFromSketchEdit(m_alignSketchId);   // what was built from it follows
             markDirty();
         }
         m_alignSketchId = -1;
@@ -5518,8 +5521,10 @@ void Application::renderSvgToolPanel() {
 void Application::renderMirrorToolPanel() {
     if (!m_inSketchMode || !m_sketchTool ||
         m_sketchTool->getMode() != SketchToolMode::Mirror ||
-        !m_sketchTool->isMirrorActive())
+        !m_sketchTool->isMirrorActive()) {
+        m_mirrorPickingLine = false;
         return;
+    }
 
     ImGuiViewport* vp = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(
@@ -5540,6 +5545,11 @@ void Application::renderMirrorToolPanel() {
         ImGui::SameLine();
         if (ImGui::Button(materializr::tr("Horizontal")))
             m_sketchTool->setMirrorAngle(0.0f);
+        // Mirror across a line that is already in the sketch: click this, then
+        // the line. The mirror line takes its position and direction.
+        if (ImGui::Button(m_mirrorPickingLine ? materializr::tr("Click a line in the sketch...")
+                                              : materializr::tr("Along a sketch line")))
+            m_mirrorPickingLine = !m_mirrorPickingLine;
         // Pin the line to the sketch origin, so a part and its twin sit either
         // side of the sketch's own axes (#153). Combine with Vertical/Horizontal.
         ImGui::SameLine();
@@ -5566,6 +5576,7 @@ void Application::renderMirrorToolPanel() {
             auto trackBodies = trackBodyChanges(); // re-tessellate only what changes
             std::set<int> newPts, newLines;
             recordSketchMutation([&]{ m_sketchTool->commitMirror(newPts, newLines); });
+            m_mirrorPickingLine = false;
             m_sketchTool->cancelMirror();
             m_sketchTool->setMode(SketchToolMode::Select);
             m_sketchTool->setSelection(newPts, newLines);
@@ -5573,15 +5584,170 @@ void Application::renderMirrorToolPanel() {
         }
         ImGui::SameLine();
         if (ImGui::Button(materializr::tr("Cancel"))) {
+            m_mirrorPickingLine = false;
             m_sketchTool->cancelMirror();
             m_sketchTool->setMode(SketchToolMode::Select);
         }
     }
     ImGui::End();
     if (!open) {
+        m_mirrorPickingLine = false;
         m_sketchTool->cancelMirror();
         m_sketchTool->setMode(SketchToolMode::Select);
     }
+}
+
+void Application::renderPolygonToolPanel() {
+    if (!m_inSketchMode || !m_sketchTool ||
+        m_sketchTool->getMode() != SketchToolMode::Polygon)
+        return;
+
+    ImGuiViewport* vp = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(
+        ImVec2(vp->WorkPos.x + vp->WorkSize.x * 0.5f, vp->WorkPos.y + 60.0f),
+        ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.0f));
+    ImGui::SetNextWindowBgAlpha(0.92f);
+    bool open = true;
+    auto& spec = m_sketchTool->polygonSpec();
+    if (ImGui::Begin("Polygon", &open,
+                     ImGuiWindowFlags_AlwaysAutoResize |
+                     ImGuiWindowFlags_NoSavedSettings)) {
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * 22.0f);
+        ImGui::TextDisabled("%s", m_sketchTool->isPlacing()
+            ? materializr::tr("Drag to size it, or type an exact size and angle below, then click or press Place.")
+            : materializr::tr("Click the centre. Choose how the size is measured below."));
+        ImGui::PopTextWrapPos();
+
+        int sides = m_sketchTool->getPolygonSides();
+        ImGui::SetNextItemWidth(materializr::uiSz(120, 0).x);
+        if (ImGui::InputInt(materializr::tr("Sides"), &sides)) m_sketchTool->setPolygonSides(sides);
+
+        // "##" ids: the size field below carries the same words as its label.
+        int dm = spec.diameter ? 1 : 0;
+        if (ImGui::RadioButton((std::string(materializr::tr("Radius")) + "##polyMode").c_str(), &dm, 0)) {}
+        ImGui::SameLine();
+        if (ImGui::RadioButton((std::string(materializr::tr("Diameter")) + "##polyMode").c_str(), &dm, 1)) {}
+        spec.diameter = dm == 1;
+        int ins = spec.inscribed ? 1 : 0;
+        if (ImGui::RadioButton(materializr::tr("Circumscribed"), &ins, 0)) {}
+        ImGui::SameLine();
+        if (ImGui::RadioButton(materializr::tr("Inscribed"), &ins, 1)) {}
+        spec.inscribed = ins == 1;
+        ImGui::TextDisabled("%s", spec.inscribed
+            ? materializr::tr("Inscribed: the circle touching the sides (across flats).")
+            : materializr::tr("Circumscribed: the circle through the corners."));
+
+        // The size: what is being dragged until it is typed.
+        float curR = 0.0f, curRot = 0.0f;
+        const bool placing = m_sketchTool->isPlacing();
+        if (placing)
+            m_sketchTool->polygonResolve(m_sketchTool->getFirstClick(),
+                                         m_sketchTool->getCurrentPos(), curR, curRot);
+        double size = spec.hasSize ? spec.size : m_sketchTool->polygonSizeFor(curR);
+        const char* sizeLabel = spec.diameter ? materializr::tr("Diameter") : materializr::tr("Radius");
+        bool edited = false;
+        ImGui::Separator();
+        if (imTouchLayout()) {
+            edited = materializr::amountLengthField("polySize", sizeLabel, &size);
+        } else {
+            edited = materializr::lengthField(sizeLabel, &size).changed;
+            // -10 / -1 / -0.1 / +0.1 / +1 / +10, like every other length.
+            ImGui::PushID("polySizeStep");
+            edited |= materializr::lengthStepperRow("##step", &size, /*allowNegative=*/true,
+                                                    0.0, 1.0e6, 0.0, /*showZero=*/false);
+            ImGui::PopID();
+        }
+        if (edited && size > 0.0) { spec.hasSize = true; spec.size = size; }
+
+        // The angle of the first corner, from the sketch's +X axis.
+        double ang = spec.hasAngle ? spec.angleDeg : curRot * 180.0 / M_PI;
+        bool angEdited = false;
+        ImGui::SetNextItemWidth(materializr::uiSz(140, 0).x);
+        angEdited = ImGui::InputDouble(materializr::tr("First corner angle (deg)"), &ang, 0.0, 0.0, "%.2f");
+        {
+            static const double steps[] = {-90, -45, -15, 0, 15, 45, 90};
+            ImGui::PushID("polyAngStep");
+            for (size_t i = 0; i < sizeof(steps) / sizeof(steps[0]); ++i) {
+                if (i) ImGui::SameLine();
+                char b[16];
+                if (steps[i] == 0) std::snprintf(b, sizeof b, "0");
+                else               std::snprintf(b, sizeof b, "%+g", steps[i]);
+                ImGui::PushID(static_cast<int>(i));
+                if (ImGui::SmallButton(b)) {
+                    ang = steps[i] == 0 ? 0.0 : ang + steps[i];
+                    angEdited = true;
+                }
+                ImGui::PopID();
+            }
+            ImGui::PopID();
+        }
+        if (angEdited) {
+            while (ang >= 360.0) ang -= 360.0;
+            while (ang < 0.0)    ang += 360.0;
+            spec.hasAngle = true;
+            spec.angleDeg = ang;
+        }
+
+        ImGui::Separator();
+        ImGui::BeginDisabled(!placing);
+        if (ImGui::Button(materializr::tr("Place"))) {
+            auto trackBodies = trackBodyChanges(); // re-tessellate only what changes
+            recordSketchMutation([&]{ m_sketchTool->commitPolygonNow(); });
+            markDirty();
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        ImGui::BeginDisabled(!spec.hasSize && !spec.hasAngle);
+        if (ImGui::Button(materializr::tr("Follow cursor"))) {
+            spec.hasSize = false;
+            spec.hasAngle = false;
+        }
+        ImGui::EndDisabled();
+    }
+    ImGui::End();
+    if (!open) m_sketchTool->setMode(SketchToolMode::Select);
+}
+
+void Application::renderCornerToolPanel() {
+    if (!m_inSketchMode || !m_sketchTool ||
+        m_sketchTool->getMode() != SketchToolMode::Corner)
+        return;
+    // A click that could not be applied (the size does not fit) says why.
+    if (const char* why = m_sketchTool->consumeCornerRejection())
+        showToast(materializr::tr(why), 3.0);
+
+    ImGuiViewport* vp = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(
+        ImVec2(vp->WorkPos.x + vp->WorkSize.x * 0.5f, vp->WorkPos.y + 60.0f),
+        ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.0f));
+    ImGui::SetNextWindowBgAlpha(0.92f);
+    bool open = true;
+    if (ImGui::Begin("Corner", &open,
+                     ImGuiWindowFlags_AlwaysAutoResize |
+                     ImGuiWindowFlags_NoSavedSettings)) {
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * 22.0f);
+        ImGui::TextDisabled("%s", materializr::tr("Click a corner where two lines meet. Set the size first; it stays for the next corner."));
+        ImGui::PopTextWrapPos();
+        int kind = m_sketchTool->cornerChamfer() ? 1 : 0;
+        if (ImGui::RadioButton(materializr::tr("Fillet"), &kind, 0)) {}
+        ImGui::SameLine();
+        if (ImGui::RadioButton(materializr::tr("Chamfer"), &kind, 1)) {}
+        m_sketchTool->setCornerChamfer(kind == 1);
+
+        double size = m_sketchTool->cornerSize();
+        const char* label = kind == 1 ? materializr::tr("Distance") : materializr::tr("Radius");
+        if (imTouchLayout()) {
+            materializr::amountLengthField("cornerSize", label, &size);
+        } else {
+            materializr::lengthField(label, &size);
+            materializr::lengthStepperRow("##cornerStep", &size, /*allowNegative=*/true,
+                                          0.0, 1.0e6, 0.0, /*showZero=*/false);
+        }
+        if (size < 0.001) size = 0.001;
+        m_sketchTool->setCornerSize(size);
+    }
+    ImGui::End();
+    if (!open) m_sketchTool->setMode(SketchToolMode::Select);
 }
 
 void Application::renderOffsetToolPanel() {
@@ -5740,6 +5906,23 @@ void Application::renderPrimitivePopup() {
                                       0.0, /*showZero=*/isOrigin);
         ImGui::PopID();
     };
+    // Radius or diameter: the part is often specified as a diameter (a bore, a
+    // bolt), so the radius fields can be typed as one. The value is kept as a
+    // radius underneath, whichever way it is entered.
+    auto radiusField = [&](const char* radiusLabel, const char* diameterLabel, double* r) {
+        if (!m_primitiveUseDiameter) { dimField(radiusLabel, r); return; }
+        double d = *r * 2.0;
+        dimField(diameterLabel, &d);
+        *r = d * 0.5;
+    };
+    if (k >= 1) {
+        int dm = m_primitiveUseDiameter ? 1 : 0;
+        // "##" ids: the field below carries the same words as its label.
+        if (ImGui::RadioButton((std::string(materializr::tr("Radius")) + "##primMode").c_str(), &dm, 0)) {}
+        ImGui::SameLine();
+        if (ImGui::RadioButton((std::string(materializr::tr("Diameter")) + "##primMode").c_str(), &dm, 1)) {}
+        m_primitiveUseDiameter = dm == 1;
+    }
     switch (k) {
     case 0: // Box
         dimField("Width (X)",  &m_primitivePopupExtents[0]);
@@ -5747,20 +5930,20 @@ void Application::renderPrimitivePopup() {
         dimField("Height (Z)", &m_primitivePopupExtents[2]);
         break;
     case 1: // Cylinder
-        dimField("Radius", &m_primitivePopupRadius);
+        radiusField("Radius", "Diameter", &m_primitivePopupRadius);
         dimField("Height", &m_primitivePopupHeight);
         break;
     case 2: // Sphere
-        dimField("Radius", &m_primitivePopupRadius);
+        radiusField("Radius", "Diameter", &m_primitivePopupRadius);
         break;
     case 3: // Cone
-        dimField("Bottom radius", &m_primitivePopupRadius);
-        dimField("Top radius",    &m_primitivePopupTopRadius);
+        radiusField("Bottom radius", "Bottom diameter", &m_primitivePopupRadius);
+        radiusField("Top radius",    "Top diameter",    &m_primitivePopupTopRadius);
         dimField("Height",        &m_primitivePopupHeight);
         break;
     case 4: // Torus
-        dimField("Major radius",  &m_primitivePopupRadius);
-        dimField("Minor radius",  &m_primitivePopupMinorRadius);
+        radiusField("Major radius", "Major diameter", &m_primitivePopupRadius);
+        radiusField("Minor radius", "Minor diameter", &m_primitivePopupMinorRadius);
         ImGui::TextDisabled("%s", materializr::tr("Major must exceed minor - equal radii are a degenerate self-touching torus."));
         break;
     }

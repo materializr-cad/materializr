@@ -3,6 +3,7 @@
 #include "Document.h"
 #include "History.h"
 #include "../modeling/ExtrudeOp.h"
+#include "../modeling/ProjectSketchOp.h"
 #include "../modeling/PushPullOp.h"
 #include "../modeling/RevolveOp.h"
 #include "../modeling/SketchEditOp.h"
@@ -146,14 +147,23 @@ inline int rederiveSketchDrivenOps(History& history, Document& doc, int sketchId
             if (sw->getProfileSketchId() != sketchId && sw->getPathSketchId() != sketchId) continue;
             ++matched;
             if (sw->rebuildFromSketches(doc) && earliest < 0) earliest = i;
+        } else if (auto* pj = dynamic_cast<ProjectSketchOp*>(op)) {
+            // Re-reads the sketch every time it executes, so there is no
+            // profile to rebuild - it only needs the chain replayed from here.
+            if (pj->getSketchId() != sketchId) continue;
+            ++matched;
+            if (earliest < 0) earliest = i;
         }
     }
     if (matchedOut) *matchedOut = matched;
     return earliest;
 }
 
-// True when `op` is an extrude / push-pull / lathe / sweep built from `sketchId`.
+// True when `op` is an extrude / push-pull / lathe / sweep / projection built
+// from `sketchId`.
 inline bool opBuiltFromSketch(const Operation* op, int sketchId) {
+    if (auto* pj = dynamic_cast<const ProjectSketchOp*>(op))
+        return pj->getSketchId() == sketchId;
     if (auto* ext = dynamic_cast<const ExtrudeOp*>(op))
         return ext->getSketchId() == sketchId;
     if (auto* rv = dynamic_cast<const RevolveOp*>(op))

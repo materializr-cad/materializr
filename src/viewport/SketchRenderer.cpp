@@ -473,6 +473,7 @@ void SketchRenderer::render(const Sketch* sketch, const SketchTool* tool,
         drawTrimHover(sketch, tool, vp);
         drawOffsetPreview(sketch, tool, vp);
         drawReferenceHover(sketch, tool, vp);
+        drawCornerHover(sketch, tool, vp);
         drawSvgGhost(sketch, tool, vp);
         drawAirfoilGhost(sketch, tool, vp);
     }
@@ -802,6 +803,25 @@ void SketchRenderer::drawReferenceHover(const Sketch* sketch, const SketchTool* 
     if (!verts.empty()) uploadAndDraw(verts, GL_LINES, glm::vec3(0.35f, 0.85f, 1.0f), vp, 4.0f);
 }
 
+void SketchRenderer::drawCornerHover(const Sketch* sketch, const SketchTool* tool,
+                                     const glm::mat4& vp) {
+    if (!sketch || !tool || tool->getMode() != SketchToolMode::Corner) return;
+    const SketchPoint* pt = sketch->getPoint(tool->cornerHoverPoint());
+    if (!pt) return;
+    // A diamond round the vertex that a click would round off.
+    const float h = tool->cornerHoverRadius();
+    const glm::vec2 c = pt->pos;
+    const glm::vec2 q[4] = {c + glm::vec2(h, 0), c + glm::vec2(0, h), c + glm::vec2(-h, 0), c + glm::vec2(0, -h)};
+    std::vector<float> verts;
+    for (int i = 0; i < 4; ++i) {
+        const glm::vec3 a = toWorld(sketch, q[i]);
+        const glm::vec3 b = toWorld(sketch, q[(i + 1) % 4]);
+        verts.push_back(a.x); verts.push_back(a.y); verts.push_back(a.z);
+        verts.push_back(b.x); verts.push_back(b.y); verts.push_back(b.z);
+    }
+    uploadAndDraw(verts, GL_LINES, glm::vec3(0.35f, 0.85f, 1.0f), vp, 4.0f);
+}
+
 void SketchRenderer::drawMidpointDots(const Sketch* sketch, const glm::mat4& vp) {
     if (!sketch) return;
 
@@ -991,8 +1011,11 @@ void SketchRenderer::drawPreview(const Sketch* sketch, const SketchTool* tool,
         float radius = glm::length(delta);
         const int sides = tool ? tool->getPolygonSides() : 6;
         // Rotation = direction from centre toward cursor. Matches the actual
-        // placement so vertex 0 sits exactly on the (grid-snapped) cursor.
+        // placement so vertex 0 sits exactly on the (grid-snapped) cursor -
+        // unless the panel has a typed size or angle, which the placement obeys
+        // and so must the preview.
         float rotation = (radius > 1e-6f) ? std::atan2(delta.y, delta.x) : 0.0f;
+        if (tool) tool->polygonResolve(start, end, radius, rotation);
         for (int i = 0; i < sides; i++) {
             float a1 = rotation + 2.0f * (float)M_PI * i / sides;
             float a2 = rotation + 2.0f * (float)M_PI * (i + 1) / sides;

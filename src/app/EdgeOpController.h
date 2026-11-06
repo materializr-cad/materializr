@@ -103,7 +103,7 @@ private:
     // Write the previewed value(s) into the history op being re-edited.
     void writeEditedParams(const IopContext& ctx, float v, float v2) const;
     // Shared teardown for every commit/cancel exit.
-    void finish(const IopContext& ctx);
+    void finish(const IopContext& ctx, bool keepSelection = false);
 
     EdgeOpKind m_kind = EdgeOpKind::None;
     std::vector<TopoDS_Shape> m_edges;
