@@ -5,6 +5,44 @@ All notable changes to Materializr are documented here. Format loosely follows
 
 ## [Unreleased]
 
+## [1.8.0-beta.4] - 2026-11-06
+
+Beta (Settings ▸ Include pre-release builds), desktop and Android. Fixes from the
+beta.3 reports, plus a few tools that were asked for.
+
+### Added
+
+- **Sketch Corner tool** (the "Corner" button in a sketch). Rounds (fillet) or
+  bevels (chamfer) a corner where two lines meet: set the size, then click each
+  corner.
+- **Polygon panel.** Size the polygon as a radius or a diameter, of the circle
+  through the corners or the one touching the sides, type an exact size and the
+  angle of the first corner, with the usual stepper buttons.
+- **Mirror across a line in the sketch.** The sketch Mirror panel has "Along a
+  sketch line": click a line and the mirror line takes its position and angle.
+- **Fillet and Chamfer on a face.** With a face selected, the two tools round or
+  bevel every edge around it.
+- **Projection can be mirrored.** Project's panel has As drawn / Mirrored, since
+  which way round a logo should read depends on where the sketch sits.
+- **Radius or diameter** when creating a cylinder, sphere, cone or torus.
+
+### Fixed
+
+- **Deleting a sketch removes what was built from it.** A cut or projection made
+  from the sketch is now switched off and the body rebuilt without it, in the
+  same step, so one Undo brings everything back. Finishing a sketch after
+  deleting all its contents does the same and can be undone.
+- **Moving a sketch on its own moves the body built from it.** Before, the body
+  stayed where it was and the link between them was cut.
+- **Projected engravings and embossing follow their sketch.** Editing the sketch
+  rebuilds them; deleting it removes them.
+- **Cancelling Fillet or Chamfer keeps your edge selection.**
+- **Touch mode: the Measure window could grow taller than the screen** and then
+  not be shrunk or closed. Windows no longer resize from their top edge, Measure
+  opens at its normal size clear of the top buttons, and it has a Close button.
+- Guided Loft now says it stays centred over its base and points to Sweep for
+  following a path.
+
 ## [1.8.0-beta.3] - 2026-11-03
 
 Desktop beta (Settings ▸ Include pre-release builds). Fixes from the beta.2

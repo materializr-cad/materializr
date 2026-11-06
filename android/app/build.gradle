@@ -52,7 +52,7 @@ android {
                                                          : 'arm64-v8a'
         def allAbi    = project.hasProperty('allAbi')
         def abiList   = allAbi ? ['arm64-v8a', 'x86_64'] : [targetAbi]
-        versionCode 53
+        versionCode 54
         def vName = '1.7.7'
         versionName vName
 
