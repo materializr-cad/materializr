@@ -1122,6 +1122,12 @@ void Application::initImGui() {
         // Settings). Restrict moves to the title bar so body drags fall through
         // to the drag-to-scroll latch in Window.cpp.
         io.ConfigWindowsMoveFromTitleBarOnly = true;
+        // ...and no resizing from window EDGES. With the touch hit padding above,
+        // the top edge's grab zone swallows the title bar: dragging a floating
+        // window (Measure, say) by its title resized it from the top instead, so
+        // it ballooned to the height of the screen and could not be shrunk or
+        // closed again (#171). Windows still resize from the bottom-right grip.
+        io.ConfigWindowsResizeFromEdges = false;
     }
 
     // Swap ImGui's default ProggyClean for JetBrains Mono - slashed zero,

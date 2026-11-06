@@ -161,8 +161,31 @@ void MeasureTool::renderPanel() {
     if (m_mode == MeasureMode::Inactive) return;
 
     bool open = true;
-    ImGui::SetNextWindowSize(uiSz(320, 0), ImGuiCond_FirstUseEver);
+    // Appearing too, for the size: a height ballooned by an earlier resize is
+    // saved in imgui.ini and would otherwise come back every time (#171).
+    ImGui::SetNextWindowSize(uiSz(320, 0), ImGuiCond_Appearing);
+    // Open clear of the floating button clusters every layout draws along the
+    // top and left edges. ImGui's default spot (top-left) put the title bar -
+    // and its close button - underneath them in the touch layout, leaving a
+    // window that could be neither closed nor resized (#171). Appearing, not
+    // FirstUseEver: a bad spot saved to imgui.ini must not stick.
+    {
+        const ImGuiViewport* vp = ImGui::GetMainViewport();
+        const ImVec2 off = uiSz(130, 120);
+        ImGui::SetNextWindowPos(ImVec2(vp->WorkPos.x + off.x, vp->WorkPos.y + off.y),
+                                ImGuiCond_Appearing);
+    }
     if (!ImGui::Begin("Measure", &open)) { ImGui::End(); return; }
+    // ...and never let a drag park the title bar under the top button row either.
+    {
+        const ImGuiViewport* vp = ImGui::GetMainViewport();
+        const float minY = vp->WorkPos.y + uiSz(0, 100).y;
+        const ImVec2 pos = ImGui::GetWindowPos();
+        if (pos.y < minY) ImGui::SetWindowPos(ImVec2(pos.x, minY));
+    }
+    // A Close button in the body as well: the title bar's is tiny and, in the
+    // touch layouts, easy to lose behind other controls.
+    if (ImGui::Button(materializr::tr("Close"))) open = false;
 
     // Mode selector - three buttons at the top, current mode highlighted.
     auto modeButton = [&](const char* label, MeasureMode m) {
