@@ -41,16 +41,17 @@ concurrency:
 jobs:
   macos:
     name: macOS (arm64)
-    # Apple Silicon runner, PINNED to macos-14 on purpose. Every Homebrew bottle
+    # Apple Silicon runner, PINNED to macos-15 on purpose. Every Homebrew bottle
     # we bundle (OpenCASCADE, tbb, freetype, libpng, brotli) is compiled for the
     # RUNNER's macOS, so the runner sets the .dmg's real floor: on macos-latest
     # (26) they all carried minos 26.0 and the released .dmg refused to open on
-    # macOS 14/15 (issue #168). On macos-14 they are minos 14.0 and the bundle is
-    # launch-tested on a real macOS 14. SDL3 is source-built below, which is what
-    # fixed the old macos-14 bottle aborting on macOS 26 (issue #12).
-    # If GitHub retires this image, or Homebrew stops pouring Sonoma bottles,
-    # move to macos-15 (floor becomes 15) rather than back to macos-latest.
-    runs-on: macos-14
+    # macOS 14/15 (issue #168). On macos-15 they are minos 15.0, so the .dmg
+    # floor is macOS 15 (macos-14 was the previous pin, floor 14). SDL3 is
+    # source-built below, which is what fixed the old macos-14 bottle aborting
+    # on macOS 26 (issue #12).
+    # If GitHub retires this image, move to the next pinned runner (floor moves
+    # with it) rather than back to macos-latest.
+    runs-on: macos-15
 
     # contents: write lets softprops/action-gh-release attach the .dmg to a
     # published Release (matches linux.yml / windows.yml).
@@ -70,20 +71,20 @@ jobs:
       # sides of issue #12: the old macos-14 bottle's dylib initializer aborts
       # on macOS 26.5.2, and the macos-26 bottle carries minos 26.0 so the
       # bundle refuses to load on macOS 14-15 at all. Building from source with
-      # MACOSX_DEPLOYMENT_TARGET pinned to 14.0 gives modern initialisation and
-      # the 14 floor regardless of runner. Version is the repo-wide pin
+      # MACOSX_DEPLOYMENT_TARGET pinned to 15.0 gives modern initialisation and
+      # the 15 floor regardless of runner. Version is the repo-wide pin
       # (MZ_SDL3_VERSION in CMakeLists.txt).
-      - name: Cache SDL3 (source-built, deployment target 14.0)
+      - name: Cache SDL3 (source-built, deployment target 15.0)
         id: sdl3cache
         uses: actions/cache@v4
         with:
           path: ~/sdl3-prefix
-          key: sdl3-3.4.18-macostarget14-${{ runner.os }}-${{ runner.arch }}-v1
+          key: sdl3-3.4.18-macostarget15-${{ runner.os }}-${{ runner.arch }}-v1
 
-      - name: Build SDL3 from source (MACOSX_DEPLOYMENT_TARGET=14.0)
+      - name: Build SDL3 from source (MACOSX_DEPLOYMENT_TARGET=15.0)
         if: steps.sdl3cache.outputs.cache-hit != 'true'
         env:
-          MACOSX_DEPLOYMENT_TARGET: "14.0"
+          MACOSX_DEPLOYMENT_TARGET: "15.0"
         run: |
           curl -L --fail --retry 3 -o /tmp/sdl3.tar.gz \
             https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/SDL3-3.4.18.tar.gz
@@ -91,7 +92,7 @@ jobs:
           tar -xzf /tmp/sdl3.tar.gz -C /tmp
           cmake -S /tmp/SDL3-3.4.18 -B /tmp/sdl3-build \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
             -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF \
             -DCMAKE_INSTALL_PREFIX="$HOME/sdl3-prefix"
           cmake --build /tmp/sdl3-build -j"$(sysctl -n hw.ncpu)"
@@ -113,7 +114,7 @@ jobs:
           esac
 
       - name: Configure
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 -DCMAKE_PREFIX_PATH="$HOME/sdl3-prefix;$(brew --prefix)"
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 -DCMAKE_PREFIX_PATH="$HOME/sdl3-prefix;$(brew --prefix)"
 
       - name: Build
         run: cmake --build build -j$(sysctl -n hw.ncpu)
@@ -127,11 +128,11 @@ jobs:
       # Deployment-target audit: we have NO Apple hardware, so CI is the only
       # place to SEE what the bundle actually requires. Print minos/sdk for the
       # main binary and every bundled dylib, and fail if the SDL3 we ship
-      # regressed past the 14.0 floor (the exact regression a contributor
+      # regressed past the 15.0 floor (the exact regression a contributor
       # caught in the first #12 fix artifact). The OCCT/tbb/freetype/... bottles
       # are held to the same floor: on macos-26 they were all minos 26.0 and
       # shipped a .dmg that macOS 14/15 rejected (issue #168), so ANY bundled
-      # binary above 14.x now fails the build.
+      # binary above 15.x now fails the build.
       - name: Audit bundled deployment targets
         run: |
           APP=$(ls -d build/Materializr.app 2>/dev/null || ls -d build/*/Materializr.app)
@@ -142,8 +143,8 @@ jobs:
             printf '%s | %s\n' "$(basename "$f")" "${line:-<none>}"
             minos=$(echo "$line" | awk '{print $1}')
             case "$minos" in
-              14.*|13.*|12.*|11.*|10.*) : ;;
-              *) echo "::error::$(basename "$f") minos=${minos:-<none>} - above the macOS 14.0 floor (issues #12/#168)"; fail=1 ;;
+              15.*|14.*|13.*|12.*|11.*|10.*) : ;;
+              *) echo "::error::$(basename "$f") minos=${minos:-<none>} - above the macOS 15.0 floor (issues #12/#168)"; fail=1 ;;
             esac
           done
           exit $fail
