@@ -6,6 +6,8 @@
 #include <vector>
 #include <string>
 
+namespace materializr { class Sketch; }
+
 class LoftOp : public Operation {
 public:
     LoftOp();
@@ -18,7 +20,33 @@ public:
     // are lofted into their own inner solids and cut from the outer loft, so a
     // ring-section profile produces a tube instead of a solid cylinder.
     void addProfile(const TopoDS_Wire& outer, const std::vector<TopoDS_Wire>& holes);
+    // Section taken from a sketch: remembers which one (and whether the panel's
+    // Flip reversed it) so the loft can follow that sketch when it is edited,
+    // moved or deleted - see rebuildFromSketches.
+    void addProfile(const TopoDS_Wire& outer, const std::vector<TopoDS_Wire>& holes,
+                    int sketchId, bool reversed);
     void clearProfiles();
+
+    // The section a sketch contributes: its outermost closed region's outer wire,
+    // plus that region's holes (concentric profiles decompose into several
+    // regions; taking the outermost keeps the inner loops as channels). Falls
+    // back to the first closed wire when there is no region. `*fromRegion` is
+    // true when the wire came from a region (a closed loop). Shared by Loft,
+    // Guided Loft and Boundary Fill.
+    static TopoDS_Wire sectionFromSketch(materializr::Sketch* sk,
+                                         std::vector<TopoDS_Wire>& holesOut,
+                                         bool* fromRegionOut = nullptr);
+
+    // Re-take every sketch-sourced section from its sketch as it is now (the
+    // cascade's pinned final state when one is set). All-or-nothing: false when
+    // a source sketch has gone or no longer has a closed shape, leaving the
+    // stored sections untouched.
+    bool rebuildFromSketches(Document& doc);
+    bool usesSketch(int sketchId) const;
+    // Sketch behind section i, or -1 (a face section).
+    int getProfileSketchId(int i) const {
+        return i >= 0 && i < static_cast<int>(m_profileSketchIds.size()) ? m_profileSketchIds[i] : -1;
+    }
     void setSolid(bool solid);   // true = solid, false = shell
     void setRuled(bool ruled);   // true = ruled surface, false = smooth
     // BRIDGE MODE: every section came from a face of ONE body. Instead of
@@ -53,6 +81,10 @@ private:
     // Parallel to m_profiles: the hole wires for each profile (empty if none).
     // m_holeProfiles[i] are the holes of m_profiles[i].
     std::vector<std::vector<TopoDS_Wire>> m_holeProfiles;
+    // Parallel to m_profiles: the sketch each section came from (-1 = a face),
+    // and whether Flip reversed it.
+    std::vector<int> m_profileSketchIds;
+    std::vector<char> m_profileReversed;
     bool m_solid = true;
     bool m_ruled = false;
     // Bridge mode (see setBridge). previousShape backs undo.

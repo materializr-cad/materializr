@@ -872,9 +872,17 @@ bool Sketch::roundCorner(int pointId, double size, bool chamfer, std::vector<int
 
     // Setback from the corner to each tangent point.
     const double t = chamfer ? size : size / std::tan(theta * 0.5);
-    if (t > len1 - 1e-4 || t > len2 - 1e-4) return false;
+    // The cut may use the whole line: a side already trimmed at its far end by
+    // a neighbouring corner can still take exactly what is left. Only past the
+    // end is it refused.
+    constexpr double kFit = 1e-4;
+    if (t > len1 + kFit || t > len2 + kFit) return false;
+    // Spending the whole line puts the tangent point ON the far endpoint; that
+    // endpoint is reused instead of leaving a zero-length line beside it.
+    const bool eat1 = t >= len1 - kFit, eat2 = t >= len2 - kFit;
 
-    const glm::dvec2 t1 = p + u1 * t, t2 = p + u2 * t;
+    const glm::dvec2 t1 = eat1 ? a : p + u1 * t;
+    const glm::dvec2 t2 = eat2 ? b : p + u2 * t;
 
     // A polygon's corner: the polygon record has no valid state with one corner
     // cut, so it becomes plain lines first.
@@ -907,14 +915,20 @@ bool Sketch::roundCorner(int pointId, double size, bool chamfer, std::vector<int
     }
 
     std::vector<int> made;
-    const int T1 = addPoint(glm::vec2(t1));
-    const int T2 = addPoint(glm::vec2(t2));
-    made.push_back(T1); made.push_back(T2);
-    const int n1 = addLine(cl.a, T1);
-    const int n2 = addLine(T2, cl.b);
-    if (cons0) setElementConstruction(n1, true);
-    if (cons1) setElementConstruction(n2, true);
-    made.push_back(n1); made.push_back(n2);
+    const int T1 = eat1 ? cl.a : addPoint(glm::vec2(t1));
+    const int T2 = eat2 ? cl.b : addPoint(glm::vec2(t2));
+    if (!eat1) made.push_back(T1);
+    if (!eat2) made.push_back(T2);
+    if (!eat1) {
+        const int n1 = addLine(cl.a, T1);
+        if (cons0) setElementConstruction(n1, true);
+        made.push_back(n1);
+    }
+    if (!eat2) {
+        const int n2 = addLine(T2, cl.b);
+        if (cons1) setElementConstruction(n2, true);
+        made.push_back(n2);
+    }
 
     if (chamfer) {
         const int bevel = addLine(T1, T2);

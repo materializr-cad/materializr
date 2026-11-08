@@ -3,6 +3,8 @@
 #include "Document.h"
 #include "History.h"
 #include "../modeling/ExtrudeOp.h"
+#include "../modeling/GuidedLoftOp.h"
+#include "../modeling/LoftOp.h"
 #include "../modeling/ProjectSketchOp.h"
 #include "../modeling/PushPullOp.h"
 #include "../modeling/RevolveOp.h"
@@ -147,6 +149,14 @@ inline int rederiveSketchDrivenOps(History& history, Document& doc, int sketchId
             if (sw->getProfileSketchId() != sketchId && sw->getPathSketchId() != sketchId) continue;
             ++matched;
             if (sw->rebuildFromSketches(doc) && earliest < 0) earliest = i;
+        } else if (auto* lf = dynamic_cast<LoftOp*>(op)) {
+            if (!lf->usesSketch(sketchId)) continue;
+            ++matched;
+            if (lf->rebuildFromSketches(doc) && earliest < 0) earliest = i;
+        } else if (auto* gl = dynamic_cast<GuidedLoftOp*>(op)) {
+            if (!gl->usesSketch(sketchId)) continue;
+            ++matched;
+            if (gl->rebuildFromSketches(doc) && earliest < 0) earliest = i;
         } else if (auto* pj = dynamic_cast<ProjectSketchOp*>(op)) {
             // Re-reads the sketch every time it executes, so there is no
             // profile to rebuild - it only needs the chain replayed from here.
@@ -159,11 +169,15 @@ inline int rederiveSketchDrivenOps(History& history, Document& doc, int sketchId
     return earliest;
 }
 
-// True when `op` is an extrude / push-pull / lathe / sweep / projection built
+// True when `op` is an extrude / push-pull / lathe / sweep / loft / projection built
 // from `sketchId`.
 inline bool opBuiltFromSketch(const Operation* op, int sketchId) {
     if (auto* pj = dynamic_cast<const ProjectSketchOp*>(op))
         return pj->getSketchId() == sketchId;
+    if (auto* lf = dynamic_cast<const LoftOp*>(op))
+        return lf->usesSketch(sketchId);
+    if (auto* gl = dynamic_cast<const GuidedLoftOp*>(op))
+        return gl->usesSketch(sketchId);
     if (auto* ext = dynamic_cast<const ExtrudeOp*>(op))
         return ext->getSketchId() == sketchId;
     if (auto* rv = dynamic_cast<const RevolveOp*>(op))

@@ -4244,6 +4244,15 @@ void SketchTool::polygonResolve(glm::vec2 centre, glm::vec2 cursor, float& circu
     circumRadius = glm::length(delta);
     rotationRad = (circumRadius > 1e-6f) ? std::atan2(delta.y, delta.x) : 0.0f;
     const PolygonSpec& sp = m_polygonSpec;
+    // Inscribed: the cursor marks the middle of a SIDE (where the inscribed
+    // circle touches), not a corner, so it is the grid-snapped point and the
+    // inscribed radius is the round number. The corner circle is then
+    // radius / cos(pi / sides), half a side's angle round from the cursor.
+    if (sp.inscribed && circumRadius > 1e-6f) {
+        const double half = M_PI / std::max(m_polygonSides, 3);
+        circumRadius = static_cast<float>(circumRadius / std::cos(half));
+        rotationRad -= static_cast<float>(half);
+    }
     if (sp.hasSize && sp.size > 0.0) {
         const double radius = sp.diameter ? sp.size * 0.5 : sp.size;
         // The inscribed circle touches the sides: its radius is the corner

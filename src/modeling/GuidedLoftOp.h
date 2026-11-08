@@ -6,6 +6,8 @@
 #include <vector>
 #include <string>
 
+namespace materializr { class Sketch; }
+
 // Guided loft ("loft with rails"): one CLOSED base profile swept away from its
 // plane while conforming to 1–2 OPEN rail curves. The rails are sampled by
 // height above the base plane; at each height the base profile is scaled about
@@ -29,8 +31,21 @@ public:
     ~GuidedLoftOp() override = default;
 
     void setBase(const TopoDS_Wire& wire, const gp_Pln& plane);
-    void addRail(const TopoDS_Wire& wire);
+    // `sketchId` = the sketch the rail was taken from (-1 = none).
+    void addRail(const TopoDS_Wire& wire, int sketchId = -1);
     void clearRails();
+    // The sketch the base profile came from, so the loft can follow it.
+    void setBaseSketch(int sketchId) { m_baseSketchId = sketchId; }
+    int  getBaseSketchId() const { return m_baseSketchId; }
+    int  getRailSketchId(int i) const {
+        return i >= 0 && i < static_cast<int>(m_railSketchIds.size()) ? m_railSketchIds[i] : -1;
+    }
+    int  railSketchCount() const { return static_cast<int>(m_railSketchIds.size()); }
+    bool usesSketch(int sketchId) const;
+    // Re-take the base profile, its plane and every rail from their sketches as
+    // they are now (the cascade's pinned final state when set). All-or-nothing:
+    // false when a source is missing or no longer usable.
+    bool rebuildFromSketches(Document& doc);
     void setSolid(bool solid);
     void setSamples(int n);          // generated intermediate sections
     int railCount() const { return static_cast<int>(m_rails.size()); }
@@ -50,6 +65,8 @@ private:
     TopoDS_Wire m_base;
     gp_Pln m_basePlane;
     std::vector<TopoDS_Wire> m_rails;
+    int m_baseSketchId = -1;
+    std::vector<int> m_railSketchIds;   // parallel to m_rails
     bool m_solid = true;
     int m_samples = 24;
 

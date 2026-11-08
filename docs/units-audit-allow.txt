@@ -166,6 +166,10 @@ src/app/Application_Viewport.cpp: double mm = 0.0;   // "2in" honoured; bare = d
 src/app/Application_Viewport.cpp: if (!materializr::parseLength(m_sketchShapeDimBuf, mm) || mm <= 0.0) return false;
 src/app/Application_Viewport.cpp: v = static_cast<float>(mm);
 src/app/Application_Viewport.cpp: // Cursor in sketch mm - the space labelOffX/Y lives in, so a
+src/app/Application_Viewport.cpp: double mm = 0.0;
+src/app/Application_Viewport.cpp: if (!materializr::parseLength(m_dimEditingBuf, mm)) mm = 0.0;
+src/app/Application_Viewport.cpp: if (materializr::lengthStepperRow("##step", &mm, /*allowNegative=*/true,
+src/app/Application_Viewport.cpp: materializr::formatLengthDigits(m_dimEditingBuf, sizeof(m_dimEditingBuf), mm);
 src/app/Application_Viewport.cpp: // Convert to mm FIRST, then halve a circle's
 src/app/Application_Viewport.cpp: // 0.5 mm + 0.5 % of view distance instead; an actually-
 src/app/Application_Viewport.cpp: // occluding face is normally many mm in front.

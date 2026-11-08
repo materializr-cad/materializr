@@ -1,4 +1,6 @@
 #include "GuidedLoftOp.h"
+#include "LoftOp.h"
+#include "Sketch.h"
 
 #include <BRepOffsetAPI_ThruSections.hxx>
 #include <BRepAdaptor_CompCurve.hxx>
@@ -155,8 +157,49 @@ void GuidedLoftOp::setBase(const TopoDS_Wire& wire, const gp_Pln& plane) {
     m_basePlane = plane;
 }
 
-void GuidedLoftOp::addRail(const TopoDS_Wire& wire) { m_rails.push_back(wire); }
-void GuidedLoftOp::clearRails() { m_rails.clear(); }
+void GuidedLoftOp::addRail(const TopoDS_Wire& wire, int sketchId) {
+    m_rails.push_back(wire);
+    m_railSketchIds.push_back(sketchId);
+}
+void GuidedLoftOp::clearRails() {
+    m_rails.clear();
+    m_railSketchIds.clear();
+}
+
+bool GuidedLoftOp::usesSketch(int sketchId) const {
+    if (sketchId < 0) return false;
+    if (m_baseSketchId == sketchId) return true;
+    for (int id : m_railSketchIds) if (id == sketchId) return true;
+    return false;
+}
+
+bool GuidedLoftOp::rebuildFromSketches(Document& doc) {
+    if (m_baseSketchId < 0 || m_railSketchIds.size() != m_rails.size()) return false;
+    auto pick = [&](int sid) {
+        std::shared_ptr<materializr::Sketch> sk = doc.cascadeSketchOverride(sid);
+        return sk ? sk : doc.getSketch(sid);
+    };
+    auto bsk = pick(m_baseSketchId);
+    if (!bsk) return false;
+    bool closed = false;
+    std::vector<TopoDS_Wire> holes;
+    TopoDS_Wire base = LoftOp::sectionFromSketch(bsk.get(), holes, &closed);
+    if (base.IsNull() || !closed) return false;
+    std::vector<TopoDS_Wire> rails = m_rails;
+    for (size_t i = 0; i < rails.size(); ++i) {
+        const int sid = m_railSketchIds[i];
+        if (sid < 0) continue;
+        auto rsk = pick(sid);
+        if (!rsk) return false;
+        TopoDS_Wire open = rsk->buildOpenWire();
+        if (open.IsNull()) return false;
+        rails[i] = open;
+    }
+    m_base = base;
+    m_basePlane = bsk->getPlane();
+    m_rails = std::move(rails);
+    return true;
+}
 void GuidedLoftOp::setSolid(bool solid) { m_solid = solid; }
 void GuidedLoftOp::setSamples(int nSamples) {
     m_samples = std::clamp(nSamples, 4, 128);
@@ -440,6 +483,11 @@ std::string GuidedLoftOp::serializeParams() const {
          << ";samples=" << m_samples
          << ";created=" << m_createdBodyId
          << ";nrails=" << m_rails.size()
+         << ";bsk=" << m_baseSketchId
+         << ";rsk=";
+    for (size_t i = 0; i < m_rails.size(); ++i)
+        head << (i ? "," : "") << (i < m_railSketchIds.size() ? m_railSketchIds[i] : -1);
+    head
          << ";plane=" << o.X() << "," << o.Y() << "," << o.Z() << ","
          << x.X() << "," << x.Y() << "," << x.Z() << ","
          << y.X() << "," << y.Y() << "," << y.Z();
@@ -456,6 +504,9 @@ std::string GuidedLoftOp::serializeParams() const {
 
 bool GuidedLoftOp::deserializeParams(const std::string& blob) {
     m_rails.clear();
+    m_railSketchIds.clear();
+    m_baseSketchId = -1;
+    std::vector<int> srcRails;
     int nrails = 0;
     bool any = false;
     size_t pos = 0;
@@ -493,6 +544,12 @@ bool GuidedLoftOp::deserializeParams(const std::string& blob) {
         else if (key == "samples") { setSamples(std::atoi(val.c_str())); any = true; }
         else if (key == "created") { m_createdBodyId = std::atoi(val.c_str()); any = true; }
         else if (key == "nrails")  { nrails = std::atoi(val.c_str()); any = true; }
+        else if (key == "bsk")     { m_baseSketchId = std::atoi(val.c_str()); }
+        else if (key == "rsk") {
+            std::istringstream ls(val);
+            std::string tok;
+            while (std::getline(ls, tok, ',')) srcRails.push_back(std::atoi(tok.c_str()));
+        }
         else if (key == "plane") {
             double v[9] = {0, 0, 0, 1, 0, 0, 0, 1, 0};
             std::istringstream ps(val);
@@ -515,12 +572,17 @@ bool GuidedLoftOp::deserializeParams(const std::string& blob) {
         }
         pos = end + 1;
     }
+    srcRails.resize(m_rails.size(), -1);
+    m_railSketchIds = std::move(srcRails);
     return any && !m_base.IsNull() &&
            static_cast<int>(m_rails.size()) == nrails && nrails >= 1;
 }
 
-bool GuidedLoftOp::rehydrateFromReload(const ReloadState& state, Document&) {
+bool GuidedLoftOp::rehydrateFromReload(const ReloadState& state, Document& doc) {
     if (m_base.IsNull() || m_rails.empty()) return false;
+    // Sketch-sourced: follow the sketches as they are now (the stored copy is
+    // the fallback if one has gone).
+    rebuildFromSketches(doc);
     if (m_createdBodyId < 0 && !state.created.empty())
         m_createdBodyId = state.created.front();
     return true;   // geometry is self-contained; execute() re-lofts it

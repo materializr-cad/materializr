@@ -811,31 +811,7 @@ void Application::cancelPattern() {
 static TopoDS_Wire outermostRegionWire(materializr::Sketch* sk,
                                        std::vector<TopoDS_Wire>& holesOut,
                                        bool* fromRegionOut = nullptr) {
-    holesOut.clear();
-    if (fromRegionOut) *fromRegionOut = false;
-    if (!sk) return {};
-    auto regions = sk->buildRegions();
-    if (!regions.empty()) {
-        size_t best = 0;
-        double bestDiag = -1.0;
-        for (size_t i = 0; i < regions.size(); ++i) {
-            if (regions[i].outerWire.IsNull()) continue;
-            Bnd_Box bb;
-            BRepBndLib::Add(regions[i].outerWire, bb);
-            if (bb.IsVoid()) continue;
-            double x0, y0, z0, x1, y1, z1;
-            bb.Get(x0, y0, z0, x1, y1, z1);
-            double dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
-            double diag = dx * dx + dy * dy + dz * dz;
-            if (diag > bestDiag) { bestDiag = diag; best = i; }
-        }
-        holesOut = regions[best].holeWires;
-        if (fromRegionOut) *fromRegionOut = true;   // regions are closed loops
-        return regions[best].outerWire;
-    }
-    auto wires = sk->buildWires();
-    if (!wires.empty()) return wires[0];
-    return {};
+    return LoftOp::sectionFromSketch(sk, holesOut, fromRegionOut);
 }
 
 // The outer boundary of a face, as a loft section.
@@ -1046,7 +1022,8 @@ void Application::updateLoft() {
         }
         held->setBase(m_loftSections[0].outer, m_loftBasePlane);
         held->clearRails();
-        for (const LoftRail& r : m_loftRails) held->addRail(r.wire);
+        for (const LoftRail& r : m_loftRails) held->addRail(r.wire, r.sketchId);
+        held->setBaseSketch(m_loftSections[0].sketchId);
         held->setSolid(m_loftSolid);
         if (!m_loftPreview.apply(*m_document))
             showToast(materializr::tr("Guided loft failed - rails must rise away from the "
@@ -1071,9 +1048,9 @@ void Application::updateLoft() {
             holes.reserve(sec.holes.size());
             for (const auto& h : sec.holes)
                 holes.push_back(TopoDS::Wire(h.Reversed()));
-            op->addProfile(TopoDS::Wire(sec.outer.Reversed()), holes);
+            op->addProfile(TopoDS::Wire(sec.outer.Reversed()), holes, sec.sketchId, true);
         } else {
-            op->addProfile(sec.outer, sec.holes);
+            op->addProfile(sec.outer, sec.holes, sec.sketchId, false);
         }
     }
     op->setSolid(m_loftSolid);
@@ -1223,6 +1200,13 @@ const std::map<int, std::set<int>>& Application::sketchBodyLinks() const {
             if (sw->getPathSketchId() >= 0) srcSketches.insert(sw->getPathSketchId());
         } else if (auto* pj = dynamic_cast<const ProjectSketchOp*>(op)) {
             if (pj->getSketchId() >= 0) srcSketches.insert(pj->getSketchId());
+        } else if (auto* lf = dynamic_cast<const LoftOp*>(op)) {
+            for (int i = 0; i < lf->profileCount(); ++i)
+                if (lf->getProfileSketchId(i) >= 0) srcSketches.insert(lf->getProfileSketchId(i));
+        } else if (auto* gl = dynamic_cast<const GuidedLoftOp*>(op)) {
+            if (gl->getBaseSketchId() >= 0) srcSketches.insert(gl->getBaseSketchId());
+            for (int i = 0; i < gl->railSketchCount(); ++i)
+                if (gl->getRailSketchId(i) >= 0) srcSketches.insert(gl->getRailSketchId(i));
         }
         if (srcSketches.empty()) continue;
         // Bodies this step touched = created + modified.

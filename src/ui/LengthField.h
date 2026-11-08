@@ -248,11 +248,16 @@ inline bool cappedStepperInput(const char* label, double* v, double step, double
                      flags | ImGuiInputTextFlags_AutoSelectAll | ImGuiInputTextFlags_CharsScientific |
                          ImGuiInputTextFlags_CallbackCharFilter,
                      decimalCapFilter, &decimals);
-    if (ImGui::IsItemEdited()) {
+    // NoMarkEdited (set above, as InputScalar does) keeps ImGuiItemStatusFlags_Edited
+    // off the item, so IsItemEdited() is never true here and a typed value was
+    // dropped. InputScalar reads EditedInternal, which MarkItemEdited sets
+    // regardless of that flag.
+    if (g.LastItemData.StatusFlags & ImGuiItemStatusFlags_EditedInternal) {
         const double parsed = std::strtod(buf, nullptr);
         if (parsed != *v) { *v = parsed; changed = true; }
     }
     if (active) *active = ImGui::IsItemActive();
+    g.LastItemData.ItemFlags &= ~ImGuiItemFlags_NoMarkEdited;
 
     const ImVec2 backupPad = style.FramePadding;
     style.FramePadding.x = style.FramePadding.y;

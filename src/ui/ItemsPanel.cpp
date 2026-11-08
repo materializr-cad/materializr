@@ -429,7 +429,11 @@ bool ItemsPanel::renderContent() {
                     ImGui::SetScrollHereY(0.5f);
                 }
                 if (ImGui::Selectable(name.c_str(), isSelected)) {
-                    if (m_selection) {
+                    // The sketch being drawn is not a selectable item: the row
+                    // fires on RELEASE, after a double-click has already opened
+                    // the sketch, and selecting it then left the whole sketch
+                    // selected inside its own edit session.
+                    if (m_selection && !(m_sketchModeActive && id == m_activeSketchId)) {
                         SelectionEntry entry;
                         entry.type = SelectionType::Sketch;
                         entry.sketchId = id;

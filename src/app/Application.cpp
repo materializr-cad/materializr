@@ -7816,7 +7816,7 @@ void Application::requestSketchCascade(int sketchId) {
     // (a negative value defers every in-sketch edit - for testing).
     static const double deferAboveMs = []() {
         const char* v = std::getenv("MZR_CASCADE_DEFER_MS");
-        return v ? std::atof(v) : 400.0;
+        return v ? std::atof(v) : 2000.0;
     }();
     auto defer = [&]() {
         if (m_pendingSketchCascades.insert(sketchId).second &&

@@ -3521,6 +3521,9 @@ void Application::renderViewport() {
                             break;
                         }
                         bool dimCommitted = false;
+                        // The value field has the keyboard: Delete / Backspace edit
+                        // its text and must not also delete the dimension.
+                        bool dimFieldActive = false;
                         if (dimKind == materializr::DimKind::Angle || materializr::touchMode()) {
                             // Buffer stays authoritative - every seed site
                             // writes it - so parse it in, let the numeric
@@ -3536,17 +3539,51 @@ void Application::renderViewport() {
                                 std::snprintf(m_dimEditingBuf, sizeof(m_dimEditingBuf), "%.6g", dimPadV);
                                 dimCommitted = true;
                             }
+                            dimFieldActive = ImGui::IsItemActive();
                         } else {
                             // Enter, or focus leaving after an edit, commits.
                             if (ImGui::InputText("##dimval", m_dimEditingBuf, sizeof(m_dimEditingBuf),
                                                  ImGuiInputTextFlags_EnterReturnsTrue) ||
                                 ImGui::IsItemDeactivatedAfterEdit())
                                 dimCommitted = true;
+                            dimFieldActive = ImGui::IsItemActive();
                             ImGui::SetItemTooltip("%s", materializr::tr(
                                 "A bare number is in the display unit; add a unit to "
                                 "override it, e.g. 2in or 50mm."));
                         }
-                        if (dimCommitted) {
+                        // -10 / -1 / -0.1 / 0 / +0.1 / +1 / +10, like every other
+                        // value. They edit the field; Enter (or clicking away)
+                        // commits, and focus goes back to the field so Enter works.
+                        if (!dimCommitted) {
+                            ImGui::PushID("##dimStep");
+                            bool stepped = false;
+                            if (dimKind == materializr::DimKind::Angle) {
+                                float deg = 0.0f;
+                                { double d = 0.0; if (materializr::parseFinite(m_dimEditingBuf, d)) deg = static_cast<float>(d); }
+                                if (materializr::stepperRow("##step", &deg, /*allowNegative=*/true,
+                                                            -360.0f, 360.0f, 0.0f)) {
+                                    std::snprintf(m_dimEditingBuf, sizeof(m_dimEditingBuf), "%.2f", deg);
+                                    stepped = true;
+                                }
+                            } else {
+                                double mm = 0.0;
+                                if (!materializr::parseLength(m_dimEditingBuf, mm)) mm = 0.0;
+                                if (materializr::lengthStepperRow("##step", &mm, /*allowNegative=*/true,
+                                                                  0.001, 1.0e6, 0.0, /*showZero=*/true)) {
+                                    materializr::formatLengthDigits(m_dimEditingBuf, sizeof(m_dimEditingBuf), mm);
+                                    stepped = true;
+                                }
+                            }
+                            ImGui::PopID();
+                            if (stepped) m_dimEditingFocus = true;
+                        }
+                        // Esc closes the window straight away (the field's own first
+                        // Esc used to only drop focus, needing a second press).
+                        if (ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
+                            m_dimEditingId = -1;
+                            ImGui::CloseCurrentPopup();
+                        }
+                        if (m_dimEditingId >= 0 && dimCommitted) {
                             // recordSketchMutation snapshots before/after and
                             // pushes a SketchEditOp so the dimension edit is
                             // Ctrl-Z-able and visible in the History panel.
@@ -3638,9 +3675,11 @@ void Application::renderViewport() {
                         // Delete removes the dimension constraint entirely, as
                         // one undoable step ("Remove …" in History).
                         ImGui::Spacing();
-                        if (ImGui::Button(materializr::tr("Delete")) ||
-                            ImGui::IsKeyPressed(ImGuiKey_Delete, false) ||
-                            ImGui::IsKeyPressed(ImGuiKey_Backspace, false)) {
+                        if (m_dimEditingId >= 0 &&
+                            (ImGui::Button(materializr::tr("Delete")) ||
+                             (!dimFieldActive &&
+                              (ImGui::IsKeyPressed(ImGuiKey_Delete, false) ||
+                               ImGui::IsKeyPressed(ImGuiKey_Backspace, false))))) {
                             int delId = m_dimEditingId;
                             recordSketchMutation([&]{
                                 m_activeSketch->removeConstraint(delId);

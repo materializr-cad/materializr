@@ -268,7 +268,11 @@ bool ProjectSketchOp::execute(Document& doc) {
         m_depth < 0.01) {
         return false;
     }
-    auto sketch = doc.getSketch(m_sketchId);
+    // The cascade's pinned FINAL sketch when one is set: a history replay rolls
+    // the live sketch back to how it stood at this step, so reading it here
+    // stamped the projection from before the sketch's later edits and moves.
+    auto sketch = doc.cascadeSketchOverride(m_sketchId);
+    if (!sketch) sketch = doc.getSketch(m_sketchId);
     if (!sketch) {
         std::fprintf(stderr, "[ProjectSketch] sketch %d not found\n",
                      m_sketchId);

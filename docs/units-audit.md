@@ -7,9 +7,9 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 
 ## Controls by dimension
 
-- CONVERTED: 157
+- CONVERTED: 159
 - absolute-mm: 2
-- angle: 39
+- angle: 41
 - count: 1
 - percent: 19
 - px/ui: 5
@@ -108,6 +108,10 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | CONVERTED | src/app/Application_Viewport.cpp | `if (!materializr::parseLength(m_sketchShapeDimBuf, mm) \|\| mm <= 0.0) return false;` |
 | CONVERTED | src/app/Application_Viewport.cpp | `(void)materializr::parseFinite(m_dimEditingBuf, dimPadV);` |
 | CONVERTED | src/app/Application_Viewport.cpp | `if (materializr::inputNumber("##dimval", &dimPadV, 0.0, 0.0, padFmt,` |
+| angle | src/app/Application_Viewport.cpp | `{ double d = 0.0; if (materializr::parseFinite(m_dimEditingBuf, d)) deg = static_cast<float>(d); }` |
+| angle | src/app/Application_Viewport.cpp | `if (materializr::stepperRow("##step", &deg, /*allowNegative=*/true,` |
+| CONVERTED | src/app/Application_Viewport.cpp | `if (!materializr::parseLength(m_dimEditingBuf, mm)) mm = 0.0;` |
+| CONVERTED | src/app/Application_Viewport.cpp | `if (materializr::lengthStepperRow("##step", &mm, /*allowNegative=*/true,` |
 | angle | src/app/Application_Viewport.cpp | `(void)materializr::parseFinite(m_sketchGizmoRotateBuf,` |
 | angle | src/app/Application_Viewport.cpp | `bool typedEnter = materializr::inputNumber(` |
 | angle | src/app/Application_Viewport.cpp | `(void)materializr::parseFinite(m_sketchGizmoRotateBuf, deg);` |
@@ -271,7 +275,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 - allowed-by-hand: 93
 - comment: 310
 - diagnostic: 13
-- identifier/other: 9
+- identifier/other: 13
 
 | class | file | code |
 |---|---|---|
@@ -440,6 +444,10 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | identifier/other | src/app/Application_Viewport.cpp | `if (!materializr::parseLength(m_sketchShapeDimBuf, mm) \|\| mm <= 0.0) return false;` |
 | identifier/other | src/app/Application_Viewport.cpp | `v = static_cast<float>(mm);` |
 | comment | src/app/Application_Viewport.cpp | `// Cursor in sketch mm - the space labelOffX/Y lives in, so a` |
+| identifier/other | src/app/Application_Viewport.cpp | `double mm = 0.0;` |
+| identifier/other | src/app/Application_Viewport.cpp | `if (!materializr::parseLength(m_dimEditingBuf, mm)) mm = 0.0;` |
+| identifier/other | src/app/Application_Viewport.cpp | `if (materializr::lengthStepperRow("##step", &mm, /*allowNegative=*/true,` |
+| identifier/other | src/app/Application_Viewport.cpp | `materializr::formatLengthDigits(m_dimEditingBuf, sizeof(m_dimEditingBuf), mm);` |
 | comment | src/app/Application_Viewport.cpp | `// Convert to mm FIRST, then halve a circle's` |
 | comment | src/app/Application_Viewport.cpp | `// 0.5 mm + 0.5 % of view distance instead; an actually-` |
 | comment | src/app/Application_Viewport.cpp | `// occluding face is normally many mm in front.` |
