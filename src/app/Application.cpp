@@ -9262,6 +9262,15 @@ void Application::run() {
             if (s->history && s->history->canRedo()) continue;
             stashActiveSessionState();
             applySessionState(i);
+            // The GPU renderers still hold the ORIGINAL tab's meshes - only the
+            // document was swapped. A thumbnail rendered now would be that
+            // tab's picture framed for this one's bounds, so the capture
+            // carries the project's existing thumbnail over instead.
+            struct StaleGuard {
+                bool& f;
+                explicit StaleGuard(bool& flag, bool v) : f(flag) { f = v; }
+                ~StaleGuard() { f = false; }
+            } staleGuard(m_thumbRendererStale, i != originalActive);
             saveProjectQuick();
         }
         stashActiveSessionState();

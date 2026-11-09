@@ -370,6 +370,11 @@ private:
     // to show (no visible bodies) - the save then simply carries no thumbnail.
     // Main thread only (needs the GL context).
     bool captureProjectThumbnailPNG(std::vector<uint8_t>& pngOut);
+    // True while a background tab's document is swapped in for a save (the
+    // quit-time autosave) but the GPU renderers still hold ANOTHER tab's
+    // meshes. captureProjectThumbnailPNG must not render then - it carries the
+    // project's existing thumbnail over instead.
+    bool m_thumbRendererStale = false;
     // Render exactly what the LIVE viewport currently shows - the user's own
     // camera angle, bodies, edges, and any plugin overlay drawn after bodies
     // (reference images/planes/axes, the AI Assistant's reference-mesh

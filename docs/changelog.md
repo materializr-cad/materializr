@@ -26,6 +26,11 @@ reports.
 
 ### Fixed
 
+- **Home-screen tiles could show another project's picture.** Quitting with
+  several tabs open and "Autosave on close" on saved each background tab with the
+  picture of the tab you were looking at. Background tabs now keep the thumbnail
+  they already had. A tile that is already wrong is repaired by saving that
+  project once from its own tab.
 - **Length fields: typing a value and pressing Enter was ignored** in every
   desktop length field (Polygon size, Offset, ...).
 - **Corner tool: a chamfer or fillet that uses exactly the available side now

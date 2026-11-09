@@ -8012,6 +8012,24 @@ bool Application::captureProjectThumbnailPNG(std::vector<uint8_t>& pngOut) {
         !m_backgroundRenderer || !m_document)
         return false;
 
+    // The renderers hold another tab's meshes (see m_thumbRendererStale):
+    // drawing now would frame that tab's picture with THIS project's bounds
+    // and bake it into the file. Keep the thumbnail the project already has -
+    // the cached copy if it is current, else the one inside the file - or
+    // none (the tile shows a placeholder until the next normal save).
+    if (m_thumbRendererStale) {
+        pngOut.clear();
+        if (m_currentProjectPath.empty()) return false;
+        if (thumbCacheFresh(m_currentProjectPath) &&
+            readCachedThumbnail(m_currentProjectPath, pngOut))
+            return true;
+        if (m_currentProjectPath.rfind("content:", 0) != 0 &&
+            ProjectIO::peekThumbnail(m_currentProjectPath, pngOut))
+            return true;
+        pngOut.clear();
+        return false;
+    }
+
     // Meshes can be stale when a save lands between frames (deferred slot).
     // Done BEFORE the bounding box so the box can ride on the triangulation.
     landMeshes();
