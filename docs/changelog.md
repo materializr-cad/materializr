@@ -5,6 +5,44 @@ All notable changes to Materializr are documented here. Format loosely follows
 
 ## [Unreleased]
 
+## [1.8.0-beta.5] - 2026-11-09
+
+Beta (Settings ▸ Include pre-release builds), desktop and Android. A menu and
+home-screen tidy-up, icons in the classic layout, and the fixes from the 11-7
+reports.
+
+### Changed
+
+- **Home screen header matches the open-project layout.** The logo, Open File,
+  Settings and Help are on the left, where the menu is once a project is open;
+  the name and version are on the right.
+- **Modern and im-touch: the logo is the menu button.** The three dots, the three
+  stripes and the "Materializr" wordmark are gone. The menu behind the logo
+  shows File, Edit, View and Help as sections you expand one at a time (no more
+  waiting on nested submenus), then Settings, then Exit on its own at the
+  bottom. It scrolls if it does not fit the window.
+- **Classic: tool buttons have icons.** The same icon the other layouts use,
+  beside the full text label. A button too narrow for both keeps just the label.
+
+### Fixed
+
+- **Length fields: typing a value and pressing Enter was ignored** in every
+  desktop length field (Polygon size, Offset, ...).
+- **Corner tool: a chamfer or fillet that uses exactly the available side now
+  applies**, without leaving a zero-length line behind.
+- Polygon "Inscribed": the cursor marks the middle of a side, not a corner.
+- Dimension popup: Delete and Backspace edit the text while the field has focus,
+  it has a -10 to +10 stepper row, and Esc closes it.
+- Items panel: double-click Edit no longer re-selects the sketch being edited
+  when the mouse is released.
+- **Project follows its sketch.** Editing or moving the sketch rebuilds the
+  projection.
+- **Loft and Guided Loft follow their sketches** on edit, move, delete and
+  reload. Lofts saved before this have no sketch links and still will not
+  follow.
+- Sketch edits reach the body while you are still editing, for mid-size
+  sketches (the wait before deferring to Finish Sketch went from 0.4 s to 2 s).
+
 ## [1.8.0-beta.4] - 2026-11-06
 
 Beta (Settings ▸ Include pre-release builds), desktop and Android. Fixes from the
