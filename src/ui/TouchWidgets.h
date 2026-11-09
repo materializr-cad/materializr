@@ -26,6 +26,10 @@ bool railButton(const char* id, const char* icon, const char* label, bool active
 // toolbar's text buttons). `max` is the button's bottom-right corner; `size`
 // the icon size the wedge scales with.
 void drawMenuMark(ImDrawList* dl, const ImVec2& max, float size, ImU32 col);
+// Draw a catalogue icon (an MZ_ICON_* glyph OR one of the hand-drawn sentinel
+// icons - chamfer, primitive, thread, pattern...) centred on `center` at
+// `size` px. Lets classic's text buttons carry the same icons as the rails.
+void drawIcon(ImDrawList* dl, const ImVec2& center, float size, const char* icon, ImU32 col);
 
 // Floating action button: filled accent circle with a centered icon
 // (im-touch-lite's "+ create"). Returns true on press.

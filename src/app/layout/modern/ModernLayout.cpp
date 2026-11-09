@@ -154,34 +154,20 @@ void Application::renderModernLayout() {
                      touchui::pillButtonWidth(MZ_ICON_DISCARD, exitLbl) + sp * 2;
         if (showMulti)
             total += touchui::pillButtonWidth(MZ_ICON_SELECT, materializr::tr("Multi")) + sp;
-        // ⋯ menu (top-left, nav-drawer style), then logo chip + name + /project.
+        // Logo menu button (top-left): the emblem IS the menu, then the tab row.
         {
             const float bh0 = 44.0f * s;
-            const float menuW = bh0 + 12.0f * s;    // ⋯ button + gap
             ImGui::SetCursorPos(ImVec2(pad, (topH - bh0) * 0.5f));
-            if (touchui::iconButton("overflow", MZ_ICON_MORE, bh0))
+            if (layoutui::logoMenuButton("logomenu", bh0))
                 ImGui::OpenPopup("##TouchOverflow");
             tip(materializr::tr("Menu: file, edit, view, help and settings"));
             renderTouchOverflowPopup();
 
-            ImDrawList* dl = ImGui::GetWindowDrawList();
-            const ImVec2 win = ImGui::GetWindowPos();
-            const float chip = 30.0f * s;
-            const float lx = pad + menuW;
-            const ImVec2 c0(win.x + lx, win.y + (topH - chip) * 0.5f);
-            dl->AddImageRounded(layoutui::logoTexture(), c0,
-                                ImVec2(c0.x + chip, c0.y + chip),
-                                ImVec2(0, 0), ImVec2(1, 1),
-                                IM_COL32_WHITE, 7.0f * s);
-            ImGui::SetCursorPos(ImVec2(lx + chip + 10.0f * s,
-                                       (topH - ImGui::GetTextLineHeight()) * 0.5f));
-            ImGui::TextColored(touchui::textPrimary(), "%s", materializr::tr("Materializr"));
             // The old "/ projectname" breadcrumb is now the tab row: one pill
             // per open project (dirty dot included), right-click/long-press
             // for Save / Save As / Close, and a trailing "+".
             const float pillH = 30.0f * s;
-            ImGui::SameLine(0.0f, 12.0f * s);
-            ImGui::SetCursorPosY((topH - pillH) * 0.5f);
+            ImGui::SetCursorPos(ImVec2(pad + bh0 + 12.0f * s, (topH - pillH) * 0.5f));
 
             // The strip is BOUNDED. `total` (measured above) is where the
             // right-hand cluster begins; the "+" and a divider sit just inside

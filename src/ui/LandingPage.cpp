@@ -178,40 +178,45 @@ LandingPage::Action LandingPage::render() {
     }
     ImGui::PopStyleVar();
 
-    // ── Header: logo + app identity left, actions right ──────────────────
-    if (m_logoTex) {
-        const float logoSz = ImGui::GetTextLineHeight() * 1.5f;
-        ImGui::Image(static_cast<ImTextureID>(static_cast<intptr_t>(m_logoTex)),
-                     ImVec2(logoSz, logoSz));
-        ImGui::SameLine();
-    }
-    ImGui::SetWindowFontScale(1.5f);
-    ImGui::TextColored(accentText(), "%s", materializr::tr("Materializr"));
-    ImGui::SetWindowFontScale(1.0f);
-    ImGui::SameLine();
-    ImGui::TextColored(dimText(), "v" MATERIALIZR_VERSION);
-
+    // ── Header: logo + actions left, app identity right ──────────────────
+    // Same side as the menu in an open project, so the first thing a user
+    // reaches for is where their hand already expects it.
     {
-        const char* openLbl = ICON_IC_FOLDER "  Open File...";
-        const char* helpLbl = ICON_IC_HELP_CIRCLE "  Help";
-        const char* gearLbl = ICON_IC_SETTINGS "  Settings";
-        const char* backLbl = ICON_IC_XMARK;
         const ImGuiStyle& style = ImGui::GetStyle();
-        int nBtns = m_canDismiss ? 4 : 3;
-        float rightW = ImGui::CalcTextSize(openLbl).x +
-                       ImGui::CalcTextSize(helpLbl).x +
-                       ImGui::CalcTextSize(gearLbl).x +
-                       (m_canDismiss ? ImGui::CalcTextSize(backLbl).x : 0.0f) +
-                       style.FramePadding.x * 2.0f * nBtns +
-                       style.ItemSpacing.x * (nBtns - 1);
-        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - rightW);
-        if (ImGui::Button(openLbl)) action.type = ActionType::OpenFileDialog;
+        if (m_logoTex) {
+            const float logoSz = ImGui::GetTextLineHeight() * 1.5f;
+            ImGui::Image(static_cast<ImTextureID>(static_cast<intptr_t>(m_logoTex)),
+                         ImVec2(logoSz, logoSz));
+            ImGui::SameLine();
+        }
+        if (ImGui::Button(ICON_IC_FOLDER "  Open File..."))
+            action.type = ActionType::OpenFileDialog;
         ImGui::SameLine();
-        if (ImGui::Button(helpLbl)) action.type = ActionType::OpenHelp;
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", materializr::tr("User guide"));
-        ImGui::SameLine();
-        if (ImGui::Button(gearLbl)) action.type = ActionType::OpenSettings;
+        if (ImGui::Button(ICON_IC_SETTINGS "  Settings"))
+            action.type = ActionType::OpenSettings;
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", materializr::tr("Settings"));
+        ImGui::SameLine();
+        if (ImGui::Button(ICON_IC_HELP_CIRCLE "  Help"))
+            action.type = ActionType::OpenHelp;
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", materializr::tr("User guide"));
+
+        // Right-aligned block: name, version, and the dismiss button.
+        const char* name = materializr::tr("Materializr");
+        const char* ver = "v" MATERIALIZR_VERSION;
+        const char* backLbl = ICON_IC_XMARK;
+        ImGui::SetWindowFontScale(1.5f);
+        const float nameW = ImGui::CalcTextSize(name).x;
+        ImGui::SetWindowFontScale(1.0f);
+        float rightW = nameW + style.ItemSpacing.x + ImGui::CalcTextSize(ver).x;
+        if (m_canDismiss)
+            rightW += style.ItemSpacing.x + ImGui::CalcTextSize(backLbl).x +
+                      style.FramePadding.x * 2.0f;
+        ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - rightW);
+        ImGui::SetWindowFontScale(1.5f);
+        ImGui::TextColored(accentText(), "%s", name);
+        ImGui::SetWindowFontScale(1.0f);
+        ImGui::SameLine();
+        ImGui::TextColored(dimText(), "%s", ver);
         if (m_canDismiss) {
             ImGui::SameLine();
             if (ImGui::Button(backLbl)) action.type = ActionType::Dismiss;

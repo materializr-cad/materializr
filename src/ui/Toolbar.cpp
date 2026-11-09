@@ -12,6 +12,7 @@
 #include "../plugin/Contributions.h"
 #include <imgui.h>
 #include <cmath>
+#include <string>
 #include <BRep_Tool.hxx>
 #include <BRepAdaptor_Curve.hxx>
 #include <Geom_Surface.hxx>
@@ -82,6 +83,64 @@ bool Toolbar::catalogOffers(ToolAction a) const {
     return false;
 }
 
+const char* Toolbar::iconForAction(ToolAction a) const {
+    if (a == ToolAction::None) return nullptr;
+    for (const auto& t : m_catalog)
+        if (t.pluginIndex < 0 && t.action == a) return t.icon;
+    // Classic-only entry points the rails fold into a menu group.
+    switch (a) {
+        case ToolAction::StartSketchXY:
+        case ToolAction::StartSketchXZ:
+        case ToolAction::StartSketchYZ: return MZ_ICON_SKETCH;
+        default: return nullptr;
+    }
+}
+
+const char* Toolbar::iconForPlugin(size_t index) const {
+    for (const auto& t : m_catalog)
+        if (t.pluginIndex == static_cast<int>(index)) return t.icon;
+    // The catalogue leaves the base construction creators to the shared
+    // Construct menu, but classic still shows them as buttons.
+    const auto& contribs = PluginRegistry::instance().toolbarContributions();
+    if (index < contribs.size()) {
+        if (contribs[index].name == "Construction Plane") return MZ_ICON_PLANE;
+        if (contribs[index].name == "Construction Axis")  return MZ_ICON_CONSTRUCTION;
+    }
+    return nullptr;
+}
+
+bool Toolbar::labelledButton(const char* label, const char* icon, ImVec2 size) {
+    if (!icon || !*icon) return ImGui::Button(label, size);
+    const ImGuiStyle& st = ImGui::GetStyle();
+    const float avail = size.x > 0.0f ? size.x : ImGui::GetContentRegionAvail().x;
+    const float iconSz = ImGui::GetFontSize() * 1.15f;
+    const float lead = st.FramePadding.x + iconSz + st.FramePadding.x * 0.75f;
+    // Not enough room for icon + words: words win.
+    if (ImGui::CalcTextSize(label).x + lead + st.FramePadding.x > avail)
+        return ImGui::Button(label, size);
+    // The icon is drawn over the button's left edge; the label's left padding
+    // is widened to clear it. Fill-width buttons left-align their text so the
+    // icons and labels each line up in a column; narrower ones (rows of 2-3)
+    // keep the centred look.
+    const bool fill = size.x <= 0.0f;
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(lead, st.FramePadding.y));
+    if (fill) ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.0f, 0.5f));
+    const bool pressed = ImGui::Button(label, size);
+    if (fill) ImGui::PopStyleVar();
+    ImGui::PopStyleVar();
+    const ImVec2 mn = ImGui::GetItemRectMin();
+    const ImVec2 mx = ImGui::GetItemRectMax();
+    touchui::drawIcon(ImGui::GetWindowDrawList(),
+                      ImVec2(mn.x + st.FramePadding.x + iconSz * 0.5f,
+                             (mn.y + mx.y) * 0.5f),
+                      iconSz, icon, ImGui::GetColorU32(ImGuiCol_Text));
+    return pressed;
+}
+
+bool Toolbar::toolBtn(const char* enLabel, ToolAction a, ImVec2 size) {
+    return labelledButton(materializr::tr(enLabel), iconForAction(a), size);
+}
+
 ToolAction Toolbar::renderCatalogRemainder(
         std::initializer_list<ToolAction> handled) {
     ToolAction action = ToolAction::None;
@@ -90,7 +149,7 @@ ToolAction Toolbar::renderCatalogRemainder(
         bool done = false;
         for (ToolAction h : handled) if (h == t.action) { done = true; break; }
         if (done) continue;
-        if (ImGui::Button(materializr::tr(t.label), ImVec2(-1, bh(30)))) action = t.action;
+        if (labelledButton(materializr::tr(t.label), t.icon, ImVec2(-1, bh(30)))) action = t.action;
         if (t.tip) tip(materializr::tr(t.tip));
     }
     return action;
@@ -585,7 +644,7 @@ void Toolbar::renderPluginButtons(int contextMask) {
             lastSection = c.section;
         }
         ImGui::PushID(static_cast<int>(i + 10000));
-        if (ImGui::Button(materializr::tr(c.name.c_str()), ImVec2(-1, bh(30)))) {
+        if (labelledButton(materializr::tr(c.name.c_str()), iconForPlugin(i), ImVec2(-1, bh(30)))) {
             if (c.toolFactory) {
                 PluginRegistry::instance().activateTool(c.toolFactory(), *m_pluginCtx);
             } else if (c.action) {
@@ -599,7 +658,7 @@ void Toolbar::renderPluginButtons(int contextMask) {
 
 void Toolbar::renderPrimitivesMenu() {
     if (!m_pluginCtx) return;
-    if (ImGui::Button(materializr::tr("Primitives..."), ImVec2(-1, bh(30))))
+    if (labelledButton(materializr::tr("Primitives..."), MZ_ICON_PRIMITIVE, ImVec2(-1, bh(30))))
         ImGui::OpenPopup("PrimitivesMenu");
     tip(materializr::tr("Create a stock OCCT primitive (box / cylinder / sphere / cone / torus). Picking one opens its parameter popup - defaults land a 10 mm / R5 mm shape at the world origin."));
     if (ImGui::BeginPopup("PrimitivesMenu")) {
@@ -646,7 +705,7 @@ void Toolbar::renderAddPlaneMenu() {
     if (!(midplane || haveCyl || haveAxis || straightEdge)) return;
 
     ImGui::Separator();
-    if (ImGui::Button(materializr::tr("Add Plane..."), ImVec2(-1, bh(30))))
+    if (labelledButton(materializr::tr("Add Plane..."), MZ_ICON_PLANE, ImVec2(-1, bh(30))))
         ImGui::OpenPopup("AddPlaneMenu");
     tip(materializr::tr("Create a construction plane derived from the current selection."));
     if (ImGui::BeginPopup("AddPlaneMenu")) {
@@ -697,7 +756,7 @@ void Toolbar::renderAddAxisMenu() {
     if (!(haveCyl || straightEdge || twoVerts || faceNormal || twoPlanes)) return;
 
     ImGui::Separator();
-    if (ImGui::Button(materializr::tr("Add Axis..."), ImVec2(-1, bh(30))))
+    if (labelledButton(materializr::tr("Add Axis..."), MZ_ICON_CONSTRUCTION, ImVec2(-1, bh(30))))
         ImGui::OpenPopup("AddAxisMenu");
     tip(materializr::tr("Create a construction axis derived from the current selection."));
     if (ImGui::BeginPopup("AddAxisMenu")) {
@@ -746,9 +805,9 @@ ToolAction Toolbar::renderSketchTools() {
     // Render a sketch-tool button with a thick light-grey border when it's
     // the currently active mode. Caller checks the return value to set
     // `action`. Mode id matches SketchToolMode enum (see Toolbar.h).
-    auto skBtn = [&](const char* label, int modeId) -> bool {
+    auto skBtn = [&](const char* label, int modeId, ToolAction icon) -> bool {
         ActiveToolStyle lit(m_activeSketchMode == modeId);
-        return ImGui::Button(materializr::tr(label), ImVec2(-1, bh(30)));
+        return toolBtn(label, icon, ImVec2(-1, bh(30)));
     };
 
     // A button that opens a menu: the corner wedge says so, so the menu is not
@@ -765,7 +824,7 @@ ToolAction Toolbar::renderSketchTools() {
                               ToolAction act, const char* tipText) {
         const bool wasActive = (m_activeSketchMode == modeId);
         const char* popup = isRect ? "RectOriginMenu" : "CircleOriginMenu";
-        const bool clicked = skBtn(label, modeId);
+        const bool clicked = skBtn(label, modeId, act);
         menuMark();
         tip(tipText);
         if (clicked) {
@@ -788,19 +847,19 @@ ToolAction Toolbar::renderSketchTools() {
         }
     };
 
-    if (skBtn("Select / Move", 1)) action = ToolAction::SelectSketch;
+    if (skBtn("Select / Move", 1, ToolAction::SelectSketch)) action = ToolAction::SelectSketch;
     tip(materializr::tr("Pick sketch elements (points, lines, regions). Drag selection to move."));
-    if (skBtn("Point",     15))    action = ToolAction::SketchPoint;
+    if (skBtn("Point", 15, ToolAction::SketchPoint))    action = ToolAction::SketchPoint;
     tip(materializr::tr("Place a standalone point. Snaps to existing points, lines and curves like every other sketch tool."));
-    if (skBtn("Line",      2))     action = ToolAction::Line;
+    if (skBtn("Line", 2, ToolAction::Line))     action = ToolAction::Line;
     tip(materializr::tr("Draw straight line segments. Click to add vertices, Esc to finish."));
     drawOriginMenu(false, "Circle", 3, ToolAction::Circle,
         materializr::tr("Draw a circle: click centre, drag to radius. Click again while it is active to choose Center or 2-Point (the two clicks are opposite ends of the diameter)."));
     drawOriginMenu(true, "Rectangle", 4, ToolAction::Rectangle,
         materializr::tr("Draw an axis-aligned rectangle: click one corner, drag to the opposite. Click again while it is active to choose Corner or Center (click the centre, drag to a corner)."));
-    if (skBtn("Arc",       5))     action = ToolAction::Arc;
+    if (skBtn("Arc", 5, ToolAction::Arc))     action = ToolAction::Arc;
     tip(materializr::tr("Three-point arc: click start, end, then a point on the curve."));
-    if (skBtn("Spline",    6))     action = ToolAction::Spline;
+    if (skBtn("Spline", 6, ToolAction::Spline))     action = ToolAction::Spline;
     tip(materializr::tr("Multi-point spline. Click control points, Enter to finish."));
     // Polygon: a popout to pick the regular-polygon side count by name (like
     // the Primitives menu), instead of typing it into a dialog. The chosen
@@ -809,7 +868,7 @@ ToolAction Toolbar::renderSketchTools() {
         bool polyClicked;
         {
             ActiveToolStyle lit(m_activeSketchMode == 7);
-            polyClicked = ImGui::Button(materializr::tr("Polygon"), ImVec2(-1, bh(30)));
+            polyClicked = toolBtn("Polygon", ToolAction::Polygon, ImVec2(-1, bh(30)));
         }
         if (polyClicked) ImGui::OpenPopup("PolygonSidesMenu");
         menuMark();
@@ -824,30 +883,30 @@ ToolAction Toolbar::renderSketchTools() {
         }
     }
     tip(materializr::tr("Regular polygon: click centre, drag to size. Side count in properties."));
-    if (skBtn("Text",      9))     action = ToolAction::SketchText;
+    if (skBtn("Text", 9, ToolAction::SketchText))     action = ToolAction::SketchText;
     tip(materializr::tr("Insert text as real outline geometry: set string, font and letter height in the popup, then click to place. Letters become closed regions - extrude them or engrave them onto a face."));
-    if (skBtn("Import SVG", 10))   action = ToolAction::SketchSvg;
+    if (skBtn("Import SVG", 10, ToolAction::SketchSvg))   action = ToolAction::SketchSvg;
     tip(materializr::tr("Import an SVG file as sketch outlines: pick the file, set the width in the popup, click to place. Paths become closed regions - extrude a logo or engrave it onto a face."));
-    if (skBtn("Airfoil",   13))    action = ToolAction::SketchAirfoil;
+    if (skBtn("Airfoil", 13, ToolAction::SketchAirfoil))    action = ToolAction::SketchAirfoil;
     tip(materializr::tr("Import an aerofoil section (Selig or Lednicer coordinates, e.g. from airfoiltools.com): pick the file, set the chord in the popup, click to place the leading edge. Stack sections on planes and Loft for a wing."));
-    if (skBtn("Trim",      8))     action = ToolAction::Trim;
+    if (skBtn("Trim", 8, ToolAction::Trim))     action = ToolAction::Trim;
     tip(materializr::tr("Trim a sketch segment at the nearest intersections."));
-    if (skBtn("Offset",   14))     action = ToolAction::SketchOffset;
+    if (skBtn("Offset", 14, ToolAction::SketchOffset))     action = ToolAction::SketchOffset;
     tip(materializr::tr("Offset a chain: click an edge to take the whole connected run, then move the cursor or type a distance. Which side you are on picks the direction."));
-    if (skBtn("Corner",   18))     action = ToolAction::SketchCorner;
+    if (skBtn("Corner", 18, ToolAction::SketchCorner))     action = ToolAction::SketchCorner;
     tip(materializr::tr("Round (fillet) or bevel (chamfer) a corner where two lines meet: set the size in the panel, then click each corner."));
-    if (skBtn("Reference", 17))    action = ToolAction::SketchReference;
+    if (skBtn("Reference", 17, ToolAction::SketchReference))    action = ToolAction::SketchReference;
     tip(materializr::tr("Copy geometry that lies on this plane into the sketch: click a body edge, a cross-section line, or another sketch's line or circle. Ctrl+click takes the whole connected run of lines."));
-    if (skBtn("Fill",     16))     action = ToolAction::SketchFill;
+    if (skBtn("Fill", 16, ToolAction::SketchFill))     action = ToolAction::SketchFill;
     tip(materializr::tr("Fill closed regions for SVG and DXF export (laser engraving): click a region to fill it, click again to clear. Cosmetic only - it never affects Extrude, Push/Pull or anything else you model."));
-    if (skBtn("Dimension", 12))    action = ToolAction::SketchDimension;
+    if (skBtn("Dimension", 12, ToolAction::SketchDimension))    action = ToolAction::SketchDimension;
     tip(materializr::tr("Dimension tool (D): click a line, circle, point pair, or two lines, place the label, then type the value."));
     // Construction: lit while "draw as construction" is on. Same border as an
     // active tool so the state reads at a glance.
     {
         {
             ActiveToolStyle lit(m_constructionDraw);
-            if (ImGui::Button(materializr::tr("Construction"), ImVec2(-1, bh(30))))
+            if (toolBtn("Construction", ToolAction::SketchConstruction, ImVec2(-1, bh(30))))
                 action = ToolAction::SketchConstruction;
         }
         tip(materializr::tr("Construction geometry: reference lines that help you draw but are not part of the shape - they never affect extrudes or exports. With elements selected, click to turn them into construction (or back). Otherwise click to draw the next shapes as construction."));
@@ -858,13 +917,13 @@ ToolAction Toolbar::renderSketchTools() {
     // Rotate is the gizmo's ring handle (drag = 15° snap, popup for exact value),
     // so it doesn't get its own button.
     ImGui::Separator();
-    if (ImGui::Button(materializr::tr("Copy"),   ImVec2(-1, bh(28)))) action = ToolAction::SketchCopy;
+    if (toolBtn("Copy", ToolAction::SketchCopy, ImVec2(-1, bh(28)))) action = ToolAction::SketchCopy;
     tip(materializr::tr("Duplicate the selected sketch elements at an offset."));
-    if (ImGui::Button(materializr::tr("Mirror"), ImVec2(-1, bh(28)))) action = ToolAction::SketchMirror;
+    if (toolBtn("Mirror", ToolAction::SketchMirror, ImVec2(-1, bh(28)))) action = ToolAction::SketchMirror;
     tip(materializr::tr("Mirror selected elements across a sketch line you'll pick next."));
-    if (ImGui::Button(materializr::tr("Linear Pattern"), ImVec2(-1, bh(28)))) action = ToolAction::SketchLinearPattern;
+    if (toolBtn("Linear Pattern", ToolAction::SketchLinearPattern, ImVec2(-1, bh(28)))) action = ToolAction::SketchLinearPattern;
     tip(materializr::tr("Copy the selected sketch elements in a row or a grid: left, right, up and/or down."));
-    if (ImGui::Button(materializr::tr("Circular Pattern"), ImVec2(-1, bh(28)))) action = ToolAction::SketchRadialPattern;
+    if (toolBtn("Circular Pattern", ToolAction::SketchRadialPattern, ImVec2(-1, bh(28)))) action = ToolAction::SketchRadialPattern;
     tip(materializr::tr("Copy the selected sketch elements around an origin you specify."));
 
     // Drawing-inference level - a live Full → Reduced → Off toggle. Lets the
@@ -894,17 +953,17 @@ ToolAction Toolbar::renderSketchTools() {
     if (!m_cameraOrtho) {
         ImGui::Separator();
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.55f, 0.85f, 1.0f));
-        if (ImGui::Button(materializr::tr("Look at Sketch"), ImVec2(-1, bh(30))))
+        if (toolBtn("Look at Sketch", ToolAction::LookAtSketch, ImVec2(-1, bh(30))))
             action = ToolAction::LookAtSketch;
         tip(materializr::tr("Snap the camera to look straight down the sketch plane (orthographic)."));
         ImGui::PopStyleColor();
     }
 
     ImGui::Separator();
-    if (ImGui::Button(materializr::tr("Finish Sketch"), ImVec2(-1, bh(30))))
+    if (toolBtn("Finish Sketch", ToolAction::FinishSketch, ImVec2(-1, bh(30))))
         action = ToolAction::FinishSketch;
     tip(materializr::tr("Leave sketch mode and return to the 3D viewport. Keeps the sketch."));
-    if (ImGui::Button(materializr::tr("Exit Sketch"), ImVec2(-1, bh(30))))
+    if (toolBtn("Exit Sketch", ToolAction::ExitSketchDiscard, ImVec2(-1, bh(30))))
         action = ToolAction::ExitSketchDiscard;
     tip(materializr::tr("Discard the current sketch entirely and leave sketch mode. Rewinds history to before the sketch was entered; the body returns to its pre-sketch state. Useful when you've started a sketch you don't want to keep - Esc-while-placing only cancels the in-progress shape, this clears everything."));
 
@@ -920,11 +979,11 @@ ToolAction Toolbar::renderNoSelectionTools() {
     // Start a sketch on a base plane - lets you model from scratch with no body.
     ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Create"));
     ImGui::Separator();
-    if (ImGui::Button(materializr::tr("Sketch on XY"), ImVec2(-1, bh(30)))) action = ToolAction::StartSketchXY;
+    if (toolBtn("Sketch on XY", ToolAction::StartSketchXY, ImVec2(-1, bh(30)))) action = ToolAction::StartSketchXY;
     tip(materializr::tr("Start a new sketch on the world XY (floor) plane."));
-    if (ImGui::Button(materializr::tr("Sketch on XZ"), ImVec2(-1, bh(30)))) action = ToolAction::StartSketchXZ;
+    if (toolBtn("Sketch on XZ", ToolAction::StartSketchXZ, ImVec2(-1, bh(30)))) action = ToolAction::StartSketchXZ;
     tip(materializr::tr("Start a new sketch on the world XZ (front) plane."));
-    if (ImGui::Button(materializr::tr("Sketch on YZ"), ImVec2(-1, bh(30)))) action = ToolAction::StartSketchYZ;
+    if (toolBtn("Sketch on YZ", ToolAction::StartSketchYZ, ImVec2(-1, bh(30)))) action = ToolAction::StartSketchYZ;
     tip(materializr::tr("Start a new sketch on the world YZ (side) plane."));
 
     // OCCT primitives (Box / Cylinder / Sphere / Cone / Torus) under a
@@ -966,20 +1025,20 @@ ToolAction Toolbar::renderBodyTools(bool primaryContext) {
     const int cols = primaryContext ? 3 : 2;
     float cw = (ImGui::GetContentRegionAvail().x -
                 (cols - 1) * ImGui::GetStyle().ItemSpacing.x) / static_cast<float>(cols);
-    if (ImGui::Button(materializr::tr("Move"), ImVec2(cw, bh(30))))   action = ToolAction::Move;
+    if (toolBtn("Move", ToolAction::Move, ImVec2(cw, bh(30))))   action = ToolAction::Move;
     tip(materializr::tr("Show the translate gizmo. Drag axes / planes to move. (W)"));
     ImGui::SameLine();
-    if (ImGui::Button(materializr::tr("Rotate"), ImVec2(cw, bh(30)))) action = ToolAction::Rotate;
+    if (toolBtn("Rotate", ToolAction::Rotate, ImVec2(cw, bh(30)))) action = ToolAction::Rotate;
     tip(materializr::tr("Show the rotate gizmo. Drag rings to rotate around each axis. (E)"));
     if (primaryContext) {
         ImGui::SameLine();
-        if (ImGui::Button(materializr::tr("Scale"), ImVec2(cw, bh(30))))  action = ToolAction::Scale;
+        if (toolBtn("Scale", ToolAction::Scale, ImVec2(cw, bh(30))))  action = ToolAction::Scale;
         tip(materializr::tr("Show the scale gizmo. Drag handles to resize. (R)"));
     }
     // Mirror + Revolve share the row so they read as the "uses an
     // already-created primitive" pair (mirror plane / construction axis).
     float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
-    if (ImGui::Button(materializr::tr("Mirror"), ImVec2(half, bh(30))))    action = ToolAction::Mirror;
+    if (toolBtn("Mirror", ToolAction::Mirror, ImVec2(half, bh(30))))    action = ToolAction::Mirror;
     tip(materializr::tr("Mirror the selected bodies across a plane you pick next."));
     ImGui::SameLine();
     // Context-sensitive: a selected sketch lathes (spin its profile into a
@@ -987,7 +1046,7 @@ ToolAction Toolbar::renderBodyTools(bool primaryContext) {
     // axis (a fan, a hinge). beginRevolve() picks the matching mode from the
     // selection, so both share one action.
     bool sketchSel = m_selection && m_selection->hasSelectedSketches();
-    if (ImGui::Button(sketchSel ? "Lathe" : "Revolve", ImVec2(half, bh(30))))
+    if (labelledButton(sketchSel ? "Lathe" : "Revolve", iconForAction(ToolAction::Revolve), ImVec2(half, bh(30))))
         action = ToolAction::Revolve;
     if (sketchSel)
         tip(materializr::tr("Lathe: spin the selected sketch's profile around a Construction Axis into a new solid. Pick the axis next."));
@@ -1015,7 +1074,7 @@ ToolAction Toolbar::renderBodyTools(bool primaryContext) {
         ImGui::Spacing();
         ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Fabrication"));
         ImGui::Separator();
-        if (ImGui::Button(materializr::tr("Unfold / Flatten"), ImVec2(-1, bh(30))))
+        if (toolBtn("Unfold / Flatten", ToolAction::Unfold, ImVec2(-1, bh(30))))
             action = ToolAction::Unfold;
         tip(materializr::tr("Lay the body flat into a 2D pattern (cut + fold lines) for a laser cutter, CNC, or printed template. Mark it as foam board / sheet metal / wood to set how folds are processed."));
     }
@@ -1048,7 +1107,7 @@ ToolAction Toolbar::renderFaceTools() {
     // only, Taper is not, and each rule used to be written out twice.
     auto btn = [&](ToolAction a, const char* label, const char* t) {
         if (!catalogOffers(a)) return;
-        if (ImGui::Button(materializr::tr(label), ImVec2(-1, bh(30)))) action = a;
+        if (toolBtn(label, a, ImVec2(-1, bh(30)))) action = a;
         tip(materializr::tr(t));
     };
 
@@ -1099,7 +1158,7 @@ ToolAction Toolbar::renderFaceTools() {
         for (const auto& t : m_catalog)
             if (t.pluginIndex < 0 && t.action == ToolAction::EditFilletChamfer) { e = &t; break; }
         if (e) {
-            if (ImGui::Button(e->label, ImVec2(-1, bh(30))))
+            if (labelledButton(materializr::tr(e->label), e->icon, ImVec2(-1, bh(30))))
                 action = ToolAction::EditFilletChamfer;
             if (e->tip) tip(e->tip);
         }
@@ -1176,7 +1235,7 @@ ToolAction Toolbar::renderSketchSelectedTools() {
     ImGui::Separator();
 
     if (catalogOffers(ToolAction::EditSketch)) {
-        if (ImGui::Button(materializr::tr("Edit Sketch"), ImVec2(-1, bh(30))))
+        if (toolBtn("Edit Sketch", ToolAction::EditSketch, ImVec2(-1, bh(30))))
             action = ToolAction::EditSketch;
         tip(materializr::tr("Re-enter sketch mode to revise this sketch's geometry."));
     }
@@ -1186,16 +1245,16 @@ ToolAction Toolbar::renderSketchSelectedTools() {
     // sketch could only ever spawn a new body, never modify its host in
     // place. Both tools now exist in every layout for every sketch selection.
     if (catalogOffers(ToolAction::PushPull)) {
-        if (ImGui::Button(materializr::tr("Push / Pull"), ImVec2(-1, bh(30))))
+        if (toolBtn("Push / Pull", ToolAction::PushPull, ImVec2(-1, bh(30))))
             action = ToolAction::PushPull;
         tip(materializr::tr("Drag the arrow to push the sketch's regions into the body beneath them, or pull them out of it. Modifies that body in place - use Extrude From for a separate body."));
     }
     if (catalogOffers(ToolAction::ExtrudeSketch) &&
-        ImGui::Button(materializr::tr("Extrude From"), ImVec2(-1, bh(30))))
+        toolBtn("Extrude From", ToolAction::ExtrudeSketch, ImVec2(-1, bh(30))))
         action = ToolAction::ExtrudeSketch;
     tip(materializr::tr("Make a NEW body by extruding the sketch's closed regions, leaving any host body unchanged. Whole-sketch extrude assumes ONE outer boundary - for multi-shape sketches (SVG imports, text), click individual regions in the viewport (Ctrl+click for several) and extrude those instead."));
     if (catalogOffers(ToolAction::SubtractSketch)) {
-        if (ImGui::Button(materializr::tr("Subtract Sketch"), ImVec2(-1, bh(30))))
+        if (toolBtn("Subtract Sketch", ToolAction::SubtractSketch, ImVec2(-1, bh(30))))
             action = ToolAction::SubtractSketch;
         tip(materializr::tr("Extrude the sketch's regions and cut the result out of the body they\nrun into - the host body when the sketch sits on one, otherwise\nwhichever body the sweep reaches."));
     }
@@ -1209,10 +1268,10 @@ ToolAction Toolbar::renderSketchSelectedTools() {
     ImGui::Separator();
     ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Transform"));
     ImGui::Separator();
-    if (ImGui::Button(materializr::tr("Move"), ImVec2(-1, bh(30))))
+    if (toolBtn("Move", ToolAction::Move, ImVec2(-1, bh(30))))
         action = ToolAction::Move;
     tip(materializr::tr("Show the Move gizmo on the selected sketch. Drag an axis to reposition the sketch in 3D - its geometry rides along, so this effectively turns the sketch into a movable construction plane. Only available outside ortho view and sketch-edit mode."));
-    if (ImGui::Button(materializr::tr("Rotate"), ImVec2(-1, bh(30))))
+    if (toolBtn("Rotate", ToolAction::Rotate, ImVec2(-1, bh(30))))
         action = ToolAction::Rotate;
     tip(materializr::tr("Show the Rotate gizmo on the selected sketch. Drag a ring to spin the sketch around its centroid."));
 
@@ -1233,16 +1292,16 @@ ToolAction Toolbar::renderPlaneSelectedTools() {
     ToolAction action = ToolAction::None;
     ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Construction Plane"));
     ImGui::Separator();
-    if (ImGui::Button(materializr::tr("Sketch on this Plane"), ImVec2(-1, bh(30))))
+    if (toolBtn("Sketch on this Plane", ToolAction::SketchOnFace, ImVec2(-1, bh(30))))
         action = ToolAction::SketchOnFace; // dispatched on Plane in handler
     tip(materializr::tr("Start a new sketch lying on this construction plane - same workflow as Sketch on Face, just with the plane as the host."));
 
     ImGui::Separator();
     ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Transform"));
     ImGui::Separator();
-    if (ImGui::Button(materializr::tr("Move"), ImVec2(-1, bh(30))))   action = ToolAction::Move;
+    if (toolBtn("Move", ToolAction::Move, ImVec2(-1, bh(30))))   action = ToolAction::Move;
     tip(materializr::tr("Show the Move gizmo on this plane. Drag an axis arrow to nudge it; the live readout pinned to the cursor shows the offset along the plane's own normal."));
-    if (ImGui::Button(materializr::tr("Rotate"), ImVec2(-1, bh(30)))) action = ToolAction::Rotate;
+    if (toolBtn("Rotate", ToolAction::Rotate, ImVec2(-1, bh(30)))) action = ToolAction::Rotate;
     tip(materializr::tr("Show the Rotate gizmo. Drag a ring to spin the plane around its origin; snap is 5° increments when snap-to-grid is on."));
 
     if (action == ToolAction::None)
@@ -1265,7 +1324,7 @@ ToolAction Toolbar::renderAxisSelectedTools() {
     ImGui::Separator();
     ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Transform"));
     ImGui::Separator();
-    if (ImGui::Button(materializr::tr("Move"), ImVec2(-1, bh(30)))) action = ToolAction::Move;
+    if (toolBtn("Move", ToolAction::Move, ImVec2(-1, bh(30)))) action = ToolAction::Move;
     tip(materializr::tr("Show the Move gizmo on this axis. Drag an arrow to translate the axis origin; the direction is preserved."));
 
     if (action == ToolAction::None)
@@ -1287,26 +1346,26 @@ ToolAction Toolbar::renderSketchRegionTools() {
     // Push/Pull routes through the app's interactive arrow gizmo (default 0,
     // drag to extrude/cut) - same as a body face.
     if (catalogOffers(ToolAction::PushPull)) {
-        if (ImGui::Button(materializr::tr("Push / Pull"), ImVec2(-1, bh(30))))
+        if (toolBtn("Push / Pull", ToolAction::PushPull, ImVec2(-1, bh(30))))
             action = ToolAction::PushPull;
         tip(materializr::tr("Drag the arrow to extrude this region into a body, or cut it into the parent."));
     }
     if (catalogOffers(ToolAction::ExtrudeSketch)) {
-        if (ImGui::Button(materializr::tr("Extrude From"), ImVec2(-1, bh(30))))
+        if (toolBtn("Extrude From", ToolAction::ExtrudeSketch, ImVec2(-1, bh(30))))
             action = ToolAction::ExtrudeSketch;
         tip(materializr::tr("Make a NEW body from this region (Ctrl+click several regions to extrude them together). The source sketch/body is left unchanged."));
     }
     // Subtract: cut this region out of the body the sketch sits on, with a red
     // preview of the removed volume.
     if (catalogOffers(ToolAction::SubtractSketch)) {
-        if (ImGui::Button(materializr::tr("Subtract"), ImVec2(-1, bh(30))))
+        if (toolBtn("Subtract", ToolAction::SubtractSketch, ImVec2(-1, bh(30))))
             action = ToolAction::SubtractSketch;
         tip(materializr::tr("Cut this region into the body the sketch was drawn on (preview in red)."));
     }
     // Revolve/Lathe is not a catalogue tool (RevolvePlugin registers only a
     // command), so it is not gated on catalogOffers. beginRevolve accepts a
     // selected region; applyRevolve spins the sketch's largest closed profile.
-    if (ImGui::Button(materializr::tr("Lathe"), ImVec2(-1, bh(30))))
+    if (toolBtn("Lathe", ToolAction::Revolve, ImVec2(-1, bh(30))))
         action = ToolAction::Revolve;
     tip(materializr::tr("Spin the sketch's largest closed profile around an axis into a solid."));
 
@@ -1315,7 +1374,7 @@ ToolAction Toolbar::renderSketchRegionTools() {
 
     // Edit the sketch this region belongs to - re-enter sketch mode to revise it.
     if (catalogOffers(ToolAction::EditSketch)) {
-        if (ImGui::Button(materializr::tr("Edit Sketch"), ImVec2(-1, bh(30))))
+        if (toolBtn("Edit Sketch", ToolAction::EditSketch, ImVec2(-1, bh(30))))
             action = ToolAction::EditSketch;
         tip(materializr::tr("Re-enter sketch mode to revise this region's parent sketch."));
     }
@@ -1327,10 +1386,10 @@ ToolAction Toolbar::renderSketchRegionTools() {
     ImGui::Separator();
     ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Transform"));
     ImGui::Separator();
-    if (ImGui::Button(materializr::tr("Move"), ImVec2(-1, bh(30))))
+    if (toolBtn("Move", ToolAction::Move, ImVec2(-1, bh(30))))
         action = ToolAction::Move;
     tip(materializr::tr("Show the Move gizmo on the parent sketch. Drag an axis to reposition the sketch in 3D - geometry follows, so the sketch becomes a movable construction plane. Outside ortho view only."));
-    if (ImGui::Button(materializr::tr("Rotate"), ImVec2(-1, bh(30))))
+    if (toolBtn("Rotate", ToolAction::Rotate, ImVec2(-1, bh(30))))
         action = ToolAction::Rotate;
     tip(materializr::tr("Show the Rotate gizmo on the parent sketch. Drag a ring to spin the sketch around its centroid."));
 
@@ -1355,19 +1414,19 @@ ToolAction Toolbar::renderEdgeTools() {
     // placement below are classic's own. "Move Hole" used to be gated on a
     // duplicate copy of the rim test here and shipped to the rails only.
     if (catalogOffers(ToolAction::Fillet)) {
-        if (ImGui::Button(materializr::tr("Fillet"), ImVec2(-1, bh(30)))) action = ToolAction::Fillet;
+        if (toolBtn("Fillet", ToolAction::Fillet, ImVec2(-1, bh(30)))) action = ToolAction::Fillet;
         tip(materializr::tr("Round the picked edge(s). Set radius in the popup."));
     }
     if (catalogOffers(ToolAction::Chamfer)) {
-        if (ImGui::Button(materializr::tr("Chamfer"), ImVec2(-1, bh(30)))) action = ToolAction::Chamfer;
+        if (toolBtn("Chamfer", ToolAction::Chamfer, ImVec2(-1, bh(30)))) action = ToolAction::Chamfer;
         tip(materializr::tr("Bevel the picked edge(s). Set distance in the popup."));
     }
     if (catalogOffers(ToolAction::Move)) {
-        if (ImGui::Button(materializr::tr("Move Hole"), ImVec2(-1, bh(30)))) action = ToolAction::Move;
+        if (toolBtn("Move Hole", ToolAction::Move, ImVec2(-1, bh(30)))) action = ToolAction::Move;
         tip(materializr::tr("Move the hole this rim belongs to: drag one rim to tilt the bore, one straight side to reshape it, or select both rims to slide the whole hole."));
     }
     if (catalogOffers(ToolAction::EditDiameter)) {
-        if (ImGui::Button(materializr::tr("Edit Diameter"), ImVec2(-1, bh(30))))
+        if (toolBtn("Edit Diameter", ToolAction::EditDiameter, ImVec2(-1, bh(30))))
             action = ToolAction::EditDiameter;
         tip(materializr::tr("Resize the cylindrical face this edge belongs to."));
     }

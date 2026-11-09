@@ -29,6 +29,8 @@
 #include "ui/PolygonSidesMenu.h"
 #include "ui/Toolbar.h"
 #include "ui/TouchIcons.h"
+#include "ui/TouchTheme.h"
+#include "ui/TouchWidgets.h"
 #include "ui/UiTheme.h"   // accentText for the touch tabs sheet heading
 #include "viewport/Viewport.h"
 #include "gl_common.h"
@@ -46,6 +48,7 @@
 #include <Geom_Surface.hxx>
 #include <TopoDS.hxx>
 
+#include <cfloat>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -88,6 +91,26 @@ ImTextureID logoTexture() {
         glBindTexture(GL_TEXTURE_2D, 0);
     }
     return (ImTextureID)(intptr_t)tex;
+}
+
+bool logoMenuButton(const char* id, float side) {
+    const float s = uiScale();
+    ImGui::PushID(id);
+    const ImVec2 p = ImGui::GetCursorScreenPos();
+    const bool pressed = ImGui::InvisibleButton("##logobtn", ImVec2(side, side));
+    ImVec4 bg = touchui::rowBg();
+    if (ImGui::IsItemHovered()) bg = touchui::hoverBg();
+    if (ImGui::IsItemActive())  bg = touchui::pressBg();
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    dl->AddRectFilled(p, ImVec2(p.x + side, p.y + side),
+                      ImGui::GetColorU32(bg), touchui::radius(10.0f * s));
+    const float lg = side * 0.64f;
+    const ImVec2 c0(p.x + (side - lg) * 0.5f, p.y + (side - lg) * 0.5f);
+    dl->AddImageRounded(logoTexture(), c0, ImVec2(c0.x + lg, c0.y + lg),
+                        ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE,
+                        touchui::radius(5.0f * s));
+    ImGui::PopID();
+    return pressed;
 }
 
 } // namespace layoutui
@@ -381,7 +404,7 @@ static const char* shortcutHint(const std::string& label) {
 
 // The four menu bodies, shared by classic's menu bar and the modern/im-touch
 // overflow popup - one item list each, so the layouts cannot drift.
-void Application::renderFileMenuItems(bool withSettings) {
+void Application::renderFileMenuItems(bool withSettings, bool withExit) {
     if (ImGui::MenuItem(materializr::tr("Home Screen"))) goToHomeScreen();
     if (ImGui::MenuItem(materializr::tr("Open Project..."), shortcutHint(keyLabel(KeyAction::Open)))) loadProject();
     // Open Recent - persisted, most-recent-first. Greyed when empty.
@@ -489,9 +512,15 @@ void Application::renderFileMenuItems(bool withSettings) {
         }
     }
 #if !defined(MZ_IOS)   // iOS apps do not offer their own quit
-    ImGui::Separator();
-    if (ImGui::MenuItem(materializr::tr("Exit"), shortcutHint("Alt+F4"))) m_window->requestClose(true);
+    if (withExit) {
+        ImGui::Separator();
+        renderExitMenuItem();
+    }
 #endif
+}
+
+void Application::renderExitMenuItem() {
+    if (ImGui::MenuItem(materializr::tr("Exit"), shortcutHint("Alt+F4"))) m_window->requestClose(true);
 }
 
 void Application::renderEditMenuItems() {
@@ -697,11 +726,17 @@ void Application::renderPluginMenuItems(const char* menuName) {
     }
 }
 
-// The ⋯/☰ menu shared by the modern and im-touch layouts: the full desktop
-// menus, flattened one level, via the shared item lists (renderFileMenuItems
-// & co.) so these layouts and classic's menu bar cannot drift. Caller does
-// OpenPopup("##TouchOverflow") on its trigger button.
+// The menu behind the logo button, shared by the modern and im-touch layouts:
+// the full desktop menus laid out FLAT (File/Edit/View/Help are collapsible
+// sections in one popup - no hover-and-wait submenu tree), via the
+// shared item lists (renderFileMenuItems & co.) so these layouts and classic's
+// menu bar cannot drift. Settings follows, and Exit sits alone at the bottom.
+// The popup scrolls when it is taller than the window (large UI scales).
+// Caller does OpenPopup("##TouchOverflow") on its trigger button.
 void Application::renderTouchOverflowPopup() {
+    const ImGuiViewport* vp = ImGui::GetMainViewport();
+    ImGui::SetNextWindowSizeConstraints(
+        ImVec2(0.0f, 0.0f), ImVec2(FLT_MAX, vp->WorkSize.y * 0.94f));
     if (!ImGui::BeginPopup("##TouchOverflow")) return;
     // The icon macro concatenates into the label, so these cannot be plain
     // literals for tr(); build icon + translated word + a ###pin so the menu's
@@ -711,28 +746,28 @@ void Application::renderTouchOverflowPopup() {
         buf = std::string(icon) + "  " + materializr::tr(en) + "###" + en;
         return buf.c_str();
     };
-    if (ImGui::BeginMenu(menuLbl(MZ_ICON_OPEN, "File"))) {
-        renderFileMenuItems(false);   // Settings is exposed at the bottom instead
-        ImGui::EndMenu();
-    }
-    if (ImGui::BeginMenu(menuLbl(MZ_ICON_UNDO, "Edit"))) {
-        renderEditMenuItems();
-        ImGui::EndMenu();
-    }
-    if (ImGui::BeginMenu(menuLbl(MZ_ICON_FOCUS, "View"))) {
-        renderViewMenuItems();
-        ImGui::EndMenu();
-    }
-    if (ImGui::BeginMenu(menuLbl(MZ_ICON_ABOUT, "Help"))) {
-        renderHelpMenuItems();
-        ImGui::EndMenu();
-    }
+    // Each section is a header the user expands on demand - all closed to
+    // start, so Settings and Exit are always in view and one extra tap beats
+    // scrolling a long list. Sections open independently; ImGui keeps their
+    // state for as long as the popup window lives.
+    auto section = [&](const char* en, auto&& body) {
+        const std::string lbl = std::string(materializr::tr(en)) + "###sec" + en;
+        if (ImGui::CollapsingHeader(lbl.c_str())) body();
+    };
+    section("File", [&] { renderFileMenuItems(false, false); });   // Settings and Exit are placed below
+    section("Edit", [&] { renderEditMenuItems(); });
+    section("View", [&] { renderViewMenuItems(); });
+    section("Help", [&] { renderHelpMenuItems(); });
     ImGui::Separator();
     if (ImGui::MenuItem(menuLbl(MZ_ICON_SETTINGS, "Settings..."))) {
         m_settingsOrbitButton = m_orbitButton;
         m_settingsPanButton   = m_panButton;
         m_showSettings = true;
     }
+#if !defined(MZ_IOS)
+    ImGui::Separator();
+    renderExitMenuItem();
+#endif
     ImGui::EndPopup();
 }
 

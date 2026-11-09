@@ -134,7 +134,7 @@ void Application::renderImTouchLayout() {
     // chip, the buttons). Their rounded fill is the only chrome we want.
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
 
-    // ── Top-left: [Logo] [Menu] [Project name] - three INDIVIDUAL boxes of
+    // ── Top-left: [Logo = menu] [Project name] - INDIVIDUAL boxes of
     //    equal height (matching the top-right cluster's button boxes), on a
     //    fully transparent host window so each box carries its own fill.
     ImGui::SetNextWindowPos(ImVec2(wp.x + m, wp.y + m));
@@ -143,24 +143,8 @@ void Application::renderImTouchLayout() {
         const float bh = 44.0f * s;
         ImDrawList* dl = ImGui::GetWindowDrawList();
 
-        // Logo box.
-        {
-            const ImVec2 p = ImGui::GetCursorScreenPos();
-            dl->AddRectFilled(p, ImVec2(p.x + bh, p.y + bh),
-                              ImGui::GetColorU32(touchui::rowBg()),
-                              touchui::radius(10.0f * s));
-            const float lg = 26.0f * s;
-            const ImVec2 c0(p.x + (bh - lg) * 0.5f, p.y + (bh - lg) * 0.5f);
-            dl->AddImageRounded(layoutui::logoTexture(), c0,
-                                ImVec2(c0.x + lg, c0.y + lg),
-                                ImVec2(0, 0), ImVec2(1, 1),
-                                IM_COL32_WHITE, touchui::radius(4.0f * s));
-            ImGui::Dummy(ImVec2(bh, bh));
-        }
-        ImGui::SameLine(0.0f, 8.0f * s);
-
-        // Menu box.
-        if (touchui::iconButton("menu", MZ_ICON_MENU_BARS, bh))
+        // Logo box: the emblem is the menu button.
+        if (layoutui::logoMenuButton("logomenu", bh))
             ImGui::OpenPopup("##TouchOverflow");
         tip(materializr::tr("Menu: file, edit, view, help and settings"));
         renderTouchOverflowPopup();

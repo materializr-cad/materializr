@@ -240,7 +240,9 @@ private:
     // withSettings=false drops the nested "Settings..." item - the touch
     // overflow exposes Settings at the top level, so it shouldn't also nest it
     // under File. The desktop menu bar keeps it (default true).
-    void renderFileMenuItems(bool withSettings = true);
+    // withExit=false leaves Exit off so the flat touch menu can put it last.
+    void renderFileMenuItems(bool withSettings = true, bool withExit = true);
+    void renderExitMenuItem();
     void renderEditMenuItems();
     // Derived construction Plane/Axis items - the popup behind the touch rail's
     // "Construct" group. Selection-aware (mirrors Toolbar's Add Plane/Axis).
@@ -264,7 +266,7 @@ private:
     // while it is already active opens a Corner/Center (or Center/2-Point)
     // menu. `wasActive` is the rail entry's active flag from BEFORE the tap.
     void renderRailDrawOriginPopup(bool isRect, bool wasActive, bool clicked);
-    void renderTouchOverflowPopup(); // shared ⋯/☰ menu popup (modern + im-touch)
+    void renderTouchOverflowPopup(); // shared logo-button menu popup (modern + im-touch)
     // Undo/redo with the sketch-edit cascade (shared by the Edit menu, the
     // touch shell's top bar, and nothing else - the Ctrl+Z shortcut has its
     // own copy in handleShortcuts pending a merge).

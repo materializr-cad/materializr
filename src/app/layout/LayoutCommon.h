@@ -8,7 +8,7 @@
 //
 //   - Menus: all layouts render the same File/Edit/View/Help item lists
 //     (renderFileMenuItems & co., LayoutCommon.cpp). Classic hosts them in
-//     the menu bar, modern/im-touch in the ⋯ overflow popup. Add a menu item
+//     the menu bar, modern/im-touch in the popup behind the logo button. Add a menu item
 //     to the shared list ONCE and every layout gets it; plugin menu
 //     contributions arrive through renderPluginMenuItems the same way.
 //   - Tools: the selection-context tool catalogue is Toolbar::railTools()
@@ -41,5 +41,11 @@ constexpr ImGuiWindowFlags kShellWindowFlags =
 // GL texture, shared by the modern top-bar chip and the im-touch project
 // chip. Uploaded once; lives with the GL context.
 ImTextureID logoTexture();
+
+// The logo drawn as the layouts' menu button: a rounded button-style chip (so
+// it reads as clickable) of `side` px at the cursor, with hover/press states.
+// Returns true on press; the caller does OpenPopup("##TouchOverflow") and
+// then renderTouchOverflowPopup(). Used by modern and im-touch.
+bool logoMenuButton(const char* id, float side);
 
 } // namespace materializr::layoutui

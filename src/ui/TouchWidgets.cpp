@@ -176,6 +176,10 @@ void drawIconCentered(ImDrawList* dl, const ImVec2& center, float size,
 
 } // namespace
 
+void drawIcon(ImDrawList* dl, const ImVec2& center, float size, const char* icon, ImU32 col) {
+    drawIconCentered(dl, center, size, icon, col);
+}
+
 void drawMenuMark(ImDrawList* dl, const ImVec2& max, float size, ImU32 col) {
     // A small right-angle wedge in the bottom-right corner: the convention for
     // "this button opens a menu of variants" (Photoshop's toolbox, Fusion).

@@ -198,6 +198,16 @@ public:
 private:
     // Scale a base button height by the UI scale (1.0 on desktop).
     float bh(float h) const { return h * m_uiScale; }
+
+    // Classic's tool buttons carry the SAME icon the rails show (from the
+    // catalogue, so one glyph per tool across layouts) in front of the full
+    // text label. `label` is already translated. The icon is dropped when it
+    // would not fit the button, so a narrow 3-across row keeps its words.
+    bool labelledButton(const char* label, const char* icon, ImVec2 size);
+    // English label + action: looks the icon up in this frame's catalogue.
+    bool toolBtn(const char* enLabel, ToolAction a, ImVec2 size);
+    const char* iconForAction(ToolAction a) const;
+    const char* iconForPlugin(size_t index) const;
     float m_uiScale = 1.0f;
 
     const SelectionManager* m_selection = nullptr;
