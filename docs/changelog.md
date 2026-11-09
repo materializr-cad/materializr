@@ -31,6 +31,16 @@ reports.
   picture of the tab you were looking at. Background tabs now keep the thumbnail
   they already had. A tile that is already wrong is repaired by saving that
   project once from its own tab.
+- **Typing a line's length in the dimension popup keeps its start point.** Before,
+  a line retyped from 18 to 50 grew at both ends and drifted off where you drew
+  it; now only the far end moves.
+- **Garbled giant characters when zoomed far into a sketch.** The dashed guides
+  drew a segment per dash across the whole line, millions of them at high zoom,
+  which overflowed the phone and tablet graphics buffers. They are now drawn only
+  where visible. Dimension and hint text too far off screen to see is skipped.
+- **New plane through a point.** With a vertex selected, the Construction Plane
+  popup has "Through selected point", which sets the distance for you (XY, XZ,
+  YZ or parallel to a face).
 - **Length fields: typing a value and pressing Enter was ignored** in every
   desktop length field (Polygon size, Offset, ...).
 - **Corner tool: a chamfer or fillet that uses exactly the available side now

@@ -24,6 +24,23 @@ const std::vector<Constraint>& SketchSolver::getConstraints() const {
     return m_sketch->getConstraints();
 }
 
+void SketchSolver::seedDistanceFromFirst(Sketch& sketch, const Constraint& c) {
+    if (c.type != ConstraintType::Distance || !(c.value > 0.0)) return;
+    const SketchPoint* pa = sketch.getPoint(c.entityA);
+    const SketchPoint* pb = sketch.getPoint(c.entityB);
+    if (!pa || !pb) return;
+    glm::vec2 diff = pb->pos - pa->pos;
+    const float len = glm::length(diff);
+    // Coincident points have no bearing of their own; use the one the
+    // dimension was placed along, as applyCorrection does.
+    glm::vec2 dir = len > 1e-6f ? diff / len
+                                : glm::vec2(static_cast<float>(c.orientX),
+                                            static_cast<float>(c.orientY));
+    if (glm::length(dir) < 1e-6f) return;
+    dir = glm::normalize(dir);
+    sketch.movePoint(c.entityB, pa->pos + dir * static_cast<float>(c.value));
+}
+
 bool SketchSolver::solve(Sketch& sketch, int maxIterations, double tolerance) {
     m_sketch = &sketch;
     auto& constraints = sketch.getMutableConstraints();

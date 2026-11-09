@@ -3882,6 +3882,38 @@ void Application::renderConstructionPlanePanel() {
         offsetChanged = true;
     }
     ImGui::TextDisabled("%s", materializr::tr("Pushes the plane along its normal. Negative for the opposite side."));
+    // A vertex is selected: one tap puts the plane through it (the distance
+    // would otherwise have to be typed from the point's coordinates).
+    if (m_planeOpHavePoint && m_planeOpKindIdx <= 3 &&
+        ImGui::Button(materializr::tr("Through selected point"))) {
+        double through = m_planeOpOffset;
+        bool ok = false;
+        if (m_planeOpKindIdx == 3 && m_planeOpHaveFace) {
+            // Distance is measured from the face along its normal.
+            const gp_Dir n = m_planeOpBaseFace.Axis().Direction();
+            const gp_Pnt o = m_planeOpBaseFace.Axis().Location();
+            through = (m_planeOpPoint.X() - o.X()) * n.X() +
+                      (m_planeOpPoint.Y() - o.Y()) * n.Y() +
+                      (m_planeOpPoint.Z() - o.Z()) * n.Z();
+            ok = true;
+        } else if (m_planeOpKindIdx <= 2) {
+            // Distance is from the world origin along the plane's normal.
+            auto ids = m_document->getAllPlaneIds();
+            if (!ids.empty()) {
+                if (const auto* p = m_document->getPlane(ids.back())) {
+                    const gp_Dir n = p->plane.Position().Direction();
+                    through = m_planeOpPoint.X() * n.X() + m_planeOpPoint.Y() * n.Y() +
+                              m_planeOpPoint.Z() * n.Z();
+                    ok = true;
+                }
+            }
+        }
+        if (ok) {
+            m_planeOpOffset = through;
+            materializr::formatLengthDigits(m_planeOpOffsetBuf, sizeof(m_planeOpOffsetBuf), m_planeOpOffset);
+            offsetChanged = true;
+        }
+    }
 
     // Gizmo for the preview plane appears automatically (the popup auto-
     // selects the just-pushed plane). Switch modes with W/E or click the

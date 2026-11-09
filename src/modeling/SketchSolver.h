@@ -31,6 +31,16 @@ public:
     // Returns true if converged.
     bool solve(Sketch& sketch, int maxIterations = 50, double tolerance = 1e-6);
 
+    // Before solving a Distance whose value was just typed: slide entityB
+    // along its current bearing from entityA until the pair already holds the
+    // value, leaving entityA where it is. The solver alone splits the
+    // correction evenly between the two points, so a free line retyped from 18
+    // to 50 grew at BOTH ends and its start drifted off where it was drawn.
+    // Seeding is only a starting guess: anything else constraining B or A
+    // still moves them when solve() runs, exactly as before. No-op for any
+    // other constraint type, a missing point, or a non-positive value.
+    static void seedDistanceFromFirst(Sketch& sketch, const Constraint& c);
+
     // Query state from the most recent solve() call.
     SketchState getState() const;
     int degreesOfFreedom() const;

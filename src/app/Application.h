@@ -2169,6 +2169,11 @@ private:
     gp_Ax1 m_planeOpAxis;
     gp_Pnt m_planeOpAxisPoint;
     bool   m_planeOpHaveCylinder = false;
+    // A selected body vertex: lets the XY/XZ/YZ/Parallel-to-face modes jump to
+    // the distance that puts the plane through that point ("Through selected
+    // point" in the popup).
+    bool   m_planeOpHavePoint = false;
+    gp_Pnt m_planeOpPoint;
     gp_Ax1 m_planeOpCylAxis;
     double m_planeOpCylRadius = 0.0;
     gp_Dir m_planeOpCylRefDir{1.0, 0.0, 0.0};

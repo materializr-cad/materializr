@@ -1822,6 +1822,7 @@ void Application::beginConstructionPlane() {
     m_planeOpHaveTwoPlanes = false;
     m_planeOpHaveAxis = false;
     m_planeOpHaveCylinder = false;
+    m_planeOpHavePoint = false;
     {
         std::vector<gp_Pln> planarPlanes;        // planar faces + construction planes
         std::vector<gp_Ax1> axes;                // construction axes + straight edges
@@ -1865,6 +1866,10 @@ void Application::beginConstructionPlane() {
             }
         }
 
+        if (!vertices.empty()) {
+            m_planeOpHavePoint = true;
+            m_planeOpPoint = vertices[0];
+        }
         if (planarPlanes.size() >= 2) {
             m_planeOpHaveTwoPlanes = true;
             m_planeOpPlaneA = planarPlanes[0];

@@ -37,6 +37,8 @@
 #include <BRepBndLib.hxx>
 #include <Standard_Failure.hxx>
 #include "io/ImageEncode.h"
+#include "ui/SafeText.h"
+#include "ui/ScreenDash.h"
 #include "viewport/Gizmo.h"
 #include "viewport/SelectionHighlight.h"
 #include "ui/TouchIcons.h"   // im-touch circle-confirm bubble ✗/✓ glyphs
@@ -1456,7 +1458,7 @@ void Application::renderViewport() {
                     if (bold) dl->AddRect(ImVec2(tp.x - 4, tp.y - 3),
                                           ImVec2(tp.x + ts.x + 4, tp.y + ts.y + 3),
                                           col, 3.0f, 0, 1.5f);
-                    dl->AddText(tp, col, label);
+                    materializr::drawTextSafe(dl, tp, col, label);
                 }
             };
 
@@ -1682,7 +1684,7 @@ void Application::renderViewport() {
                             ImVec2(tp.x - 5, tp.y - 3),
                             ImVec2(tp.x + ts.x + 5, tp.y + ts.y + 3),
                             col, 3.0f, 0, 1.5f);
-                        dl->AddText(tp, col, lbl);
+                        materializr::drawTextSafe(dl, tp, col, lbl);
                     }
                 }
             }
@@ -1717,7 +1719,7 @@ void Application::renderViewport() {
                     dl->AddRectFilled(ImVec2(tp.x - 4, tp.y - 2),
                                       ImVec2(tp.x + ts.x + 4, tp.y + ts.y + 2),
                                       IM_COL32(20, 20, 28, 220), 3.0f);
-                    dl->AddText(tp, col, txt);
+                    materializr::drawTextSafe(dl, tp, col, txt);
                 };
                 ov.triangle = [&](glm::vec2 a, glm::vec2 b, glm::vec2 c,
                                   unsigned col) {
@@ -1734,7 +1736,7 @@ void Application::renderViewport() {
                                     rounding, 0, thickness);
                 };
                 ov.text = [&](glm::vec2 at, const char* txt, unsigned col) {
-                    dl->AddText(ImVec2(at.x, at.y), col, txt);
+                    materializr::drawTextSafe(dl, ImVec2(at.x, at.y), col, txt);
                 };
                 ov.textSize = [&](const char* txt) {
                     ImVec2 ts = ImGui::CalcTextSize(txt);
@@ -1844,7 +1846,7 @@ void Application::renderViewport() {
                         dl->AddRectFilled(ImVec2(tp.x - 5, tp.y - 3),
                                           ImVec2(tp.x + ts.x + 5, tp.y + ts.y + 3),
                                           outline, 3.0f);
-                        dl->AddText(tp, col, hint);
+                        materializr::drawTextSafe(dl, tp, col, hint);
                     }
                 }
             } else if (m_gizmoDragging && !m_planeGizmoDrag.empty()) {
@@ -1910,7 +1912,7 @@ void Application::renderViewport() {
                         ImVec2(tp.x - 5, tp.y - 3),
                         ImVec2(tp.x + ts.x + 5, tp.y + ts.y + 3),
                         IM_COL32(255, 200, 60, 255), 3.0f, 0, 1.5f);
-                    dl->AddText(tp, IM_COL32(255, 200, 60, 255), dbuf);
+                    materializr::drawTextSafe(dl, tp, IM_COL32(255, 200, 60, 255), dbuf);
                 }
             }
 
@@ -1963,7 +1965,7 @@ void Application::renderViewport() {
                             ImVec2 tp(sp.x - ts.x*0.5f, sp.y - ts.y - 14.0f);
                             dl->AddRectFilled(ImVec2(tp.x-4, tp.y-2), ImVec2(tp.x+ts.x+4, tp.y+ts.y+2),
                                               IM_COL32(20,20,28,205), 3.0f);
-                            dl->AddText(tp, IM_COL32(235,235,240,255), rb);
+                            materializr::drawTextSafe(dl, tp, IM_COL32(235,235,240,255), rb);
                         }
                     }
                 } catch (...) {}
@@ -2109,7 +2111,7 @@ void Application::renderViewport() {
                                     ImVec2(tp.x - 5, tp.y - 3),
                                     ImVec2(tp.x + ts.x + 5, tp.y + ts.y + 3),
                                     IM_COL32(20, 20, 28, 225), 3.0f);
-                                dl->AddText(tp,
+                                materializr::drawTextSafe(dl, tp,
                                             IM_COL32(255, 235, 120, 255), dbuf);
                             }
                         }
@@ -2410,13 +2412,15 @@ void Application::renderViewport() {
                         ImVec2 a0(sa.x - d.x * extend, sa.y - d.y * extend);
                         float total = len + extend;
                         const float dashOn = 11.0f, dashOff = 7.0f;
-                        for (float t = 0.0f; t < total; t += dashOn + dashOff) {
-                            float t1 = std::min(t + dashOn, total);
-                            ImVec2 p0(a0.x + d.x * t,  a0.y + d.y * t);
-                            ImVec2 p1(a0.x + d.x * t1, a0.y + d.y * t1);
-                            dl->AddLine(p0, p1, halo, 5.0f);
-                            dl->AddLine(p0, p1, col,  2.5f);
-                        }
+                        // Visible part only: the guide can run millions of px
+                        // at high zoom (see ScreenDash.h).
+                        materializr::forEachVisibleDash(
+                            a0, ImVec2(a0.x + d.x * total, a0.y + d.y * total),
+                            dashOn, dashOff, dl->GetClipRectMin(), dl->GetClipRectMax(),
+                            40.0f, [&](ImVec2 p0, ImVec2 p1) {
+                                dl->AddLine(p0, p1, halo, 5.0f);
+                                dl->AddLine(p0, p1, col,  2.5f);
+                            });
                         // Marker at the reference point so the user can see
                         // which existing feature the guide is sourced from.
                         if (g.kind == InferenceGuide::AxisHFromPoint ||
@@ -2500,14 +2504,11 @@ void Application::renderViewport() {
                             if (len < 1.0f) return;
                             d.x /= len; d.y /= len;
                             const float on = 8.0f, off = 6.0f;
-                            for (float t = 0.0f; t < len; t += on + off) {
-                                float t1 = std::min(t + on, len);
-                                dl->AddLine(
-                                    ImVec2(p0.x + d.x * t, p0.y + d.y * t),
-                                    ImVec2(p0.x + d.x * t1,
-                                           p0.y + d.y * t1),
-                                    boxCol, 1.5f);
-                            }
+                            materializr::forEachVisibleDash(
+                                p0, p1, on, off, dl->GetClipRectMin(), dl->GetClipRectMax(),
+                                40.0f, [&](ImVec2 a, ImVec2 b) {
+                                    dl->AddLine(a, b, boxCol, 1.5f);
+                                });
                         };
                         for (int i = 0; i < 4; ++i)
                             dashSeg(sc[i], sc[(i + 1) % 4]);
@@ -2560,12 +2561,11 @@ void Application::renderViewport() {
                             if (len > 1.0f) {
                                 d.x /= len; d.y /= len;
                                 const float on = 10.0f, off = 8.0f;
-                                for (float t = 0.0f; t < len; t += on + off) {
-                                    float t1 = std::min(t + on, len);
-                                    dl->AddLine(ImVec2(p0.x + d.x * t, p0.y + d.y * t),
-                                                ImVec2(p0.x + d.x * t1, p0.y + d.y * t1),
-                                                lineCol, 1.6f);
-                                }
+                                materializr::forEachVisibleDash(
+                                    p0, p1, on, off, dl->GetClipRectMin(), dl->GetClipRectMax(),
+                                    40.0f, [&](ImVec2 a, ImVec2 b) {
+                                        dl->AddLine(a, b, lineCol, 1.6f);
+                                    });
                             }
                         }
                         // Live ghost of the reflected geometry.
@@ -2739,7 +2739,7 @@ void Application::renderViewport() {
                             ImVec2(tp.x - 5.0f, tp.y - 3.0f),
                             ImVec2(tp.x + ts.x + 5.0f, tp.y + ts.y + 3.0f),
                             IM_COL32(20, 20, 28, 220), 4.0f);
-                        dl->AddText(tp, IM_COL32(255, 240, 200, 255), label.c_str());
+                        materializr::drawTextSafe(dl, tp, IM_COL32(255, 240, 200, 255), label.c_str());
                     }
                 }
             }
@@ -2799,7 +2799,7 @@ void Application::renderViewport() {
                     mdl->AddRectFilled(ImVec2(tp.x - 4, tp.y - 2),
                                       ImVec2(tp.x + ts.x + 4, tp.y + ts.y + 2),
                                       IM_COL32(20, 20, 28, 220), 3.0f);
-                    mdl->AddText(tp, mCol, txt.c_str());
+                    materializr::drawTextSafe(mdl, tp, mCol, txt.c_str());
                 };
                 double totalLen = 0.0;
                 int lenCount = 0;
@@ -2944,7 +2944,7 @@ void Application::renderViewport() {
                     // Driving dimensions in the usual amber; reference ones in
                     // a muted grey so a glance separates "this number controls
                     // the shape" from "this number just reports it".
-                    dl->AddText(tp, c.isDriving ? IM_COL32(255, 235, 120, 255)
+                    materializr::drawTextSafe(dl, tp, c.isDriving ? IM_COL32(255, 235, 120, 255)
                                                 : IM_COL32(170, 178, 190, 255), text);
                     // A press LATCHES the label for dragging. The edit popup
                     // is deferred to release (below, after the loop) and only
@@ -3442,7 +3442,7 @@ void Application::renderViewport() {
                                     dl->AddLine(e1, e2, IM_COL32(255, 235, 120, 230), 1.5f);
                                     ImVec2 sc;
                                     if (toImg(dim2world(sketchCursor), sc))
-                                        dl->AddText(ImVec2(sc.x + 8, sc.y - 8),
+                                        materializr::drawTextSafe(dl, ImVec2(sc.x + 8, sc.y - 8),
                                                     IM_COL32(255, 235, 120, 220), gbuf);
                                     drewSpecial = true;
                                 }
@@ -3453,7 +3453,7 @@ void Application::renderViewport() {
                             toImg(dim2world(ganchor), sa) &&
                             toImg(dim2world(sketchCursor), sc)) {
                             dl->AddLine(sa, sc, IM_COL32(255, 235, 120, 90), 1.0f);
-                            dl->AddText(ImVec2(sc.x + 8, sc.y - 8),
+                            materializr::drawTextSafe(dl, ImVec2(sc.x + 8, sc.y - 8),
                                         IM_COL32(255, 235, 120, 220), gbuf);
                         }
                     }
@@ -3601,6 +3601,11 @@ void Application::renderViewport() {
                                                                         m_dimEditingBuf, cn.value) &&
                                         constraintSupportsReference(cn.type))
                                         cn.isDriving = true;
+                                    // Hold the first point: only the far end
+                                    // moves (the solver would split the change
+                                    // across both ends of the line).
+                                    if (cn.isDriving)
+                                        SketchSolver::seedDistanceFromFirst(*m_activeSketch, cn);
                                     break;
                                 }
                                 if (m_sketchSolver) m_sketchSolver->solve(*m_activeSketch);
@@ -3738,7 +3743,7 @@ void Application::renderViewport() {
                         dl->AddRectFilled(ImVec2(mid.x - 4, mid.y - 2),
                                           ImVec2(mid.x + ts.x + 4, mid.y + ts.y + 2),
                                           IM_COL32(30, 18, 38, 220), 3.0f);
-                        dl->AddText(mid, measureCol, lbl);
+                        materializr::drawTextSafe(dl, mid, measureCol, lbl);
                     }
                 }
             }
@@ -4217,7 +4222,7 @@ void Application::renderViewport() {
                             char buf[64];
                             std::snprintf(buf, sizeof(buf), "(%.2f, %.2f, %.2f)",
                                           hit.x, hit.y, hit.z);
-                            dl->AddText(ImVec2(sp.x + 10.0f, sp.y - 8.0f),
+                            materializr::drawTextSafe(dl, ImVec2(sp.x + 10.0f, sp.y - 8.0f),
                                         IM_COL32(255, 220, 50, 255), buf);
                         }
                         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
@@ -6040,7 +6045,7 @@ void Application::renderViewport() {
                     dl->AddCircle      (sp, 7.0f, IM_COL32(0, 0, 0, 255), 0, 1.5f);
                     char buf[64];
                     std::snprintf(buf, sizeof(buf), "(%.2f, %.2f)", snapped.x, snapped.y);
-                    dl->AddText(ImVec2(sp.x + 10.0f, sp.y - 8.0f),
+                    materializr::drawTextSafe(dl, ImVec2(sp.x + 10.0f, sp.y - 8.0f),
                                 IM_COL32(255, 220, 50, 255), buf);
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
                         m_sketchPatternOriginX = snapped.x;
@@ -6352,7 +6357,7 @@ void Application::renderViewport() {
                                 gdl->AddRectFilled(ImVec2(lp.x - 4, lp.y - 2),
                                                    ImVec2(lp.x + ts.x + 4, lp.y + ts.y + 2),
                                                    IM_COL32(20, 20, 28, 220), 3.0f);
-                                gdl->AddText(lp, IM_COL32(255, 240, 80, 255), angBuf);
+                                materializr::drawTextSafe(gdl, lp, IM_COL32(255, 240, 80, 255), angBuf);
                             }
 
                             // Track the popup's screen-space anchor each frame so

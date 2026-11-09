@@ -987,3 +987,48 @@ TEST(DimensionPersistence, OrientationRoundTrips) {
     EXPECT_DOUBLE_EQ(loaded.getConstraints()[0].orientY,
                      sk.getConstraints()[0].orientY);
 }
+
+TEST(DistanceConstraint, RetypedLengthKeepsTheFirstPoint) {
+    // A free line 18 long, retyped to 50 through the dimension popup: the start
+    // point stays where it was drawn and only the far end moves. (The solver
+    // alone splits the change across both ends.)
+    Sketch sk;
+    int a = sk.addPoint({3.0f, 4.0f});
+    int b = sk.addPoint({3.0f, 22.0f});
+    sk.addLine(a, b);
+    Constraint c{};
+    c.type = ConstraintType::Distance;
+    c.entityA = a;
+    c.entityB = b;
+    c.value = 50.0;
+    c.isDriving = true;
+    int id = sk.addConstraint(c);
+
+    SketchSolver solver;
+    // Control: unseeded, both ends move (this is the old behaviour).
+    {
+        Sketch plain = sk;
+        EXPECT_TRUE(solver.solve(plain, 200, 1e-4));
+        EXPECT_NEAR(plain.getPoint(a)->pos.y, -12.0, 1e-3);   // midpoint (13) stays, start drifts
+    }
+    for (const auto& cn : sk.getConstraints())
+        if (cn.id == id) SketchSolver::seedDistanceFromFirst(sk, cn);
+    EXPECT_TRUE(solver.solve(sk, 200, 1e-4));
+    EXPECT_NEAR(sk.getPoint(a)->pos.x, 3.0, 1e-3);
+    EXPECT_NEAR(sk.getPoint(a)->pos.y, 4.0, 1e-3);
+    EXPECT_NEAR(sk.getPoint(b)->pos.x, 3.0, 1e-3);
+    EXPECT_NEAR(sk.getPoint(b)->pos.y, 54.0, 1e-3);
+}
+
+TEST(DistanceConstraint, SeedLeavesOtherConstraintTypesAlone) {
+    Sketch sk;
+    int a = sk.addPoint({0.0f, 0.0f});
+    int b = sk.addPoint({5.0f, 0.0f});
+    Constraint c{};
+    c.type = ConstraintType::Radius;
+    c.entityA = a;
+    c.entityB = b;
+    c.value = 9.0;
+    SketchSolver::seedDistanceFromFirst(sk, c);
+    EXPECT_NEAR(sk.getPoint(b)->pos.x, 5.0, 1e-6);
+}
