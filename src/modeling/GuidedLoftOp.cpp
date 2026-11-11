@@ -233,13 +233,13 @@ bool GuidedLoftOp::execute(Document& doc) {
                 BRepAdaptor_CompCurve rc(rw);
                 const double r0 = rc.FirstParameter(), r1 = rc.LastParameter();
                 if (!(r1 > r0)) continue;
-                double far = 0.0;
+                double deepest = 0.0;
                 for (int i = 0; i <= 200; ++i) {
                     const gp_Pnt p = rc.Value(r0 + (r1 - r0) * (i / 200.0));
                     const double h = gp_Vec(C, p).Dot(n);
-                    if (std::abs(h) > std::abs(far)) far = h;
+                    if (std::abs(h) > std::abs(deepest)) deepest = h;
                 }
-                reach += far;
+                reach += deepest;
             }
             if (reach < 0.0) n.Reverse();
         }

@@ -40,6 +40,7 @@ OVERRIDE = [
     ("src/app/FaceOpControllers.cpp", "sclBStep", "percent"),
     ("src/app/FaceOpControllers.cpp", "twistStep", "angle"),
     ("src/app/Application_Viewport.cpp", "##bubbleDia", "CONVERTED"),   # commits via parseLength below
+    ("src/app/Application_Dialogs.cpp", "edited = ImGui::InputDouble(label, &a", "angle"),  # shape-panel angle row (degrees)
     ("src/app/Application_Viewport.cpp", "parseFinite(m_sketchDimBuf", "angle"),  # sweep deg / polygon sides
     ("src/plugins/SketchPlugin.cpp", "parseFinite(m_dimBuf", "angle"),            # same non-length branch
     ("src/app/Application_Dialogs.cpp", "Slice position", "absolute-mm"),   # mesh-trace plane offset along its own normal: a genuine length, deliberately shown in mm

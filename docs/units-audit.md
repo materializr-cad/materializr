@@ -8,9 +8,8 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 ## Controls by dimension
 
 - CONVERTED: 162
-- LENGTH?: 1
 - absolute-mm: 2
-- angle: 41
+- angle: 42
 - count: 1
 - percent: 19
 - px/ui: 5
@@ -20,7 +19,6 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 
 | dim | file | code |
 |---|---|---|
-| LENGTH? | src/app/Application_Dialogs.cpp | `edited = ImGui::InputDouble(label, &a, 0.0, 0.0, "%.2f");` |
 | seconds | src/app/Application_Dialogs.cpp | `if (ImGui::SliderInt(materializr::tr("Interval (min)"), &m_autosaveIntervalMin, 1, 30, "%d min")) changed = tr` |
 | percent | src/app/Application_Dialogs.cpp | `if (ImGui::SliderInt("##uiScaleUser", &pct, 50, 250, "%d%%",` |
 | seconds | src/app/Application_Dialogs.cpp | `if (ImGui::SliderFloat(materializr::tr("Fillet time limit"),` |
@@ -95,6 +93,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | CONVERTED | src/app/Application_Dialogs.cpp | `edited = amountLengthField(id, label, &v);` |
 | CONVERTED | src/app/Application_Dialogs.cpp | `edited = lengthField(label, &v).changed;` |
 | CONVERTED | src/app/Application_Dialogs.cpp | `edited \|= lengthStepperRow("##step", &v, /*allowNegative=*/true,` |
+| angle | src/app/Application_Dialogs.cpp | `edited = ImGui::InputDouble(label, &a, 0.0, 0.0, "%.2f");` |
 | CONVERTED | src/app/Application_Dialogs.cpp | `materializr::amountLengthField("cornerSize", label, &size);` |
 | CONVERTED | src/app/Application_Dialogs.cpp | `materializr::lengthField(label, &size);` |
 | CONVERTED | src/app/Application_Dialogs.cpp | `materializr::lengthStepperRow("##cornerStep", &size, /*allowNegative=*/true,` |
