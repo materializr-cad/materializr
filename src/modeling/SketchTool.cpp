@@ -72,6 +72,7 @@ void SketchTool::setMode(SketchToolMode mode) {
     m_mirrorActive = false; // switching tools aborts any in-progress mirror
     m_polygonSpec.hasSize = false;   // typed polygon values do not outlive the tool
     m_polygonSpec.hasAngle = false;
+    clearShapeSpec();                // ... nor do the line / circle / rectangle / arc ones
     cancelOffset();         // ... and any in-progress offset
     // A selection made before choosing Offset IS the pick: go straight to the
     // distance step instead of asking for the same elements to be clicked again.
@@ -162,6 +163,11 @@ void SketchTool::onMouseDown(glm::vec2 pos, bool addToSel) {
         m_currentPos = snapped; // move the anchor; don't stamp yet
         return;
     }
+
+    // Typed values from the panel (length, angle, width, height, chord, sweep /
+    // radius) take over the moving end of the placement; the click only says
+    // "now". Without any, the cursor rules, as it always did.
+    if (m_isPlacing && m_shapeSpec.any() && commitTypedShape(snapped)) return;
 
     switch (m_mode) {
         case SketchToolMode::Select:
@@ -428,6 +434,7 @@ void SketchTool::onConfirm() {
     m_activeInferences.clear();
     m_rectDimStage = 0;
     m_rectDimH = 0.0f;
+    clearShapeSpec();
 }
 
 void SketchTool::onCancel() {
@@ -709,15 +716,21 @@ glm::vec2 SketchTool::getPreviewStart() const {
     // (centre, rim) and the rectangle's (corner, opposite corner). Return the
     // EFFECTIVE start for the active draw mode so both visuals match what the
     // click will actually create - no renderer changes needed.
-    if (m_mode == SketchToolMode::Rectangle && m_rectMode == RectMode::Center)
-        return 2.0f * m_firstClick - m_currentPos; // opposite corner
+    if (m_mode == SketchToolMode::Rectangle) {
+        glm::vec2 c[4];
+        if (rectResolve(m_currentPos, c)) return c[0];
+    }
     if (m_mode == SketchToolMode::Circle && m_circleMode == CircleMode::TwoPoint)
-        return 0.5f * (m_firstClick + m_currentPos); // diameter midpoint = centre
+        return 0.5f * (m_firstClick + shapeResolve(m_currentPos)); // diameter midpoint = centre
     return m_firstClick;
 }
 
 glm::vec2 SketchTool::getPreviewEnd() const {
-    return m_currentPos;
+    if (m_mode == SketchToolMode::Rectangle) {
+        glm::vec2 c[4];
+        if (rectResolve(m_currentPos, c)) return c[2];
+    }
+    return shapeResolve(m_currentPos);
 }
 
 SketchToolMode SketchTool::getPreviewType() const {
@@ -4273,6 +4286,247 @@ bool SketchTool::commitPolygonNow() {
     const size_t before = m_sketch->getPolygons().size();
     handlePolygonTool(m_currentPos);
     return m_sketch->getPolygons().size() > before;
+}
+
+namespace {
+constexpr double kDeg2Rad = M_PI / 180.0;
+}
+
+glm::vec2 SketchTool::shapeResolve(glm::vec2 cursor) const {
+    const ShapeSpec& sp = m_shapeSpec;
+    if (!m_isPlacing || !sp.any()) return cursor;
+    const glm::vec2 anchor = m_firstClick;
+    const glm::vec2 d = cursor - anchor;
+    const double curLen = glm::length(d);
+    const double curAng = (curLen > 1e-9) ? std::atan2(d.y, d.x) : 0.0;
+    switch (m_mode) {
+        case SketchToolMode::Line: {
+            const double L = sp.hasLen ? sp.len : curLen;
+            const double a = sp.hasAngle ? sp.angleDeg * kDeg2Rad : curAng;
+            if (!sp.hasLen && !sp.hasAngle) return cursor;
+            return anchor + glm::vec2(static_cast<float>(std::cos(a) * L),
+                                      static_cast<float>(std::sin(a) * L));
+        }
+        case SketchToolMode::Circle: {
+            if (!sp.hasLen) return cursor;
+            // Centre mode: the rim is a radius from the click. Two-point mode:
+            // the click is one end of a diameter, so the far end is a diameter
+            // away. The typed value is a radius or a diameter per the switch.
+            const double radius = m_circleDiameter ? sp.len * 0.5 : sp.len;
+            const double reach = (m_circleMode == CircleMode::TwoPoint) ? radius * 2.0 : radius;
+            return anchor + glm::vec2(static_cast<float>(std::cos(curAng) * reach),
+                                      static_cast<float>(std::sin(curAng) * reach));
+        }
+        case SketchToolMode::Rectangle: {
+            glm::vec2 c[4];
+            return rectResolve(cursor, c) ? c[2] : cursor;
+        }
+        case SketchToolMode::Arc: {
+            if (m_clickCount == 1) {
+                if (!sp.hasLen) return cursor;
+                return anchor + glm::vec2(static_cast<float>(std::cos(curAng) * sp.len),
+                                          static_cast<float>(std::sin(curAng) * sp.len));
+            }
+            if (m_clickCount != 2 || !sp.hasApex) return cursor;
+            const glm::vec2 A = m_firstClick, B = m_secondClick;
+            const glm::vec2 chord = B - A;
+            const float L = glm::length(chord);
+            if (L < 1e-4f) return cursor;
+            const glm::vec2 chordDir = chord / L;
+            glm::vec2 perp(-chordDir.y, chordDir.x);
+            const glm::vec2 M = 0.5f * (A + B);
+            if (glm::dot(cursor - M, perp) < 0.0f) perp = -perp;
+            // The same relations applyDimension uses, so typing a value in the
+            // panel and typing it in the old popup land on the same arc.
+            float dist = 0.0f;
+            if (m_arcDimMode == ArcDimMode::Sweep) {
+                const float deg = glm::clamp(static_cast<float>(sp.apex), 0.1f, 359.9f);
+                dist = (L * 0.5f) * std::tan(deg * static_cast<float>(M_PI) / 180.0f * 0.25f);
+            } else {
+                // Under half the chord no arc exists; clamp to the semicircle
+                // rather than refuse, so the preview never vanishes mid-typing.
+                const float half = L * 0.5f;
+                const float R = std::max(static_cast<float>(sp.apex), half);
+                dist = R - std::sqrt(std::max(0.0f, R * R - half * half));
+            }
+            return M + perp * dist;
+        }
+        default:
+            return cursor;
+    }
+}
+
+bool SketchTool::rectResolve(glm::vec2 cursor, glm::vec2 out[4]) const {
+    if (m_mode != SketchToolMode::Rectangle || !m_isPlacing) return false;
+    const ShapeSpec& sp = m_shapeSpec;
+    const glm::vec2 anchor = m_firstClick;
+    const bool center = (m_rectMode == RectMode::Center);
+    if (!sp.hasAngle && !sp.hasW && !sp.hasH) {
+        // The classic axis-aligned rectangle straight from the cursor.
+        const glm::vec2 c0 = center ? 2.0f * anchor - cursor : anchor;
+        out[0] = c0;
+        out[1] = glm::vec2(cursor.x, c0.y);
+        out[2] = cursor;
+        out[3] = glm::vec2(c0.x, cursor.y);
+        return true;
+    }
+    const double th = sp.hasAngle ? sp.angleDeg * kDeg2Rad : 0.0;
+    const glm::vec2 u(static_cast<float>(std::cos(th)), static_cast<float>(std::sin(th)));
+    const glm::vec2 v(-u.y, u.x);
+    const glm::vec2 d = cursor - anchor;
+    // In centre mode the cursor is a CORNER, half the side from the centre.
+    const float k = center ? 2.0f : 1.0f;
+    const float wm = glm::dot(d, u) * k, hm = glm::dot(d, v) * k;
+    const float sw = (wm < 0.0f) ? -1.0f : 1.0f, sh = (hm < 0.0f) ? -1.0f : 1.0f;
+    const float W = sw * static_cast<float>(sp.hasW ? sp.w : std::fabs(wm));
+    const float H = sh * static_cast<float>(sp.hasH ? sp.h : std::fabs(hm));
+    const glm::vec2 c0 = center ? anchor - (u * W + v * H) * 0.5f : anchor;
+    out[0] = c0;
+    out[1] = c0 + u * W;
+    out[2] = c0 + u * W + v * H;
+    out[3] = c0 + v * H;
+    return true;
+}
+
+SketchTool::ShapeNow SketchTool::shapeMeasure() const {
+    ShapeNow n;
+    if (!m_isPlacing) return n;
+    const glm::vec2 d = m_currentPos - m_firstClick;
+    const double L = glm::length(d);
+    n.len = L;
+    n.angleDeg = (L > 1e-9) ? std::atan2(d.y, d.x) / kDeg2Rad : 0.0;
+    if (n.angleDeg < 0.0) n.angleDeg += 360.0;
+    if (m_mode == SketchToolMode::Circle) {
+        const double reach = (m_circleMode == CircleMode::TwoPoint) ? L * 0.5 : L;   // radius
+        n.len = m_circleDiameter ? reach * 2.0 : reach;
+    } else if (m_mode == SketchToolMode::Rectangle) {
+        // Measured on the SAME frame the spec would place it in, minus the typed
+        // fields, so a field still following the cursor shows what it would do.
+        const double th = m_shapeSpec.hasAngle ? m_shapeSpec.angleDeg * kDeg2Rad : 0.0;
+        const glm::vec2 u(static_cast<float>(std::cos(th)), static_cast<float>(std::sin(th)));
+        const glm::vec2 v(-u.y, u.x);
+        const double k = (m_rectMode == RectMode::Center) ? 2.0 : 1.0;
+        n.w = std::fabs(glm::dot(d, u)) * k;
+        n.h = std::fabs(glm::dot(d, v)) * k;
+        n.angleDeg = m_shapeSpec.hasAngle ? m_shapeSpec.angleDeg : 0.0;
+    } else if (m_mode == SketchToolMode::Arc && m_clickCount == 2) {
+        const glm::vec2 A = m_firstClick, B = m_secondClick;
+        const glm::vec2 chord = B - A;
+        const double cl = glm::length(chord);
+        n.len = cl;
+        if (cl > 1e-6) {
+            glm::vec2 perp(-chord.y / static_cast<float>(cl), chord.x / static_cast<float>(cl));
+            const glm::vec2 M = 0.5f * (A + B);
+            const double sag = std::fabs(glm::dot(m_currentPos - M, perp));
+            // Sweep from the sagitta: tan(theta / 4) = sag / (chord / 2).
+            const double sweepDeg = 4.0 * std::atan2(sag, cl * 0.5) / kDeg2Rad;
+            const double R = (sag > 1e-9) ? ((cl * cl) / 4.0 + sag * sag) / (2.0 * sag) : 0.0;
+            n.apex = (m_arcDimMode == ArcDimMode::Sweep) ? sweepDeg : R;
+        }
+    }
+    return n;
+}
+
+void SketchTool::addLineDistanceConstraint(int aId, int bId, double value) {
+    if (!m_sketch) return;
+    // One Distance constraint per segment: drop any prior one on this pair so
+    // repeated refinements don't stack duplicates.
+    for (const auto& c : m_sketch->getConstraints())
+        if (c.type == ConstraintType::Distance &&
+            ((c.entityA == aId && c.entityB == bId) ||
+             (c.entityA == bId && c.entityB == aId)))
+            m_sketch->removeConstraint(c.id);
+    Constraint c;
+    c.id = 0;
+    c.type = ConstraintType::Distance;
+    c.entityA = aId;
+    c.entityB = bId;
+    c.value = value;
+    c.isSatisfied = true;
+    m_sketch->addConstraint(c);
+}
+
+bool SketchTool::commitTypedShape(glm::vec2 cursor) {
+    if (!m_sketch || !m_isPlacing || !m_shapeSpec.any()) return false;
+    NewElementGuard newElements(*this, m_sketch);
+    const ShapeSpec sp = m_shapeSpec;
+    const glm::vec2 end = shapeResolve(cursor);
+    switch (m_mode) {
+        case SketchToolMode::Line: {
+            const size_t before = m_sketch->getLines().size();
+            handleLineTool(end);
+            if (sp.hasLen && m_sketch->getLines().size() > before) {
+                const auto& l = m_sketch->getLines().back();
+                addLineDistanceConstraint(l.startPointId, l.endPointId, sp.len);
+            }
+            // Each segment of a chain is typed afresh.
+            m_shapeSpec.hasLen = m_shapeSpec.hasAngle = false;
+            return true;
+        }
+        case SketchToolMode::Circle:
+            // A typed size is exact: no grid rounding (see handleCircleTool).
+            handleCircleTool(end, /*exact=*/sp.hasLen);
+            clearShapeSpec();
+            return true;
+        case SketchToolMode::Rectangle: {
+            glm::vec2 c[4];
+            if (!rectResolve(cursor, c)) return false;
+            const double th = sp.hasAngle ? sp.angleDeg * kDeg2Rad : 0.0;
+            // A quarter-turn is still axis-aligned: keep the horizontal /
+            // vertical constraints that a click-drawn rectangle carries.
+            const bool axis = std::fabs(std::sin(th)) < 1e-6 || std::fabs(std::cos(th)) < 1e-6;
+            const float side0 = glm::length(c[1] - c[0]), side1 = glm::length(c[3] - c[0]);
+            if (side0 > 1e-6f && side1 > 1e-6f) {
+                if (axis) m_sketch->addRectangle(c[0], c[2]);
+                else      m_sketch->addRotatedRectangle(c);
+            }
+            m_isPlacing = false;
+            m_clickCount = 0;
+            clearShapeSpec();
+            return true;
+        }
+        case SketchToolMode::Arc: {
+            if (m_clickCount == 1) {
+                handleArcTool(end);
+                // The chord is placed; its typed length is spent, the apex value
+                // (if any) is for the next step.
+                m_shapeSpec.hasLen = false;
+                return true;
+            }
+            if (m_clickCount == 2) {
+                handleArcTool(end);
+                clearShapeSpec();
+                return true;
+            }
+            return false;
+        }
+        default:
+            return false;
+    }
+}
+
+bool SketchTool::commitShapeNow() {
+    if (!m_isPlacing || !m_sketch) return false;
+    switch (m_mode) {
+        case SketchToolMode::Line:
+        case SketchToolMode::Circle:
+        case SketchToolMode::Rectangle:
+        case SketchToolMode::Arc:
+            break;
+        default:
+            return false;
+    }
+    if (m_shapeSpec.any()) return commitTypedShape(m_currentPos);
+    // Nothing typed: Place = a click at the cursor, exactly as before.
+    NewElementGuard newElements(*this, m_sketch);
+    switch (m_mode) {
+        case SketchToolMode::Line:      handleLineTool(m_currentPos); break;
+        case SketchToolMode::Circle:    handleCircleTool(m_currentPos); break;
+        case SketchToolMode::Rectangle: handleRectangleTool(m_currentPos); break;
+        case SketchToolMode::Arc:       handleArcTool(m_currentPos); break;
+        default: break;
+    }
+    return true;
 }
 
 void SketchTool::handlePolygonTool(glm::vec2 pos) {

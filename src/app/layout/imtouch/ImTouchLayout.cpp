@@ -762,7 +762,7 @@ void Application::renderImTouchLayout() {
             // repeated taps can walk the levels, and Polygon opens its own
             // nested sides popup which closes the whole stack on pick).
             auto fire = [&](const Toolbar::RailTool& tool, bool clicked,
-                            bool inPopup) {
+                            bool inPopup, bool inMenuZone = false) {
                 if (tool.pluginIndex >= 0) {
                     if (clicked) {
                         m_toolbar->fireRailPlugin(tool.pluginIndex);
@@ -773,7 +773,7 @@ void Application::renderImTouchLayout() {
                 } else if (tool.action == ToolAction::Rectangle ||
                            tool.action == ToolAction::Circle) {
                     renderRailDrawOriginPopup(tool.action == ToolAction::Rectangle,
-                                              tool.active, clicked);
+                                              tool.active, clicked, inMenuZone);
                 } else if (clicked) {
                     handleToolAction(static_cast<int>(tool.action));
                     if (inPopup &&
@@ -783,11 +783,12 @@ void Application::renderImTouchLayout() {
             };
             auto flatButton = [&](const Toolbar::RailTool& tool, int id) {
                 ImGui::PushID(id); // labels can repeat across groups
+                bool inZone = false;
                 const bool clicked = touchui::railButton(
                     tool.label, tool.icon, tr(tool.label), tool.active, 64.0f * s,
-                    false, tool.menu);
+                    false, tool.menu, &inZone);
                 tip(materializr::tr(tool.tip));
-                fire(tool, clicked, /*inPopup=*/false);
+                fire(tool, clicked, /*inPopup=*/false, inZone);
                 ImGui::PopID();
             };
             // Group button + flyout: the button wears the group's ACTIVE
@@ -814,10 +815,12 @@ void Application::renderImTouchLayout() {
                     for (const auto* t : members) {
                         if (idx % 4 != 0) ImGui::SameLine(0.0f, 6.0f * s);
                         ImGui::PushID(idx++);
+                        bool inZone = false;
                         const bool clicked = touchui::railButton(
-                            t->label, t->icon, tr(t->label), t->active, 64.0f * s);
+                            t->label, t->icon, tr(t->label), t->active, 64.0f * s,
+                            false, t->menu, &inZone);
                         tip(materializr::tr(t->tip));
-                        fire(*t, clicked, /*inPopup=*/true);
+                        fire(*t, clicked, /*inPopup=*/true, inZone);
                         ImGui::PopID();
                     }
                     ImGui::EndPopup();

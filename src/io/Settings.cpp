@@ -159,6 +159,8 @@ void applyKv(const std::map<std::string, std::string>& kv, AppSettings& s) {
     readBool(kv, "includePrereleases",   s.includePrereleases);
     readBool(kv, "supporter",            s.supporter);
     readBool(kv, "snapToGrid",           s.snapToGrid);
+    readIntClamped(kv, "menuSectionsOpen", s.menuSectionsOpen, 0, 15);
+    readIntClamped(kv, "toolSwitches",     s.toolSwitches, 0, 0xFFFF);
     {
         std::string v;
         readString(kv, "aiProvider", v);
@@ -503,6 +505,8 @@ bool SettingsIO::save(const std::string& path, const AppSettings& s) {
     ofs << "includePrereleases = "      << (s.includePrereleases ? "true" : "false") << "\n";
     ofs << "supporter = "               << (s.supporter ? "true" : "false") << "\n";
     ofs << "snapToGrid = "              << (s.snapToGrid ? "true" : "false") << "\n";
+    ofs << "menuSectionsOpen = "        << s.menuSectionsOpen << "\n";
+    ofs << "toolSwitches = "            << s.toolSwitches     << "\n";
     ofs << "aiProvider = "         << aiProviderName(s.ai.provider)      << "\n";
     ofs << "aiAnthropicApiKey = "  << sanitizeValue(s.ai.anthropicApiKey) << "\n";
     ofs << "aiAnthropicModel = "   << sanitizeValue(s.ai.anthropicModel)  << "\n";
@@ -633,6 +637,8 @@ bool SettingsIO::exportJson(const std::string& path, const AppSettings& s) {
     ofs << "  \"includePrereleases\": " << b(s.includePrereleases) << ",\n";
     ofs << "  \"supporter\": "               << b(s.supporter)          << ",\n";
     ofs << "  \"snapToGrid\": "              << b(s.snapToGrid)         << ",\n";
+    ofs << "  \"menuSectionsOpen\": "        << s.menuSectionsOpen      << ",\n";
+    ofs << "  \"toolSwitches\": "            << s.toolSwitches          << ",\n";
     ofs << "  \"sketchGridStepUnits\": "     << s.sketchGridStep        << ",\n";
     ofs << "  \"inferenceLevel\": "          << s.inferenceLevel        << ",\n";
     ofs << "  \"language\": "                << s.language              << ",\n";

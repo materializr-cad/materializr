@@ -259,10 +259,12 @@ std::vector<Toolbar::RailTool> Toolbar::railTools() const {
         // Corner/Center) when tapped again while active. That replaces the
         // extra toggle button that used to appear under them; `menu` puts the
         // corner wedge on the button so the second tap is discoverable.
-        add(MZ_ICON_CIRCLE,  "Circle",  ToolAction::Circle,       m_activeSketchMode == 3,
+        add(m_circleMode == 1 ? MZ_ICON_CIRCLE_2PT : MZ_ICON_CIRCLE_CENTER,
+            "Circle",  ToolAction::Circle,       m_activeSketchMode == 3,
             "Draw a circle: press the centre, drag to the radius. Tap again "
-            "while it is active to choose Center or 2-Point.", /*menu=*/true);
-        add(MZ_ICON_RECT,    "Rectangle", ToolAction::Rectangle,  m_activeSketchMode == 4,
+            "while it is active - or tap the corner mark - to choose Center or 2-Point.", /*menu=*/true);
+        add(m_rectMode == 1 ? MZ_ICON_RECT_CENTER : MZ_ICON_RECT_CORNER,
+            "Rectangle", ToolAction::Rectangle,  m_activeSketchMode == 4,
             "Draw a rectangle: press one corner, drag to the opposite. Tap "
             "again while it is active to choose Corner or Center.", /*menu=*/true);
         add(MZ_ICON_ARC,     "Arc",     ToolAction::Arc,          m_activeSketchMode == 5,
@@ -825,11 +827,16 @@ ToolAction Toolbar::renderSketchTools() {
         const bool wasActive = (m_activeSketchMode == modeId);
         const char* popup = isRect ? "RectOriginMenu" : "CircleOriginMenu";
         const bool clicked = skBtn(label, modeId, act);
+        // The corner mark is a target of its own: pressing it (it and a
+        // fingertip's margin round it) opens the menu on the FIRST press, and
+        // starts the tool too if it was not already active.
+        const bool inMark = clicked && materializr::touchui::menuZoneHit(
+            ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), ImGui::GetFontSize() * 2.2f);
         menuMark();
         tip(tipText);
         if (clicked) {
-            if (wasActive) ImGui::OpenPopup(popup);
-            else action = act;
+            if (wasActive || inMark) ImGui::OpenPopup(popup);
+            if (!wasActive) action = act;
         }
         if (ImGui::BeginPopup(popup)) {
             const int cur = isRect ? m_rectMode : m_circleMode;

@@ -196,6 +196,40 @@ public:
     // cursor - the panel's Place button. False when nothing is being placed.
     bool commitPolygonNow();
     void setPolygonSides(int n) { m_polygonSides = (n < 3) ? 3 : n; }
+
+    // Typed values for the Line / Circle / Rectangle / Arc panels - the same idea
+    // as PolygonSpec. Each field, once typed, overrides what the cursor would
+    // have said; the rest keeps following the cursor. Used for the preview and
+    // for the commit, so the two cannot disagree.
+    //   hasLen   Line length, Circle size (a radius, or a diameter when
+    //            circleDiameter()), Arc chord. mm.
+    //   hasAngle Line direction / Rectangle rotation, degrees from sketch +X.
+    //   hasW/H   Rectangle width (along the rotated X) and height.
+    //   hasApex  Arc: the sweep in degrees or the radius in mm, per ArcDimMode.
+    // The cursor still chooses the QUADRANT / SIDE: a size has no direction.
+    struct ShapeSpec {
+        bool hasLen = false;   double len = 0.0;
+        bool hasAngle = false; double angleDeg = 0.0;
+        bool hasW = false;     double w = 0.0;
+        bool hasH = false;     double h = 0.0;
+        bool hasApex = false;  double apex = 0.0;
+        bool any() const { return hasLen || hasAngle || hasW || hasH || hasApex; }
+    };
+    ShapeSpec& shapeSpec() { return m_shapeSpec; }
+    const ShapeSpec& shapeSpec() const { return m_shapeSpec; }
+    // What the panel shows while a value is still following the cursor.
+    struct ShapeNow { double len = 0.0, angleDeg = 0.0, w = 0.0, h = 0.0, apex = 0.0; };
+    ShapeNow shapeMeasure() const;
+    // Where the moving end of the current placement lands once the spec has had
+    // its say (Line end, Circle rim / diameter end, Arc chord end or apex).
+    glm::vec2 shapeResolve(glm::vec2 cursor) const;
+    // The four corners (in order round the edge) of the rectangle being placed
+    // for `cursor`, after the spec. False when not placing a rectangle.
+    bool rectResolve(glm::vec2 cursor, glm::vec2 out[4]) const;
+    // The panel's Place: commit the current placement from the spec and cursor.
+    // True when something was placed (a chord end counts for the arc).
+    bool commitShapeNow();
+    void clearShapeSpec() { m_shapeSpec = ShapeSpec{}; }
     // Text tool settings - the popup edits these; the click consumes them.
     const std::string& getTextString() const { return m_textString; }
     void setTextString(const std::string& s) { m_textString = s; }
@@ -545,6 +579,9 @@ public:
     void setRectMode(RectMode m) { m_rectMode = m; }
     RectMode getRectMode() const { return m_rectMode; }
     void setCircleMode(CircleMode m) { m_circleMode = m; }
+    // Circle tool: the typed size is a diameter rather than a radius. Sticky.
+    bool circleDiameter() const { return m_circleDiameter; }
+    void setCircleDiameter(bool d) { m_circleDiameter = d; }
     CircleMode getCircleMode() const { return m_circleMode; }
 
     // Hover-to-charge references (Full level only). Call once per frame during
@@ -656,6 +693,7 @@ private:
     int m_angleSnapDeg = 15; // line angle-snap increment (0 = off)
     RectMode   m_rectMode   = RectMode::Corner;
     CircleMode m_circleMode = CircleMode::Center;
+    bool       m_circleDiameter = false;
     // Session-sticky: whichever the user last drew arcs with stays selected, so
     // a run of fillet arcs is not a mode toggle per arc.
     ArcDimMode m_arcDimMode = ArcDimMode::Sweep;
@@ -780,6 +818,10 @@ private:
     double m_cornerSize = 2.0;
     int    m_cornerHover = -1;
     PolygonSpec m_polygonSpec;
+    ShapeSpec   m_shapeSpec;
+    // Click / Place with typed values: the one commit path. Handled = true.
+    bool commitTypedShape(glm::vec2 cursor);
+    void addLineDistanceConstraint(int aId, int bId, double value);
     const char* m_cornerRejection = nullptr;
     std::vector<std::vector<glm::vec2>> m_refHover;
     std::set<int> m_offsetOnly;   // see offsetSelectionCount()

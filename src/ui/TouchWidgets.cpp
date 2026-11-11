@@ -168,6 +168,36 @@ void drawIconCentered(ImDrawList* dl, const ImVec2& center, float size,
         }
         return;
     }
+    // Circle / Rectangle "draw from" variants (U+E009..U+E00C): the shape plus
+    // the dots that say where the clicks go. Dots sit ON the outline (a click
+    // lands on the rim / a corner) and the centre dot at the centre.
+    {
+        const bool c1 = std::strcmp(icon, "\xee\x80\x89") == 0;   // circle, centre
+        const bool c2 = std::strcmp(icon, "\xee\x80\x8a") == 0;   // circle, 2 points
+        const bool r1 = std::strcmp(icon, "\xee\x80\x8b") == 0;   // rect, corner
+        const bool r2 = std::strcmp(icon, "\xee\x80\x8c") == 0;   // rect, centre
+        if (c1 || c2 || r1 || r2) {
+            const float th  = std::max(1.5f, size * 0.075f);
+            const float dot = std::max(2.0f, size * 0.10f);
+            auto dotAt = [&](float x, float y) { dl->AddCircleFilled(ImVec2(x, y), dot, col); };
+            if (c1 || c2) {
+                const float r = size * 0.38f;
+                dl->AddCircle(center, r, col, 0, th);
+                const float k = r * 0.70710678f;            // cos / sin 45 degrees
+                dotAt(center.x + k, center.y - k);          // 45 degrees (up and right)
+                if (c1) dotAt(center.x, center.y);
+                else    dotAt(center.x - k, center.y + k);  // 225 degrees
+            } else {
+                const float hw = size * 0.42f, hh = size * 0.32f;
+                dl->AddRect(ImVec2(center.x - hw, center.y - hh),
+                            ImVec2(center.x + hw, center.y + hh), col, 0.0f, 0, th);
+                dotAt(center.x + hw, center.y - hh);        // upper-right
+                if (r1) dotAt(center.x - hw, center.y + hh); // lower-left
+                else    dotAt(center.x, center.y);
+            }
+            return;
+        }
+    }
     ImFont* font = ImGui::GetFont();
     const ImVec2 ts = font->CalcTextSizeA(size, FLT_MAX, 0.0f, icon);
     dl->AddText(font, size, ImVec2(center.x - ts.x * 0.5f, center.y - ts.y * 0.5f),
@@ -192,8 +222,17 @@ void drawMenuMark(ImDrawList* dl, const ImVec2& max, float size, ImU32 col) {
                           ImVec2(max.x - in,       max.y - in - leg), col);
 }
 
+bool menuZoneHit(const ImVec2& itemMin, const ImVec2& itemMax, float zone) {
+    // Where the press STARTED, not where it ended: a tap that slides a few
+    // pixels out of the corner is still the corner's tap. Mouse and touch both
+    // arrive here (touch is mapped onto the mouse).
+    const ImVec2 c = ImGui::GetIO().MouseClickedPos[0];
+    return c.x >= itemMax.x - zone && c.x <= itemMax.x &&
+           c.y >= itemMax.y - zone && c.y <= itemMax.y && c.x >= itemMin.x && c.y >= itemMin.y;
+}
+
 bool railButton(const char* id, const char* icon, const char* label, bool active,
-                float width, bool solid, bool hasMenu) {
+                float width, bool solid, bool hasMenu, bool* menuZonePressed) {
     const float s = uiScale();
     const float w = width > 0.0f ? width : ImGui::GetContentRegionAvail().x;
     // 52 (was 62): shorter so the whole tool set fits with less scrolling,
@@ -206,6 +245,12 @@ bool railButton(const char* id, const char* icon, const char* label, bool active
     const bool pressed = ImGui::InvisibleButton("##rail", ImVec2(w, h));
     const bool hovered = ImGui::IsItemHovered();
     ImDrawList* dl = ImGui::GetWindowDrawList();
+    // The corner wedge is a target of its own: the wedge plus a comfortable
+    // margin round it (about a fingertip), so the menu opens on the FIRST tap.
+    const float zone = 30.0f * s;
+    const bool inZone = hasMenu && hovered &&
+        ImGui::GetMousePos().x >= p.x + w - zone && ImGui::GetMousePos().y >= p.y + h - zone;
+    if (menuZonePressed) *menuZonePressed = pressed && hasMenu && menuZoneHit(p, ImVec2(p.x + w, p.y + h), zone);
 
     if (active) {
         dl->AddRectFilled(p, ImVec2(p.x + w, p.y + h),
@@ -228,7 +273,7 @@ bool railButton(const char* id, const char* icon, const char* label, bool active
     dl->AddText(font, ls,
                 ImVec2(p.x + (w - lsz.x) * 0.5f, p.y + h * 0.62f), fgDim, label);
     if (hasMenu)
-        drawMenuMark(dl, ImVec2(p.x + w, p.y + h), 22.0f * s, fgDim);
+        drawMenuMark(dl, ImVec2(p.x + w, p.y + h), 22.0f * s, inZone ? fg : fgDim);
     ImGui::PopID();
     return pressed;
 }

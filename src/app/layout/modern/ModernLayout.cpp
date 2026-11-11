@@ -583,9 +583,10 @@ void Application::renderModernLayout() {
                     // Circle / Rectangle / Polygon carry `menu`: a corner wedge
                     // on the button, and a second tap while active opens the
                     // origin / sides menu instead of the old extra toggle row.
+                    bool inZone = false;
                     const bool clicked = touchui::railButton(
                         tool.label, tool.icon, tr(tool.label), tool.active, cell(),
-                        false, tool.menu);
+                        false, tool.menu, &inZone);
                     tip(materializr::tr(tool.tip));
                     if (tool.pluginIndex >= 0) {
                         if (clicked) m_toolbar->fireRailPlugin(tool.pluginIndex);
@@ -594,7 +595,7 @@ void Application::renderModernLayout() {
                     else if (tool.action == ToolAction::Rectangle ||
                              tool.action == ToolAction::Circle)
                         renderRailDrawOriginPopup(tool.action == ToolAction::Rectangle,
-                                                  tool.active, clicked);
+                                                  tool.active, clicked, inZone);
                     else if (clicked)
                         handleToolAction(static_cast<int>(tool.action));
                     ImGui::PopID();

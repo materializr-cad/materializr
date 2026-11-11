@@ -219,6 +219,31 @@ bool GuidedLoftOp::execute(Document& doc) {
         gp_Pnt C = lp.CentreOfMass();
         gp_Vec n(m_basePlane.Axis().Direction());
 
+        // Which way is "up"? The way the rails go. A rail drawn on the far side
+        // of the base plane (rising to -Z from a base at Z=0, say) has negative
+        // heights along the base normal; the height tables below would then read
+        // it from its far end back to its start - the rail upside down - and the
+        // loft would climb the OPPOSITE way carrying a profile that tapers the
+        // wrong direction (a cone came out as an hourglass). The old code only
+        // flipped when the table build failed, which this case never does. So
+        // point `n` at the side of the plane the rails reach furthest into.
+        {
+            double reach = 0.0;
+            for (const TopoDS_Wire& rw : m_rails) {
+                BRepAdaptor_CompCurve rc(rw);
+                const double r0 = rc.FirstParameter(), r1 = rc.LastParameter();
+                if (!(r1 > r0)) continue;
+                double far = 0.0;
+                for (int i = 0; i <= 200; ++i) {
+                    const gp_Pnt p = rc.Value(r0 + (r1 - r0) * (i / 200.0));
+                    const double h = gp_Vec(C, p).Dot(n);
+                    if (std::abs(h) > std::abs(far)) far = h;
+                }
+                reach += far;
+            }
+            if (reach < 0.0) n.Reverse();
+        }
+
         std::vector<RailTable> rails(m_rails.size());
         auto buildAll = [&]() -> bool {
             for (size_t r = 0; r < m_rails.size(); ++r) {

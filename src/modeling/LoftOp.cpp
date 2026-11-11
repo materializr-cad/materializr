@@ -442,9 +442,19 @@ TopoDS_Wire LoftOp::sectionFromSketch(materializr::Sketch* sk,
     if (!sk) return {};
     auto regions = sk->buildRegions();
     if (!regions.empty()) {
-        size_t best = 0;
+        // A sketch started on a body's face also carries the REST of that face
+        // as a region (everything outside the drawn shape), and being the biggest
+        // it won the "outermost" pick below - so a loft from a rectangle drawn on
+        // a cylinder's top took the cylinder's whole circle as its base, and the
+        // loft grew from the body it was never told about. Only the regions the
+        // user DREW are candidates; with none (a bare host face) all of them are.
+        std::vector<int> candidates = sk->drawnRegions(regions);
+        if (candidates.empty())
+            for (size_t i = 0; i < regions.size(); ++i) candidates.push_back(static_cast<int>(i));
+        size_t best = static_cast<size_t>(candidates.front());
         double bestDiag = -1.0;
-        for (size_t i = 0; i < regions.size(); ++i) {
+        for (int ci : candidates) {
+            const size_t i = static_cast<size_t>(ci);
             if (regions[i].outerWire.IsNull()) continue;
             Bnd_Box bb;
             BRepBndLib::Add(regions[i].outerWire, bb);

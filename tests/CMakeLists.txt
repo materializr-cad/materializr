@@ -1161,6 +1161,30 @@ add_executable(test_arc_typed_dimension test_arc_typed_dimension.cpp)
 target_link_libraries(test_arc_typed_dimension PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_arc_typed_dimension COMMAND test_arc_typed_dimension)
 
+# test_shape_spec - Line / Circle / Rectangle / Arc panels: typed length, angle,
+# width, height, chord, sweep or radius override the cursor (SketchTool::ShapeSpec)
+add_executable(test_shape_spec test_shape_spec.cpp)
+target_link_libraries(test_shape_spec PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_shape_spec COMMAND test_shape_spec)
+
+# test_plane_reference_round - the Reference tool on round / symmetric bodies:
+# seam-split arcs merge into one circle, mirror-image walls both survive
+add_executable(test_plane_reference_round test_plane_reference_round.cpp)
+target_link_libraries(test_plane_reference_round PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_plane_reference_round COMMAND test_plane_reference_round)
+
+# test_loft_host_and_rails - a loft section ignores the host face of a sketch
+# drawn on a body; a guided-loft rail below the base plane is read the right way up
+add_executable(test_loft_host_and_rails test_loft_host_and_rails.cpp)
+target_link_libraries(test_loft_host_and_rails PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_loft_host_and_rails COMMAND test_loft_host_and_rails)
+
+# test_extrude_host_face_resize - an extrude-cut drawn on a body face: enlarging
+# its circle must not leave the old hole's disc standing (the "pancake")
+add_executable(test_extrude_host_face_resize test_extrude_host_face_resize.cpp)
+target_link_libraries(test_extrude_host_face_resize PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_extrude_host_face_resize COMMAND test_extrude_host_face_resize)
+
 # test_i18n - the translation layer: ImGui ##id suffixes survive translation,
 # and every shipped string fits the glyph range the font atlas is built with
 add_executable(test_i18n test_i18n.cpp)

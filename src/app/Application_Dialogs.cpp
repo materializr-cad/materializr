@@ -5686,10 +5686,12 @@ void Application::renderPolygonToolPanel() {
             // -10 / -1 / -0.1 / +0.1 / +1 / +10, like every other length.
             ImGui::PushID("polySizeStep");
             edited |= materializr::lengthStepperRow("##step", &size, /*allowNegative=*/true,
-                                                    0.0, 1.0e6, 0.0, /*showZero=*/false);
+                                                    0.0, 1.0e6, 0.0, /*showZero=*/true);
             ImGui::PopID();
         }
+        // The 0 button (and a typed 0) hands the size back to the cursor.
         if (edited && size > 0.0) { spec.hasSize = true; spec.size = size; }
+        else if (edited && size <= 0.0) spec.hasSize = false;
 
         // The angle of the first corner, from the sketch's +X axis.
         double ang = spec.hasAngle ? spec.angleDeg : curRot * 180.0 / M_PI;
@@ -5735,6 +5737,196 @@ void Application::renderPolygonToolPanel() {
             spec.hasAngle = false;
         }
         ImGui::EndDisabled();
+    }
+    ImGui::End();
+    if (!open) m_sketchTool->setMode(SketchToolMode::Select);
+}
+
+// Line / Circle / Rectangle / Arc: the Polygon panel's idea for the other four
+// drawing tools. Every value the cursor would set can be typed instead - length,
+// angle, width, height, chord, sweep or radius - with the -10 .. +10 steppers
+// beside it; Place puts the shape down now, Follow cursor hands everything back
+// to the mouse. The values live in SketchTool::ShapeSpec, which both the live
+// preview and the commit read, so what is drawn is what is placed.
+void Application::renderShapeToolPanel() {
+    if (!m_inSketchMode || !m_sketchTool) return;
+    const SketchToolMode mode = m_sketchTool->getMode();
+    if (mode != SketchToolMode::Line && mode != SketchToolMode::Circle &&
+        mode != SketchToolMode::Rectangle && mode != SketchToolMode::Arc)
+        return;
+
+    using namespace materializr;
+    auto& spec = m_sketchTool->shapeSpec();
+    const SketchTool::ShapeNow now = m_sketchTool->shapeMeasure();
+    const bool placing = m_sketchTool->isPlacing();
+    const int  clicks  = m_sketchTool->getClickCount();
+
+    const char* name = mode == SketchToolMode::Line ? "Line"
+                     : mode == SketchToolMode::Circle ? "Circle"
+                     : mode == SketchToolMode::Rectangle ? "Rectangle" : "Arc";
+    // One window id for all four so it keeps its place when the tool changes.
+    const std::string title = std::string(tr(name)) + "###shapeToolPanel";
+
+    ImGuiViewport* vp = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(
+        ImVec2(vp->WorkPos.x + vp->WorkSize.x * 0.5f, vp->WorkPos.y + 60.0f),
+        ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.0f));
+    ImGui::SetNextWindowBgAlpha(0.92f);
+    bool open = true;
+    if (ImGui::Begin(title.c_str(), &open,
+                     ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) {
+        const char* hint = "";
+        switch (mode) {
+            case SketchToolMode::Line:
+                hint = placing ? tr("Type the length and angle below, then click or press Place. A value you leave alone follows the cursor.")
+                               : tr("Click the start of the line.");
+                break;
+            case SketchToolMode::Circle:
+                hint = placing ? tr("Type the size below, then click or press Place. It follows the cursor until you do.")
+                               : tr("Click the centre (or the first end of the diameter).");
+                break;
+            case SketchToolMode::Rectangle:
+                hint = placing ? tr("Type the width, height and angle below, then click or press Place. Angle 0 keeps the sides horizontal and vertical.")
+                               : tr("Click the first corner (or the centre).");
+                break;
+            default:
+                hint = clicks == 0 ? tr("Click the start of the arc.")
+                     : clicks == 1 ? tr("Type the chord, then click the end or press Place - or just click it.")
+                                   : tr("Set the sweep or radius below, then click or press Place. The cursor chooses which way it bows.");
+                break;
+        }
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * 22.0f);
+        ImGui::TextDisabled("%s", hint);
+        ImGui::PopTextWrapPos();
+
+        // A length: field, then the -10 .. +10 row. 0 (or typing 0) gives the
+        // value back to the cursor. `cur` is what the cursor currently says.
+        auto lengthRow = [&](const char* id, const char* label, bool& has, double& val, double cur) {
+            double v = has ? val : cur;
+            bool edited = false;
+            ImGui::PushID(id);
+            if (imTouchLayout()) {
+                edited = amountLengthField(id, label, &v);
+            } else {
+                edited = lengthField(label, &v).changed;
+                edited |= lengthStepperRow("##step", &v, /*allowNegative=*/true,
+                                           0.0, 1.0e6, 0.0, /*showZero=*/true);
+            }
+            ImGui::PopID();
+            if (edited) {
+                if (v > 0.0) { has = true; val = v; } else has = false;
+            }
+        };
+        // An angle in degrees: field, then -90 .. +90. `wrap` keeps it in 0..360
+        // (a direction); off, the value is clamped by the caller (a sweep).
+        // Zero sets 0 for a direction (horizontal / axis-aligned) but clears a
+        // sweep, where 0 is no arc.
+        auto angleRow = [&](const char* id, const char* label, bool& has, double& val,
+                            double cur, bool direction, double lo, double hi) {
+            double a = has ? val : cur;
+            bool edited = false;
+            ImGui::PushID(id);
+            ImGui::SetNextItemWidth(uiSz(140, 0).x);
+            edited = ImGui::InputDouble(label, &a, 0.0, 0.0, "%.2f");
+            static const double steps[] = { -90, -45, -15, 0, 15, 45, 90 };
+            bool cleared = false;
+            for (size_t i = 0; i < sizeof(steps) / sizeof(steps[0]); ++i) {
+                if (i) ImGui::SameLine();
+                char b[16];
+                if (steps[i] == 0) std::snprintf(b, sizeof b, "0");
+                else               std::snprintf(b, sizeof b, "%+g", steps[i]);
+                ImGui::PushID(static_cast<int>(i));
+                if (ImGui::SmallButton(b)) {
+                    if (steps[i] == 0) { a = 0.0; if (!direction) cleared = true; }
+                    else a += steps[i];
+                    edited = true;
+                }
+                ImGui::PopID();
+            }
+            ImGui::PopID();
+            if (edited) {
+                if (cleared) { has = false; }
+                else {
+                    if (direction) { while (a >= 360.0) a -= 360.0; while (a < 0.0) a += 360.0; }
+                    else a = std::min(std::max(a, lo), hi);
+                    has = true; val = a;
+                }
+            }
+        };
+        auto placeRow = [&](bool placeEnabled) {
+            ImGui::Separator();
+            ImGui::BeginDisabled(!placeEnabled);
+            if (ImGui::Button(tr("Place"))) {
+                auto trackBodies = trackBodyChanges(); // re-tessellate only what changes
+                recordSketchMutation([&]{ m_sketchTool->commitShapeNow(); });
+                markDirty();
+            }
+            ImGui::EndDisabled();
+            ImGui::SameLine();
+            ImGui::BeginDisabled(!spec.any());
+            if (ImGui::Button(tr("Follow cursor"))) m_sketchTool->clearShapeSpec();
+            ImGui::EndDisabled();
+        };
+
+        ImGui::Separator();
+        switch (mode) {
+            case SketchToolMode::Line: {
+                lengthRow("lineLen", tr("Length"), spec.hasLen, spec.len, now.len);
+                angleRow("lineAng", tr("Angle (deg)"), spec.hasAngle, spec.angleDeg, now.angleDeg,
+                         /*direction=*/true, 0.0, 360.0);
+                placeRow(placing);
+                break;
+            }
+            case SketchToolMode::Circle: {
+                int dm = m_sketchTool->circleDiameter() ? 1 : 0;
+                const int was = dm;
+                if (ImGui::RadioButton((std::string(tr("Radius")) + "##circMode").c_str(), &dm, 0)) {}
+                ImGui::SameLine();
+                if (ImGui::RadioButton((std::string(tr("Diameter")) + "##circMode").c_str(), &dm, 1)) {}
+                if (dm != was) {
+                    // Keep the same circle: the typed number changes meaning.
+                    if (spec.hasLen) spec.len *= (dm == 1) ? 2.0 : 0.5;
+                    m_sketchTool->setCircleDiameter(dm == 1);
+                }
+                lengthRow("circSize", dm == 1 ? tr("Diameter") : tr("Radius"),
+                          spec.hasLen, spec.len, now.len);
+                placeRow(placing);
+                break;
+            }
+            case SketchToolMode::Rectangle: {
+                lengthRow("rectW", tr("Width"),  spec.hasW, spec.w, now.w);
+                lengthRow("rectH", tr("Height"), spec.hasH, spec.h, now.h);
+                angleRow("rectAng", tr("Angle (deg)"), spec.hasAngle, spec.angleDeg, now.angleDeg,
+                         /*direction=*/true, 0.0, 360.0);
+                placeRow(placing);
+                break;
+            }
+            default: {   // Arc
+                lengthRow("arcChord", tr("Chord"), spec.hasLen, spec.len, now.len);
+                ImGui::Separator();
+                int rm = m_sketchTool->getArcDimMode() == SketchTool::ArcDimMode::Radius ? 1 : 0;
+                const int was = rm;
+                if (ImGui::RadioButton((std::string(tr("Degrees")) + "##arcMode").c_str(), &rm, 0)) {}
+                ImGui::SameLine();
+                if (ImGui::RadioButton((std::string(tr("Radius")) + "##arcMode").c_str(), &rm, 1)) {}
+                if (rm != was) {
+                    // Degrees and millimetres do not convert: start over.
+                    spec.hasApex = false;
+                    m_sketchTool->setArcDimMode(rm == 1 ? SketchTool::ArcDimMode::Radius
+                                                        : SketchTool::ArcDimMode::Sweep);
+                }
+                if (rm == 1) {
+                    lengthRow("arcRadius", tr("Radius"), spec.hasApex, spec.apex, now.apex);
+                    if (clicks == 2)
+                        ImGui::TextDisabled("%s", trFormat("min %s (half the chord)", fmtLength(m_sketchTool->arcMinRadius())).c_str());
+                } else {
+                    angleRow("arcSweep", tr("Degrees"), spec.hasApex, spec.apex, now.apex,
+                             /*direction=*/false, 0.1, 359.9);
+                }
+                placeRow(placing);
+                break;
+            }
+        }
     }
     ImGui::End();
     if (!open) m_sketchTool->setMode(SketchToolMode::Select);

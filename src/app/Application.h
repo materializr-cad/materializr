@@ -158,6 +158,7 @@ private:
     void renderOffsetToolPanel(); // offset distance / side / corner style (floating)
     void renderCornerToolPanel(); // sketch fillet / chamfer: kind + size (floating)
     void renderPolygonToolPanel(); // polygon: radius/diameter, in/circumscribed, exact size + angle
+    void renderShapeToolPanel();   // line / circle / rectangle / arc: typed length, angle, size + Place
     // Camera-upright default rotation for Text/SVG placement.
     void seedUprightPlacementAngle();
     void initRenderers();
@@ -265,7 +266,7 @@ private:
     // Rectangle / Circle in the tool rail: the first tap picks the tool, a tap
     // while it is already active opens a Corner/Center (or Center/2-Point)
     // menu. `wasActive` is the rail entry's active flag from BEFORE the tap.
-    void renderRailDrawOriginPopup(bool isRect, bool wasActive, bool clicked);
+    void renderRailDrawOriginPopup(bool isRect, bool wasActive, bool clicked, bool inMenuZone = false);
     void renderTouchOverflowPopup(); // shared logo-button menu popup (modern + im-touch)
     // Undo/redo with the sketch-edit cascade (shared by the Edit menu, the
     // touch shell's top bar, and nothing else - the Ctrl+Z shortcut has its
@@ -287,6 +288,19 @@ private:
     void exportSettings();    // Settings dialog → Export…  (write current prefs as JSON)
     void importSettings();    // Settings dialog → Import…  (load prefs from JSON, apply live)
     AppSettings currentSettings() const;     // gather current prefs into a struct
+    // The remembered two-way tool switches (rect/circle "draw from", radius vs
+    // diameter, arc dimension kind, polygon in/circumscribed, corner kind,
+    // primitive radius/diameter), one bit each in AppSettings::toolSwitches.
+    int  packToolSwitches() const;
+    void unpackToolSwitches(int bits);
+    // Logo-menu sections (Modern / im-touch) the user has expanded, as
+    // AppSettings::menuSectionsOpen bits. Written back by renderTouchOverflowPopup.
+    int  m_menuSectionsOpen = 0;
+    // What the last saved settings held for the two above; a mismatch next
+    // frame means a switch or section changed and settings are re-saved.
+    int  m_savedToolSwitches = -1;
+    int  m_savedMenuSections = -1;
+    void saveRememberedUiStateIfChanged();
     void        applyAppSettings(const AppSettings& s); // push prefs onto the live members
     void renderMirrorPopup();
     void renderUpdatePopup();
@@ -850,6 +864,7 @@ private:
     double m_lastCascadeMs = 0.0;
     std::set<int> m_pendingSketchCascades;
     void flushPendingSketchCascades();
+    void flushPendingCascadesBeforeSave();   // a save must not write bodies out of step with their sketches
     // Map each sketch id to the body ids it drives (created/modified through a
     // sketch-sourced extrude / push-pull). Used by the gizmo commit to tell a
     // unison move (body + its driving sketch) from a lone move that de-links.

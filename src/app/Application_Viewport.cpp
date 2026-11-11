@@ -2025,6 +2025,14 @@ void Application::renderViewport() {
                     // ps, pe = opposite corners. Dimension the bottom and right sides.
                     glm::vec2 bl(ps.x, ps.y), br(pe.x, ps.y), tr(pe.x, pe.y);
                     float w = std::abs(pe.x - ps.x), h = std::abs(pe.y - ps.y);
+                    // A rotated rectangle (typed angle): dimension its own sides.
+                    {
+                        glm::vec2 rc[4];
+                        if (m_sketchTool->rectResolve(m_sketchTool->getCurrentPos(), rc)) {
+                            bl = rc[0]; br = rc[1]; tr = rc[2];
+                            w = glm::length(br - bl); h = glm::length(tr - br);
+                        }
+                    }
                     if (w > 1e-3f) {
                         fmtLen(dbuf, sizeof(dbuf), w);
                         drawDim(sketch2world(bl), sketch2world(br), dbuf);
@@ -3496,6 +3504,28 @@ void Application::renderViewport() {
                     ImGui::PushStyleVar(
                         ImGuiStyleVar_WindowPadding,
                         ImVec2(8.0f * uiScale(), 8.0f * uiScale()));
+                    // Wide enough for the whole -10 .. +10 stepper row on ONE line
+                    // (it wrapped onto a second row before), whatever the unit's
+                    // step labels read as. Only a floor: a wider popup stays wide.
+                    {
+                        const ImGuiStyle& st = ImGui::GetStyle();
+                        const double us = materializr::unitInfo(materializr::currentUnit()).step;
+                        const double mags[3] = { 10.0 * us, us, 0.1 * us };
+                        float rowW = 0.0f;
+                        char lb[32];
+                        auto addBtn = [&](const char* t) {
+                            rowW += ImGui::CalcTextSize(t).x + 2.0f * st.FramePadding.x + st.ItemSpacing.x;
+                        };
+                        for (double m : mags) { std::snprintf(lb, sizeof lb, "-%g", m); addBtn(lb); }
+                        addBtn("0");
+                        for (double m : mags) { std::snprintf(lb, sizeof lb, "+%g", m); addBtn(lb); }
+                        // Angles use 10 / 1 / 0.1 whatever the unit.
+                        float rowA = 0.0f;
+                        for (const char* t : { "-10", "-1", "-0.1", "0", "+0.1", "+1", "+10" })
+                            rowA += ImGui::CalcTextSize(t).x + 2.0f * st.FramePadding.x + st.ItemSpacing.x;
+                        const float need = std::max(rowW, rowA) + 2.0f * 8.0f * uiScale() + 4.0f;
+                        ImGui::SetNextWindowSizeConstraints(ImVec2(need, 0.0f), ImVec2(FLT_MAX, FLT_MAX));
+                    }
                     if (ImGui::BeginPopup("##DimEdit")) {
                         ImGui::TextUnformatted(materializr::tr("Edit dimension"));
                         ImGui::Separator();
@@ -3576,6 +3606,14 @@ void Application::renderViewport() {
                             }
                             ImGui::PopID();
                             if (stepped) m_dimEditingFocus = true;
+                        }
+                        // A button for what Enter does, for mouse and touch users who
+                        // have no Enter key to hand.
+                        if (!dimCommitted) {
+                            const float bh = materializr::touchMode()
+                                ? std::max(ImGui::GetFrameHeight(), 44.0f * uiScale()) : 0.0f;
+                            if (ImGui::Button(materializr::tr("Confirm (Enter)"), ImVec2(-1.0f, bh)))
+                                dimCommitted = true;
                         }
                         // Esc closes the window straight away (the field's own first
                         // Esc used to only drop focus, needing a second press).
@@ -6037,8 +6075,11 @@ void Application::renderViewport() {
                     // the origin between the lines the user can see whenever the
                     // zoom has scaled the lattice.
                     float step = std::max(m_effectiveGridStepMm, 0.01f);
-                    glm::vec2 snapped(std::round(sketchCoord.x / step) * step,
-                                      std::round(sketchCoord.y / step) * step);
+                    // The Snap & Grid checkbox applies here too: off = the exact click.
+                    glm::vec2 snapped = m_snapToGrid
+                        ? glm::vec2(std::round(sketchCoord.x / step) * step,
+                                    std::round(sketchCoord.y / step) * step)
+                        : sketchCoord;
                     ImVec2 sp(mousePos.x, mousePos.y);
                     auto* dl = ImGui::GetForegroundDrawList();
                     dl->AddCircleFilled(sp, 7.0f, IM_COL32(255, 220, 50, 255));
@@ -6190,7 +6231,7 @@ void Application::renderViewport() {
                             // mirrored elements on whole grid increments (e.g. a
                             // 0.5 mm line nudge → 1 mm mirror shift on a 1 mm grid).
                             float step = m_sketchTool->getGridStep() * 0.5f;
-                            if (step > 0.0f) {
+                            if (m_snapToGrid && step > 0.0f) {
                                 if (m_mirrorGizmoHandle != SketchGizmoHandle::MoveY)
                                     na.x = std::round(na.x / step) * step;
                                 if (m_mirrorGizmoHandle != SketchGizmoHandle::MoveX)
@@ -6422,8 +6463,10 @@ void Application::renderViewport() {
                         else if (m_sketchGizmoHandle == SketchGizmoHandle::MoveY) delta.x = 0.0f;
                         // Snap the new centroid (on the unconstrained axes) so the
                         // numbers land on grid lines.
+                        // Only with the Snap & Grid checkbox on: with it off the
+                        // move is smooth, like moving a body outside a sketch.
                         float step = m_sketchTool->getGridStep();
-                        if (step > 0.0f) {
+                        if (m_snapToGrid && step > 0.0f) {
                             glm::vec2 nc = m_sketchGizmoCenter + delta;
                             if (m_sketchGizmoHandle != SketchGizmoHandle::MoveY)
                                 nc.x = std::round(nc.x / step) * step;
@@ -7774,45 +7817,10 @@ void Application::renderViewport() {
             "Type a value and press Enter. The shape extends from your first click toward the cursor.";
         if (!bubbleOwnsInput)
         switch (mode) {
-            case SketchToolMode::Line:      dimLabel = "Length (%s)"; break;
-            case SketchToolMode::Circle:    dimLabel = "Diameter (%s)"; break;
-            // Polygon side count is picked from the toolbar popout now, and
-            // radius/rotation come from the drag - so no typed dialog (it was
-            // the one that clipped). dimLabel stays null → no input window.
-            case SketchToolMode::Rectangle:
-                // Touch shows BOTH Width and Height fields at once (below);
-                // desktop keeps its two-stage single field.
-                dimLabel = materializr::touchMode()
-                             ? "Rectangle (%s)"
-                             : (m_sketchTool->getRectDimStage() == 0
-                                    ? "Width (%s)" : "Height (%s)");
-                dimHint  = materializr::touchMode()
-                  ? "Type Width and Height, then Apply."
-                  : (m_sketchTool->getRectDimStage() == 0
-                       ? "Type width and Enter to lock horizontal - cursor still "
-                         "drives height. Or click for both at once."
-                       : "Type height and Enter to commit the rectangle.");
-                break;
-            case SketchToolMode::Arc:
-                // Two stages, like the rectangle: the chord first, then one
-                // number for the bow. Click 3 has no input until the chord
-                // exists, so clickCount drives which is on offer.
-                if (m_sketchTool->getClickCount() == 1) {
-                    dimLabel = "Chord (%s)";
-                    dimHint  = "Type the straight-line distance between the arc's "
-                               "two ends and press Enter - or just click the end.";
-                } else if (m_sketchTool->getClickCount() == 2) {
-                    const bool sweep = m_sketchTool->getArcDimMode() ==
-                                       SketchTool::ArcDimMode::Sweep;
-                    dimLabel = sweep ? "Sweep (deg)" : "Radius (%s)";
-                    dimHint  = sweep
-                      ? "Type the swept angle and Enter. 180 is a semicircle. "
-                        "Move the cursor across the chord to flip which way it bows."
-                      : "Type the radius and Enter. It cannot be smaller than half "
-                        "the chord. Move the cursor across the chord to flip which "
-                        "way it bows.";
-                }
-                break;
+            // Line / Circle / Rectangle / Arc have their own panel now (like the
+            // Polygon one): length, angle, width, height, chord, sweep or radius
+            // with the -10..+10 steppers and Place / Follow cursor. dimLabel
+            // stays null here, so no second window opens over it.
             default: dimLabel = nullptr;
         }
         if (dimLabel) {

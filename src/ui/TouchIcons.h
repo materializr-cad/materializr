@@ -112,6 +112,16 @@
 // construction geometry itself draws in the sketch. Iconoir has no dashed-line
 // glyph. Drawn in drawIconCentered.
 #define MZ_ICON_CONSTRUCTION "\xee\x80\x88"  // U+E008
+// Circle / Rectangle "draw from" variants - sentinels (PUA U+E009..U+E00C) drawn
+// in drawIconCentered, so the tool button shows HOW it will draw:
+//   circle from centre: ring + centre dot + one rim dot at 45 degrees
+//   circle from 2 points: ring + rim dots at 45 and 225 degrees
+//   rectangle from corner: box + dots at lower-left and upper-right
+//   rectangle from centre: box + centre dot + upper-right dot
+#define MZ_ICON_CIRCLE_CENTER "\xee\x80\x89"  // U+E009
+#define MZ_ICON_CIRCLE_2PT    "\xee\x80\x8a"  // U+E00A
+#define MZ_ICON_RECT_CORNER   "\xee\x80\x8b"  // U+E00B
+#define MZ_ICON_RECT_CENTER   "\xee\x80\x8c"  // U+E00C
 #define MZ_ICON_FILL       ICON_IC_FILL_COLOR  // sketch Fill tool (paint bucket)
 #define MZ_ICON_FINISH     ICON_IC_CHECK
 #define MZ_ICON_DISCARD    ICON_IC_XMARK

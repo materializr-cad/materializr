@@ -750,14 +750,21 @@ void Application::renderTouchOverflowPopup() {
     // start, so Settings and Exit are always in view and one extra tap beats
     // scrolling a long list. Sections open independently; ImGui keeps their
     // state for as long as the popup window lives.
-    auto section = [&](const char* en, auto&& body) {
+    // The open/closed state is remembered (AppSettings::menuSectionsOpen): the
+    // header is told what the saved bit says each frame and its answer is
+    // written back, so a click both toggles and sticks - across closing the
+    // menu and across launches.
+    auto section = [&](const char* en, int bit, auto&& body) {
         const std::string lbl = std::string(materializr::tr(en)) + "###sec" + en;
-        if (ImGui::CollapsingHeader(lbl.c_str())) body();
+        ImGui::SetNextItemOpen((m_menuSectionsOpen & bit) != 0, ImGuiCond_Always);
+        const bool open = ImGui::CollapsingHeader(lbl.c_str());
+        if (open) m_menuSectionsOpen |= bit; else m_menuSectionsOpen &= ~bit;
+        if (open) body();
     };
-    section("File", [&] { renderFileMenuItems(false, false); });   // Settings and Exit are placed below
-    section("Edit", [&] { renderEditMenuItems(); });
-    section("View", [&] { renderViewMenuItems(); });
-    section("Help", [&] { renderHelpMenuItems(); });
+    section("File", 1, [&] { renderFileMenuItems(false, false); });   // Settings and Exit are placed below
+    section("Edit", 2, [&] { renderEditMenuItems(); });
+    section("View", 4, [&] { renderViewMenuItems(); });
+    section("Help", 8, [&] { renderHelpMenuItems(); });
     ImGui::Separator();
     if (ImGui::MenuItem(menuLbl(MZ_ICON_SETTINGS, "Settings..."))) {
         m_settingsOrbitButton = m_orbitButton;
@@ -787,15 +794,19 @@ void Application::renderRailPolygonSidesPopup(bool clicked) {
     }
 }
 
-void Application::renderRailDrawOriginPopup(bool isRect, bool wasActive, bool clicked) {
+void Application::renderRailDrawOriginPopup(bool isRect, bool wasActive, bool clicked,
+                                             bool inMenuZone) {
     // Same menu as the classic toolbar's (Toolbar.cpp drawOriginMenu), so every
     // layout answers the second tap the same way. The popup id is shared: only
     // one rail button is ever tapped at a time, and BeginPopup keys on the id
     // within the calling button's ID scope.
     const ToolAction act = isRect ? ToolAction::Rectangle : ToolAction::Circle;
+    // First tap on the button: pick the tool. A tap on its corner mark opens the
+    // "Draw from" menu at once - also on the first tap; a second tap on the
+    // body of the active tool does the same, as it always did.
     if (clicked) {
-        if (wasActive) ImGui::OpenPopup("##railDrawOrigin");
-        else handleToolAction(static_cast<int>(act));
+        if (wasActive || inMenuZone) ImGui::OpenPopup("##railDrawOrigin");
+        if (!wasActive) handleToolAction(static_cast<int>(act));
     }
     if (ImGui::BeginPopup("##railDrawOrigin")) {
         int cur = 0;

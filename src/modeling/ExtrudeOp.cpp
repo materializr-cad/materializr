@@ -215,19 +215,30 @@ bool ExtrudeOp::rebuildProfileFromSketch(Document& doc, bool adoptNewRegions) {
         known.reserve(m_knownPts.size());
         for (const auto& p : m_knownPts)
             known.emplace_back(static_cast<float>(p.first), static_cast<float>(p.second));
-        const auto regions = sk->buildRegions();
-        const std::vector<int> fresh = sk->regionsMissingFrom(regions, known);
+        // Regions of what was DRAWN, never of the face the sketch sits on. A
+        // sketch started on a body face also carries that face's own outline
+        // and holes as region boundaries, and they move with the body: once the
+        // extrude had cut a hole through the face, the face carried that hole,
+        // so a drawn circle later made bigger was split into a ring around the
+        // OLD hole. The ring plus the face's leftover were "contours drawn since"
+        // and the cut left the old hole's disc standing - a pancake in the middle
+        // of the enlarged hole, and the new circles ignored (1.8.0-beta.5 tester
+        // list). The normal path below already works from the drawn profile only.
+        materializr::Sketch drawnOnly(*sk);
+        drawnOnly.setSourceFace(TopoDS_Face());
+        const auto regions = drawnOnly.buildRegions();
+        const std::vector<int> fresh = drawnOnly.regionsMissingFrom(regions, known);
         if (!fresh.empty()) {
             BRep_Builder bb;
             TopoDS_Compound all;
             bb.MakeCompound(all);
             int usedRegions = 0, taken = 0;
-            for (int idx : sk->drawnRegions(regions)) {
+            for (int idx : drawnOnly.drawnRegions(regions)) {
                 if (regions[idx].face.IsNull()) continue;
                 bool wanted = std::find(fresh.begin(), fresh.end(), idx) != fresh.end();
                 bool used = false;
                 for (const auto& p : m_regionPts)
-                    if (sk->isPointInRegion(regions[idx],
+                    if (drawnOnly.isPointInRegion(regions[idx],
                                             glm::vec2(static_cast<float>(p.first),
                                                       static_cast<float>(p.second)))) {
                         used = true;
@@ -486,8 +497,13 @@ bool ExtrudeOp::execute(Document& doc) {
                     // later can be told from one deliberately left out.
                     m_knownPts.clear();
                     if (auto sk = doc.getSketch(m_sketchId))
-                        for (const glm::vec2& q : sk->drawnRegionSamples(sk->buildRegions()))
+                    {
+                        // Same drawn-only view the rebuild compares against.
+                        materializr::Sketch drawnOnly(*sk);
+                        drawnOnly.setSourceFace(TopoDS_Face());
+                        for (const glm::vec2& q : drawnOnly.drawnRegionSamples(drawnOnly.buildRegions()))
                             m_knownPts.push_back({q.x, q.y});
+                    }
                 }
             }
         }

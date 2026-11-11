@@ -16,9 +16,12 @@
 #include <gp_Elips.hxx>
 #include <gp_Pln.hxx>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
-#include <unordered_set>
+#include <array>
+#include <set>
+#include <vector>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -41,11 +44,7 @@ public:
         for (const auto& p : refs.points) m_points.insert(key(p));
         for (const auto& l : refs.lines) m_lines.insert(lineKey(l.first, l.second));
         for (const auto& c : refs.circles) m_circles.insert(circleKey(c));
-        for (const auto& s : refs.splines) {
-            std::int64_t k = static_cast<std::int64_t>(s.control.size());
-            for (const glm::vec2& q : s.control) k = k * 1000003LL ^ key(q);
-            m_splines.insert(k);
-        }
+        for (const auto& s : refs.splines) m_splines.insert(splineKey(s.control));
     }
     void point(glm::vec2 p) {
         if (m_refs.points.size() >= kMaxRefPoints) return;
@@ -61,30 +60,42 @@ public:
     }
     void spline(Sketch::FaceReference::Spline s) {
         if (s.control.size() < 2 || s.poly.size() < 2) return;
-        std::int64_t k = static_cast<std::int64_t>(s.control.size());
-        for (const glm::vec2& q : s.control) k = k * 1000003LL ^ key(q);
-        if (m_splines.insert(k).second) { m_refs.splines.push_back(std::move(s)); ++splines; }
+        if (m_splines.insert(splineKey(s.control)).second) { m_refs.splines.push_back(std::move(s)); ++splines; }
     }
     int points = 0, lines = 0, circles = 0, splines = 0;
 
 private:
-    static std::int64_t key(glm::vec2 p) {
-        const std::int64_t x = std::llround(p.x * 1e3), y = std::llround(p.y * 1e3);
-        return (x << 32) ^ (y & 0xffffffffLL);
-    }
+    // EXACT keys - the quantised values themselves, not a hash of them. These
+    // were folded into one int64 each, and the fold collided for mirror-image
+    // geometry: (-5,0)-(-5,10) and (5,0)-(5,10) hashed to the same number, so a
+    // symmetric body lost one of its two walls from the references (the
+    // cylinder's missing side). A set of the real values cannot do that.
+    using PointKey  = std::pair<std::int64_t, std::int64_t>;
+    using LineKey   = std::array<std::int64_t, 4>;
+    using CircleKey = std::array<std::int64_t, 5>;
+    static std::int64_t q(float v) { return static_cast<std::int64_t>(std::llround(static_cast<double>(v) * 1e3)); }
+    static PointKey key(glm::vec2 p) { return { q(p.x), q(p.y) }; }
     // Centre + radius + SPAN: a plane through a pipe returns each wall circle as
     // two arcs, and keying on centre/radius alone dropped the second one.
-    static std::int64_t circleKey(const Sketch::FaceReference::Circle& c) {
-        std::int64_t k = key(c.center) ^ (std::int64_t(std::lround(c.radius * 1e3)) << 1);
-        k = k * 1000003LL ^ std::int64_t(std::llround(c.startAngle * 1e3));
-        return k * 1000003LL ^ std::int64_t(std::llround(c.sweep * 1e3));
+    static CircleKey circleKey(const Sketch::FaceReference::Circle& c) {
+        return { q(c.center.x), q(c.center.y), q(c.radius), q(c.startAngle), q(c.sweep) };
     }
-    static std::int64_t lineKey(glm::vec2 a, glm::vec2 b) {
-        const std::int64_t ka = key(a), kb = key(b);
-        return ka < kb ? (ka * 1000003LL) ^ kb : (kb * 1000003LL) ^ ka;   // order-free
+    static LineKey lineKey(glm::vec2 a, glm::vec2 b) {
+        const PointKey ka = key(a), kb = key(b);   // order-free: smaller end first
+        return ka < kb ? LineKey{ ka.first, ka.second, kb.first, kb.second }
+                       : LineKey{ kb.first, kb.second, ka.first, ka.second };
+    }
+    static std::vector<std::int64_t> splineKey(const std::vector<glm::vec2>& control) {
+        std::vector<std::int64_t> k;
+        k.reserve(control.size() * 2);
+        for (const glm::vec2& p : control) { k.push_back(q(p.x)); k.push_back(q(p.y)); }
+        return k;
     }
     Sketch::FaceReference& m_refs;
-    std::unordered_set<std::int64_t> m_points, m_lines, m_circles, m_splines;
+    std::set<PointKey> m_points;
+    std::set<LineKey> m_lines;
+    std::set<CircleKey> m_circles;
+    std::set<std::vector<std::int64_t>> m_splines;
 };
 
 struct Frame {
@@ -200,6 +211,91 @@ void sides(const Bnd_Box& bb, const Frame& fr, bool& below, bool& above) {
     }
 }
 
+// Arcs of ONE circle that together close it become that circle. A round body's
+// edges and its plane section arrive split at the seam (a sphere's meridian, a
+// cylinder's seam line): each half is a separate reference arc, so picking one
+// copied half the outline - hover lit the half under the cursor, which looked
+// right, and the click then took only that half. Contiguous arcs of the same
+// centre and radius are also joined into one longer arc.
+void mergeCircleArcs(std::vector<Sketch::FaceReference::Circle>& circles) {
+    using Circle = Sketch::FaceReference::Circle;
+    const float twoPi = 2.0f * static_cast<float>(M_PI);
+    const float full = twoPi - 1e-3f;
+    auto wrap = [&](float a) {
+        while (a < 0.0f) a += twoPi;
+        while (a >= twoPi) a -= twoPi;
+        return a;
+    };
+    auto sameCircle = [](const Circle& a, const Circle& b) {
+        return glm::length(a.center - b.center) < 2e-3f && std::abs(a.radius - b.radius) < 2e-3f;
+    };
+    std::vector<Circle> out;
+    std::vector<bool> done(circles.size(), false);
+    for (size_t i = 0; i < circles.size(); ++i) {
+        if (done[i]) continue;
+        std::vector<Circle> group;
+        for (size_t j = i; j < circles.size(); ++j)
+            if (!done[j] && sameCircle(circles[i], circles[j])) { done[j] = true; group.push_back(circles[j]); }
+        const Circle base = group.front();
+        bool whole = false;
+        for (const auto& g : group) if (g.sweep >= full) whole = true;
+        if (whole || group.size() == 1) {
+            if (whole) { Circle c = base; c.startAngle = 0.0f; c.sweep = twoPi; out.push_back(c); }
+            else out.push_back(base);
+            continue;
+        }
+        // Chain arcs end to start, round and round, until no more join.
+        std::sort(group.begin(), group.end(), [&](const Circle& a, const Circle& b) {
+            return wrap(a.startAngle) < wrap(b.startAngle);
+        });
+        std::vector<Circle> chains;
+        std::vector<bool> used(group.size(), false);
+        const float eps = 2e-3f;
+        for (size_t k = 0; k < group.size(); ++k) {
+            if (used[k]) continue;
+            used[k] = true;
+            Circle cur = group[k];
+            cur.startAngle = wrap(cur.startAngle);
+            bool grew = true;
+            while (grew && cur.sweep < full) {
+                grew = false;
+                const float end = cur.startAngle + cur.sweep;
+                for (size_t m = 0; m < group.size(); ++m) {
+                    if (used[m]) continue;
+                    float d = wrap(group[m].startAngle - end);
+                    if (d > twoPi - eps) d = 0.0f;
+                    if (d < eps) {
+                        cur.sweep += group[m].sweep;
+                        used[m] = true;
+                        grew = true;
+                        break;
+                    }
+                }
+            }
+            // A chain that also meets its own start has closed the circle.
+            if (cur.sweep >= full) { cur.startAngle = 0.0f; cur.sweep = twoPi; }
+            chains.push_back(cur);
+        }
+        // The last chain can run into the first across the wrap: join them.
+        for (size_t a = 0; a < chains.size(); ++a) {
+            for (size_t b = 0; b < chains.size(); ++b) {
+                if (a == b || chains[a].sweep >= full || chains[b].sweep >= full) continue;
+                float d = wrap(chains[b].startAngle - (chains[a].startAngle + chains[a].sweep));
+                if (d > twoPi - eps) d = 0.0f;
+                if (d < eps) {
+                    chains[a].sweep += chains[b].sweep;
+                    if (chains[a].sweep >= full) { chains[a].startAngle = 0.0f; chains[a].sweep = twoPi; }
+                    chains.erase(chains.begin() + static_cast<long>(b));
+                    if (b < a) --a;
+                    b = static_cast<size_t>(-1);   // rescan from the start
+                }
+            }
+        }
+        for (const auto& c : chains) out.push_back(c);
+    }
+    circles = std::move(out);
+}
+
 } // namespace
 
 PlaneReferenceStats addBodyPlaneReferences(Sketch& sk,
@@ -258,6 +354,7 @@ PlaneReferenceStats addBodyPlaneReferences(Sketch& sk,
             // A body OCCT cannot bound or section simply contributes nothing.
         }
     }
+    mergeCircleArcs(refs.circles);
     st.points = out.points; st.lines = out.lines; st.circles = out.circles;
     sk.setFaceReferences(std::move(refs));
     return st;

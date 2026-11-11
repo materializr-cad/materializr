@@ -2152,6 +2152,8 @@ AppSettings Application::currentSettings() const {
     s.includePrereleases = m_includePrereleases;
     s.supporter = m_supporter;
     s.snapToGrid = m_snapToGrid;
+    s.menuSectionsOpen = m_menuSectionsOpen;
+    s.toolSwitches = packToolSwitches();
     // Stored as the DISPLAY NUMBER, not millimetres. The step is chosen from
     // presets labelled 0.1 / 0.5 / 1 / 10, and "1" means one of whatever unit
     // is showing. Saved as millimetres, picking "1" under feet wrote 304.8 -
@@ -2175,6 +2177,45 @@ AppSettings Application::currentSettings() const {
     s.stlImportAccuracy = m_stlImportAccuracy;
     s.meshShowWireframe = m_meshShowWireframe;
     return s;
+}
+
+int Application::packToolSwitches() const {
+    int b = 0;
+    if (m_sketchTool) {
+        using ST = SketchTool;
+        if (m_sketchTool->getRectMode() == ST::RectMode::Center)       b |= 1 << 0;
+        if (m_sketchTool->getCircleMode() == ST::CircleMode::TwoPoint) b |= 1 << 1;
+        if (m_sketchTool->circleDiameter())                             b |= 1 << 2;
+        if (m_sketchTool->getArcDimMode() == ST::ArcDimMode::Radius)   b |= 1 << 3;
+        if (m_sketchTool->polygonSpec().diameter)                       b |= 1 << 4;
+        if (m_sketchTool->polygonSpec().inscribed)                      b |= 1 << 5;
+        if (m_sketchTool->cornerChamfer())                              b |= 1 << 6;
+    }
+    if (m_primitiveUseDiameter) b |= 1 << 7;
+    return b;
+}
+
+void Application::unpackToolSwitches(int b) {
+    m_primitiveUseDiameter = (b & (1 << 7)) != 0;
+    if (!m_sketchTool) return;
+    using ST = SketchTool;
+    m_sketchTool->setRectMode((b & (1 << 0)) ? ST::RectMode::Center : ST::RectMode::Corner);
+    m_sketchTool->setCircleMode((b & (1 << 1)) ? ST::CircleMode::TwoPoint : ST::CircleMode::Center);
+    m_sketchTool->setCircleDiameter((b & (1 << 2)) != 0);
+    m_sketchTool->setArcDimMode((b & (1 << 3)) ? ST::ArcDimMode::Radius : ST::ArcDimMode::Sweep);
+    m_sketchTool->polygonSpec().diameter  = (b & (1 << 4)) != 0;
+    m_sketchTool->polygonSpec().inscribed = (b & (1 << 5)) != 0;
+    m_sketchTool->setCornerChamfer((b & (1 << 6)) != 0);
+}
+
+// Called once a frame: when a remembered switch or menu section differs from
+// what was last written, write the settings again. Cheap - an int compare.
+void Application::saveRememberedUiStateIfChanged() {
+    const int sw = packToolSwitches();
+    if (sw == m_savedToolSwitches && m_menuSectionsOpen == m_savedMenuSections) return;
+    m_savedToolSwitches = sw;
+    m_savedMenuSections = m_menuSectionsOpen;
+    saveAppSettings();
 }
 
 // Push a settings struct onto the live members. Preferences only - session
@@ -2264,6 +2305,10 @@ void Application::applyAppSettings(const AppSettings& s) {
     m_includePrereleases = s.includePrereleases;
     m_supporter = s.supporter;
     m_snapToGrid = s.snapToGrid;
+    m_menuSectionsOpen = s.menuSectionsOpen;
+    unpackToolSwitches(s.toolSwitches);
+    m_savedMenuSections = m_menuSectionsOpen;
+    m_savedToolSwitches = packToolSwitches();
     // Display number -> millimetres. Safe here because the display unit is
     // applied above (applyDisplayUnitChange) before this runs.
     m_sketchGridStep = static_cast<float>(materializr::toMm(s.sketchGridStep));
@@ -2287,6 +2332,11 @@ void Application::applyAppSettings(const AppSettings& s) {
     }
     // Mirror onto the toolbar so the in-sketch grid controls show the loaded
     // values right away rather than waiting for the first frame's sync.
+    if (m_toolbar && m_sketchTool) {
+        // The rail icons show which way Circle / Rectangle will draw - from launch.
+        m_toolbar->setRectMode(static_cast<int>(m_sketchTool->getRectMode()));
+        m_toolbar->setCircleMode(static_cast<int>(m_sketchTool->getCircleMode()));
+    }
     if (m_toolbar) {
         m_toolbar->setSnapToGrid(s.snapToGrid);
         m_toolbar->setGridStep(m_sketchGridStep);   // millimetres, not the stored number
@@ -4163,6 +4213,7 @@ void Application::saveProject() {
             // registered the sketch and flipped the dirty flag with no file
             // ever written.
             flushActiveSketchToDocument();
+            flushPendingCascadesBeforeSave();
             std::string path = chosenPath;
 #if !defined(MZ_MOBILE)
             // Keep a project extension. The file is gzip-compressed, so
@@ -4254,6 +4305,7 @@ void Application::saveProject() {
 
 void Application::saveProjectQuick() {
     flushActiveSketchToDocument();
+    flushPendingCascadesBeforeSave();
     // An explicit save expresses "keep what's committed" - captureProjectHistory
     // cancels any live preview first, so a mid-preview save can't persist the
     // preview body and its phantom history step. (Historically that leaked and
@@ -4839,11 +4891,13 @@ bool Application::loadProjectAt(const std::string& path) {
     m_meshesDirty = true;
     // Builds up to 1.8.0-beta.2 let edits made through the sketch tools (a new
     // circle, a typed dimension, trim, offset, mirror) skip the model, so a file
-    // saved from one can hold a body that does not match its sketch (#170). Follow
+    // saved from one can hold a body that does not match its sketch (#170). Up to
+    // 1.8.0-beta.5 a file could also be SAVED while edits still waited for Finish
+    // on a heavy model (see flushPendingCascadesBeforeSave). Follow
     // the sketches once after opening such a file; it is silent unless a body
     // actually changes, and a replay that cannot follow leaves the model as saved.
     if (!result.savedByVersion.empty() &&
-        UpdateChecker::compareVersions(result.savedByVersion, "1.8.0-beta.2") <= 0)
+        UpdateChecker::compareVersions(result.savedByVersion, "1.8.0-beta.5") <= 0)
         resyncModelToSketches(/*manual=*/false);
     // Home view = the ViewCube Home button: default isometric orientation AND
     // zoom-to-fit the loaded geometry (computed from the OCCT body bounds, which
@@ -7836,6 +7890,19 @@ void Application::requestSketchCascade(int sketchId) {
     if (!cascadeFromSketchEdit(sketchId, deferAboveMs)) defer();
 }
 
+// A save made while edits were still waiting for Finish would write bodies that
+// do not match their sketches - and the pending list is not in the file, so
+// reopening it showed the stale body for good (1.8.0-beta.5 tester: "the file
+// shows the body wrongly resized after changing sketch 2"; a later Move of the
+// sketch cascaded and corrected it). Bring the model up to date first.
+void Application::flushPendingCascadesBeforeSave() {
+    if (m_pendingSketchCascades.empty() || !m_document || !m_history) return;
+    std::vector<int> ids(m_pendingSketchCascades.begin(), m_pendingSketchCascades.end());
+    m_pendingSketchCascades.clear();
+    for (int sid : ids)
+        if (m_document->getSketch(sid)) cascadeFromSketchEdit(sid);
+}
+
 // Rebuild the bodies of sketches edited while the model was too heavy to follow
 // every edit. Runs between frames behind the progress card, like any other
 // slow commit, so the one long replay is visible and the window stays alive.
@@ -8662,6 +8729,7 @@ void Application::run() {
             // NoBringToFrontOnFocus Viewport window until a focus reorder).
             if (m_uiLayout == UiLayout::Modern) renderModernEdgeTabs();
 
+            saveRememberedUiStateIfChanged();
             m_toolbar->setGridStep(m_sketchGridStep);
             m_toolbar->setSnapToGrid(m_snapToGrid);
             m_toolbar->setCameraOrtho(m_viewport->getCamera().isOrthographic());
@@ -9031,6 +9099,7 @@ void Application::run() {
             renderOffsetToolPanel();
             renderCornerToolPanel();
             renderPolygonToolPanel();
+            renderShapeToolPanel();
             renderLoftPanel();
             renderSweepPanel();
             renderBoundaryFillPanel();

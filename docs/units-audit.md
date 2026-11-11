@@ -7,7 +7,8 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 
 ## Controls by dimension
 
-- CONVERTED: 159
+- CONVERTED: 162
+- LENGTH?: 1
 - absolute-mm: 2
 - angle: 41
 - count: 1
@@ -19,6 +20,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 
 | dim | file | code |
 |---|---|---|
+| LENGTH? | src/app/Application_Dialogs.cpp | `edited = ImGui::InputDouble(label, &a, 0.0, 0.0, "%.2f");` |
 | seconds | src/app/Application_Dialogs.cpp | `if (ImGui::SliderInt(materializr::tr("Interval (min)"), &m_autosaveIntervalMin, 1, 30, "%d min")) changed = tr` |
 | percent | src/app/Application_Dialogs.cpp | `if (ImGui::SliderInt("##uiScaleUser", &pct, 50, 250, "%d%%",` |
 | seconds | src/app/Application_Dialogs.cpp | `if (ImGui::SliderFloat(materializr::tr("Fillet time limit"),` |
@@ -90,6 +92,9 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | CONVERTED | src/app/Application_Dialogs.cpp | `edited = materializr::lengthField(sizeLabel, &size).changed;` |
 | CONVERTED | src/app/Application_Dialogs.cpp | `edited \|= materializr::lengthStepperRow("##step", &size, /*allowNegative=*/true,` |
 | angle | src/app/Application_Dialogs.cpp | `angEdited = ImGui::InputDouble(materializr::tr("First corner angle (deg)"), &ang, 0.0, 0.0, "%.2f");` |
+| CONVERTED | src/app/Application_Dialogs.cpp | `edited = amountLengthField(id, label, &v);` |
+| CONVERTED | src/app/Application_Dialogs.cpp | `edited = lengthField(label, &v).changed;` |
+| CONVERTED | src/app/Application_Dialogs.cpp | `edited \|= lengthStepperRow("##step", &v, /*allowNegative=*/true,` |
 | CONVERTED | src/app/Application_Dialogs.cpp | `materializr::amountLengthField("cornerSize", label, &size);` |
 | CONVERTED | src/app/Application_Dialogs.cpp | `materializr::lengthField(label, &size);` |
 | CONVERTED | src/app/Application_Dialogs.cpp | `materializr::lengthStepperRow("##cornerStep", &size, /*allowNegative=*/true,` |
@@ -273,7 +278,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 
 - CONVERTED: 1
 - allowed-by-hand: 93
-- comment: 310
+- comment: 312
 - diagnostic: 13
 - identifier/other: 13
 
@@ -625,6 +630,8 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | comment | src/modeling/SketchTool.cpp | `// sketch to extrude" after switching feet -> mm, then as "I can't close` |
 | comment | src/modeling/SketchTool.h | `// current geometry value: mm for distances, RADIUS in mm for Radius (UI` |
 | comment | src/modeling/SketchTool.h | `double size = 0.0;            //   in mm, in the sense above` |
+| comment | src/modeling/SketchTool.h | `//            circleDiameter()), Arc chord. mm.` |
+| comment | src/modeling/SketchTool.h | `//   hasApex  Arc: the sweep in degrees or the radius in mm, per ArcDimMode.` |
 | comment | src/modeling/SketchTool.h | `// Unrotated text extents relative to the anchor (mm), pushed by the app` |
 | comment | src/modeling/SketchTool.h | `// Actual glyph contours (anchor-relative, unrotated mm - same space as the` |
 | comment | src/modeling/SketchTool.h | `// real-world size in mm, and the click lands on the LEADING EDGE.` |

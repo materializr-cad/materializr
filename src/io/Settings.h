@@ -196,6 +196,17 @@ struct AppSettings {
     // body/sketch gizmo translate. Persisting these means the user doesn't
     // have to re-enable snap and re-pick a 1 mm step every launch.
     bool  snapToGrid    = true;
+
+    // --- Remembered UI state (1.8.0-beta.5 tester list) ---
+    // Which sections of the logo menu (Modern / im-touch) are expanded, one bit
+    // each: File 1, Edit 2, View 4, Help 8. Closed to start; what the user opens
+    // stays open across launches.
+    int   menuSectionsOpen = 0;
+    // The two-way switches on the drawing tools and primitives, packed so a new
+    // one costs a bit, not a settings key (bit layout: Application::packToolSwitches):
+    // rect from centre, circle from 2 points, circle diameter, arc by radius,
+    // polygon diameter, polygon inscribed, corner chamfer, primitive diameter.
+    int   toolSwitches = 0;
     // Largest grid step accepted from a file, in display units. A huge finite
     // value makes framing unusable and a NaN reaches an int conversion in the
     // renderer, so both are rejected rather than clamped.

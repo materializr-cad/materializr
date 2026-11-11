@@ -99,6 +99,9 @@ public:
     int addCircle(int centerPtId, double radius);
     int addArc(int centerPtId, int startPtId, int endPtId, double radius);
     int addRectangle(glm::vec2 corner1, glm::vec2 corner2); // returns first line id
+    // A rectangle at any angle: `corners` in order round the edge. Held square by
+    // perpendicular constraints and sized by width / height distances.
+    int addRotatedRectangle(const glm::vec2 corners[4]);
 
     // Spline and polygon creation
     int addSpline(const std::vector<int>& controlPointIds);

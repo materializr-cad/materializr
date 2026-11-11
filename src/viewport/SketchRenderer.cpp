@@ -329,6 +329,13 @@ void SketchRenderer::uploadAndDraw(const std::vector<float>& verts, GLenum mode,
     glUseProgram(0);
 }
 
+namespace {
+// Defined further down with the construction-geometry drawing; the selection
+// overlay in render() dashes selected construction lines with the same pattern.
+float constructionDash(const Sketch* sketch);
+void appendDashed(std::vector<float>& out, const std::vector<glm::vec3>& poly, float dash);
+} // namespace
+
 void SketchRenderer::render(const Sketch* sketch, const SketchTool* tool,
                              const glm::mat4& view, const glm::mat4& projection,
                              const SketchSolver* solver) {
@@ -368,51 +375,55 @@ void SketchRenderer::render(const Sketch* sketch, const SketchTool* tool,
 
     // Selection highlight overlay: re-draw selected lines/points in a bright
     // colour so the user can see what Mirror/Copy/Rotate will act on.
+    // Construction geometry keeps its DASHES when selected, in an amber a shade
+    // off the gold of a selected normal line - a solid yellow stroke hid which
+    // lines were scaffolding (1.8.0-beta.5 tester list).
     if (tool && tool->hasElementSelection()) {
+        const glm::vec3 kSelColor(1.0f, 0.85f, 0.1f);
+        const glm::vec3 kSelConstructionColor(1.0f, 0.5f, 0.05f);
+        const float selDash = sketch->hasConstructionGeometry() ? constructionDash(sketch) : 1.0f;
         const auto& selLines = tool->getSelectedLines();
         const auto& selPoints = tool->getSelectedPoints();
-        if (!selLines.empty()) {
-            std::vector<float> lv;
-            for (const auto& l : sketch->getLines()) {
-                if (!selLines.count(l.id)) continue;
-                const SketchPoint* a = lutPoint(sketch, l.startPointId);
-                const SketchPoint* b = lutPoint(sketch, l.endPointId);
-                if (!a || !b) continue;
-                glm::vec3 wa = toWorld(sketch, a->pos);
-                glm::vec3 wb = toWorld(sketch, b->pos);
-                lv.push_back(wa.x); lv.push_back(wa.y); lv.push_back(wa.z);
-                lv.push_back(wb.x); lv.push_back(wb.y); lv.push_back(wb.z);
-            }
-            if (!lv.empty())
-                uploadAndDraw(lv, GL_LINES, glm::vec3(1.0f, 0.85f, 0.1f), vp, 3.5f);
+        auto pushSeg = [](std::vector<float>& v, const glm::vec3& a, const glm::vec3& b) {
+            v.push_back(a.x); v.push_back(a.y); v.push_back(a.z);
+            v.push_back(b.x); v.push_back(b.y); v.push_back(b.z);
+        };
+        // One selected element as a polyline: solid segments, or dashes when
+        // it is construction geometry.
+        auto addPoly = [&](bool construction, const std::vector<glm::vec3>& poly,
+                           std::vector<float>& solid, std::vector<float>& dashed) {
+            if (construction) { appendDashed(dashed, poly, selDash); return; }
+            for (size_t i = 0; i + 1 < poly.size(); ++i) pushSeg(solid, poly[i], poly[i + 1]);
+        };
+        std::vector<float> solidV, dashedV;
+        for (const auto& l : sketch->getLines()) {
+            if (!selLines.count(l.id)) continue;
+            const SketchPoint* a = lutPoint(sketch, l.startPointId);
+            const SketchPoint* b = lutPoint(sketch, l.endPointId);
+            if (!a || !b) continue;
+            addPoly(l.isConstruction, {toWorld(sketch, a->pos), toWorld(sketch, b->pos)},
+                    solidV, dashedV);
         }
         const auto& selCircles = tool->getSelectedCircles();
         if (!selCircles.empty()) {
             const int segments = 64;
-            std::vector<float> cv;
             for (const auto& c : sketch->getCircles()) {
                 if (!selCircles.count(c.id)) continue;
                 const SketchPoint* center = lutPoint(sketch, c.centerPointId);
                 if (!center) continue;
                 float r = static_cast<float>(c.radius);
-                for (int i = 0; i < segments; i++) {
-                    float a1 = 2.0f * M_PI * i / segments;
-                    float a2 = 2.0f * M_PI * (i + 1) / segments;
-                    glm::vec3 w1 = toWorld(sketch, glm::vec2(center->pos.x + r * std::cos(a1),
-                                                             center->pos.y + r * std::sin(a1)));
-                    glm::vec3 w2 = toWorld(sketch, glm::vec2(center->pos.x + r * std::cos(a2),
-                                                             center->pos.y + r * std::sin(a2)));
-                    cv.push_back(w1.x); cv.push_back(w1.y); cv.push_back(w1.z);
-                    cv.push_back(w2.x); cv.push_back(w2.y); cv.push_back(w2.z);
+                std::vector<glm::vec3> poly;
+                for (int i = 0; i <= segments; i++) {
+                    float a = 2.0f * M_PI * i / segments;
+                    poly.push_back(toWorld(sketch, glm::vec2(center->pos.x + r * std::cos(a),
+                                                             center->pos.y + r * std::sin(a))));
                 }
+                addPoly(c.isConstruction, poly, solidV, dashedV);
             }
-            if (!cv.empty())
-                uploadAndDraw(cv, GL_LINES, glm::vec3(1.0f, 0.85f, 0.1f), vp, 3.5f);
         }
         const auto& selArcs = tool->getSelectedArcs();
         if (!selArcs.empty()) {
             const int segments = 32;
-            std::vector<float> av;
             for (const auto& arc : sketch->getArcs()) {
                 if (!selArcs.count(arc.id)) continue;
                 const SketchPoint* center = lutPoint(sketch, arc.centerPointId);
@@ -425,36 +436,27 @@ void SketchRenderer::render(const Sketch* sketch, const SketchTool* tool,
                                             end->pos.x - center->pos.x);
                 if (endAngle < startAngle) endAngle += 2.0f * M_PI;
                 float r = static_cast<float>(arc.radius);
-                for (int i = 0; i < segments; i++) {
-                    float a1 = startAngle + (static_cast<float>(i) / segments) * (endAngle - startAngle);
-                    float a2 = startAngle + (static_cast<float>(i + 1) / segments) * (endAngle - startAngle);
-                    glm::vec3 w1 = toWorld(sketch, glm::vec2(center->pos.x + r * std::cos(a1),
-                                                             center->pos.y + r * std::sin(a1)));
-                    glm::vec3 w2 = toWorld(sketch, glm::vec2(center->pos.x + r * std::cos(a2),
-                                                             center->pos.y + r * std::sin(a2)));
-                    av.push_back(w1.x); av.push_back(w1.y); av.push_back(w1.z);
-                    av.push_back(w2.x); av.push_back(w2.y); av.push_back(w2.z);
+                std::vector<glm::vec3> poly;
+                for (int i = 0; i <= segments; i++) {
+                    float a = startAngle + (static_cast<float>(i) / segments) * (endAngle - startAngle);
+                    poly.push_back(toWorld(sketch, glm::vec2(center->pos.x + r * std::cos(a),
+                                                             center->pos.y + r * std::sin(a))));
                 }
+                addPoly(arc.isConstruction, poly, solidV, dashedV);
             }
-            if (!av.empty())
-                uploadAndDraw(av, GL_LINES, glm::vec3(1.0f, 0.85f, 0.1f), vp, 3.5f);
         }
         const auto& selSplines = tool->getSelectedSplines();
         if (!selSplines.empty()) {
-            std::vector<float> sv;
             for (const auto& sp : sketch->getSplines()) {
                 if (!selSplines.count(sp.id)) continue;
                 std::vector<glm::vec2> pts = sketch->sampleSpline2D(sp, 12);
-                for (size_t i = 0; i + 1 < pts.size(); ++i) {
-                    glm::vec3 w1 = toWorld(sketch, pts[i]);
-                    glm::vec3 w2 = toWorld(sketch, pts[i + 1]);
-                    sv.push_back(w1.x); sv.push_back(w1.y); sv.push_back(w1.z);
-                    sv.push_back(w2.x); sv.push_back(w2.y); sv.push_back(w2.z);
-                }
+                std::vector<glm::vec3> poly;
+                for (const auto& q : pts) poly.push_back(toWorld(sketch, q));
+                addPoly(sp.isConstruction, poly, solidV, dashedV);
             }
-            if (!sv.empty())
-                uploadAndDraw(sv, GL_LINES, glm::vec3(1.0f, 0.85f, 0.1f), vp, 3.5f);
         }
+        if (!solidV.empty()) uploadAndDraw(solidV, GL_LINES, kSelColor, vp, 3.5f);
+        if (!dashedV.empty()) uploadAndDraw(dashedV, GL_LINES, kSelConstructionColor, vp, 3.5f);
         if (!selPoints.empty()) {
             std::vector<float> pv;
             for (const auto& p : sketch->getPoints()) {
@@ -463,7 +465,7 @@ void SketchRenderer::render(const Sketch* sketch, const SketchTool* tool,
                 pv.push_back(w.x); pv.push_back(w.y); pv.push_back(w.z);
             }
             if (!pv.empty())
-                uploadAndDraw(pv, GL_POINTS, glm::vec3(1.0f, 0.85f, 0.1f), vp, 8.0f);
+                uploadAndDraw(pv, GL_POINTS, kSelColor, vp, 8.0f);
         }
     }
 
@@ -1001,6 +1003,9 @@ void SketchRenderer::drawPreview(const Sketch* sketch, const SketchTool* tool,
         uploadAndDraw(verts, GL_LINES, color, vp, 1.5f);
     } else if (mode == SketchToolMode::Rectangle) {
         glm::vec2 corners[4] = { start, {end.x, start.y}, end, {start.x, end.y} };
+        // A typed rotation / width / height: the panel's rectangle, which need not
+        // be axis-aligned. Without them this is the same four corners as above.
+        tool->rectResolve(tool->getCurrentPos(), corners);
         for (int i = 0; i < 4; i++) {
             pushPt(verts, pw(corners[i]));
             pushPt(verts, pw(corners[(i+1)%4]));

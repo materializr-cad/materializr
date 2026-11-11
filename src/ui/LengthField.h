@@ -240,7 +240,7 @@ inline bool cappedStepperInput(const char* label, double* v, double step, double
     const float btn = ImGui::GetFrameHeight();
     ImGui::BeginGroup();
     ImGui::PushID(label);
-    ImGui::SetNextItemWidth(std::max(1.0f, ImGui::CalcItemWidth() - (btn + style.ItemInnerSpacing.x) * 2));
+    ImGui::SetNextItemWidth(std::max(1.0f, ImGui::CalcItemWidth() - (btn + style.ItemInnerSpacing.x) * 2));  // as before: the label lands where the buttons were
     // As InputScalar: the data is compared, not the string, so no edit is marked
     // for an untouched value.
     g.NextItemData.ItemFlags |= ImGuiItemFlags_NoMarkEdited;
@@ -259,16 +259,10 @@ inline bool cappedStepperInput(const char* label, double* v, double step, double
     if (active) *active = ImGui::IsItemActive();
     g.LastItemData.ItemFlags &= ~ImGuiItemFlags_NoMarkEdited;
 
-    const ImVec2 backupPad = style.FramePadding;
-    style.FramePadding.x = style.FramePadding.y;
-    ImGui::PushItemFlag(ImGuiItemFlags_ButtonRepeat, true);
-    const double inc = g.IO.KeyCtrl ? stepFast : step;
-    ImGui::SameLine(0, style.ItemInnerSpacing.x);
-    if (ImGui::ButtonEx("-", ImVec2(btn, btn))) { *v -= inc; changed = true; }
-    ImGui::SameLine(0, style.ItemInnerSpacing.x);
-    if (ImGui::ButtonEx("+", ImVec2(btn, btn))) { *v += inc; changed = true; }
-    ImGui::PopItemFlag();
-    style.FramePadding = backupPad;
+    // No -/+ buttons (1.8.0-beta.5 tester list): every length field already sits
+    // above a -10 .. +10 stepper row whose -1 / +1 do the same job, so the
+    // buttons were a duplicate. The label takes their place, right of the field.
+    (void)step; (void)stepFast;
 
     const char* labelEnd = ImGui::FindRenderedTextEnd(label);
     if (label != labelEnd) {

@@ -19,8 +19,16 @@ namespace touchui {
 // flyout, or a tool with options on a second press) with a small corner
 // wedge, so the menu is not hidden behind an unmarked button. Returns true on
 // press.
+//
+// A button with a menu has a second target: the corner wedge and a fingertip's
+// margin round it. `menuZonePressed`, when given, is set true on a press that
+// started there, so the caller can open the menu on the FIRST tap instead of
+// waiting for a second one.
 bool railButton(const char* id, const char* icon, const char* label, bool active,
-                float width = 0.0f, bool solid = false, bool hasMenu = false);
+                float width = 0.0f, bool solid = false, bool hasMenu = false,
+                bool* menuZonePressed = nullptr);
+// Did the press now ending start in the bottom-right `zone` px of the item?
+bool menuZoneHit(const ImVec2& itemMin, const ImVec2& itemMax, float zone);
 
 // The corner wedge itself, for buttons drawn by other code (the classic
 // toolbar's text buttons). `max` is the button's bottom-right corner; `size`

@@ -585,6 +585,33 @@ int Sketch::addRectangle(glm::vec2 corner1, glm::vec2 corner2) {
     return firstLineId;
 }
 
+int Sketch::addRotatedRectangle(const glm::vec2 corners[4]) {
+    int p[4];
+    for (int i = 0; i < 4; ++i) p[i] = addPoint(corners[i]);
+    int l[4];
+    for (int i = 0; i < 4; ++i) l[i] = addLine(p[i], p[(i + 1) % 4]);
+
+    // No Horizontal / Vertical here - the sides are not axis-aligned. Square
+    // corners instead (three are enough, the fourth follows), so a later
+    // dimension cannot skew the box into a parallelogram.
+    auto addPerp = [&](int a, int b) {
+        Constraint c; c.id = 0; c.type = ConstraintType::Perpendicular;
+        c.entityA = a; c.entityB = b; c.isSatisfied = true; addConstraint(c);
+    };
+    addPerp(l[0], l[1]);
+    addPerp(l[1], l[2]);
+    addPerp(l[2], l[3]);
+    auto addDistance = [&](int a, int b) {
+        Constraint c; c.id = 0; c.type = ConstraintType::Distance;
+        c.entityA = a; c.entityB = b;
+        c.value = glm::length(getPoint(b)->pos - getPoint(a)->pos);
+        c.isSatisfied = true; addConstraint(c);
+    };
+    addDistance(p[0], p[1]);   // width
+    addDistance(p[1], p[2]);   // height
+    return l[0];
+}
+
 // Element access
 
 const std::vector<SketchLine>& Sketch::getLines() const {

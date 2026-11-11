@@ -1722,6 +1722,18 @@ inline const TrEntry kEsCatalogue[] = {
     { "First corner angle (deg)", "\xc3""\x81""ngulo de la primera esquina (grados)" },
     { "Place", "Colocar" },
     { "Follow cursor", "Seguir el cursor" },
+    { "Chord", "Cuerda" },
+    { "Length", "Longitud" },
+    { "Width", "Ancho" },
+    { "Click the start of the line.", "Haz clic en el inicio de la l\xc3""\xad""nea." },
+    { "Click the start of the arc.", "Haz clic en el inicio del arco." },
+    { "Click the centre (or the first end of the diameter).", "Haz clic en el centro (o en el primer extremo del di\xc3""\xa1""metro)." },
+    { "Click the first corner (or the centre).", "Haz clic en la primera esquina (o en el centro)." },
+    { "Type the length and angle below, then click or press Place. A value you leave alone follows the cursor.", "Escribe abajo la longitud y el \xc3""\xa1""ngulo, luego haz clic o pulsa Colocar. Un valor que no toques sigue al cursor." },
+    { "Type the size below, then click or press Place. It follows the cursor until you do.", "Escribe abajo el tama\xc3""\xb1""o, luego haz clic o pulsa Colocar. Sigue al cursor hasta entonces." },
+    { "Type the width, height and angle below, then click or press Place. Angle 0 keeps the sides horizontal and vertical.", "Escribe abajo el ancho, el alto y el \xc3""\xa1""ngulo, luego haz clic o pulsa Colocar. Con \xc3""\xa1""ngulo 0 los lados quedan horizontales y verticales." },
+    { "Type the chord, then click the end or press Place - or just click it.", "Escribe la cuerda, luego haz clic en el extremo o pulsa Colocar; o simplemente haz clic en \xc3""\xa9""l." },
+    { "Set the sweep or radius below, then click or press Place. The cursor chooses which way it bows.", "Fija abajo el \xc3""\xa1""ngulo de barrido o el radio, luego haz clic o pulsa Colocar. El cursor decide hacia qu\xc3""\xa9"" lado se curva." },
 };
 inline constexpr int kEsCount =
     static_cast<int>(sizeof(kEsCatalogue) / sizeof(kEsCatalogue[0]));
@@ -3439,6 +3451,18 @@ inline const TrEntry kPtCatalogue[] = {
     { "First corner angle (deg)", "\xc3""\x82""ngulo do primeiro canto (graus)" },
     { "Place", "Colocar" },
     { "Follow cursor", "Seguir o cursor" },
+    { "Chord", "Corda" },
+    { "Length", "Comprimento" },
+    { "Width", "Largura" },
+    { "Click the start of the line.", "Clique no in\xc3""\xad""cio da linha." },
+    { "Click the start of the arc.", "Clique no in\xc3""\xad""cio do arco." },
+    { "Click the centre (or the first end of the diameter).", "Clique no centro (ou na primeira extremidade do di\xc3""\xa2""metro)." },
+    { "Click the first corner (or the centre).", "Clique no primeiro canto (ou no centro)." },
+    { "Type the length and angle below, then click or press Place. A value you leave alone follows the cursor.", "Digite abaixo o comprimento e o \xc3""\xa2""ngulo, depois clique ou pressione Colocar. Um valor que voc\xc3""\xaa"" n\xc3""\xa3""o alterar acompanha o cursor." },
+    { "Type the size below, then click or press Place. It follows the cursor until you do.", "Digite abaixo o tamanho, depois clique ou pressione Colocar. Ele acompanha o cursor at\xc3""\xa9"" l\xc3""\xa1""." },
+    { "Type the width, height and angle below, then click or press Place. Angle 0 keeps the sides horizontal and vertical.", "Digite abaixo a largura, a altura e o \xc3""\xa2""ngulo, depois clique ou pressione Colocar. Com \xc3""\xa2""ngulo 0 os lados ficam horizontais e verticais." },
+    { "Type the chord, then click the end or press Place - or just click it.", "Digite a corda, depois clique na extremidade ou pressione Colocar; ou simplesmente clique nela." },
+    { "Set the sweep or radius below, then click or press Place. The cursor chooses which way it bows.", "Defina abaixo o \xc3""\xa2""ngulo ou o raio, depois clique ou pressione Colocar. O cursor escolhe para que lado ele curva." },
 };
 inline constexpr int kPtCount =
     static_cast<int>(sizeof(kPtCatalogue) / sizeof(kPtCatalogue[0]));
@@ -5156,6 +5180,18 @@ inline const TrEntry kFrCatalogue[] = {
     { "First corner angle (deg)", "Angle du premier sommet (deg)" },
     { "Place", "Placer" },
     { "Follow cursor", "Suivre le curseur" },
+    { "Chord", "Corde" },
+    { "Length", "Longueur" },
+    { "Width", "Largeur" },
+    { "Click the start of the line.", "Cliquez sur le d\xc3""\xa9""but de la ligne." },
+    { "Click the start of the arc.", "Cliquez sur le d\xc3""\xa9""but de l'arc." },
+    { "Click the centre (or the first end of the diameter).", "Cliquez sur le centre (ou sur la premi\xc3""\xa8""re extr\xc3""\xa9""mit\xc3""\xa9"" du diam\xc3""\xa8""tre)." },
+    { "Click the first corner (or the centre).", "Cliquez sur le premier coin (ou sur le centre)." },
+    { "Type the length and angle below, then click or press Place. A value you leave alone follows the cursor.", "Saisissez ci-dessous la longueur et l'angle, puis cliquez ou appuyez sur Placer. Une valeur laiss\xc3""\xa9""e telle quelle suit le curseur." },
+    { "Type the size below, then click or press Place. It follows the cursor until you do.", "Saisissez ci-dessous la taille, puis cliquez ou appuyez sur Placer. Elle suit le curseur jusque-l\xc3""\xa0""." },
+    { "Type the width, height and angle below, then click or press Place. Angle 0 keeps the sides horizontal and vertical.", "Saisissez ci-dessous la largeur, la hauteur et l'angle, puis cliquez ou appuyez sur Placer. Avec un angle de 0, les c\xc3""\xb4""t\xc3""\xa9""s restent horizontaux et verticaux." },
+    { "Type the chord, then click the end or press Place - or just click it.", "Saisissez la corde, puis cliquez sur l'extr\xc3""\xa9""mit\xc3""\xa9"" ou appuyez sur Placer, ou cliquez simplement dessus." },
+    { "Set the sweep or radius below, then click or press Place. The cursor chooses which way it bows.", "R\xc3""\xa9""glez ci-dessous l'angle ou le rayon, puis cliquez ou appuyez sur Placer. Le curseur choisit le c\xc3""\xb4""t\xc3""\xa9"" du bombement." },
 };
 inline constexpr int kFrCount =
     static_cast<int>(sizeof(kFrCatalogue) / sizeof(kFrCatalogue[0]));
@@ -6873,6 +6909,18 @@ inline const TrEntry kDeCatalogue[] = {
     { "First corner angle (deg)", "Winkel der ersten Ecke (Grad)" },
     { "Place", "Platzieren" },
     { "Follow cursor", "Cursor folgen" },
+    { "Chord", "Sehne" },
+    { "Length", "L\xc3""\xa4""nge" },
+    { "Width", "Breite" },
+    { "Click the start of the line.", "Klicke auf den Anfang der Linie." },
+    { "Click the start of the arc.", "Klicke auf den Anfang des Bogens." },
+    { "Click the centre (or the first end of the diameter).", "Klicke auf den Mittelpunkt (oder auf das erste Ende des Durchmessers)." },
+    { "Click the first corner (or the centre).", "Klicke auf die erste Ecke (oder auf den Mittelpunkt)." },
+    { "Type the length and angle below, then click or press Place. A value you leave alone follows the cursor.", "Gib unten L\xc3""\xa4""nge und Winkel ein und klicke dann oder dr\xc3""\xbc""cke Platzieren. Ein Wert, den du nicht \xc3""\xa4""nderst, folgt dem Cursor." },
+    { "Type the size below, then click or press Place. It follows the cursor until you do.", "Gib unten die Gr\xc3""\xb6""\xc3""\x9f""e ein und klicke dann oder dr\xc3""\xbc""cke Platzieren. Bis dahin folgt sie dem Cursor." },
+    { "Type the width, height and angle below, then click or press Place. Angle 0 keeps the sides horizontal and vertical.", "Gib unten Breite, H\xc3""\xb6""he und Winkel ein und klicke dann oder dr\xc3""\xbc""cke Platzieren. Bei Winkel 0 bleiben die Seiten waagerecht und senkrecht." },
+    { "Type the chord, then click the end or press Place - or just click it.", "Gib die Sehne ein und klicke dann auf das Ende oder dr\xc3""\xbc""cke Platzieren \xe2""\x80""\x93"" oder klicke es einfach an." },
+    { "Set the sweep or radius below, then click or press Place. The cursor chooses which way it bows.", "Lege unten \xc3""\x96""ffnungswinkel oder Radius fest und klicke dann oder dr\xc3""\xbc""cke Platzieren. Der Cursor bestimmt, in welche Richtung sich der Bogen w\xc3""\xb6""lbt." },
 };
 inline constexpr int kDeCount =
     static_cast<int>(sizeof(kDeCatalogue) / sizeof(kDeCatalogue[0]));
@@ -8590,6 +8638,18 @@ inline const TrEntry kItCatalogue[] = {
     { "First corner angle (deg)", "Angolo del primo vertice (gradi)" },
     { "Place", "Posiziona" },
     { "Follow cursor", "Segui il cursore" },
+    { "Chord", "Corda" },
+    { "Length", "Lunghezza" },
+    { "Width", "Larghezza" },
+    { "Click the start of the line.", "Fai clic sull'inizio della linea." },
+    { "Click the start of the arc.", "Fai clic sull'inizio dell'arco." },
+    { "Click the centre (or the first end of the diameter).", "Fai clic sul centro (o sul primo estremo del diametro)." },
+    { "Click the first corner (or the centre).", "Fai clic sul primo angolo (o sul centro)." },
+    { "Type the length and angle below, then click or press Place. A value you leave alone follows the cursor.", "Digita qui sotto lunghezza e angolo, poi fai clic o premi Posiziona. Un valore che non tocchi segue il cursore." },
+    { "Type the size below, then click or press Place. It follows the cursor until you do.", "Digita qui sotto la dimensione, poi fai clic o premi Posiziona. Fino ad allora segue il cursore." },
+    { "Type the width, height and angle below, then click or press Place. Angle 0 keeps the sides horizontal and vertical.", "Digita qui sotto larghezza, altezza e angolo, poi fai clic o premi Posiziona. Con angolo 0 i lati restano orizzontali e verticali." },
+    { "Type the chord, then click the end or press Place - or just click it.", "Digita la corda, poi fai clic sull'estremit\xc3""\xa0"" o premi Posiziona, oppure fai semplicemente clic." },
+    { "Set the sweep or radius below, then click or press Place. The cursor chooses which way it bows.", "Imposta qui sotto l'ampiezza o il raggio, poi fai clic o premi Posiziona. Il cursore sceglie da che parte si curva." },
 };
 inline constexpr int kItCount =
     static_cast<int>(sizeof(kItCatalogue) / sizeof(kItCatalogue[0]));

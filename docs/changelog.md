@@ -5,6 +5,59 @@ All notable changes to Materializr are documented here. Format loosely follows
 
 ## [Unreleased]
 
+The 11-10 tester list.
+
+### Added
+
+- **Line, Circle, Rectangle and Arc take typed values in a panel, like Polygon.**
+  Line: length (with -10 .. +10 steppers) and angle (-90 .. +90). Circle: a
+  Radius / Diameter switch and the size. Rectangle: width, height and angle (0
+  keeps the sides horizontal and vertical; any other angle turns it, held square
+  by perpendicular constraints). Arc: chord, then sweep in degrees or radius in
+  one window. **Place** puts the shape down now; **Follow cursor** hands every
+  value back to the mouse. A value you type stays fixed while the rest follows the
+  cursor; a stepper changes it live. 0 on a length gives it back to the cursor.
+- **Circle and Rectangle show how they draw.** The tool icon carries the dots
+  that say where the clicks go - centre and rim point, two rim points, two
+  corners, or centre and corner - from launch, in every layout. Tapping the small
+  corner triangle (and a fingertip's margin round it) opens the "Draw from" menu
+  on the first tap.
+- **Dimension popup:** wide enough for -10 .. +10 on one row, and a **Confirm
+  (Enter)** button for mouse and touch.
+- **The logo menu remembers which sections you opened**, and the two-way switches
+  on the tools (draw from, radius / diameter, arc by degrees / radius, polygon
+  in / circumscribed, corner fillet / chamfer, primitive radius / diameter) are
+  remembered across launches.
+- Polygon: a 0 button on the size row (gives the size back to the cursor).
+
+### Changed
+
+- **The -/+ buttons beside length fields are gone** - the -10 .. +10 row under
+  each already has -1 and +1. The label sits where they were.
+- **Selected construction lines stay dashed**, in amber rather than the gold of
+  selected normal lines.
+
+### Fixed
+
+- **Snap to grid now works in the sketch.** Moving selected sketch geometry with
+  the gizmo (and the mirror and pattern pickers) always snapped to the grid,
+  whatever the Snap & Grid checkbox said.
+- **A sketch edit no longer leaves the body behind when you save.** A heavy model
+  defers the rebuild to Finish; saving before then wrote the old body, and the
+  file reopened that way. Save now brings the model up to date first, and files
+  saved by 1.8.0-beta.5 or earlier are checked against their sketches when opened.
+- **Loft from a sketch drawn on a body face** took that whole face as its base, so
+  the loft grew from a body that was never selected. Only the shape you drew is
+  used.
+- **Guided loft with a rail on the far side of the base plane** read the rail
+  upside down (a cone came out as an hourglass). The loft now climbs the way the
+  rail goes.
+- **Reference tool on round bodies.** A sphere's outline and a cylinder's walls
+  were copied only in part: the outline arrives split at the seam, and one of two
+  mirror-image walls was lost to a key collision. Arcs that close a circle are one
+  circle, and both walls are offered.
+- Android: the test build said 1.7.7 on the home screen.
+
 ## [1.8.0-beta.5] - 2026-11-09
 
 Beta (Settings ▸ Include pre-release builds), desktop and Android. A menu and
