@@ -13,9 +13,8 @@ echo "=== Building Materializr AppImage (${ARCH}) ==="
 
 cd "$PROJECT_DIR"
 
-# Build in Docker and extract the AppImage. --network=host: the default bridge
-# network lost DNS on the GitHub runners (apt could not resolve the mirrors).
-DOCKER_BUILDKIT=1 docker build --network=host --build-arg APP_VERSION="$APP_VERSION" --output type=local,dest="$OUTPUT_DIR" .
+# Build in Docker and extract the AppImage
+DOCKER_BUILDKIT=1 docker build --build-arg APP_VERSION="$APP_VERSION" --output type=local,dest="$OUTPUT_DIR" .
 
 echo ""
 echo "=== Build complete ==="
