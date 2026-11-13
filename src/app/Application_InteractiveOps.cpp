@@ -680,16 +680,18 @@ int Application::userAxisToWorldIdx(int userIdx) {
 
 void Application::beginPattern(PatternKind kind) {
     cancelActiveIops();
-    // Find the first selected body. PatternOp clones one source body.
-    int bodyId = -1;
+    // Every selected body is a source: PatternOp lays a run of copies for each.
+    std::vector<int> bodyIds;
     if (m_selection) {
         for (const auto& e : m_selection->getSelection()) {
-            if (e.type == SelectionType::Body && e.bodyId >= 0) {
-                bodyId = e.bodyId; break;
-            }
+            if (e.type != SelectionType::Body || e.bodyId < 0) continue;
+            if (std::find(bodyIds.begin(), bodyIds.end(), e.bodyId) == bodyIds.end())
+                bodyIds.push_back(e.bodyId);
         }
     }
-    if (bodyId < 0) return;
+    if (bodyIds.empty()) return;
+    const int bodyId = bodyIds.front();
+    m_patternBodyIds = bodyIds;
 
     m_patternKind   = kind;
     m_patternBodyId = bodyId;
@@ -703,8 +705,12 @@ void Application::beginPattern(PatternKind kind) {
     // ring immediately and can re-pick the origin via the viewport.
     m_patternOriginX = m_patternOriginY = m_patternOriginZ = 0.0f;
     try {
+        // Union box of every source, so the default rotation axis runs through
+        // the middle of the whole selection rather than the first body.
         Bnd_Box bb;
-        BRepBndLib::Add(m_document->getBody(bodyId), bb);
+        for (int id : bodyIds) {
+            try { BRepBndLib::Add(m_document->getBody(id), bb); } catch (...) {}
+        }
         if (!bb.IsVoid()) {
             double x0,y0,z0,x1,y1,z1; bb.Get(x0,y0,z0,x1,y1,z1);
             m_patternOriginX = static_cast<float>((x0 + x1) * 0.5);
@@ -740,7 +746,7 @@ void Application::updatePattern() {
     if (!m_patternPreview.op())
         m_patternPreview.hold(std::make_unique<PatternOp>(), *m_document);
     auto* op = static_cast<PatternOp*>(m_patternPreview.op());
-    op->setBody(m_patternBodyId);
+    op->setBodies(m_patternBodyIds.empty() ? std::vector<int>{m_patternBodyId} : m_patternBodyIds);
 
     // Axis direction comes from the chosen world axis, or - when the user
     // picked a construction axis from the dropdown - from that axis's own
@@ -784,6 +790,7 @@ void Application::commitPattern() {
     m_patternActive        = false;
     m_patternPickingOrigin = false;
     m_patternBodyId        = -1;
+    m_patternBodyIds.clear();
 }
 
 void Application::cancelPattern() {
@@ -792,6 +799,7 @@ void Application::cancelPattern() {
     m_patternActive        = false;
     m_patternPickingOrigin = false;
     m_patternBodyId        = -1;
+    m_patternBodyIds.clear();
 }
 
 // ─── Loft (interactive popup) ──────────────────────────────────────────────

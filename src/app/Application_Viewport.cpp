@@ -483,6 +483,18 @@ void Application::renderViewport() {
             const glm::vec2 g1 = screenToSketch(1.0f, 0.0f, contentSize.x, contentSize.y);
             m_effectiveGridStepMm = gridStepForZoom(
                 m_effectiveGridStepMm, glm::length(g1 - g0), m_gridMinCellPx);
+        } else if (m_zoomScaledGrid && contentSize.y > 1.0f) {
+            // Outside a sketch the ground grid scales with zoom too (it used to
+            // stay at the picked step at every distance - the shader's tier
+            // fade hid detail but never changed the step). Millimetres per
+            // pixel at the orbit target: the same convention Camera::pan uses.
+            const float mmPerPx = cam.isOrthographic()
+                ? (2.0f * cam.getOrthoSize()) / contentSize.y
+                : (2.0f * glm::length(cam.getTarget() - cam.getPosition()) *
+                   std::tan(glm::radians(cam.getFov()) * 0.5f)) / contentSize.y;
+            if (mmPerPx > 0.0f && std::isfinite(mmPerPx))
+                m_effectiveGridStepMm = gridStepForZoom(
+                    m_effectiveGridStepMm, mmPerPx, m_gridMinCellPx);
         }
 
         auto drawGrid = [&]() {
@@ -5476,12 +5488,14 @@ void Application::renderViewport() {
                                     auto trackBodies = trackBodyChanges(); // re-tessellate only what changes
                                     gp_Pln pln = Handle(Geom_Plane)::DownCast(surf)->Pln();
                                     const gp_Ax3& ax = pln.Position();
-                                    auto op = std::make_unique<MirrorOp>();
-                                    op->setBody(m_mirrorBodyId);
-                                    op->setPlane(MirrorPlane::Custom);
-                                    op->setCustomPlane(gp_Ax2(ax.Location(), ax.Direction()));
-                                    op->setKeepOriginal(true);
-                                    m_history->pushOperation(std::move(op), *m_document);
+                                    for (int mid : m_mirrorBodyIds) {
+                                        auto op = std::make_unique<MirrorOp>();
+                                        op->setBody(mid);
+                                        op->setPlane(MirrorPlane::Custom);
+                                        op->setCustomPlane(gp_Ax2(ax.Location(), ax.Direction()));
+                                        op->setKeepOriginal(true);
+                                        m_history->pushOperation(std::move(op), *m_document);
+                                    }
                                 }
                             } catch (...) {}
                         }
@@ -7143,7 +7157,13 @@ void Application::renderViewport() {
                         bool moved = (ddx * ddx + ddy * ddy) > slop * slop;
                         if (!(m_sketchDragCenterPlaced && !moved)) {
                             recordSketchMutation([&]{ m_sketchTool->onMouseDown(sketchCoord, io.KeyCtrl); });
-                            if (moved) m_sketchTool->onConfirm();
+                            // Only a drag that STARTED the segment (the press dropped
+                            // the start vertex) ends the chain. A click that merely
+                            // continues a live chain used to end it whenever the mouse
+                            // moved past the slop between press and release - a fast
+                            // flick across the click - so the next line started over
+                            // "as if you had just selected the Line tool".
+                            if (moved && m_sketchDragCenterPlaced) m_sketchTool->onConfirm();
                         }
                         m_sketchPressActive = false;
                         m_sketchDragCenterPlaced = false;

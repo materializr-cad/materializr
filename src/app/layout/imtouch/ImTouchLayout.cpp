@@ -297,13 +297,21 @@ void Application::renderImTouchLayout() {
     //    and folder grouping, mirroring ItemsPanel but touch-native.
     m_imTouchTreeHovered = false;   // fed to the long-press gate every frame
     if (m_imTouchTree && m_document) {
-        // Flush to the right edge, below the top cluster's reach.
+        // Flush to the right edge, in the band BETWEEN the fixed chrome: below
+        // the top cluster and the ViewCube (offset 68 + the cube and its roll arrow)
+        // and above the bottom-corner FAB. It used to be centred and allowed to
+        // grow to nearly the full height, so a long body list (a 20-copy
+        // pattern) slid over the cluster, the cube and the FAB. It now stops at
+        // that band and scrolls inside it.
+        const float treeTop    = 240.0f * s;   // clears the cube AND its lower roll arrow (measured on the TB330FU)
+        const float treeBottom = 104.0f * s;
+        const float treeMaxH   = std::max(ws.y - treeTop - treeBottom, 120.0f * s);
         ImGui::SetNextWindowPos(
-            ImVec2(wp.x + ws.x - m, wp.y + ws.y * 0.5f),
-            ImGuiCond_Always, ImVec2(1.0f, 0.5f));
+            ImVec2(wp.x + ws.x - m, wp.y + treeTop),
+            ImGuiCond_Always, ImVec2(1.0f, 0.0f));
         const float treeW = 260.0f * s;
         ImGui::SetNextWindowSizeConstraints(ImVec2(treeW, 0),
-                                            ImVec2(treeW, ws.y - 2.0f * m));
+                                            ImVec2(treeW, treeMaxH));
         ImGui::SetNextWindowBgAlpha(0.25f);   // Fusion-browser translucency
         if (ImGui::Begin("##LiteTree", nullptr,
                          kFloat & ~ImGuiWindowFlags_NoScrollbar)) {

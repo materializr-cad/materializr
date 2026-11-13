@@ -23,6 +23,19 @@ void PatternOp::setBody(int id) {
     m_bodyId = id;
 }
 
+void PatternOp::setBodies(const std::vector<int>& ids) {
+    m_bodyId = ids.empty() ? -1 : ids.front();
+    m_extraBodyIds.clear();
+    for (size_t i = 1; i < ids.size(); ++i) m_extraBodyIds.push_back(ids[i]);
+}
+
+std::vector<int> PatternOp::getBodyIds() const {
+    std::vector<int> out;
+    if (m_bodyId >= 0) out.push_back(m_bodyId);
+    for (int id : m_extraBodyIds) out.push_back(id);
+    return out;
+}
+
 void PatternOp::setType(PatternType t) {
     m_type = t;
 }
@@ -59,57 +72,70 @@ bool PatternOp::execute(Document& doc) {
     }
 
     try {
-        TopoDS_Shape sourceShape = doc.getBody(m_bodyId);
-        if (sourceShape.IsNull()) {
-            return false;
-        }
-
         m_createdBodyIds.clear();
         m_reuseIdx = 0; // walks m_reuseBodyIds as each pattern copy is emitted
 
-        for (int i = 1; i < m_count; ++i) {
-            gp_Trsf trsf;
+        const std::vector<int> sources = getBodyIds();
+        const bool multi = sources.size() > 1;
+        bool anySource = false;
 
-            if (m_type == PatternType::Linear) {
-                // Translate by i * spacing
-                gp_Vec offset(
-                    i * m_spacingX,
-                    i * m_spacingY,
-                    i * m_spacingZ
-                );
-                trsf.SetTranslation(offset);
-            } else {
-                // Radial: rotate by i * (totalAngle / count) around axis
-                double stepAngle = (m_totalAngle / m_count) * i;
-                double stepAngleRad = stepAngle * M_PI / 180.0;
-                gp_Ax1 axis(gp_Pnt(m_originX, m_originY, m_originZ),
-                            gp_Dir(m_axisX, m_axisY, m_axisZ));
-                trsf.SetRotation(axis, stepAngleRad);
-            }
+        for (int srcId : sources) {
+            TopoDS_Shape sourceShape = doc.getBody(srcId);
+            if (sourceShape.IsNull()) continue;
+            anySource = true;
 
-            BRepBuilderAPI_Transform transform(sourceShape, trsf, true);
-            transform.Build();
-            if (!transform.IsDone()) {
-                // Undo any bodies created so far
-                for (int createdId : m_createdBodyIds) {
-                    doc.removeBody(createdId);
+            for (int i = 1; i < m_count; ++i) {
+                gp_Trsf trsf;
+
+                if (m_type == PatternType::Linear) {
+                    // Translate by i * spacing
+                    gp_Vec offset(
+                        i * m_spacingX,
+                        i * m_spacingY,
+                        i * m_spacingZ
+                    );
+                    trsf.SetTranslation(offset);
+                } else {
+                    // Radial: rotate by i * (totalAngle / count) around axis
+                    double stepAngle = (m_totalAngle / m_count) * i;
+                    double stepAngleRad = stepAngle * M_PI / 180.0;
+                    gp_Ax1 axis(gp_Pnt(m_originX, m_originY, m_originZ),
+                                gp_Dir(m_axisX, m_axisY, m_axisZ));
+                    trsf.SetRotation(axis, stepAngleRad);
                 }
-                m_createdBodyIds.clear();
-                return false;
-            }
 
-            // Reuse the prior id for this slot on redo so the body's folder
-            // / colour / visibility / name come back via Document's tombstone
-            // restore. On first execute m_reuseBodyIds is empty so addOrPutBody
-            // allocates a fresh id.
-            int newId = (m_reuseIdx < m_reuseBodyIds.size())
-                          ? m_reuseBodyIds[m_reuseIdx] : -1;
-            doc.addOrPutBody(newId, transform.Shape(), "Pattern " + std::to_string(i));
-            m_createdBodyIds.push_back(newId);
-            ++m_reuseIdx;
+                BRepBuilderAPI_Transform transform(sourceShape, trsf, true);
+                transform.Build();
+                if (!transform.IsDone()) {
+                    // Undo any bodies created so far
+                    for (int createdId : m_createdBodyIds) {
+                        doc.removeBody(createdId);
+                    }
+                    m_createdBodyIds.clear();
+                    return false;
+                }
+
+                // Reuse the prior id for this slot on redo so the body's folder
+                // / colour / visibility / name come back via Document's tombstone
+                // restore. On first execute m_reuseBodyIds is empty so addOrPutBody
+                // allocates a fresh id.
+                int newId = (m_reuseIdx < m_reuseBodyIds.size())
+                              ? m_reuseBodyIds[m_reuseIdx] : -1;
+                // One source keeps the long-standing "Pattern N" names; with
+                // several, "Pattern 3" would repeat per source, so lead with the
+                // source's own name.
+                std::string label = "Pattern " + std::to_string(i);
+                if (multi) {
+                    const std::string src = doc.getBodyName(srcId);
+                    if (!src.empty()) label = src + " " + std::to_string(i);
+                }
+                doc.addOrPutBody(newId, transform.Shape(), label);
+                m_createdBodyIds.push_back(newId);
+                ++m_reuseIdx;
+            }
         }
 
-        return true;
+        return anySource;
     } catch (...) {
         // Clean up on exception
         for (int createdId : m_createdBodyIds) {
@@ -151,7 +177,18 @@ std::string PatternOp::serializeParams() const {
         m_spacingX, m_spacingY, m_spacingZ,
         m_axisX, m_axisY, m_axisZ,
         m_originX, m_originY, m_originZ, m_totalAngle);
-    return buf;
+    std::string out = buf;
+    // Extra sources (multi-select). Appended after the original keys, so a
+    // single-body pattern serialises exactly as it always did and an older
+    // build reading a multi-body file still gets the primary body.
+    if (!m_extraBodyIds.empty()) {
+        out += ";extra=";
+        for (size_t i = 0; i < m_extraBodyIds.size(); ++i) {
+            if (i) out += ",";
+            out += std::to_string(m_extraBodyIds[i]);
+        }
+    }
+    return out;
 }
 
 bool PatternOp::deserializeParams(const std::string& blob) {
@@ -179,6 +216,17 @@ bool PatternOp::deserializeParams(const std::string& blob) {
         else if (key == "oy")    { m_originY = d; any = true; }
         else if (key == "oz")    { m_originZ = d; any = true; }
         else if (key == "angle") { m_totalAngle = d; any = true; }
+        else if (key == "extra") {
+            m_extraBodyIds.clear();
+            size_t p0 = 0;
+            while (p0 < val.size()) {
+                size_t c = val.find(',', p0);
+                if (c == std::string::npos) c = val.size();
+                if (c > p0) m_extraBodyIds.push_back(std::atoi(val.substr(p0, c - p0).c_str()));
+                p0 = c + 1;
+            }
+            any = true;
+        }
         pos = end + 1;
     }
     return any;
@@ -221,6 +269,9 @@ void PatternOp::renderProperties() {
     }
 
     ImGui::Text(materializr::tr("Body ID: %d"), m_bodyId);
+    if (!m_extraBodyIds.empty())
+        ImGui::TextDisabled("+ %d more source bod%s", static_cast<int>(m_extraBodyIds.size()),
+                            m_extraBodyIds.size() == 1 ? "y" : "ies");
 
     if (m_type == PatternType::Linear) {
         materializr::lengthField(materializr::tr("Spacing X"), &m_spacingX);

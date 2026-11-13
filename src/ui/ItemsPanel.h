@@ -30,6 +30,11 @@ public:
         m_activeSketchId = activeSketchId;
     }
 
+    // The Multi toggle (touch stand-in for holding Ctrl). The viewport forces
+    // io.KeyCtrl on only inside its own scope, so without this the rows here
+    // never saw it and Multi did nothing in the Bodies / Sketches lists.
+    void setMultiSelectArmed(bool armed) { m_multiArmed = armed; }
+
     // True if the panel was hovered last frame - the touch input layer uses this
     // to arm long-press (right-click) over the panel's rows for their context
     // menus, the same way it does over the viewport.
@@ -155,6 +160,7 @@ private:
     std::function<void(int)> m_rotatePlane;
     std::function<void(int)> m_movePlane;
     bool m_sketchModeActive = false;
+    bool m_multiArmed = false;   // Multi toggle: rows add/remove like Ctrl+click
     int m_activeSketchId = -1;
     int m_renamingId = -1;
     char m_renameBuffer[128] = {};

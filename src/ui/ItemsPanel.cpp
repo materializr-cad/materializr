@@ -68,7 +68,7 @@ void ItemsPanel::dropBodiesOn(int targetFolderId, int beforeBodyId) {
 
 void ItemsPanel::applyRowClick(const SelectionEntry& entry) {
     if (!m_selection) return;
-    if (ImGui::GetIO().KeyCtrl) m_selection->toggleSelection(entry);
+    if (ImGui::GetIO().KeyCtrl || m_multiArmed) m_selection->toggleSelection(entry);
     else                        m_selection->select(entry);
 }
 
@@ -896,7 +896,7 @@ bool ItemsPanel::renderBodyRow(int id, int folderId) {
                         m_selection->addToSelection(makeEntry(displayOrder[i]));
                     m_selection->setNavigationOnly(true);
                 }
-            } else if (io.KeyCtrl) {
+            } else if (io.KeyCtrl || m_multiArmed) {
                 // Toggle this body in/out of the selection without disturbing
                 // the others. Keeps the anchor where it was.
                 m_selection->toggleSelection(makeEntry(id));

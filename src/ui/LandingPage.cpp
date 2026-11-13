@@ -199,6 +199,14 @@ LandingPage::Action LandingPage::render() {
         if (ImGui::Button(ICON_IC_HELP_CIRCLE "  Help"))
             action.type = ActionType::OpenHelp;
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", materializr::tr("User guide"));
+#if !defined(MZ_IOS)
+        // Quit from the home screen. Before this the only way out was to open
+        // a project and exit from there (iOS apps don't quit themselves).
+        ImGui::SameLine();
+        if (ImGui::Button(ICON_IC_LOG_OUT "  Exit"))
+            action.type = ActionType::Exit;
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", materializr::tr("Exit"));
+#endif
 
         // Right-aligned block: name, version, and the dismiss button.
         const char* name = materializr::tr("Materializr");

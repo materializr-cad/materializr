@@ -272,7 +272,7 @@ void SketchTool::onMouseMove(glm::vec2 pos) {
             updateOffsetHover(pos);
         } else {
             m_currentPos = snap(pos);
-            updateOffsetDistance(m_currentPos);
+            if (!m_offsetLocked) updateOffsetDistance(m_currentPos);
         }
         return;
     }
@@ -4958,6 +4958,7 @@ bool SketchTool::beginOffsetFromSelection() {
     m_offsetExtraRes.assign(m_offsetExtra.size(), OffsetResult{});
     m_offsetChainHover.clear();
     m_offsetPhase = OffsetPhase::Distance;
+    m_offsetLocked = false;
     m_offsetDistance = 0.0f;
     m_offsetResult = OffsetResult{};
     m_offsetPreview.clear();
@@ -5213,6 +5214,7 @@ void SketchTool::handleOffsetTool(glm::vec2 pos) {
         m_offsetChain = std::move(ch);
         m_offsetChainHover.clear();
         m_offsetPhase = OffsetPhase::Distance;
+        m_offsetLocked = false;
         m_offsetDistance = 0.0f;
         m_offsetResult = OffsetResult{};
         m_offsetPreview.clear();
@@ -5223,8 +5225,18 @@ void SketchTool::handleOffsetTool(glm::vec2 pos) {
 
     // Distance phase: the click asks for the commit, it does not perform it -
     // the app wraps commitOffset in recordSketchMutation for one undo step.
+    // Locked (typed value, or a tap already fixed it): the pointer does not
+    // move the distance. A mouse click then commits what is shown; a touch tap
+    // is ignored (it is the Offset button that commits, Follow cursor that
+    // frees it again).
+    if (m_offsetLocked) {
+        if (!m_offsetTapLocks && m_offsetResult.valid) m_offsetCommitRequested = true;
+        return;
+    }
     updateOffsetDistance(snap(pos));
-    if (m_offsetResult.valid) m_offsetCommitRequested = true;
+    if (!m_offsetResult.valid) return;
+    if (m_offsetTapLocks) m_offsetLocked = true;
+    else                  m_offsetCommitRequested = true;
 }
 
 void SketchTool::commitOffset(std::set<int>& outPoints, std::set<int>& outElements) {
@@ -5259,6 +5271,7 @@ void SketchTool::cancelOffset() {
     m_offsetExtra.clear();
     m_offsetExtraRes.clear();
     m_offsetExtraSign.clear();
+    m_offsetLocked = false;
     m_offsetDistance = 0.0f;
     m_offsetCommitRequested = false;
     m_offsetChainHover.clear();

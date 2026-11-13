@@ -1592,7 +1592,8 @@ private:
     // Mirror: single button opens a popup; "across a face" arms face-pick mode.
     bool m_showMirrorPopup = false;
     bool m_mirrorPickFace = false;
-    int m_mirrorBodyId = -1;
+    int m_mirrorBodyId = -1;              // primary (first selected); >=0 = a mirror is pending
+    std::vector<int> m_mirrorBodyIds;     // every selected body to mirror
 
     // Scale side panel (shown in Scale gizmo mode): X/Y/Z percentages + uniform.
     float m_scalePct[3] = {100.0f, 100.0f, 100.0f};
@@ -1904,7 +1905,8 @@ private:
     enum class PatternKind { Linear, Radial };
     bool m_patternActive = false;
     PatternKind m_patternKind = PatternKind::Linear;
-    int m_patternBodyId = -1;
+    int m_patternBodyId = -1;            // primary source (first selected)
+    std::vector<int> m_patternBodyIds;   // every selected source body, in selection order
     int m_patternAxisIdx = 0; // 0=X, 1=Y, 2=Z (used when m_patternAxisId < 0)
     int m_patternAxisId = -1; // selected construction axis id; -1 = world axis
     int m_patternCount = 3;

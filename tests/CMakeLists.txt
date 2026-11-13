@@ -618,6 +618,11 @@ add_executable(test_mirror_origin test_mirror_origin.cpp)
 target_link_libraries(test_mirror_origin PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_mirror_origin COMMAND test_mirror_origin)
 
+# test_pattern_multibody - a pattern over several selected bodies (bug report 11-13-26)
+add_executable(test_pattern_multibody test_pattern_multibody.cpp)
+target_link_libraries(test_pattern_multibody PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_pattern_multibody COMMAND test_pattern_multibody)
+
 # test_sweep - a profile swept along a path (#167)
 add_executable(test_sweep test_sweep.cpp)
 target_link_libraries(test_sweep PRIVATE materializr_core gtest gtest_main)

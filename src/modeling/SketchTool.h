@@ -319,6 +319,18 @@ public:
     float getOffsetDistance() const { return m_offsetDistance; }
     void  setOffsetDistance(float d);
     void  flipOffsetSide() { setOffsetDistance(-m_offsetDistance); }
+    // Distance LOCK. While locked the cursor no longer drives the distance, so
+    // a typed value (or a position the user fixed with a tap) stays put instead
+    // of snapping back to wherever the pointer is - which is what overwrote a
+    // typed value the instant the finger/stylus moved. unlockOffsetDistance is
+    // the panel's "Follow cursor".
+    bool  offsetDistanceLocked() const { return m_offsetLocked; }
+    void  lockOffsetDistance()   { m_offsetLocked = true; }
+    void  unlockOffsetDistance() { m_offsetLocked = false; }
+    // Touch: a Distance-phase tap FIXES the distance (locks it) instead of
+    // committing, and the Offset button commits - a finger lifting would
+    // otherwise place the offset before it could be adjusted.
+    void  setOffsetTapLocks(bool v) { m_offsetTapLocks = v; }
     OffsetCorners getOffsetCorners() const { return m_offsetCorners; }
     void  setOffsetCorners(OffsetCorners c) { m_offsetCorners = c; recomputeOffsetPreview(); }
     // True when the current distance yields geometry that can be committed.
@@ -935,6 +947,8 @@ private:
     OffsetCorners m_offsetCorners = OffsetCorners::Round;
     float         m_offsetDistance = 0.0f;   // signed: + is right of travel
     bool          m_offsetCommitRequested = false;
+    bool          m_offsetLocked = false;     // distance frozen; the cursor is ignored
+    bool          m_offsetTapLocks = false;   // touch: a tap locks rather than commits
     // After a commit the cursor still sits on the new geometry; without this
     // the hover would re-highlight it instantly and the commit would look like
     // it did nothing. Cleared once the cursor moves clear.

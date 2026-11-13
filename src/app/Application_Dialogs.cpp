@@ -960,8 +960,11 @@ void Application::renderMirrorPopup() {
         auto mirrorAxis = [&](int axis) {
             try {
                 auto trackBodies = trackBodyChanges(); // re-tessellate only what changes
-                const TopoDS_Shape& shape = m_document->getBody(m_mirrorBodyId);
-                Bnd_Box bb; BRepBndLib::Add(shape, bb);
+                // One plane for the whole selection (the union box), so a group
+                // mirrors as a group and keeps its internal layout.
+                Bnd_Box bb;
+                for (int mid : m_mirrorBodyIds)
+                    BRepBndLib::Add(m_document->getBody(mid), bb);
                 if (bb.IsVoid()) return;
                 double x1, y1, z1, x2, y2, z2; bb.Get(x1, y1, z1, x2, y2, z2);
                 double cx = (x1 + x2) * 0.5, cy = (y1 + y2) * 0.5, cz = (z1 + z2) * 0.5;
@@ -969,12 +972,14 @@ void Application::renderMirrorPopup() {
                 if (axis == 0)      { pt = gp_Pnt(x1, cy, cz); dir = gp_Dir(1, 0, 0); }
                 else if (axis == 1) { pt = gp_Pnt(cx, y1, cz); dir = gp_Dir(0, 1, 0); }
                 else                { pt = gp_Pnt(cx, cy, z1); dir = gp_Dir(0, 0, 1); }
-                auto op = std::make_unique<MirrorOp>();
-                op->setBody(m_mirrorBodyId);
-                op->setPlane(MirrorPlane::Custom);
-                op->setCustomPlane(gp_Ax2(pt, dir));
-                op->setKeepOriginal(true);
-                m_history->pushOperation(std::move(op), *m_document);
+                for (int mid : m_mirrorBodyIds) {
+                    auto op = std::make_unique<MirrorOp>();
+                    op->setBody(mid);
+                    op->setPlane(MirrorPlane::Custom);
+                    op->setCustomPlane(gp_Ax2(pt, dir));
+                    op->setKeepOriginal(true);
+                    m_history->pushOperation(std::move(op), *m_document);
+                }
             } catch (...) {}
         };
 
@@ -988,11 +993,13 @@ void Application::renderMirrorPopup() {
         ImGui::TextDisabled("%s", materializr::tr("Through the origin"));
         auto mirrorOrigin = [&](MirrorPlane plane) {
             auto trackBodies = trackBodyChanges(); // re-tessellate only what changes
-            auto op = std::make_unique<MirrorOp>();
-            op->setBody(m_mirrorBodyId);
-            op->setPlane(plane);
-            op->setKeepOriginal(true);
-            m_history->pushOperation(std::move(op), *m_document);
+            for (int mid : m_mirrorBodyIds) {
+                auto op = std::make_unique<MirrorOp>();
+                op->setBody(mid);
+                op->setPlane(plane);
+                op->setKeepOriginal(true);
+                m_history->pushOperation(std::move(op), *m_document);
+            }
         };
         if (ImGui::Button(materializr::tr("X = 0 plane"), materializr::uiSz(150, 0))) { mirrorOrigin(MirrorPlane::YZ); ImGui::CloseCurrentPopup(); }
         if (ImGui::Button(materializr::tr("Y = 0 plane"), materializr::uiSz(150, 0))) { mirrorOrigin(MirrorPlane::XY); ImGui::CloseCurrentPopup(); }
@@ -6037,9 +6044,15 @@ void Application::renderOffsetToolPanel() {
                     "To offset just some segments, select them first, then choose Offset."));
             }
         } else {
+            // Touch: a tap FIXES the distance and the Offset button places it;
+            // a mouse click places it directly.
+            m_sketchTool->setOffsetTapLocks(materializr::touchMode());
             ImGui::TextDisabled("%s", materializr::tr(
-                "Move the cursor to set the distance; the side it is on picks "
-                "the direction. Click or press Enter to place it."));
+                materializr::touchMode()
+                    ? "Move the stylus to set the distance, then tap to fix it, or type "
+                      "a value. Press Offset to place it."
+                    : "Move the cursor to set the distance; the side it is on picks "
+                      "the direction. Click or press Enter to place it."));
 
             // Edited as a magnitude - the sign is a direction, and Flip owns it.
             float mag = std::abs(m_sketchTool->getOffsetDistance());
@@ -6049,7 +6062,11 @@ void Application::renderOffsetToolPanel() {
                 if (mag < 0.0f) mag = 0.0f;
                 m_sketchTool->setOffsetDistance(
                     m_sketchTool->getOffsetDistance() < 0.0f ? -mag : mag);
+                m_sketchTool->lockOffsetDistance();
             }
+            // Focusing the field freezes the distance where it is, so the preview
+            // stops chasing the pointer while the value is being typed.
+            if (ImGui::IsItemActive()) m_sketchTool->lockOffsetDistance();
             ImGui::SameLine();
             if (ImGui::Button(materializr::tr("Flip"))) m_sketchTool->flipOffsetSide();
             ImGui::SetItemTooltip("%s", materializr::tr(
@@ -6078,6 +6095,13 @@ void Application::renderOffsetToolPanel() {
         ImGui::BeginDisabled(!m_sketchTool->offsetReady());
         if (ImGui::Button(materializr::tr("Offset"))) commitOffsetNow();
         ImGui::EndDisabled();
+        if (picked) {
+            ImGui::SameLine();
+            ImGui::BeginDisabled(!m_sketchTool->offsetDistanceLocked());
+            if (ImGui::Button(materializr::tr("Follow cursor")))
+                m_sketchTool->unlockOffsetDistance();
+            ImGui::EndDisabled();
+        }
         ImGui::SameLine();
         if (ImGui::Button(materializr::tr("Cancel"))) {
             if (picked) m_sketchTool->cancelOffset();
@@ -7819,6 +7843,11 @@ void Application::renderLandingPage() {
     case AT::OpenHelp:
         if (m_helpPanel) m_helpPanel->setVisible(true);
         break;   // page stays up beneath the help window
+    case AT::Exit:
+        // Same path as File > Exit: the main loop's requestClose() still runs
+        // the unsaved-changes prompt for any tab with work in it.
+        m_window->requestClose(true);
+        break;
     case AT::Dismiss:
         m_landingPage->setVisible(false);
         break;

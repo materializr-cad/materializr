@@ -20,7 +20,7 @@ public:
 
     enum class ActionType { None, NewProject, OpenEntry, OpenFileDialog, Dismiss,
                             ExportStep, ExportStl, OpenSettings, OpenHelp,
-                            ImportParts };
+                            ImportParts, Exit };
     struct Action {
         ActionType type = ActionType::None;
         std::string ref, name;   // OpenEntry / ExportStep / ExportStl

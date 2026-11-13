@@ -3010,6 +3010,12 @@ void Application::handleToolAction(int action) {
             const auto& sel = m_selection->getSelection();
             if (!sel.empty() && sel[0].bodyId >= 0) {
                 m_mirrorBodyId = sel[0].bodyId;
+                // Every selected body is mirrored, not just the first.
+                m_mirrorBodyIds.clear();
+                for (const auto& e : sel)
+                    if (e.bodyId >= 0 && std::find(m_mirrorBodyIds.begin(),
+                                                   m_mirrorBodyIds.end(), e.bodyId) == m_mirrorBodyIds.end())
+                        m_mirrorBodyIds.push_back(e.bodyId);
                 m_mirrorPickFace = false;
                 m_showMirrorPopup = true;
             }
@@ -8478,8 +8484,8 @@ void Application::run() {
         // at the bottom of the loop (measured after the event wait so the
         // idle floor's own sleep doesn't count against the budget).
         const uint32_t frameLoopStartMs = platformTicksMs();
-#if !defined(MZ_MOBILE)
-        const uint64_t frameLoopStartNs = platformTicksNs();
+#if !defined(MZ_MOBILE) || defined(__ANDROID__)
+        const uint64_t frameLoopStartNs = platformTicksNs();   // Android paces to the display too
 #endif
         // Significant events (click, key, scroll, resize, focus): 5 frames.
         // Trivial events (mouse motion, expose): 25 frames - at 60 fps that is
@@ -8698,7 +8704,10 @@ void Application::run() {
         // ItemsPanel's Delete/Edit-Sketch/Combine gating on the sketch being
         // drawn must never see a stale value from a frame where the panel (or
         // a different layout) didn't render.
-        if (m_itemsPanel) m_itemsPanel->setActiveSketchContext(m_inSketchMode, m_activeSketchId);
+        if (m_itemsPanel) {
+            m_itemsPanel->setActiveSketchContext(m_inSketchMode, m_activeSketchId);
+            m_itemsPanel->setMultiSelectArmed(m_multiSelectToggle);
+        }
         // Per-layout chrome (src/app/layout/<name>/). A new layout gets a case
         // here; everything below this dispatch is layout-agnostic or gated on
         // the layout helpers. While the landing page is up the modern and
@@ -9257,7 +9266,7 @@ void Application::run() {
         // to it; this is the backstop for when it doesn't (a hidden or occluded
         // window, a compositor that doesn't block). 5 % under, so it never
         // fights the swap interval over a frame boundary.
-#if defined(MZ_MOBILE)
+#if defined(MZ_MOBILE) && !defined(__ANDROID__)
         {
             constexpr uint32_t kMinFrameMs = 16;
             const uint32_t spent = platformTicksMs() - frameLoopStartMs;

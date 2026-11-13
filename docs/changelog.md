@@ -9,6 +9,8 @@ The 11-10 tester list.
 
 ### Added
 
+- **An Exit button on the home screen**, right of Help (not on iOS). It quits
+  through the usual path, so unsaved work still gets its prompt.
 - **Line, Circle, Rectangle and Arc take typed values in a panel, like Polygon.**
   Line: length (with -10 .. +10 steppers) and angle (-90 .. +90). Circle: a
   Radius / Diameter switch and the size. Rectangle: width, height and angle (0
@@ -39,6 +41,26 @@ The 11-10 tester list.
 
 ### Fixed
 
+- **Multi works in the Bodies and Sketches lists** in the Classic and Modern
+  layouts (it only ever worked in the viewport and in im-touch), so several
+  bodies or sketches can be picked without Ctrl.
+- **Linear and Circular Pattern, Mirror and Duplicate act on every selected
+  body**, not just the first. A pattern is still one step; Mirror and Duplicate
+  add one step per body. Split still takes one body.
+- **Offset: a typed or tapped distance stays put.** Clicking into the value field
+  or pressing Enter freezes the distance instead of letting the cursor overwrite
+  it. In touch mode a tap fixes the distance and the **Offset** button places it;
+  the new **Follow cursor** button hands it back to the pointer.
+- **The grid scales with zoom outside a sketch too** when "Scale grid with zoom"
+  is on (it only did inside a sketch).
+- **Line: a fast click no longer ends the chain.** A click that moved a few pixels
+  between press and release counted as a drag and ended the polyline; now only a
+  drag that starts a segment does.
+- **im-touch: the Bodies list no longer grows over the buttons.** It stays below
+  the top buttons and the ViewCube and above the bottom-corner button, and
+  scrolls inside that space.
+- **Android runs at the display's refresh rate** instead of a fixed 60 fps cap
+  (a 90 Hz tablet was held to about 62).
 - **Snap to grid now works in the sketch.** Moving selected sketch geometry with
   the gizmo (and the mirror and pattern pickers) always snapped to the grid,
   whatever the Snap & Grid checkbox said.
