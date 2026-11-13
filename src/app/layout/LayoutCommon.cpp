@@ -250,7 +250,8 @@ void Application::renderTabMenuItems(size_t i) {
     ImGui::Separator();
     if (ImGui::MenuItem(materializr::tr("Close Tab"))) {
         if (activateTabFor(i))
-            guardedOpen([this]() { closeSession(m_activeSession); }, /*closingTab=*/true);
+            guardedOpen([this]() { closeSession(m_activeSession); saveAppSettings(); },
+                        /*closingTab=*/true);
     }
 }
 
@@ -327,7 +328,8 @@ void Application::renderViewportTabBar() {
         if (!open) {
             // The tab's × - same guarded flow as the menu item.
             if (activateTabFor(i))
-                guardedOpen([this]() { closeSession(m_activeSession); }, /*closingTab=*/true);
+                guardedOpen([this]() { closeSession(m_activeSession); saveAppSettings(); },
+                        /*closingTab=*/true);
             closedOne = true;   // indices may have shifted; finish this frame
         }
         ImGui::PopID();
@@ -449,7 +451,8 @@ void Application::renderFileMenuItems(bool withSettings, bool withExit) {
     }
     if (ImGui::MenuItem(materializr::tr("Close Tab"))) {
         // Same prompt-then-act path as every destructive project action.
-        guardedOpen([this]() { closeSession(m_activeSession); }, /*closingTab=*/true);
+        guardedOpen([this]() { closeSession(m_activeSession); saveAppSettings(); },
+                        /*closingTab=*/true);
     }
     ImGui::Separator();
 

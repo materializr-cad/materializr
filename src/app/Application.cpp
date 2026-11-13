@@ -7973,7 +7973,10 @@ void Application::renderSketchRecoveryPrompt() {
         }
         ImGui::SameLine();
         if (ImGui::Button(materializr::tr("Discard"), materializr::uiSz(140, 0))) {
-            materializr::clearSketchDraftAt(materializr::sketchDraftRestorePath());
+            // ALL leftovers, not just the one offered: every launch that ended
+            // mid-sketch leaves its own, and clearing one at a time made the
+            // prompt come back once per leftover.
+            materializr::clearAllOrphanSketchDrafts();
             m_pendingSketchRecovery = false;
             ImGui::CloseCurrentPopup();
         }

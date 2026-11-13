@@ -41,6 +41,11 @@ The 11-10 tester list.
 
 ### Fixed
 
+- **A tab you closed no longer comes back** after the app is killed (swipe-away,
+  an Android restart, a crash). The tab list is now saved when a tab closes, not
+  only on a clean exit.
+- **"Recover Sketch?" Discard clears every leftover sketch draft**, not just the
+  newest, so the prompt no longer reappears once per leftover.
 - **Multi works in the Bodies and Sketches lists** in the Classic and Modern
   layouts (it only ever worked in the viewport and in im-touch), so several
   bodies or sketches can be picked without Ctrl.

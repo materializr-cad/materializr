@@ -50,6 +50,12 @@ std::string sketchDraftRestorePath();
 // restored or declined, so it is not offered again on every later launch.
 void clearSketchDraftAt(const std::string& path);
 
+// Delete EVERY orphaned draft (all dead instances' slots), not just this
+// launch's candidate. Used by the prompt's Discard: each launch that ended
+// mid-sketch leaves its own draft, and clearing only the newest made the
+// prompt reappear once per leftover.
+void clearAllOrphanSketchDrafts();
+
 // Serialize `sk` + context to the draft file. Best-effort; returns success.
 bool writeSketchDraft(const Sketch& sk, int sourceBodyId,
                       const std::string& projectPath);
