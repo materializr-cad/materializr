@@ -788,3 +788,43 @@ TEST(GridSnap, OnSplineContactStaysOnTheCurveWithGridOn) {
         << "grid-on landed the contact off the true curve at ("
         << placed->pos.x << ", " << placed->pos.y << ")";
 }
+
+// An "On Vertical / Horizontal Axis" guide is a claim about the SOURCE point's
+// own coordinate. With grid snap on, the result used to be rounded in BOTH
+// axes, so for a source point that is not on the lattice (drawn with snap off,
+// imported, or on another step) the placed point slid up to half a step off
+// the guide while the label kept saying it was aligned (tester, 11-14-26).
+// The aligned coordinate must stay exact; only the free one goes to the grid.
+TEST(GridSnap, AxisGuideKeepsTheSourcePointsExactCoordinate) {
+    const float step = 1.0f;
+    Sketch sk;
+    SketchTool tool;
+    tool.setSketch(&sk);
+    tool.setGridStep(step);
+    tool.setSnapToGridEnabled(true);
+    tool.setInferenceLevel(SketchTool::InferenceLevel::Full);
+
+    const glm::vec2 src(3.37f, 5.21f);       // deliberately off the 1 mm lattice
+    sk.addPoint(src);
+
+    // Vertical: cursor X within the capture band of src.x, free Y off-lattice.
+    tool.setMode(SketchToolMode::Line);
+    tool.onMouseMove({3.50f, 9.20f});
+    bool sawV = false;
+    for (const auto& g : tool.getActiveInferences())
+        if (g.kind == InferenceGuide::AxisVFromPoint) sawV = true;
+    ASSERT_TRUE(sawV) << "vertical axis guide did not fire - test setup is off";
+    EXPECT_FLOAT_EQ(tool.getCurrentPos().x, src.x)
+        << "placed point left the guide's X while the guide still showed";
+    EXPECT_LE(offLattice(tool.getCurrentPos().y, step), 1e-4)
+        << "the free coordinate should still land on the grid";
+
+    // Horizontal: the same, transposed.
+    tool.onMouseMove({9.20f, 5.35f});
+    bool sawH = false;
+    for (const auto& g : tool.getActiveInferences())
+        if (g.kind == InferenceGuide::AxisHFromPoint) sawH = true;
+    ASSERT_TRUE(sawH) << "horizontal axis guide did not fire - test setup is off";
+    EXPECT_FLOAT_EQ(tool.getCurrentPos().y, src.y);
+    EXPECT_LE(offLattice(tool.getCurrentPos().x, step), 1e-4);
+}

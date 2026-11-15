@@ -2480,6 +2480,51 @@ void Application::renderViewport() {
                     }
                 }
 
+                // Grid-snap landing marker. Before the first click of a drawing
+                // tool the cursor is pulled to a grid intersection with nothing
+                // on screen saying which one, so the start point was placed
+                // "blind" (tester, 11-14-26). A small cross-hair ring on the
+                // intersection the click will land on, unless an inference
+                // already marks the spot (endpoint / midpoint / on-line squares
+                // and diamonds sit there themselves).
+                if (m_snapToGrid && !m_sketchTool->isPlacing()) {
+                    const SketchToolMode gm = m_sketchTool->getMode();
+                    const bool placesPoints =
+                        gm == SketchToolMode::Point  || gm == SketchToolMode::Line ||
+                        gm == SketchToolMode::Circle || gm == SketchToolMode::Rectangle ||
+                        gm == SketchToolMode::Arc    || gm == SketchToolMode::Spline ||
+                        gm == SketchToolMode::Polygon;
+                    bool marked = false;
+                    for (const auto& g : m_sketchTool->getActiveInferences())
+                        if (g.kind == InferenceGuide::Endpoint ||
+                            g.kind == InferenceGuide::Midpoint ||
+                            g.kind == InferenceGuide::OnLine ||
+                            g.kind == InferenceGuide::OnCircle) { marked = true; break; }
+                    ImVec2 gs;
+                    if (placesPoints && !marked &&
+                        toImg(sk2w(m_sketchTool->getCurrentPos()), gs)) {
+                        // Only while the pointer is actually near it: the tool
+                        // keeps its last position when the mouse leaves the
+                        // viewport, and a marker stranded there would mislead.
+                        const ImVec2 mp = ImGui::GetMousePos();
+                        const float ui = m_window ? m_window->uiScale() : 1.0f;
+                        const float reach = 60.0f * ui;
+                        const float dx = mp.x - gs.x, dy = mp.y - gs.y;
+                        if (dx * dx + dy * dy < reach * reach &&
+                            ImGui::IsMouseHoveringRect(imgMin, ImVec2(imgMin.x + imgSize.x,
+                                                                      imgMin.y + imgSize.y))) {
+                            const float r = 5.0f * ui, arm = 9.0f * ui;
+                            const ImU32 gcol = IM_COL32(255, 235, 120, 255);
+                            dl->AddCircle(gs, r, halo, 0, 3.5f);
+                            dl->AddCircle(gs, r, gcol, 0, 1.6f);
+                            dl->AddLine(ImVec2(gs.x - arm, gs.y), ImVec2(gs.x + arm, gs.y), halo, 3.5f);
+                            dl->AddLine(ImVec2(gs.x, gs.y - arm), ImVec2(gs.x, gs.y + arm), halo, 3.5f);
+                            dl->AddLine(ImVec2(gs.x - arm, gs.y), ImVec2(gs.x + arm, gs.y), gcol, 1.4f);
+                            dl->AddLine(ImVec2(gs.x, gs.y - arm), ImVec2(gs.x, gs.y + arm), gcol, 1.4f);
+                        }
+                    }
+                }
+
                 // Text / SVG placement: dashed rectangle following the
                 // cursor - the measured (rotated) extents of the artwork,
                 // so the user sees exactly where it will land before
@@ -6352,9 +6397,17 @@ void Application::renderViewport() {
                         if (auto* p = m_activeSketch->getPoint(id)) { c += p->pos; ++nInv; }
                     if (nInv > 0) {
                         c /= static_cast<float>(nInv);
-                        // During a drag, anchor the gizmo visual at the drag-start
-                        // centroid so it doesn't slide around with the selection.
-                        glm::vec2 gizmoC = gizmoOwnsInput ? m_sketchGizmoCenter : c;
+                        // A ROTATE drag pins the gizmo at the drag-start centroid:
+                        // that is the pivot, and the ring/arrows belong on it.
+                        // A MOVE drag must carry the gizmo with the selection -
+                        // anchored at the start it was left behind while the
+                        // point went off under the cursor, and only jumped to
+                        // the right place on release (tester, 11-14-26: "the
+                        // circle with the axes remains in its original place").
+                        glm::vec2 gizmoC =
+                            (gizmoOwnsInput &&
+                             m_sketchGizmoHandle == SketchGizmoHandle::Rotate)
+                                ? m_sketchGizmoCenter : c;
 
                         const gp_Ax3& ax = m_activeSketch->getPlane().Position();
                         glm::vec3 O(ax.Location().X(), ax.Location().Y(), ax.Location().Z());

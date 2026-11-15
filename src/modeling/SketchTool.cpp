@@ -2217,6 +2217,24 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     auto axisAligned = [](glm::vec2 d) {
         return std::abs(d.x) < 1e-4f || std::abs(d.y) < 1e-4f;
     };
+    // An axis-from-point guide is a claim about ONE coordinate: "same X as that
+    // point" / "same Y". Rounding both coordinates to the lattice kept the point
+    // on the ray only when the source point itself sat on the lattice; for a
+    // point drawn with grid snap off (or on another step) the result slid up to
+    // half a step sideways while the guide kept saying "On Vertical Axis" - so
+    // the label was true of the cursor, not of the placed point (tester,
+    // 11-14-26). The anchor's coordinate stays EXACT; only the free one goes to
+    // the grid.
+    auto isAxisFromPoint = [](InferenceGuide::Kind k) {
+        return k == InferenceGuide::AxisHFromPoint ||
+               k == InferenceGuide::AxisVFromPoint;
+    };
+    auto latticeAlongAxis = [&](const LineCand& c, glm::vec2 p) {
+        if (!m_snapToGridEnabled || m_gridStep <= 0.0f) return p;
+        if (c.kind == InferenceGuide::AxisVFromPoint)
+            return glm::vec2(c.anchor.x, std::round(p.y / m_gridStep) * m_gridStep);
+        return glm::vec2(std::round(p.x / m_gridStep) * m_gridStep, c.anchor.y);
+    };
 
     // Intersection cap is WIDER than the single-line posCap: each cand only
     // enters the list after passing its own perpDist tolerance, so a two-cand
@@ -2305,11 +2323,21 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
         // vertex - leave it exactly where the geometry puts it.
         const bool ci = isContact(cands[bestI].kind);
         const bool cj = isContact(cands[bestJ].kind);
-        if (!ci && !cj) {
+        const bool ai = isAxisFromPoint(cands[bestI].kind);
+        const bool aj = isAxisFromPoint(cands[bestJ].kind);
+        if ((ai || aj) && !(ci || cj)) {
+            // Axis-from-point x anything: the crossing already satisfies both
+            // claims exactly. Rounding it to the lattice would break the axis
+            // one whenever the source point is off the lattice, so leave it.
+        } else if (!ci && !cj) {
             // Only when BOTH rays are axis-aligned; otherwise rounding the
             // crossing breaks the very directions that defined it.
             if (axisAligned(cands[bestI].dir) && axisAligned(cands[bestJ].dir))
                 bestIsect = onLattice(bestIsect);
+        } else if (ci != cj && (ai || aj)) {
+            // Edge landing + exact axis guide: the intersection is on the edge
+            // AND exactly aligned. Walking it along the edge to the grid
+            // (below) drags it off the axis - keep it.
         } else if (ci != cj) {
             const auto& con = ci ? cands[bestI] : cands[bestJ];
             // See LineCand::exactDirection: a spline contact's `dir` is only
@@ -2365,7 +2393,10 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
         glm::vec2 snapped = c.exactDirection
             ? gridAlongLine(c.anchor, c.dir, c.isSegment, c.segLen, c.proj)
             : c.proj;
-        if (!isContact(c.kind) && axisAligned(c.dir)) snapped = onLattice(snapped);
+        if (isAxisFromPoint(c.kind))
+            snapped = latticeAlongAxis(c, snapped);
+        else if (!isContact(c.kind) && axisAligned(c.dir))
+            snapped = onLattice(snapped);
         emitWithSnap(c, snapped);
         // Preserve a borrowed direction (parallel/perp/tangent/on-line) exactly;
         // only flatten genuinely free near-axis results.
