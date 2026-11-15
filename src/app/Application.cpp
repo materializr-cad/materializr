@@ -36,6 +36,7 @@ inline void resetFpuForOcct() {
 #endif
 
 #include "app/Application.h"
+#include "../core/SketchSignature.h"
 #include "app/DeferredTasks.h"
 #include "app/DrawThrottle.h"
 #include "i18n.h"
@@ -2811,6 +2812,7 @@ void Application::handleToolAction(int action) {
                 before->getLines().size()  != after->getLines().size()) {
                 auto op = std::make_unique<SketchEditOp>(m_activeSketch, before, after);
                 m_history->pushExecuted(std::move(op), *m_document);
+                if (m_activeSketchId >= 0) requestSketchCascade(m_activeSketchId);
             }
             break;
         }
@@ -6008,6 +6010,7 @@ void Application::enterSketchMode() {
     m_sketchEntryHistoryStep = m_history ? m_history->currentStep() : -1;
     m_sketchUndoFloorStep = m_sketchEntryHistoryStep;
     if (m_history) m_history->setUndoFloor(m_sketchUndoFloorStep);  // no undo past sketch entry
+    markSketchSynced();   // the model matches the sketch as it is on entry
     refreshCoplanarReferences();
     m_toolbar->setSketchMode(true);
     // Fresh sketch session: drop any stale Dimension edit-popup state left
@@ -6039,6 +6042,7 @@ void Application::enterSketchOnPlane(const gp_Pln& plane) {
     m_sketchEntryHistoryStep = m_history ? m_history->currentStep() : -1;
     m_sketchUndoFloorStep = m_sketchEntryHistoryStep;
     if (m_history) m_history->setUndoFloor(m_sketchUndoFloorStep);  // no undo past sketch entry
+    markSketchSynced();   // the model matches the sketch as it is on entry
     refreshCoplanarReferences();
     m_toolbar->setSketchMode(true);
     // Fresh sketch session: drop any stale Dimension edit-popup state left
@@ -6714,6 +6718,7 @@ void Application::enterSketchOnFace(const TopoDS_Face& face, int sourceBodyId) {
     m_sketchEntryHistoryStep = m_history ? m_history->currentStep() : -1;
     m_sketchUndoFloorStep = m_sketchEntryHistoryStep;
     if (m_history) m_history->setUndoFloor(m_sketchUndoFloorStep);  // no undo past sketch entry
+    markSketchSynced();   // the model matches the sketch as it is on entry
     refreshCoplanarReferences();
     m_toolbar->setSketchMode(true);
     // Fresh sketch session: drop any stale Dimension edit-popup state left
@@ -7120,69 +7125,7 @@ void Application::recordSketchMutation(const std::function<void()>& mutator) {
     if (!m_activeSketch) { mutator(); return; }
     // Signature includes counts AND element IDs so that swaps (trim line→line,
     // trim circle→arc) register as a mutation even though counts may be equal.
-    auto signature = [](const Sketch& s) {
-        size_t h = 1469598103934665603ull;
-        auto mix = [&](size_t v) { h = (h ^ v) * 1099511628211ull; };
-        // Hash point positions and circle/arc radii too (quantised to 1e-4 mm)
-        // so a pure move/resize - a line length, rectangle W×H, or arc sweep
-        // edit that keeps every id and count fixed - still registers as a
-        // mutation and gets its own undoable history step.
-        auto mixPos = [&](glm::vec2 p) {
-            mix(static_cast<size_t>(std::llround(p.x * 1e4)));
-            mix(static_cast<size_t>(std::llround(p.y * 1e4)));
-        };
-        mix(s.getPoints().size());
-        for (const auto& p : s.getPoints()) { mix(static_cast<size_t>(p.id)); mixPos(p.pos); }
-        mix(s.getLines().size());
-        // The construction flag too: flipping it changes nothing else, and a
-        // change that does not register is not an undo step.
-        for (const auto& l : s.getLines()) { mix(static_cast<size_t>(l.id)); mix(l.isConstruction ? 1u : 0u); }
-        mix(s.getCircles().size());
-        for (const auto& c : s.getCircles()) {
-            mix(static_cast<size_t>(c.id));
-            mix(static_cast<size_t>(std::llround(c.radius * 1e4)));
-            mix(c.isConstruction ? 1u : 0u);
-        }
-        mix(s.getArcs().size());
-        for (const auto& a : s.getArcs()) {
-            mix(static_cast<size_t>(a.id));
-            mix(static_cast<size_t>(std::llround(a.radius * 1e4)));
-            mix(a.isConstruction ? 1u : 0u);
-        }
-        mix(s.getSplines().size());
-        for (const auto& sp : s.getSplines()) { mix(static_cast<size_t>(sp.id)); mix(sp.isConstruction ? 1u : 0u); }
-        mix(s.getPolygons().size());
-        for (const auto& p : s.getPolygons()) { mix(static_cast<size_t>(p.id)); mix(p.isConstruction ? 1u : 0u); }
-        // Constraints too - including their values so an edit (not just an
-        // add / remove) registers as a mutation and pushes a history step.
-        mix(s.getConstraints().size());
-        for (const auto& c : s.getConstraints()) {
-            mix(static_cast<size_t>(c.id));
-            mix(static_cast<size_t>(c.type));
-            mix(static_cast<size_t>(c.entityA));
-            mix(static_cast<size_t>(c.entityB));
-            size_t vb; std::memcpy(&vb, &c.value, sizeof(vb));
-            mix(vb);
-            std::memcpy(&vb, &c.valueY, sizeof(vb));
-            mix(vb);
-            // Label offsets too: a dedup-replace that only re-places a
-            // label (value bitwise-equal) must still register as a
-            // mutation, or the re-placement gets no undo step.
-            std::memcpy(&vb, &c.labelOffX, sizeof(vb));
-            mix(vb);
-            std::memcpy(&vb, &c.labelOffY, sizeof(vb));
-            mix(vb);
-            // Driving/reference too - promoting a dimension changes no
-            // number, so without this the toggle hashes identically and
-            // recordSketchMutation skips the history push entirely.
-            mix(static_cast<size_t>(c.isDriving ? 1 : 0));
-        }
-        // Fill anchors: a fill toggle changes nothing else, so without them
-        // it would get no undo step.
-        mix(s.getFillAnchors().size());
-        for (glm::vec2 a : s.getFillAnchors()) mixPos(a);
-        return h;
-    };
+    auto signature = [](const Sketch& s) { return sketchGeometrySignature(s); };
     size_t beforeSig = signature(*m_activeSketch);
     auto before = std::make_shared<Sketch>(*m_activeSketch);
     // Fold a deferred anchor snapshot (from the first click of a line chain) in
@@ -7851,6 +7794,19 @@ void Application::exitSketchMode() {
         markDirty();
     }
 
+    // Safety net: whatever edited the sketch, make sure the bodies built from it
+    // are rebuilt from what it is NOW. Each edit path is meant to ask for the
+    // cascade itself, but several did not (a circular / linear pattern, Duplicate,
+    // a gizmo rotate), and the body then kept the OLD shape until the project was
+    // saved and reopened. If the sketch no longer matches the last state the model
+    // was rebuilt from, queue it for the Finish-time rebuild below.
+    if (m_activeSketch && m_activeSketchId >= 0 && m_sketchSyncedSigValid &&
+        m_activeSketch->elementCount() > 0 &&
+        materializr::sketchGeometrySignature(*m_activeSketch) != m_sketchSyncedSig &&
+        !m_pendingSketchCascades.count(m_activeSketchId))
+        m_pendingSketchCascades.insert(m_activeSketchId);
+    m_sketchSyncedSigValid = false;
+
     m_activeSketch.reset();
     m_sketchSolver.reset();
     m_activeSketchId = -1;
@@ -7873,6 +7829,12 @@ void Application::exitSketchMode() {
     // looked at remains framed, only the sketch grid disappears. Any orbit
     // they do drops ortho mode and returns to perspective with a level
     // horizon (handled in Camera::orbitLevel).
+}
+
+// Remember that the model has been rebuilt from the active sketch as it is right now.
+void Application::markSketchSynced() {
+    m_sketchSyncedSigValid = m_activeSketch != nullptr;
+    m_sketchSyncedSig = m_activeSketch ? materializr::sketchGeometrySignature(*m_activeSketch) : 0;
 }
 
 void Application::requestSketchCascade(int sketchId) {

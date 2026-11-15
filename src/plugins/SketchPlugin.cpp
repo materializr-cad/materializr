@@ -250,6 +250,8 @@ private:
         auto after = std::make_shared<Sketch>(*m_sketch);
         auto op = std::make_unique<SketchEditOp>(m_sketch, std::move(before), std::move(after));
         ctx.history().pushExecuted(std::move(op), ctx.document());
+        // Bodies built from this sketch follow the edit (the app subscribes and runs the cascade).
+        if (m_editSketchId >= 0) ctx.events().publish(SketchEditedEvent{m_editSketchId});
     }
 
     std::shared_ptr<Sketch> m_sketch;

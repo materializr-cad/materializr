@@ -12,6 +12,7 @@
 #include "core/SketchCascadeTarget.h"
 #include "modeling/ExtrudeOp.h"
 #include "modeling/PushPullOp.h"
+#include "modeling/RevolveOp.h"
 #include "modeling/Sketch.h"
 #include <BRepGProp.hxx>
 #include <GProp_GProps.hxx>
@@ -250,4 +251,89 @@ TEST(RegionAdoption, TheCascadeAdoptsWhenTheSketchHasOneFeature) {
     addCircleAt(*sk, {20, 0}, 5);
     EXPECT_GE(rederiveSketchDrivenOps(hist, doc, sid), 0);
     EXPECT_EQ(raw->targetCount(), 2);
+}
+
+// 1.8.0 beta tester list 11-14-26 (item 4): a dome / cylinder made by a Lathe, a
+// Subtract extrude of two circles through its top, then seven more circles drawn
+// in that sketch (a circular pattern). The body must pick up all the new holes
+// through the cascade, without a save and reload.
+TEST(RegionAdoption, SubtractExtrudeThroughALatheTakesPatternCirclesDrawnLater) {
+    Document doc; History hist;
+    // Lathe profile: a 30 x 25 rectangle on XY, revolved about Y -> a cylinder r=30, h=25.
+    auto prof = std::make_shared<Sketch>();
+    prof->setPlane(groundPlane());
+    const int a = prof->addPoint({0, 0}), b = prof->addPoint({30, 0}),
+              c = prof->addPoint({30, 25}), d = prof->addPoint({0, 25});
+    prof->addLine(a, b); prof->addLine(b, c); prof->addLine(c, d); prof->addLine(d, a);
+    const int psid = doc.addSketch(prof, "Profile");
+    {
+        auto regions = prof->buildRegions();
+        auto op = std::make_unique<RevolveOp>();
+        op->setProfile(regions.front().face);
+        op->setSketchSource(psid);
+        op->setAxis(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 1, 0)));
+        op->setAngle(360.0);
+        op->setMode(RevolveMode::NewBody);
+        ASSERT_TRUE(hist.pushOperation(std::move(op), doc));
+    }
+    const int bid = doc.getAllBodyIds().front();
+    const double base = vol(doc.getBody(bid));
+    ASSERT_NEAR(base, kPi * 30 * 30 * 25, 5.0);
+
+    // The hole sketch: on the top face plane (y = 25, normal +Y).
+    auto hs = std::make_shared<Sketch>();
+    hs->setPlane(gp_Pln(gp_Ax3(gp_Pnt(0, 25, 0), gp_Dir(0, 1, 0), gp_Dir(1, 0, 0))));
+    const int centreP = hs->addPoint({0, 0});
+    hs->addCircle(centreP, 4.0);                         // the big centre hole
+    const int smallP = hs->addPoint({15, 0});
+    hs->addCircle(smallP, 1.5);                          // one small hole
+    hs->addLine(centreP, smallP);                        // the tester's line between them
+    const int hsid = doc.addSketch(hs, "Holes");
+
+    auto cut = std::make_unique<ExtrudeOp>();
+    cut->setSketchSource(hsid);
+    ASSERT_TRUE(cut->rebuildProfileFromSketch(doc));
+    cut->setDistance(-25.0);
+    cut->setMode(ExtrudeMode::Subtract);
+    cut->setTargetBody(bid);
+    ASSERT_TRUE(hist.pushOperation(std::move(cut), doc));
+    const double twoHoles = vol(doc.getBody(bid));
+    EXPECT_NEAR(twoHoles, base - (kPi * 16 + kPi * 2.25) * 25.0, 20.0) << "setup: two holes cut";
+
+    // Seven more small circles round the centre, as a circular pattern would.
+    for (int i = 1; i < 8; ++i) {
+        const double ang = i * kPi / 4.0;
+        addCircleAt(*hs, {static_cast<float>(15 * std::cos(ang)), static_cast<float>(15 * std::sin(ang))}, 1.5);
+    }
+    // What the app's cascade does.
+    int matched = 0;
+    const int earliest = rederiveSketchDrivenOps(hist, doc, hsid, &matched);
+    ASSERT_GE(earliest, 0) << "the cut must be re-derived (matched " << matched << ")";
+    doc.setCascadeSketchOverride(hsid, std::make_shared<Sketch>(*hs));
+    ASSERT_TRUE(hist.editStep(earliest, doc, /*transactional=*/true));
+    doc.clearCascadeSketchOverrides();
+    EXPECT_NEAR(vol(doc.getBody(bid)), base - (kPi * 16 + 8 * kPi * 2.25) * 25.0, 20.0)
+        << "all eight small holes + the centre hole";
+}
+
+// The fingerprint the app compares at sketch Finish to know whether the bodies were
+// rebuilt from the sketch's CURRENT state (Application::exitSketchMode). It has to
+// see every kind of edit - in particular what a circular pattern adds (new circles
+// and points) and a Duplicate / rotate (moved points) - and ignore a pure copy.
+#include "core/SketchSignature.h"
+TEST(SketchSignature, SeesEveryEditAndIgnoresACopy) {
+    Sketch sk;
+    sk.setPlane(groundPlane());
+    const int c = sk.addPoint({0, 0});
+    const int circ = sk.addCircle(c, 3.0);
+    const size_t base = sketchGeometrySignature(sk);
+    EXPECT_EQ(sketchGeometrySignature(Sketch(sk)), base) << "a copy is the same sketch";
+
+    { Sketch t(sk); t.addCircle(t.addPoint({10, 0}), 1.5);
+      EXPECT_NE(sketchGeometrySignature(t), base) << "a circle added by a pattern"; }
+    { Sketch t(sk); t.movePoint(c, {0.5f, 0});
+      EXPECT_NE(sketchGeometrySignature(t), base) << "a moved point (gizmo rotate / move)"; }
+    { Sketch t(sk); t.addLine(t.addPoint({5, 5}), t.addPoint({9, 5}));
+      EXPECT_NE(sketchGeometrySignature(t), base) << "a line added by a duplicate"; }
+    (void)circ;
 }

@@ -278,7 +278,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 
 - CONVERTED: 1
 - allowed-by-hand: 93
-- comment: 314
+- comment: 315
 - diagnostic: 13
 - identifier/other: 14
 
@@ -372,7 +372,6 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | comment | src/app/Application.cpp | `// sides at a generous offset (1 mm) so tessellation slack near the` |
 | comment | src/app/Application.cpp | `const double eps = 1.0; // mm` |
 | comment | src/app/Application.cpp | `// lines wrote raw millimetres: placing a dimension under any non-mm unit` |
-| comment | src/app/Application.cpp | `// Hash point positions and circle/arc radii too (quantised to 1e-4 mm)` |
 | comment | src/app/Application.cpp | `// millimetres. 40 mm is a reasonable first view in millimetres and an` |
 | comment | src/app/Application.cpp | `// Measured offsets were 10–50% of a cell. At a 1 mm grid that reads as` |
 | comment | src/app/Application.cpp | `// slightly-fat lines; at 0.1 mm it is most of a cell, i.e. "I can't draw a` |
@@ -499,6 +498,8 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | comment | src/core/MeshParams.h | `// format string's second half reads as a user-facing "mm" readout.` |
 | diagnostic | src/core/MeshParams.h | `std::fprintf(stderr, "[Mesh] %s face strayed %.3f mm from its surface (limit %.3f): %s -> %.3f mm\n",` |
 | comment | src/core/SheetSpec.h | `// offset = (T/2)·tan(θ/2). For a 90° corner in 12.7 mm ply this is 6.35 mm.` |
+| comment | src/core/SketchSignature.h | `// mm), construction flags, constraints with their values, fill anchors.` |
+| comment | src/core/SketchSignature.h | `// Hash point positions and circle/arc radii too (quantised to 1e-4 mm)` |
 | comment | src/io/DxfExport.cpp | `// CAM package reads. Minimal file = HEADER ($ACADVER + $INSUNITS mm) and an` |
 | comment | src/io/DxfImport.cpp | `double unitScale = 1.0; // file units → mm` |
 | comment | src/io/DxfImport.cpp | `default: return 1.0;     // unitless / exotic → assume mm` |

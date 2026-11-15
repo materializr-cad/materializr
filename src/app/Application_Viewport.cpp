@@ -6683,6 +6683,7 @@ void Application::renderViewport() {
                             auto op = std::make_unique<SketchEditOp>(
                                 m_activeSketch, m_sketchGizmoBefore, after);
                             m_history->pushExecuted(std::move(op), *m_document);
+                            if (m_activeSketchId >= 0) requestSketchCascade(m_activeSketchId);
                         }
                         m_sketchGizmoHandle = SketchGizmoHandle::None;
                         m_sketchGizmoBefore.reset();

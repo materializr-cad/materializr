@@ -1315,7 +1315,16 @@ std::string Application::linkHintFor(bool isBody, int id) const {
            materializr::tr(" - editing this sketch updates it.");
 }
 
+// A completed cascade (nothing deferred, nothing rolled back for being over budget)
+// means the model now matches the active sketch as it stands.
 bool Application::cascadeFromSketchEdit(int sketchId, double budgetMs, bool resync) {
+    const bool done = cascadeFromSketchEditImpl(sketchId, budgetMs, resync);
+    if (done && m_inSketchMode && m_activeSketch && sketchId == m_activeSketchId)
+        markSketchSynced();
+    return done;
+}
+
+bool Application::cascadeFromSketchEditImpl(int sketchId, double budgetMs, bool resync) {
     if (sketchId < 0 || !m_history || !m_document) return true;
     // A detached sketch has been deliberately broken out of unison with its
     // body (moved on its own in 3D) - editing it must NOT retro-drive the body.
@@ -2867,6 +2876,9 @@ void Application::commitSketchPattern() {
         auto op = std::make_unique<SketchEditOp>(m_activeSketch,
                                                   m_sketchPatternBefore, after);
         m_history->pushExecuted(std::move(op), *m_document);
+        // The pattern's new contours belong to whatever was built from this sketch.
+        // (It used to push the step and stop here: the body kept its old shape.)
+        if (m_activeSketchId >= 0) requestSketchCascade(m_activeSketchId);
     }
     m_sketchPatternActive = false;
     m_sketchPatternPickingOrigin = false;

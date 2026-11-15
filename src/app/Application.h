@@ -843,6 +843,7 @@ private:
     // a step that cannot follow is NOT disabled and nothing is toasted - the
     // replay simply rolls back and the model stays as it was saved.
     bool cascadeFromSketchEdit(int sketchId, double budgetMs = -1.0, bool resync = false);
+    bool cascadeFromSketchEditImpl(int sketchId, double budgetMs, bool resync);
     // Re-run every feature built from a sketch, so a body saved while it did not
     // match its sketch (a 1.8.0-beta.2 and earlier bug: edits made through the
     // sketch tools never reached the body until an Undo/Redo) follows it again.
@@ -1028,6 +1029,11 @@ private:
     // partial content. -1 = no sketch in progress (or pre-sketch state
     // wasn't capturable).
     int m_sketchEntryHistoryStep = -1;
+    // The sketch's geometry signature at the last point the model was rebuilt from it
+    // (sketch entry, or a completed cascade). exitSketchMode compares against it.
+    size_t m_sketchSyncedSig = 0;
+    bool   m_sketchSyncedSigValid = false;
+    void markSketchSynced();
     int m_sketchUndoFloorStep = -1;   // Ctrl+Z stops here; below the entry step when reopening a sketch
     int m_activeSketchId = -1; // document id of the sketch being edited, or -1 if new
 
