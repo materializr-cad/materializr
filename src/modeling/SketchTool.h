@@ -822,6 +822,11 @@ private:
     // Select/drag state
     int m_dragPointId = -1;
     bool m_isDragging = false;
+    // Set when a Select drag begins; onMouseDown then baselines the snapped cursor.
+    bool m_dragNeedsBaseline = false;
+    glm::vec2 m_dragGrab{0.0f};   // single-point drag: point position minus snapped cursor at the press
+    std::set<int> dragPoints() const;
+    glm::vec2 dragAwareSnap(glm::vec2 pos, const std::set<int>& dragPts);
     bool m_lastDownAddedToSel = false; // Ctrl state for the current click
     // The line the last Select click landed on, so a repeat click at the same
     // spot can walk to the next of several overlapping lines.

@@ -278,7 +278,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 
 - CONVERTED: 1
 - allowed-by-hand: 93
-- comment: 313
+- comment: 314
 - diagnostic: 13
 - identifier/other: 14
 
@@ -588,6 +588,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | comment | src/modeling/SketchOffset.cpp | `// accept the (sub-0.1 mm) deviation that comes with it.` |
 | comment | src/modeling/SketchTool.cpp | `// circle centred on a grid node (a 3 mm circle on a 1 mm grid) landed half` |
 | comment | src/modeling/SketchTool.cpp | `// a grid step off the rim, right on the 0.5 mm pick tolerance, and the` |
+| comment | src/modeling/SketchTool.cpp | `// it snap onto ITSELF - with grid snap off the first ~0.25 mm of every slow drag` |
 | comment | src/modeling/SketchTool.cpp | `// Popup asks for DIAMETER (matching the on-canvas "X.X mm dia"` |
 | comment | src/modeling/SketchTool.cpp | `// comes out NEARLY axis-aligned, "nearly" is the bug: 1° over 80 mm is` |
 | comment | src/modeling/SketchTool.cpp | `// 4° rule. (Steve: a 1 mm rise over a long run must not snap to horizontal.)` |

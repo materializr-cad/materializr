@@ -242,6 +242,72 @@ void SketchTool::onMouseDown(glm::vec2 pos, bool addToSel) {
         const int pid = findCoincidentPoint(snapped, -1);
         if (pid >= 0) m_sketch->setPointOnCurve(pid, m_snapRimId);
     }
+    // A drag just began: baseline the snapped cursor with the DRAG's snap (the
+    // hover before the press snapped differently - inference, no exclusion), or
+    // the geometry would jump by the difference on its first move.
+    if (m_mode == SketchToolMode::Select && m_isDragging && m_dragNeedsBaseline) {
+        const std::set<int> dp = dragPoints();
+        m_currentPos = dragAwareSnap(pos, dp);
+        // A single dragged point keeps the offset it was grabbed at (see onMouseMove).
+        m_dragGrab = glm::vec2(0.0f);
+        if (dp.size() == 1)
+            if (const SketchPoint* gp = m_sketch->getPoint(*dp.begin()))
+                m_dragGrab = gp->pos - m_currentPos;
+        m_activeInferences.clear();
+    }
+    m_dragNeedsBaseline = false;
+}
+
+namespace {
+// Alignment-to-another-point's-X/Y band while moving a single point, in screen px.
+constexpr float kAlignPx = 6.0f;
+}
+
+// The points a Select drag is moving (the same set the drag in onMouseMove moves).
+std::set<int> SketchTool::dragPoints() const {
+    std::set<int> pts;
+    if (m_mode != SketchToolMode::Select || !m_isDragging || !m_sketch) return pts;
+    pts = m_selectedPoints;
+    for (int lid : m_selectedLines) {
+        for (const auto& l : m_sketch->getLines()) {
+            if (l.id == lid) {
+                pts.insert(l.startPointId);
+                pts.insert(l.endPointId);
+                break;
+            }
+        }
+    }
+    if (pts.empty() && m_dragPointId >= 0) pts.insert(m_dragPointId);
+    return pts;
+}
+
+// The cursor snap for the current gesture. Worked out knowing what is being
+// dragged: the dragged geometry sits at the cursor, so snapping without that let
+// it snap onto ITSELF - with grid snap off the first ~0.25 mm of every slow drag
+// was swallowed (then it caught up in a jump, worst when zoomed in).
+glm::vec2 SketchTool::dragAwareSnap(glm::vec2 pos, const std::set<int>& dragPts) {
+    if (dragPts.size() > 1) {
+        // A line / selection moves rigidly by the CURSOR's travel. Pulling the
+        // cursor onto some unrelated endpoint would jump the whole selection by an
+        // arbitrary amount, so the grid is the only thing that snaps it
+        // (inference Off keeps grid only - see snap()).
+        const InferenceLevel keep = m_inferenceLevel;
+        m_inferenceLevel = InferenceLevel::Off;
+        const glm::vec2 r = snap(pos);
+        m_inferenceLevel = keep;
+        return r;
+    }
+    if (dragPts.size() == 1) {
+        // The cursor only gets the grid here: the point's own landing spot is what
+        // the inference (point snaps, alignment, symmetry) acts on, further down in
+        // onMouseMove. Pulling the cursor as well counted every inference twice.
+        const InferenceLevel keep = m_inferenceLevel;
+        m_inferenceLevel = InferenceLevel::Off;
+        const glm::vec2 r = snap(pos);
+        m_inferenceLevel = keep;
+        return r;
+    }
+    return snap(pos);
 }
 
 void SketchTool::onMouseMove(glm::vec2 pos) {
@@ -283,7 +349,8 @@ void SketchTool::onMouseMove(glm::vec2 pos) {
     }
     // Trim uses the raw cursor for picking; snapping would pull the click toward
     // unrelated nearby targets and pick the wrong element.
-    glm::vec2 newPos = (m_mode == SketchToolMode::Trim) ? pos : snap(pos);
+    const std::set<int> dragPts = dragPoints();
+    glm::vec2 newPos = (m_mode == SketchToolMode::Trim) ? pos : dragAwareSnap(pos, dragPts);
     // Select/move only manipulates existing geometry - inference guides are
     // visual noise here. Keep the snapped position (handy when dragging an
     // element onto a grid point/endpoint) but drop the guide markers.
@@ -339,17 +406,7 @@ void SketchTool::onMouseMove(glm::vec2 pos) {
     // Drag the active selection (or the single dragged point if no broader
     // selection exists) by the cursor delta each frame.
     if (m_isDragging && m_sketch) {
-        std::set<int> pts = m_selectedPoints;
-        for (int lid : m_selectedLines) {
-            for (const auto& l : m_sketch->getLines()) {
-                if (l.id == lid) {
-                    pts.insert(l.startPointId);
-                    pts.insert(l.endPointId);
-                    break;
-                }
-            }
-        }
-        if (pts.empty() && m_dragPointId >= 0) pts.insert(m_dragPointId);
+        const std::set<int>& pts = dragPts;
 
         // When a single point is being dragged, run inference snap on its
         // target position so endpoint / midpoint / on-line / axis-from-point
@@ -367,7 +424,12 @@ void SketchTool::onMouseMove(glm::vec2 pos) {
             // the cursor to actually travel before the magnet engages.
             if (p && delta != glm::vec2(0.0f)) {
                 m_snapExcludePoints = pts;
-                glm::vec2 target = p->pos + delta;
+                // Where the point WANTS to be: the cursor plus the fixed offset it
+                // was grabbed at - not "where it is now + this frame's travel".
+                // The relative form carried every pull (alignment, point snap)
+                // forward as a permanent offset, so pulls piled up and a point
+                // that had been pulled never came back to the cursor.
+                glm::vec2 target = newPos + m_dragGrab;
                 glm::vec2 inferred = snap(target);
                 m_snapExcludePoints.clear();
                 // A point already stuck to a rim rides it; snap()'s answer only
@@ -1025,8 +1087,23 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     //   allowDirectional - perp/parallel-to-prev, angle, on-line-extension,
     //                      tangent, axis-from-point. ON for both Full & Reduced.
     //   allowCharge      - hover-to-charge references (Full only).
+    // MOVING existing geometry (the Select tool dragging points / lines): only
+    // the point snaps - endpoints, midpoints, centres, and the axis-aligned
+    // symmetry suggestion - apply. Alignment to any other point's X / Y, on-line,
+    // line extensions, rim and the directional guides are for PLACING something
+    // new. In a drag they pulled the cursor with no guide drawn (Select mode drops
+    // the markers), so on a busy sketch a free move felt stuck to the grid even
+    // with Snap to grid off (tester list 11-14-26, item 3).
+    const bool moving = (m_mode == SketchToolMode::Select);
+    // ...plus ONE thing that IS useful while moving a single point: lining it up
+    // with another point's X or Y (level this vertex with that one). Single-point
+    // drags only (m_snapExcludePoints is set just for those), Full / Max only, on
+    // a tight pixel-sized band, and the guide is drawn so you can see what grabbed.
+    const bool moveAlign = moving && !m_snapExcludePoints.empty() &&
+                           (m_inferenceLevel == InferenceLevel::Full ||
+                            m_inferenceLevel == InferenceLevel::Max);
     const bool allowSnaps       = (m_inferenceLevel != InferenceLevel::Off);
-    const bool allowDirectional = (m_inferenceLevel != InferenceLevel::Off);
+    const bool allowDirectional = (m_inferenceLevel != InferenceLevel::Off) && !moving;
     const bool allowCharge      = (m_inferenceLevel == InferenceLevel::Full ||
                                    m_inferenceLevel == InferenceLevel::Max);
 
@@ -1116,6 +1193,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     }
     const auto& circles = m_sketch->getCircles();
     for (const auto& c : circles) {
+        if (moving) break;
         const SketchPoint* center = m_sketch->getPoint(c.centerPointId);
         if (!center) continue;
         glm::vec2 v = pos - center->pos;
@@ -1145,6 +1223,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     }
     const auto& arcs = m_sketch->getArcs();
     for (const auto& a : arcs) {
+        if (moving) break;
         const SketchPoint* center = m_sketch->getPoint(a.centerPointId);
         const SketchPoint* spt   = m_sketch->getPoint(a.startPointId);
         const SketchPoint* ept   = m_sketch->getPoint(a.endPointId);
@@ -1199,7 +1278,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     // Face-reference circular / arc edges - continuous perimeter snapping for
     // in-plane host/neighbour circles (hole rims, fillet arcs). Mirrors the
     // sketch-circle behaviour: grid wins ties; never fires when inference is Off.
-    if (m_inferenceLevel != InferenceLevel::Off) {
+    if (m_inferenceLevel != InferenceLevel::Off && !moving) {
         const float TWO_PI = 2.0f * static_cast<float>(M_PI);
         for (const auto& fc : m_sketch->getFaceReferences().circles) {
             glm::vec2 v = pos - fc.center;
@@ -1462,7 +1541,12 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     // snap above: with grid snap on, an absolute 0.2 mm floor would fire a
     // horizontal/vertical guide off a point within 0.2 mm on a fine grid,
     // hijacking the cursor within one increment. Tie it to the grid instead.
-    const float axisThresh   = (gridActive ? tolStep() * 0.3f : 0.2f);
+    float axisThresh         = (gridActive ? tolStep() * 0.3f : 0.2f);
+    // Moving a point: a few SCREEN pixels, never more than the band above. A band
+    // in millimetres is huge when zoomed in and tiny zoomed out; pixels feel the
+    // same at every zoom, and on a busy sketch a wider one is a magnet everywhere.
+    if (moveAlign && m_mmPerPixel > 0.0f)
+        axisThresh = std::min(axisThresh, kAlignPx * m_mmPerPixel);
     // Unlike point-to-point snapping above, this band is testing distance to
     // a CURVE, not to a small set of discrete candidate points - there's no
     // "other nearby line" to confuse it with in the way a second nearby point
@@ -1492,7 +1576,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
 
     // On-line: cursor's perpendicular projection lands within an existing
     // sketch segment.
-    if (allowSnaps) {
+    if (allowSnaps && !moving) {
         for (const auto& ln : lines) {
             // fromText (SVG-import / Text-tool) segments ARE valid on-edge
             // targets: landing a point on an imported outline is how you anchor
@@ -1616,7 +1700,7 @@ glm::vec2 SketchTool::snap(glm::vec2 pos) const {
     const bool preStartAxis =
         !m_isPlacing && (m_inferenceLevel == InferenceLevel::Full ||
                          m_inferenceLevel == InferenceLevel::Max);
-    if (allowDirectional) {
+    if (allowDirectional || moveAlign) {
         for (const auto& pt : m_sketch->getPoints()) {
             if (m_snapExcludePoints.count(pt.id)) continue;
             if (pt.fromText) continue;
@@ -2569,6 +2653,7 @@ void SketchTool::handleSelectTool(glm::vec2 pos) {
         m_selectedPoints.insert(nearPt);
         m_dragPointId = nearPt;
         m_isDragging = true; // multi-point drag handled in onMouseMove
+        m_dragNeedsBaseline = true;
     } else if (nearLine >= 0) {
         if (m_lastDownAddedToSel) {
             // Ctrl+click on a line: toggle.
@@ -2577,6 +2662,7 @@ void SketchTool::handleSelectTool(glm::vec2 pos) {
         } else {
             m_selectedLines.insert(nearLine);
             m_isDragging = true; // dragging the line translates the whole selection
+            m_dragNeedsBaseline = true;
         }
     } else if (nearCircle >= 0) {
         if (m_lastDownAddedToSel) {

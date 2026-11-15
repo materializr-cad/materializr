@@ -12,6 +12,7 @@
 #include <gtest/gtest.h>
 #include <glm/glm.hpp>
 #include <cmath>
+#include <map>
 #include <string>
 
 namespace materializr {
@@ -224,5 +225,210 @@ TEST(ShapeSpec, ZeroTypedSizeRefusesClickAndPlace) {
         r.click({3, 0});
         EXPECT_EQ(1u, r.sketch.getLines().size());
         EXPECT_EQ(nullptr, r.tool.consumeShapeRejection());
+    }
+}
+
+// Switching Snap & Grid off in the middle of a drag: the dragged geometry must
+// follow the cursor from then on, not keep landing on the lattice. (Tester list
+// 11-14-26 reported the move "staying snapped"; at the tool level it does not.)
+TEST(SnapToggle, PointDragFollowsCursorAfterSnapOff) {
+    Rig r(SketchToolMode::Select);
+    r.sketch.addRectangle({0, 0}, {10, 10});
+    const int pid = r.sketch.addPoint({20.0f, 20.0f});
+    r.tool.setGridStep(1.0f);
+    r.tool.setSnapToGridEnabled(true);
+    r.tool.setInferenceLevel(SketchTool::InferenceLevel::Full);
+    r.hover({20.0f, 20.0f});
+    r.tool.onMouseDown({20.0f, 20.0f});
+    r.hover({21.4f, 22.3f});
+    r.hover({23.37f, 24.81f});
+    EXPECT_NEAR(r.sketch.getPoint(pid)->pos.x, 23.0f, 1e-4);   // snapped while ON
+    EXPECT_NEAR(r.sketch.getPoint(pid)->pos.y, 25.0f, 1e-4);
+    r.tool.setSnapToGridEnabled(false);
+    for (glm::vec2 s : { glm::vec2{27.37f, 28.81f}, glm::vec2{29.62f, 31.23f}, glm::vec2{30.41f, 33.77f} }) {
+        r.hover(s);
+        EXPECT_NEAR(r.sketch.getPoint(pid)->pos.x, s.x, 1e-3);
+        EXPECT_NEAR(r.sketch.getPoint(pid)->pos.y, s.y, 1e-3);
+    }
+    r.tool.onMouseUp({30.41f, 33.77f});
+}
+
+TEST(SnapToggle, LineDragFollowsCursorAfterSnapOff) {
+    Rig r(SketchToolMode::Select);
+    const int a = r.sketch.addPoint({20.0f, 20.0f}), b = r.sketch.addPoint({26.0f, 20.0f});
+    r.sketch.addLine(a, b);
+    r.tool.setGridStep(1.0f);
+    r.tool.setSnapToGridEnabled(true);
+    r.tool.setInferenceLevel(SketchTool::InferenceLevel::Full);
+    r.hover({23.0f, 20.0f});
+    r.tool.onMouseDown({23.0f, 20.0f});
+    r.hover({24.4f, 21.3f});
+    r.hover({26.37f, 22.81f});
+    EXPECT_NEAR(r.sketch.getPoint(a)->pos.x, 23.0f, 1e-4);     // whole-step delta while ON
+    EXPECT_NEAR(r.sketch.getPoint(a)->pos.y, 23.0f, 1e-4);
+    r.tool.setSnapToGridEnabled(false);
+    for (glm::vec2 s : { glm::vec2{28.37f, 24.81f}, glm::vec2{30.62f, 26.23f}, glm::vec2{31.41f, 28.77f} }) {
+        r.hover(s);
+        EXPECT_NEAR(r.sketch.getPoint(a)->pos.x, s.x - 3.0f, 1e-3);   // grabbed 3 in from the end
+        EXPECT_NEAR(r.sketch.getPoint(a)->pos.y, s.y - 0.0f, 1e-3);
+    }
+    r.tool.onMouseUp({31.41f, 28.77f});
+}
+
+// Moving a point on a busy sketch with Snap to grid off: the only things allowed to
+// pull it are a POINT snap (endpoint, midpoint, centre), the axis-aligned symmetry
+// suggestion, or alignment with another point's X / Y inside a few screen pixels.
+// On-line, extension and rim pulls belong to placing new geometry - in a drag they
+// read as the move sticking to the grid. (Before: 57% of positions were pulled at
+// Full; now about 15%, each with its guide reported.)
+TEST(SnapToggle, SelectDragOnBusySketchOnlyPointAndSymmetrySnaps) {
+    for (auto lvl : { SketchTool::InferenceLevel::Reduced, SketchTool::InferenceLevel::Full,
+                      SketchTool::InferenceLevel::Max }) {
+        Rig r(SketchToolMode::Select);
+        unsigned seed = 12345;
+        auto rnd = [&]{ seed = seed * 1664525u + 1013904223u; return ((seed >> 8) & 0xffff) / 65535.0f; };
+        for (int i = 0; i < 12; ++i) {
+            const int a = r.sketch.addPoint({rnd() * 60 - 30, rnd() * 60 - 30});
+            const int b = r.sketch.addPoint({rnd() * 60 - 30, rnd() * 60 - 30});
+            r.sketch.addLine(a, b);
+        }
+        for (int i = 0; i < 10; ++i)
+            r.sketch.addCircle(r.sketch.addPoint({rnd() * 60 - 30, rnd() * 60 - 30}), 1.0 + rnd() * 6.0);
+        const int pid = r.sketch.addPoint({100.0f, 100.0f});
+        r.tool.setGridStep(1.0f);
+        r.tool.setPixelScale(0.02f);                    // 6 px of alignment band = 0.12 mm
+        r.tool.setSnapToGridEnabled(false);
+        r.tool.setInferenceLevel(lvl);
+        r.hover({100.0f, 100.0f});
+        r.tool.onMouseDown({100.0f, 100.0f});
+        int pulled = 0;
+        for (int i = 0; i < 400; ++i) {
+            const glm::vec2 c{rnd() * 70 - 35, rnd() * 70 - 35};
+            r.hover(c);
+            const glm::vec2 p = r.sketch.getPoint(pid)->pos;
+            if (glm::length(p - c) <= 0.02f) continue;
+            ++pulled;
+            for (const auto& g : r.tool.getActiveInferences()) {
+                const bool allowed = g.kind == materializr::InferenceGuide::Endpoint ||
+                                     g.kind == materializr::InferenceGuide::Midpoint ||
+                                     g.kind == materializr::InferenceGuide::Symmetry ||
+                                     g.kind == materializr::InferenceGuide::AxisHFromPoint ||
+                                     g.kind == materializr::InferenceGuide::AxisVFromPoint;
+                EXPECT_TRUE(allowed) << "level " << (int)lvl << " cursor (" << c.x << "," << c.y
+                                     << ") pulled by inference kind " << (int)g.kind;
+            }
+        }
+        EXPECT_LT(pulled, 100) << "level " << (int)lvl << ": most of a free drag was still being pulled";
+        r.tool.onMouseUp({0, 0});
+    }
+}
+
+// A slow drag with grid snap off must follow the cursor from the very first step.
+// The dragged point used to snap onto ITSELF (the cursor was snapped before the
+// dragged geometry was excluded), swallowing the first ~0.25 mm of every drag -
+// "stuck, then a jump", worst when zoomed in.
+TEST(SnapToggle, SlowDragHasNoSelfSnapDeadZone) {
+    for (float stepMm : { 0.02f, 0.05f, 0.1f, 0.2f }) {
+        Rig r(SketchToolMode::Select);
+        r.sketch.addRectangle({0, 0}, {10, 10});
+        const int pid = r.sketch.addPoint({20.0f, 20.0f});
+        r.tool.setGridStep(1.0f);
+        r.tool.setSnapToGridEnabled(false);
+        r.tool.setInferenceLevel(SketchTool::InferenceLevel::Full);
+        r.hover({20.0f, 20.0f});
+        r.tool.onMouseDown({20.0f, 20.0f});
+        for (int i = 1; i <= 60; ++i) {
+            const glm::vec2 c{20.0f + stepMm * i, 20.0f + 0.5f * stepMm * i};
+            r.hover(c);
+            const glm::vec2 p = r.sketch.getPoint(pid)->pos;
+            ASSERT_NEAR(p.x, c.x, 1e-3) << "step " << stepMm << " #" << i;
+            ASSERT_NEAR(p.y, c.y, 1e-3) << "step " << stepMm << " #" << i;
+        }
+        r.tool.onMouseUp({0, 0});
+    }
+}
+
+// Dragging a line (or any selection) moves it rigidly by the cursor's travel: the
+// cursor is not pulled onto unrelated endpoints, nor onto the line's own moving
+// midpoint / ends, so a slow drag grabbed a little off the middle still tracks.
+TEST(SnapToggle, LineDragIsRigidAndIgnoresNearbyPointsAndItself) {
+    Rig r(SketchToolMode::Select);
+    const int a = r.sketch.addPoint({20.0f, 20.0f}), b = r.sketch.addPoint({26.0f, 20.0f});
+    r.sketch.addLine(a, b);
+    r.sketch.addPoint({28.1f, 23.1f});                 // a stray point the cursor will pass close to
+    r.tool.setGridStep(1.0f);
+    r.tool.setSnapToGridEnabled(false);
+    r.tool.setInferenceLevel(SketchTool::InferenceLevel::Max);
+    r.hover({23.2f, 20.0f});                           // 0.2 mm off the line's midpoint
+    r.tool.onMouseDown({23.2f, 20.0f});
+    for (int i = 1; i <= 40; ++i) {                    // slow: 0.05 mm a frame
+        const glm::vec2 c{23.2f + 0.05f * i, 20.0f + 0.05f * i};
+        r.hover(c);
+        ASSERT_NEAR(r.sketch.getPoint(a)->pos.x, 20.0f + 0.05f * i, 1e-3) << "#" << i;
+        ASSERT_NEAR(r.sketch.getPoint(a)->pos.y, 20.0f + 0.05f * i, 1e-3) << "#" << i;
+    }
+    // Carry on past the stray point at (28.1, 23.1): the cursor goes through
+    // (28.1, 23.1)+(0.1, 0.1) and the line must still be exactly cursor-(3.2, 0).
+    r.hover({28.2f, 23.2f});
+    EXPECT_NEAR(r.sketch.getPoint(a)->pos.x, 28.2f - 3.2f, 1e-3);
+    EXPECT_NEAR(r.sketch.getPoint(a)->pos.y, 23.2f, 1e-3);
+    r.tool.onMouseUp({0, 0});
+}
+
+// Moving ONE point can line it up with another point's X or Y (level this vertex
+// with that one): within a few screen pixels, with the guide reported so it can be
+// drawn. A line / selection drag never does, and neither does a point drag at
+// Reduced.
+TEST(SnapToggle, SinglePointDragAlignsToAnotherPointsXOrY) {
+    auto build = [](Rig& r) {
+        const int q = r.sketch.addPoint({30.0f, 5.0f});   // the alignment target
+        (void)q;
+        r.tool.setGridStep(1.0f);
+        r.tool.setPixelScale(0.02f);                       // band = 6 px = 0.12 mm
+        r.tool.setSnapToGridEnabled(false);
+    };
+    {   // single point, Full: 0.07 mm off Q's X -> pulled onto X = 30, the guide says so
+        Rig r(SketchToolMode::Select);
+        build(r);
+        const int pid = r.sketch.addPoint({20.0f, 20.0f});
+        r.tool.setInferenceLevel(SketchTool::InferenceLevel::Full);
+        r.hover({20.0f, 20.0f});
+        r.tool.onMouseDown({20.0f, 20.0f});
+        r.hover({25.0f, 21.0f});
+        r.hover({30.07f, 22.0f});
+        EXPECT_NEAR(r.sketch.getPoint(pid)->pos.x, 30.0f, 1e-3);
+        EXPECT_NEAR(r.sketch.getPoint(pid)->pos.y, 22.0f, 1e-3);   // only X aligned
+        bool guide = false;
+        for (const auto& g : r.tool.getActiveInferences())
+            if (g.kind == materializr::InferenceGuide::AxisVFromPoint) guide = true;
+        EXPECT_TRUE(guide) << "the alignment must be reported so it is drawn";
+        r.hover({30.5f, 22.0f});                          // well outside the band: free
+        EXPECT_NEAR(r.sketch.getPoint(pid)->pos.x, 30.5f, 1e-3);
+        r.tool.onMouseUp({0, 0});
+    }
+    {   // single point, Reduced: no standalone alignment
+        Rig r(SketchToolMode::Select);
+        build(r);
+        const int pid = r.sketch.addPoint({20.0f, 20.0f});
+        r.tool.setInferenceLevel(SketchTool::InferenceLevel::Reduced);
+        r.hover({20.0f, 20.0f});
+        r.tool.onMouseDown({20.0f, 20.0f});
+        r.hover({25.0f, 21.0f});
+        r.hover({30.07f, 22.0f});
+        EXPECT_NEAR(r.sketch.getPoint(pid)->pos.x, 30.07f, 1e-3);
+        r.tool.onMouseUp({0, 0});
+    }
+    {   // a line drag passing the same spot: rigid, never aligned
+        Rig r(SketchToolMode::Select);
+        build(r);
+        const int a = r.sketch.addPoint({20.0f, 20.0f}), b = r.sketch.addPoint({24.0f, 20.0f});
+        r.sketch.addLine(a, b);
+        r.tool.setInferenceLevel(SketchTool::InferenceLevel::Full);
+        r.hover({22.0f, 20.0f});
+        r.tool.onMouseDown({22.0f, 20.0f});
+        r.hover({27.0f, 21.0f});
+        r.hover({32.07f, 22.0f});                          // b's X would be 34.07; a's 30.07
+        EXPECT_NEAR(r.sketch.getPoint(a)->pos.x, 30.07f, 1e-3);
+        r.tool.onMouseUp({0, 0});
     }
 }
