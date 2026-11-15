@@ -230,6 +230,11 @@ public:
     // True when something was placed (a chord end counts for the arc).
     bool commitShapeNow();
     void clearShapeSpec() { m_shapeSpec = ShapeSpec{}; }
+    // A size the user typed (or stepped to) as 0 is pinned, not "follow the
+    // cursor". It cannot make a shape: the click / Place that would use it is
+    // refused and this says why (read-and-clear), like the Corner tool does.
+    bool typedSizeIsZero() const;
+    const char* consumeShapeRejection() { const char* r = m_shapeRejection; m_shapeRejection = nullptr; return r; }
     // Text tool settings - the popup edits these; the click consumes them.
     const std::string& getTextString() const { return m_textString; }
     void setTextString(const std::string& s) { m_textString = s; }
@@ -835,6 +840,7 @@ private:
     bool commitTypedShape(glm::vec2 cursor);
     void addLineDistanceConstraint(int aId, int bId, double value);
     const char* m_cornerRejection = nullptr;
+    const char* m_shapeRejection = nullptr;
     std::vector<std::vector<glm::vec2>> m_refHover;
     std::set<int> m_offsetOnly;   // see offsetSelectionCount()
     const std::set<int>* offsetOnly() const { return m_offsetOnly.empty() ? nullptr : &m_offsetOnly; }

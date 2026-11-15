@@ -2,7 +2,11 @@
 #include "LoftOp.h"
 #include "Sketch.h"
 
+#include <BRepAlgoAPI_Fuse.hxx>
+#include <BRepCheck_Analyzer.hxx>
 #include <BRepOffsetAPI_ThruSections.hxx>
+#include <ShapeUpgrade_UnifySameDomain.hxx>
+#include <TopExp_Explorer.hxx>
 #include <BRepAdaptor_CompCurve.hxx>
 #include <BRepBuilderAPI_GTransform.hxx>
 #include <BRepBuilderAPI_Transform.hxx>
@@ -55,8 +59,12 @@ struct RailTable {
     double hMax = 0.0;
 };
 
+// `halfOnly`: a rail that crosses the base plane is lofted one side at a time.
+// Only the part of the rail on the +n side of the plane counts, and heights are
+// measured from the PLANE (not from the rail's lowest point, which for a rail
+// crossing the plane would put the base section at the far end of the rail).
 bool buildRailTable(const TopoDS_Wire& wire, const gp_Pnt& C, const gp_Vec& n,
-                    RailTable& out) {
+                    RailTable& out, bool halfOnly = false) {
     BRepAdaptor_CompCurve curve(wire);
     const double u0 = curve.FirstParameter(), u1 = curve.LastParameter();
     if (!(u1 > u0)) return false;
@@ -71,11 +79,12 @@ bool buildRailTable(const TopoDS_Wire& wire, const gp_Pnt& C, const gp_Vec& n,
         gp_Pnt p = curve.Value(u);
         gp_Vec v(C, p);
         const double h = v.Dot(n);
+        if (halfOnly && h < -1e-7) continue;
         samples.push_back({h, v - n.Multiplied(h)});
         hMin = std::min(hMin, h);
         hTop = std::max(hTop, h);
     }
-    if (hTop - hMin < 1e-6) return false;   // never leaves the base plane
+    if (samples.empty() || hTop - hMin < 1e-6) return false;   // never leaves the base plane
 
     // Azimuth axis: the in-plane direction of the sample farthest from the
     // axis (signed so that sample is on the POSITIVE side).
@@ -96,7 +105,7 @@ bool buildRailTable(const TopoDS_Wire& wire, const gp_Pnt& C, const gp_Vec& n,
     struct Acc { double cPos = -1e300, cNeg = 1e300; bool anyP = false, anyN = false; };
     std::map<long, Acc> bins;
     for (const auto& sm : samples) {
-        const double h = sm.h - hMin;
+        const double h = halfOnly ? std::max(sm.h, 0.0) : sm.h - hMin;
         const double c = sm.ip.Dot(out.axis);
         Acc& a = bins[static_cast<long>(h / bin + 0.5)];
         if (c >= 0.0) { a.cPos = std::max(a.cPos, c); a.anyP = true; }
@@ -146,6 +155,50 @@ double sideAt(const SideTable& t, double h) {
 void railInterval(const RailTable& t, double h, double& lo, double& hi) {
     hi = sideAt(t.pos, h);
     lo = t.twoSided ? sideAt(t.neg, h) : -hi;
+}
+
+// Does any rail reach clearly to BOTH sides of the base plane? Then it is two
+// rails in one stroke - one climbing each way - and the loft is built as a half
+// each side. A rail that merely starts a hair under the plane is not crossing.
+bool anyRailCrossesPlane(const std::vector<TopoDS_Wire>& rails, const gp_Pnt& C, const gp_Vec& n) {
+    for (const TopoDS_Wire& rw : rails) {
+        BRepAdaptor_CompCurve rc(rw);
+        const double r0 = rc.FirstParameter(), r1 = rc.LastParameter();
+        if (!(r1 > r0)) continue;
+        double lo = 1e300, hi = -1e300;
+        for (int i = 0; i <= 200; ++i) {
+            const double h = gp_Vec(C, rc.Value(r0 + (r1 - r0) * (i / 200.0))).Dot(n);
+            lo = std::min(lo, h); hi = std::max(hi, h);
+        }
+        const double tol = std::max(1e-3, 0.05 * (hi - lo));
+        if (lo < -tol && hi > tol) return true;
+    }
+    return false;
+}
+
+// The two halves share the base profile (its planar cap), so they fuse into one
+// solid. If the fuse does not give exactly one valid solid, keep both in a
+// compound rather than lose a half.
+TopoDS_Shape joinHalves(const TopoDS_Shape& a, const TopoDS_Shape& b, bool solid) {
+    if (solid) {
+        try {
+            BRepAlgoAPI_Fuse fuse(a, b);
+            if (fuse.IsDone() && !fuse.Shape().IsNull()) {
+                ShapeUpgrade_UnifySameDomain uni(fuse.Shape(), Standard_True, Standard_True, Standard_True);
+                uni.Build();
+                const TopoDS_Shape r = uni.Shape();
+                int nSolids = 0;
+                for (TopExp_Explorer ex(r, TopAbs_SOLID); ex.More(); ex.Next()) ++nSolids;
+                if (nSolids == 1 && BRepCheck_Analyzer(r).IsValid()) return r;
+            }
+        } catch (...) {}
+    }
+    BRep_Builder bb;
+    TopoDS_Compound comp;
+    bb.MakeCompound(comp);
+    bb.Add(comp, a);
+    bb.Add(comp, b);
+    return comp;
 }
 
 } // namespace
@@ -210,14 +263,42 @@ bool GuidedLoftOp::execute(Document& doc) {
 
     try {
         OCC_CATCH_SIGNALS
-
-        // Base frame: centroid of the base wire (the scaling centre / axis
-        // foot) + the base plane normal, flipped if the rails climb the other
-        // way so "up" is always the rails' direction.
         GProp_GProps lp;
         BRepGProp::LinearProperties(m_base, lp);
-        gp_Pnt C = lp.CentreOfMass();
-        gp_Vec n(m_basePlane.Axis().Direction());
+        const gp_Pnt C = lp.CentreOfMass();
+        const gp_Vec n0(m_basePlane.Axis().Direction());
+
+        TopoDS_Shape result;
+        if (!anyRailCrossesPlane(m_rails, C, n0)) {
+            if (!loftSide(n0, /*autoDirection=*/true, /*halfOnly=*/false, result)) return false;
+        } else {
+            // A rail drawn through the base plane describes a body on BOTH
+            // sides of it. Read as one stroke it was folded onto a single
+            // climb (the profile pinched to nothing, then swelled again), so
+            // each side is lofted on its own, then the two are joined.
+            TopoDS_Shape up, down;
+            const bool okUp = loftSide(n0, false, true, up);
+            const bool okDn = loftSide(n0.Reversed(), false, true, down);
+            if (!okUp && !okDn) return false;
+            result = (okUp && okDn) ? joinHalves(up, down, m_solid) : (okUp ? up : down);
+        }
+        doc.addOrPutBody(m_createdBodyId, result, "Guided Loft");
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+// One climb: the base profile swept along +n (or whichever way the rails go,
+// when `autoDirection`) to the rails. `halfOnly` reads only the +n side of a
+// rail that crosses the base plane.
+bool GuidedLoftOp::loftSide(gp_Vec n, bool autoDirection, bool halfOnly, TopoDS_Shape& out) const {
+    try {
+        OCC_CATCH_SIGNALS
+
+        GProp_GProps lp;
+        BRepGProp::LinearProperties(m_base, lp);
+        const gp_Pnt C = lp.CentreOfMass();
 
         // Which way is "up"? The way the rails go. A rail drawn on the far side
         // of the base plane (rising to -Z from a base at Z=0, say) has negative
@@ -227,7 +308,7 @@ bool GuidedLoftOp::execute(Document& doc) {
         // wrong direction (a cone came out as an hourglass). The old code only
         // flipped when the table build failed, which this case never does. So
         // point `n` at the side of the plane the rails reach furthest into.
-        {
+        if (autoDirection) {
             double reach = 0.0;
             for (const TopoDS_Wire& rw : m_rails) {
                 BRepAdaptor_CompCurve rc(rw);
@@ -248,11 +329,12 @@ bool GuidedLoftOp::execute(Document& doc) {
         auto buildAll = [&]() -> bool {
             for (size_t r = 0; r < m_rails.size(); ++r) {
                 rails[r] = RailTable();
-                if (!buildRailTable(m_rails[r], C, n, rails[r])) return false;
+                if (!buildRailTable(m_rails[r], C, n, rails[r], halfOnly)) return false;
             }
             return true;
         };
         if (!buildAll()) {
+            if (!autoDirection) return false;
             n.Reverse();
             if (!buildAll()) {
                 std::fprintf(stderr,
@@ -470,7 +552,7 @@ bool GuidedLoftOp::execute(Document& doc) {
             return false;
         }
 
-        doc.addOrPutBody(m_createdBodyId, thru.Shape(), "Guided Loft");
+        out = thru.Shape();
         return true;
     } catch (...) {
         return false;

@@ -167,6 +167,11 @@ void SketchTool::onMouseDown(glm::vec2 pos, bool addToSel) {
     // Typed values from the panel (length, angle, width, height, chord, sweep /
     // radius) take over the moving end of the placement; the click only says
     // "now". Without any, the cursor rules, as it always did.
+    // A typed size of 0 cannot place anything: say so, keep the placement live.
+    if (m_isPlacing && typedSizeIsZero()) {
+        m_shapeRejection = "Size must be greater than 0.";
+        return;
+    }
     if (m_isPlacing && m_shapeSpec.any() && commitTypedShape(snapped)) return;
 
     switch (m_mode) {
@@ -4281,8 +4286,26 @@ double SketchTool::polygonSizeFor(double circumRadius) const {
     return circumRadius * k * (m_polygonSpec.diameter ? 2.0 : 1.0);
 }
 
+bool SketchTool::typedSizeIsZero() const {
+    if (!m_isPlacing) return false;
+    const ShapeSpec& sp = m_shapeSpec;
+    switch (m_mode) {
+        case SketchToolMode::Polygon:   return m_polygonSpec.hasSize && m_polygonSpec.size <= 0.0;
+        case SketchToolMode::Line:      return sp.hasLen && sp.len <= 0.0;
+        case SketchToolMode::Circle:    return sp.hasLen && sp.len <= 0.0;
+        case SketchToolMode::Rectangle: return (sp.hasW && sp.w <= 0.0) || (sp.hasH && sp.h <= 0.0);
+        case SketchToolMode::Arc:
+            if (m_clickCount == 1) return sp.hasLen && sp.len <= 0.0;
+            // A radius of 0 is no arc; a sweep of 0 is already clamped to 0.1.
+            return m_clickCount == 2 && m_arcDimMode == ArcDimMode::Radius &&
+                   sp.hasApex && sp.apex <= 0.0;
+        default: return false;
+    }
+}
+
 bool SketchTool::commitPolygonNow() {
     if (m_mode != SketchToolMode::Polygon || !m_isPlacing || !m_sketch) return false;
+    if (typedSizeIsZero()) { m_shapeRejection = "Size must be greater than 0."; return false; }
     const size_t before = m_sketch->getPolygons().size();
     handlePolygonTool(m_currentPos);
     return m_sketch->getPolygons().size() > before;
@@ -4516,6 +4539,7 @@ bool SketchTool::commitShapeNow() {
         default:
             return false;
     }
+    if (typedSizeIsZero()) { m_shapeRejection = "Size must be greater than 0."; return false; }
     if (m_shapeSpec.any()) return commitTypedShape(m_currentPos);
     // Nothing typed: Place = a click at the cursor, exactly as before.
     NewElementGuard newElements(*this, m_sketch);

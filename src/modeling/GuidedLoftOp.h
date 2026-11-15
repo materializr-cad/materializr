@@ -3,6 +3,8 @@
 #include "../core/Document.h"
 #include <TopoDS_Wire.hxx>
 #include <gp_Pln.hxx>
+#include <gp_Vec.hxx>
+#include <TopoDS_Shape.hxx>
 #include <vector>
 #include <string>
 
@@ -22,6 +24,8 @@ namespace materializr { class Sketch; }
 //   * base = closed planar wire; rails = open wires, each gaining height
 //     monotonically-ish above the base plane (sampled, linearly interpolated).
 //   * 1 rail  -> uniform scaling of the base profile.
+//   * a rail that crosses the base plane is two rails in one stroke: each side
+//     is lofted on its own and the halves are joined into one body.
 //   * 2 rails -> anisotropic scaling: rail 1 drives the scale along its own
 //     in-plane azimuth, rail 2 drives the perpendicular axis. Best when the
 //     rails sit roughly 90° apart around the base (the common corner case).
@@ -62,6 +66,10 @@ public:
     OperationDiff captureDiff() const override;
 
 private:
+    // One climb of the profile along +n (see the .cpp); execute() calls it once,
+    // or once per side for a rail that crosses the base plane.
+    bool loftSide(gp_Vec n, bool autoDirection, bool halfOnly, TopoDS_Shape& out) const;
+
     TopoDS_Wire m_base;
     gp_Pln m_basePlane;
     std::vector<TopoDS_Wire> m_rails;

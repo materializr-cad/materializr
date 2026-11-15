@@ -12,6 +12,9 @@
 #include "modeling/Sketch.h"
 
 #include <BRepBndLib.hxx>
+#include <BRepCheck_Analyzer.hxx>
+#include <BRepGProp.hxx>
+#include <GProp_GProps.hxx>
 #include <BRepAlgoAPI_Section.hxx>
 #include <BRepPrimAPI_MakeCylinder.hxx>
 #include <Bnd_Box.hxx>
@@ -92,4 +95,50 @@ TEST(GuidedLoftRails, RailBelowTheBasePlaneTapersTheRightWay) {
         double x0, y0, z0, x1, y1, z1; bb.Get(x0, y0, z0, x1, y1, z1);
         if (dir > 0) EXPECT_NEAR(z1, 22.0, 0.1); else EXPECT_NEAR(z0, -22.0, 0.1);
     }
+}
+
+// 1.8.0 beta tester list 11-14-26: a rail drawn THROUGH the base plane (up on one
+// side, down on the other) is two rails in one stroke. It used to be folded onto
+// a single climb - the profile pinched to nothing right after the base, swelled
+// back, then closed again - instead of a body each way. Now each side is lofted
+// on its own and the halves are joined into one solid.
+TEST(GuidedLoftRails, RailThroughTheBasePlaneLoftsBothSides) {
+    Document doc; History hist;
+    // The tester's file: a 5 x 5 square on a plane whose normal is +Y, and a "<"
+    // rail in the XY plane from (0, 2.5) back to (-2.5, 0) on the base plane and
+    // on to (0, -2.5).
+    auto base = std::make_shared<Sketch>();
+    base->setPlane(gp_Pln(gp_Ax3(gp_Pnt(0, 0, 0), gp_Dir(0, 1, 0), gp_Dir(1, 0, 0))));
+    const int a = base->addPoint({2.5f, 2.5f}), b = base->addPoint({-2.5f, 2.5f});
+    const int c = base->addPoint({-2.5f, -2.5f}), d = base->addPoint({2.5f, -2.5f});
+    base->addLine(a, b); base->addLine(b, c); base->addLine(c, d); base->addLine(d, a);
+    auto rail = std::make_shared<Sketch>();
+    rail->setPlane(gp_Pln(gp_Ax3(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1), gp_Dir(1, 0, 0))));
+    const int top = rail->addPoint({0, 2.5f}), mid = rail->addPoint({-2.5f, 0}),
+              bot = rail->addPoint({0, -2.5f});
+    rail->addLine(mid, top); rail->addLine(mid, bot);
+    const int ib = doc.addSketch(base), ir = doc.addSketch(rail);
+    std::vector<TopoDS_Wire> holes; bool closed = false;
+    auto w = LoftOp::sectionFromSketch(base.get(), holes, &closed);
+    ASSERT_TRUE(closed);
+    auto op = std::make_unique<GuidedLoftOp>();
+    op->setBase(w, base->getPlane());
+    op->setBaseSketch(ib);
+    op->addRail(rail->buildOpenWire(), ir);
+    ASSERT_TRUE(hist.pushOperation(std::move(op), doc));
+
+    ASSERT_EQ(1u, doc.getAllBodyIds().size()) << "the two halves should be one body";
+    const TopoDS_Shape body = doc.getBody(doc.getAllBodyIds().front());
+    EXPECT_TRUE(BRepCheck_Analyzer(body).IsValid());
+    int nSolids = 0;
+    for (TopExp_Explorer ex(body, TopAbs_SOLID); ex.More(); ex.Next()) ++nSolids;
+    EXPECT_EQ(1, nSolids);
+    // Reaches 2.5 each way along the plane normal (Y)...
+    Bnd_Box bb; BRepBndLib::Add(body, bb);
+    double x0, y0, z0, x1, y1, z1; bb.Get(x0, y0, z0, x1, y1, z1);
+    EXPECT_NEAR(y1, 2.5, 0.05);
+    EXPECT_NEAR(y0, -2.5, 0.05);
+    // ...and is two square pyramids (base 5 x 5, height 2.5) base to base.
+    GProp_GProps vp; BRepGProp::VolumeProperties(body, vp);
+    EXPECT_NEAR(vp.Mass(), 2.0 * (25.0 * 2.5 / 3.0), 0.5);
 }

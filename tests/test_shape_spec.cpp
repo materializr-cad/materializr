@@ -172,3 +172,57 @@ TEST(ShapeSpec, ArcTypedRadiusBelowHalfChordClampsToSemicircle) {
     EXPECT_NEAR(a.x, 5.0f, 1e-3f);
     EXPECT_NEAR(a.y, 5.0f, 1e-3f);                                         // the semicircle's apex
 }
+
+// A typed size of 0 is pinned at 0.00 (the panel's 0 button), not "follow the
+// cursor". It cannot make a shape: the click / Place is refused, says why, and
+// the placement stays live so the value can be fixed.
+TEST(ShapeSpec, ZeroTypedSizeRefusesClickAndPlace) {
+    {   // Line
+        Rig r(SketchToolMode::Line);
+        r.click({0, 0});
+        r.tool.shapeSpec().hasLen = true;
+        r.tool.shapeSpec().len = 0.0;
+        r.click({5, 0});
+        EXPECT_TRUE(r.sketch.getLines().empty());
+        EXPECT_TRUE(r.tool.isPlacing());
+        ASSERT_NE(nullptr, r.tool.consumeShapeRejection());
+        EXPECT_EQ(nullptr, r.tool.consumeShapeRejection());   // read-and-clear
+        EXPECT_FALSE(r.tool.commitShapeNow());
+        EXPECT_NE(nullptr, r.tool.consumeShapeRejection());
+        r.tool.shapeSpec().len = 4.0;                          // fixing it places the line
+        r.click({5, 0});
+        ASSERT_EQ(1u, r.sketch.getLines().size());
+    }
+    {   // Rectangle: either side at 0 refuses
+        Rig r(SketchToolMode::Rectangle);
+        r.click({0, 0});
+        r.tool.shapeSpec().hasW = true;  r.tool.shapeSpec().w = 5.0;
+        r.tool.shapeSpec().hasH = true;  r.tool.shapeSpec().h = 0.0;
+        r.click({6, 6});
+        EXPECT_TRUE(r.sketch.getLines().empty());
+        EXPECT_NE(nullptr, r.tool.consumeShapeRejection());
+    }
+    {   // Circle
+        Rig r(SketchToolMode::Circle);
+        r.click({0, 0});
+        r.tool.shapeSpec().hasLen = true;  r.tool.shapeSpec().len = 0.0;
+        EXPECT_FALSE(r.tool.commitShapeNow());
+        EXPECT_TRUE(r.sketch.getCircles().empty());
+        EXPECT_NE(nullptr, r.tool.consumeShapeRejection());
+    }
+    {   // Polygon
+        Rig r(SketchToolMode::Polygon);
+        r.click({0, 0});
+        r.tool.polygonSpec().hasSize = true;  r.tool.polygonSpec().size = 0.0;
+        EXPECT_FALSE(r.tool.commitPolygonNow());
+        EXPECT_TRUE(r.sketch.getPolygons().empty());
+        EXPECT_NE(nullptr, r.tool.consumeShapeRejection());
+    }
+    {   // Nothing typed: no refusal, the cursor rules as before
+        Rig r(SketchToolMode::Line);
+        r.click({0, 0});
+        r.click({3, 0});
+        EXPECT_EQ(1u, r.sketch.getLines().size());
+        EXPECT_EQ(nullptr, r.tool.consumeShapeRejection());
+    }
+}

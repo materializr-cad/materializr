@@ -5641,6 +5641,10 @@ void Application::renderPolygonToolPanel() {
         m_sketchTool->getMode() != SketchToolMode::Polygon)
         return;
 
+    // A click / Place with a typed size of 0 does nothing; say why.
+    if (const char* why = m_sketchTool->consumeShapeRejection())
+        showToast(materializr::tr(why), 3.0);
+
     ImGuiViewport* vp = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(
         ImVec2(vp->WorkPos.x + vp->WorkSize.x * 0.5f, vp->WorkPos.y + 60.0f),
@@ -5696,9 +5700,10 @@ void Application::renderPolygonToolPanel() {
                                                     0.0, 1.0e6, 0.0, /*showZero=*/true);
             ImGui::PopID();
         }
-        // The 0 button (and a typed 0) hands the size back to the cursor.
-        if (edited && size > 0.0) { spec.hasSize = true; spec.size = size; }
-        else if (edited && size <= 0.0) spec.hasSize = false;
+        // The 0 button (and a typed 0) sets 0.00 - a place to start stepping
+        // from - and a negative value is 0. A size of 0 makes no polygon: Place
+        // or a click says so (Follow cursor hands the size back to the mouse).
+        if (edited) { spec.hasSize = true; spec.size = std::max(size, 0.0); }
 
         // The angle of the first corner, from the sketch's +X axis.
         double ang = spec.hasAngle ? spec.angleDeg : curRot * 180.0 / M_PI;
@@ -5763,6 +5768,9 @@ void Application::renderShapeToolPanel() {
         return;
 
     using namespace materializr;
+    // A click / Place with a typed size of 0 does nothing; say why.
+    if (const char* why = m_sketchTool->consumeShapeRejection())
+        showToast(tr(why), 3.0);
     auto& spec = m_sketchTool->shapeSpec();
     const SketchTool::ShapeNow now = m_sketchTool->shapeMeasure();
     const bool placing = m_sketchTool->isPlacing();
@@ -5806,8 +5814,9 @@ void Application::renderShapeToolPanel() {
         ImGui::TextDisabled("%s", hint);
         ImGui::PopTextWrapPos();
 
-        // A length: field, then the -10 .. +10 row. 0 (or typing 0) gives the
-        // value back to the cursor. `cur` is what the cursor currently says.
+        // A length: field, then the -10 .. +10 row. 0 sets 0.00 (a negative is
+        // 0 too); a 0 size is refused at Place / click. Follow cursor gives the
+        // values back to the mouse. `cur` is what the cursor currently says.
         auto lengthRow = [&](const char* id, const char* label, bool& has, double& val, double cur) {
             double v = has ? val : cur;
             bool edited = false;
@@ -5820,9 +5829,7 @@ void Application::renderShapeToolPanel() {
                                            0.0, 1.0e6, 0.0, /*showZero=*/true);
             }
             ImGui::PopID();
-            if (edited) {
-                if (v > 0.0) { has = true; val = v; } else has = false;
-            }
+            if (edited) { has = true; val = std::max(v, 0.0); }
         };
         // An angle in degrees: field, then -90 .. +90. `wrap` keeps it in 0..360
         // (a direction); off, the value is clamped by the caller (a sweep).
