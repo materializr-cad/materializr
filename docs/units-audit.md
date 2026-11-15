@@ -7,7 +7,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 
 ## Controls by dimension
 
-- CONVERTED: 162
+- CONVERTED: 163
 - absolute-mm: 2
 - angle: 42
 - count: 1
@@ -116,6 +116,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | angle | src/app/Application_Viewport.cpp | `if (materializr::stepperRow("##step", &deg, /*allowNegative=*/true,` |
 | CONVERTED | src/app/Application_Viewport.cpp | `if (!materializr::parseLength(m_dimEditingBuf, mm)) mm = 0.0;` |
 | CONVERTED | src/app/Application_Viewport.cpp | `if (materializr::lengthStepperRow("##step", &mm, /*allowNegative=*/true,` |
+| CONVERTED | src/app/Application_Viewport.cpp | `materializr::parseLength(m_dimEditingBuf, typed) && typed < 0.0)` |
 | angle | src/app/Application_Viewport.cpp | `(void)materializr::parseFinite(m_sketchGizmoRotateBuf,` |
 | angle | src/app/Application_Viewport.cpp | `bool typedEnter = materializr::inputNumber(` |
 | angle | src/app/Application_Viewport.cpp | `(void)materializr::parseFinite(m_sketchGizmoRotateBuf, deg);` |
@@ -277,9 +278,9 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 
 - CONVERTED: 1
 - allowed-by-hand: 93
-- comment: 312
+- comment: 313
 - diagnostic: 13
-- identifier/other: 13
+- identifier/other: 14
 
 | class | file | code |
 |---|---|---|
@@ -450,7 +451,9 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | comment | src/app/Application_Viewport.cpp | `// Cursor in sketch mm - the space labelOffX/Y lives in, so a` |
 | identifier/other | src/app/Application_Viewport.cpp | `double mm = 0.0;` |
 | identifier/other | src/app/Application_Viewport.cpp | `if (!materializr::parseLength(m_dimEditingBuf, mm)) mm = 0.0;` |
+| comment | src/app/Application_Viewport.cpp | `// An emptied or unreadable field steps from 0 (mm` |
 | identifier/other | src/app/Application_Viewport.cpp | `if (materializr::lengthStepperRow("##step", &mm, /*allowNegative=*/true,` |
+| identifier/other | src/app/Application_Viewport.cpp | `if (mm < 0.0) mm = 0.0;` |
 | identifier/other | src/app/Application_Viewport.cpp | `materializr::formatLengthDigits(m_dimEditingBuf, sizeof(m_dimEditingBuf), mm);` |
 | comment | src/app/Application_Viewport.cpp | `// Convert to mm FIRST, then halve a circle's` |
 | comment | src/app/Application_Viewport.cpp | `// 0.5 mm + 0.5 % of view distance instead; an actually-` |

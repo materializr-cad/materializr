@@ -47,6 +47,7 @@ TEST(KeyBindings, DefaultsAreTheShippedShortcuts) {
     EXPECT_EQ("F9",           KeyBindings::format(kb.chord(KeyAction::TogglePanels)));
     EXPECT_EQ("W",            KeyBindings::format(kb.chord(KeyAction::GizmoTranslate)));
     EXPECT_EQ("D",            KeyBindings::format(kb.chord(KeyAction::DimensionTool)));
+    EXPECT_EQ("X",            KeyBindings::format(kb.chord(KeyAction::ConstructionTool)));
     for (int i = 0; i < KeyBindings::count(); ++i)
         EXPECT_TRUE(kb.isDefault(KeyBindings::fromIndex(i)));
 }

@@ -18,7 +18,7 @@ enum class KeyAction : int {
     NextTab, PrevTab,
     ResetCamera, FrameSelection, TogglePanels,
     GizmoTranslate, GizmoRotate, GizmoScale,
-    DimensionTool,
+    DimensionTool, ConstructionTool,
     COUNT
 };
 

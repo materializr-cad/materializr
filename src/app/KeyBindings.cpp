@@ -37,6 +37,7 @@ const KeyActionInfo kActions[] = {
     { KeyAction::GizmoScale,     "gizmo_scale",     "Gizmo: scale",     "View", KeyScope::Model, bare(ImGuiKey_R) },
 
     { KeyAction::DimensionTool,  "dimension_tool",  "Dimension tool",   "Sketch", KeyScope::Sketch, bare(ImGuiKey_D) },
+    { KeyAction::ConstructionTool, "construction_tool", "Construction geometry", "Sketch", KeyScope::Sketch, bare(ImGuiKey_X) },
 };
 static_assert(sizeof(kActions) / sizeof(kActions[0]) ==
               static_cast<size_t>(KeyAction::COUNT),

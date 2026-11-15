@@ -3440,6 +3440,11 @@ void Application::handleShortcuts() {
     if (m_inSketchMode && m_sketchTool && keyPressed(KeyAction::DimensionTool, false)) {
         m_sketchTool->setMode(SketchToolMode::Dimension);
     }
+    // Plain X - Construction: flips the selected elements to / from construction,
+    // or toggles "draw as construction" for the next shapes (the toolbar button).
+    if (m_inSketchMode && m_sketchTool && keyPressed(KeyAction::ConstructionTool, false)) {
+        handleToolAction(static_cast<int>(ToolAction::SketchConstruction));
+    }
     // Ctrl+D - Duplicate in place. Branches on selection type:
     //   Body   → CopyOp (full history support, undoable via Ctrl+Z)
     //   Axis   → Document::addAxis with the source's origin/direction

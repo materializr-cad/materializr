@@ -3583,11 +3583,14 @@ void Application::renderViewport() {
                             }
                             dimFieldActive = ImGui::IsItemActive();
                         } else {
-                            // Enter, or focus leaving after an edit, commits.
+                            // Enter commits (so does Confirm). Focus leaving the
+                            // field does NOT: clicking a -10 / -1 / 0 / +1 button
+                            // below steals focus, and committing then closed the
+                            // popup on a half-edited (or emptied) field.
                             if (ImGui::InputText("##dimval", m_dimEditingBuf, sizeof(m_dimEditingBuf),
-                                                 ImGuiInputTextFlags_EnterReturnsTrue) ||
-                                ImGui::IsItemDeactivatedAfterEdit())
+                                                 ImGuiInputTextFlags_EnterReturnsTrue))
                                 dimCommitted = true;
+                            if (ImGui::IsItemEdited()) m_dimEditErrId = -1;
                             dimFieldActive = ImGui::IsItemActive();
                             ImGui::SetItemTooltip("%s", materializr::tr(
                                 "A bare number is in the display unit; add a unit to "
@@ -3610,14 +3613,23 @@ void Application::renderViewport() {
                             } else {
                                 double mm = 0.0;
                                 if (!materializr::parseLength(m_dimEditingBuf, mm)) mm = 0.0;
+                                // An emptied or unreadable field steps from 0 (mm
+                                // stays 0 above); a length never goes below 0.
                                 if (materializr::lengthStepperRow("##step", &mm, /*allowNegative=*/true,
                                                                   0.001, 1.0e6, 0.0, /*showZero=*/true)) {
+                                    if (mm < 0.0) mm = 0.0;
                                     materializr::formatLengthDigits(m_dimEditingBuf, sizeof(m_dimEditingBuf), mm);
                                     stepped = true;
                                 }
                             }
                             ImGui::PopID();
-                            if (stepped) m_dimEditingFocus = true;
+                            if (stepped) { m_dimEditingFocus = true; m_dimEditErrId = -1; }
+                        }
+                        if (m_dimEditErrId == m_dimEditingId && m_dimEditingId >= 0) {
+                            ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.40f, 1.0f), "%s",
+                                dimKind == materializr::DimKind::Angle
+                                    ? materializr::tr("Enter a number.")
+                                    : materializr::tr("Enter a number greater than 0."));
                         }
                         // A button for what Enter does, for mouse and touch users who
                         // have no Enter key to hand.
@@ -3632,6 +3644,24 @@ void Application::renderViewport() {
                         if (ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
                             m_dimEditingId = -1;
                             ImGui::CloseCurrentPopup();
+                        }
+                        if (m_dimEditingId >= 0 && dimCommitted) {
+                            // An empty, zero, negative or unreadable value is not
+                            // a dimension: say so and keep the popup open (it
+                            // used to close, silently dropping the edit). A
+                            // negative length snaps the field back to 0.00.
+                            double probe = 0.0;
+                            if (!materializr::applyDimensionEdit(dimKind, dimIsArc,
+                                                                 m_dimEditingBuf, probe)) {
+                                double typed = 0.0;
+                                if (dimKind != materializr::DimKind::Angle &&
+                                    materializr::parseLength(m_dimEditingBuf, typed) && typed < 0.0)
+                                    materializr::formatLengthDigits(m_dimEditingBuf,
+                                                                    sizeof(m_dimEditingBuf), 0.0);
+                                m_dimEditErrId = m_dimEditingId;
+                                m_dimEditingFocus = true;
+                                dimCommitted = false;
+                            }
                         }
                         if (m_dimEditingId >= 0 && dimCommitted) {
                             // recordSketchMutation snapshots before/after and
@@ -3745,11 +3775,12 @@ void Application::renderViewport() {
                             ImGui::CloseCurrentPopup();
                         }
                         ImGui::SameLine();
-                        ImGui::TextDisabled("%s", materializr::tr("(Del)"));
+                        ImGui::TextDisabled("%s", materializr::tr("(delete dimension)"));
                         ImGui::EndPopup();
                     } else {
                         // Popup closed without committing - drop edit state.
                         m_dimEditingId = -1;
+                        m_dimEditErrId = -1;
                     }
                     ImGui::PopStyleVar(); // ##DimEdit WindowPadding
                 }
@@ -7153,8 +7184,19 @@ void Application::renderViewport() {
                         // genuine drag ends the chain (a single segment).
                         float ddx = io.MousePos.x - m_sketchDownX;
                         float ddy = io.MousePos.y - m_sketchDownY;
-                        float slop = 5.0f * (m_window ? m_window->uiScale() : 1.0f);
-                        bool moved = (ddx * ddx + ddy * ddy) > slop * slop;
+                        const float uiS = m_window ? m_window->uiScale() : 1.0f;
+                        float slop = 5.0f * uiS;
+                        const float dist2 = ddx * ddx + ddy * ddy;
+                        // A press-release past the slop is a DRAG only if it was
+                        // held for a moment or travelled well past it. A quick
+                        // click whose cursor merely jittered a few px (fast
+                        // hands, a laggy frame) used to read as a drag: it
+                        // ended the chain after every segment, so quickly
+                        // entered lines came out as disconnected pieces.
+                        const float heldS = ImGui::GetIO().MouseDownDurationPrev[0];
+                        const float farPx = 30.0f * uiS;
+                        bool moved = dist2 > slop * slop &&
+                                     (dist2 > farPx * farPx || heldS > 0.25f);
                         if (!(m_sketchDragCenterPlaced && !moved)) {
                             recordSketchMutation([&]{ m_sketchTool->onMouseDown(sketchCoord, io.KeyCtrl); });
                             // Only a drag that STARTED the segment (the press dropped

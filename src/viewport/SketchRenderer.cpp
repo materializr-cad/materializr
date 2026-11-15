@@ -1511,7 +1511,10 @@ void SketchRenderer::renderSketchHighlight(const Sketch* sketch,
         verts.push_back(b.x); verts.push_back(b.y); verts.push_back(b.z);
     };
 
+    // Construction geometry only exists to help draw its own sketch: it does
+    // not take part in the selection glow seen from outside the sketch.
     for (const auto& ln : sketch->getLines()) {
+        if (ln.isConstruction) continue;
         const SketchPoint* p1 = lutPoint(sketch, ln.startPointId);
         const SketchPoint* p2 = lutPoint(sketch, ln.endPointId);
         if (!p1 || !p2) continue;
@@ -1520,6 +1523,7 @@ void SketchRenderer::renderSketchHighlight(const Sketch* sketch,
 
     const int circSegs = 64;
     for (const auto& c : sketch->getCircles()) {
+        if (c.isConstruction) continue;
         const SketchPoint* ctr = lutPoint(sketch, c.centerPointId);
         if (!ctr) continue;
         float r = static_cast<float>(c.radius);
@@ -1534,6 +1538,7 @@ void SketchRenderer::renderSketchHighlight(const Sketch* sketch,
 
     const int arcSegs = 32;
     for (const auto& a : sketch->getArcs()) {
+        if (a.isConstruction) continue;
         const SketchPoint* ctr = lutPoint(sketch, a.centerPointId);
         const SketchPoint* s   = lutPoint(sketch, a.startPointId);
         const SketchPoint* e   = lutPoint(sketch, a.endPointId);
@@ -1553,13 +1558,13 @@ void SketchRenderer::renderSketchHighlight(const Sketch* sketch,
         }
     }
 
+    // The glow follows the drawn CURVE (the same samples the sketch itself is
+    // drawn from), not the straight control polygon between its key points.
     for (const auto& sp : sketch->getSplines()) {
-        for (size_t i = 0; i + 1 < sp.controlPointIds.size(); ++i) {
-            const SketchPoint* p1 = lutPoint(sketch, sp.controlPointIds[i]);
-            const SketchPoint* p2 = lutPoint(sketch, sp.controlPointIds[i + 1]);
-            if (!p1 || !p2) continue;
-            push(toWorld(sketch, p1->pos), toWorld(sketch, p2->pos));
-        }
+        if (sp.isConstruction) continue;
+        const std::vector<glm::vec2> pts = sketch->sampleSpline2D(sp, 12);
+        for (size_t i = 0; i + 1 < pts.size(); ++i)
+            push(toWorld(sketch, pts[i]), toWorld(sketch, pts[i + 1]));
     }
 
     glDisable(GL_DEPTH_TEST);

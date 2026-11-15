@@ -1093,6 +1093,7 @@ private:
     int  m_dimEditingId = -1;
     char m_dimEditingBuf[32] = "";
     bool m_dimEditingFocus = false;
+    int  m_dimEditErrId = -1;   // constraint whose last Confirm was refused (shows the hint)
     bool m_dimEditingClickedThisFrame = false;
     // Set by applyPendingDimension() (Dimension tool commit) to defer
     // ImGui::OpenPopup("##DimEdit") to the viewport's own ImGui window scope
