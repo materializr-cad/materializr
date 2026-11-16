@@ -3624,7 +3624,12 @@ void Application::renderViewport() {
                             if (materializr::inputNumber("##dimval", &dimPadV, 0.0, 0.0, padFmt,
                                                          ImGuiInputTextFlags_EnterReturnsTrue)) {
                                 std::snprintf(m_dimEditingBuf, sizeof(m_dimEditingBuf), "%.6g", dimPadV);
-                                dimCommitted = true;
+                                // Under touch the pad's Enter only means "this is
+                                // the number": it folds the pad and leaves the
+                                // popup open so the -10..+10 steppers can still
+                                // adjust it. "Confirm (Enter)" below commits. On
+                                // desktop (an angle's InputDouble) Enter commits.
+                                if (!materializr::touchMode()) dimCommitted = true;
                             }
                             dimFieldActive = ImGui::IsItemActive();
                         } else {

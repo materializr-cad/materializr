@@ -657,7 +657,10 @@ bool numberField(const char* id, const char* label, double* v, const char* fmt,
     // scroll-into-view by a frame, so it runs once the pad has a real height.
     // fresh: buf still holds the value the pad opened with, so the FIRST key
     // replaces it (calculator-style) instead of appending to "10.00".
-    struct Entry { char buf[32]; bool fresh; };
+    // lastV: the value the pad last agreed with. When the caller changes *v
+    // behind the pad's back (a -10..+10 stepper beside it) the open entry is
+    // rebuilt from it, so the readout never shows a stale number.
+    struct Entry { char buf[32]; bool fresh; double lastV; };
     static std::map<ImGuiID, Entry> s_entries;
     static ImGuiID s_open = 0;
     static ImGuiID s_justOpened = 0;
@@ -665,6 +668,14 @@ bool numberField(const char* id, const char* label, double* v, const char* fmt,
     ImGui::PushID(id);
     const ImGuiID key = ImGui::GetID("##numfield");
     const bool openHere = (s_open == key);
+    if (openHere && !(hint && *v <= 0.0)) {
+        Entry& oe = s_entries[key];
+        if (*v != oe.lastV) {
+            std::snprintf(oe.buf, sizeof(oe.buf), fmt ? fmt : "%g", *v);
+            oe.fresh = true;     // the next digit replaces it, as when opened
+            oe.lastV = *v;
+        }
+    }
 
     // Honour ImGui's label conventions, which InputDouble got for free and a
     // plain TextUnformatted does not: "##id" means NO visible label (printing
@@ -730,6 +741,7 @@ bool numberField(const char* id, const char* label, double* v, const char* fmt,
                 std::snprintf(e.buf, sizeof(e.buf), fmt ? fmt : "%g", *v);
                 e.fresh = true;
             }
+            e.lastV = *v;
             s_entries[key] = e;
             s_open = key;
             s_justOpened = key;
@@ -938,6 +950,8 @@ TreeLeafAction treeLeaf(const char* id, const char* icon, const char* label,
         "##row", ImVec2(std::max(1.0f, w - indent - eyeW - swW), h));
     if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) act.rightClicked = true;
     const bool rowHov = ImGui::IsItemHovered();
+    if (rowHov && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+        act.doubleClicked = true;
 
     const float fillR = p.x + w - swW;   // fills stop short of the swatch
     if (selected) {

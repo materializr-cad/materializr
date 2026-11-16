@@ -228,6 +228,10 @@ private:
     float m_rightClickX = 0.0f, m_rightClickY = 0.0f;
 
     void handleFingerEvent(unsigned type, std::int64_t id, float nx, float ny);
+    // The OS took the touch away (Android ACTION_CANCEL, e.g. a three-finger
+    // system gesture; focus lost): drop every tracked finger and reset all
+    // gesture state WITHOUT firing a tap. See Window.cpp.
+    void cancelAllFingers();
     void updateHoldSelect();              // per-frame hold check (Android)
     void pumpSyntheticRightClick();       // play back a queued long-press click
 };

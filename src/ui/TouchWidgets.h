@@ -181,6 +181,7 @@ struct TreeLeafAction {
     bool clicked       = false;  // row body tapped (select)
     bool rightClicked  = false;  // row body long-pressed (open context menu)
     bool swatchClicked = false;  // colour swatch tapped (open a picker)
+    bool doubleClicked = false;  // row body double-tapped (open for editing)
 };
 // swatchRGB, when non-null, points at 3 contiguous floats (an rgb colour, e.g.
 // &glm::vec3::x); treeLeaf draws a colour swatch on the right with its own hit

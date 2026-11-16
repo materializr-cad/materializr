@@ -3751,6 +3751,25 @@ void Application::renderSnapSettingsPopup() {
             }
         }
 
+        // Angle snap for the line tool, duplicated from Settings (Sketch tab) so
+        // it can be flipped without leaving the sketch, like Display unit above.
+        {
+            static const int kDegs[] = { 0, 5, 15, 30, 45, 90 };
+            const char* degLabels[] = { "Off", "5\xc2\xb0", "15\xc2\xb0", "30\xc2\xb0", "45\xc2\xb0", "90\xc2\xb0" };
+            int curDeg = m_sketchTool ? m_sketchTool->getAngleSnapDeg() : 15;
+            int idx = 2; // default 15 deg
+            for (int i = 0; i < 6; ++i) if (kDegs[i] == curDeg) idx = i;
+            ImGui::SetNextItemWidth(materializr::uiSz(150, 0).x);
+            if (ImGui::Combo(materializr::tr("Angle snap"), &idx, degLabels, 6)) {
+                if (m_sketchTool) m_sketchTool->setAngleSnapDeg(kDegs[idx]);
+                saveAppSettings();
+                // Same reason as the unit combo: an open popup holds
+                // m_snapWidgetHovered and freezes sketch input.
+                ImGui::CloseCurrentPopup();
+            }
+            wrapTip(materializr::tr("While drawing a line, snap its direction to multiples of this angle from the start point. Lower = more snap rays (15\xc2\xb0 is the classic CAD default); higher = only the cardinal angles; Off = free angles."));
+        }
+
         ImGui::Spacing();
         ImGui::Text("%s", materializr::trFormat("Step (%s)", materializr::unitSuffix()).c_str());
         // The presets are in the DISPLAY unit, not millimetres. They used to be
@@ -5692,16 +5711,16 @@ void Application::renderPolygonToolPanel() {
         const char* sizeLabel = spec.diameter ? materializr::tr("Diameter") : materializr::tr("Radius");
         bool edited = false;
         ImGui::Separator();
-        if (imTouchLayout()) {
+        if (imTouchLayout())
             edited = materializr::amountLengthField("polySize", sizeLabel, &size);
-        } else {
+        else
             edited = materializr::lengthField(sizeLabel, &size).changed;
-            // -10 / -1 / -0.1 / +0.1 / +1 / +10, like every other length.
-            ImGui::PushID("polySizeStep");
-            edited |= materializr::lengthStepperRow("##step", &size, /*allowNegative=*/true,
-                                                    0.0, 1.0e6, 0.0, /*showZero=*/true);
-            ImGui::PopID();
-        }
+        // -10 / -1 / -0.1 / +0.1 / +1 / +10, like every other length - in
+        // every layout, im-touch included (its number pad is no substitute).
+        ImGui::PushID("polySizeStep");
+        edited |= materializr::lengthStepperRow("##step", &size, /*allowNegative=*/true,
+                                                0.0, 1.0e6, 0.0, /*showZero=*/true);
+        ImGui::PopID();
         // The 0 button (and a typed 0) sets 0.00 - a place to start stepping
         // from - and a negative value is 0. A size of 0 makes no polygon: Place
         // or a click says so (Follow cursor hands the size back to the mouse).
@@ -5823,13 +5842,12 @@ void Application::renderShapeToolPanel() {
             double v = has ? val : cur;
             bool edited = false;
             ImGui::PushID(id);
-            if (imTouchLayout()) {
+            if (imTouchLayout())
                 edited = amountLengthField(id, label, &v);
-            } else {
+            else
                 edited = lengthField(label, &v).changed;
-                edited |= lengthStepperRow("##step", &v, /*allowNegative=*/true,
-                                           0.0, 1.0e6, 0.0, /*showZero=*/true);
-            }
+            edited |= lengthStepperRow("##step", &v, /*allowNegative=*/true,
+                                       0.0, 1.0e6, 0.0, /*showZero=*/true);
             ImGui::PopID();
             if (edited) { has = true; val = std::max(v, 0.0); }
         };
@@ -5976,13 +5994,12 @@ void Application::renderCornerToolPanel() {
 
         double size = m_sketchTool->cornerSize();
         const char* label = kind == 1 ? materializr::tr("Distance") : materializr::tr("Radius");
-        if (imTouchLayout()) {
+        if (imTouchLayout())
             materializr::amountLengthField("cornerSize", label, &size);
-        } else {
+        else
             materializr::lengthField(label, &size);
-            materializr::lengthStepperRow("##cornerStep", &size, /*allowNegative=*/true,
-                                          0.0, 1.0e6, 0.0, /*showZero=*/false);
-        }
+        materializr::lengthStepperRow("##cornerStep", &size, /*allowNegative=*/true,
+                                      0.0, 1.0e6, 0.0, /*showZero=*/false);
         if (size < 0.001) size = 0.001;
         m_sketchTool->setCornerSize(size);
     }
@@ -6152,11 +6169,10 @@ void Application::renderPrimitivePopup() {
     // the other tools - the field's own -/+ only step one unit at a time.
     // Sizes get no 0 button (zero is not a useful size); origins keep it.
     auto dimField = [&](const char* label, double* v, bool isOrigin = false) {
-        if (imTouchLayout()) {
+        if (imTouchLayout())
             materializr::amountLengthField(label, label, v);
-            return;
-        }
-        materializr::lengthField(label, v);
+        else
+            materializr::lengthField(label, v);
         ImGui::PushID(label);
         materializr::lengthStepperRow("##step", v, /*allowNegative=*/true,
                                       isOrigin ? -1.0e6 : 0.0, 1.0e6,
@@ -7842,6 +7858,11 @@ void Application::renderLandingPage() {
         // hides itself (see renderPartsPickerDialog).
         openPartsPicker(act.ref, act.name, /*intoNewProject=*/true);
         break;
+    case AT::DeleteEntry:
+        m_landingDeleteRef = act.ref;
+        m_landingDeleteName = act.name;
+        m_landingDeleteAsk = true;   // the popup below asks before anything goes
+        break;
     case AT::OpenSettings:
         // Same staging as the File menu item: the dialog can Cancel cleanly.
         m_settingsOrbitButton = m_orbitButton;
@@ -7862,6 +7883,71 @@ void Application::renderLandingPage() {
         break;
     case AT::None:
         break;
+    }
+
+    // Delete-project confirmation. A filesystem project is removed from disk
+    // (no recycle bin, so it asks); a content:// document (Android's file
+    // picker) cannot be deleted through the paths this app has, so for those
+    // the tile just comes off the recent list and the file stays put.
+    if (m_landingDeleteAsk) {
+        ImGui::OpenPopup("##LandingDelete");
+        m_landingDeleteAsk = false;
+    }
+    if (ImGui::BeginPopupModal("##LandingDelete", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize |
+                               ImGuiWindowFlags_NoTitleBar)) {
+        const bool isUri = m_landingDeleteRef.rfind("content:", 0) == 0;
+        const bool openElsewhere =
+            !isUri && sessionForProjectRef(m_landingDeleteRef) < m_sessions.size();
+        ImGui::TextColored(materializr::accentText(), "%s",
+                           isUri ? materializr::tr("Remove from the home screen?")
+                                 : materializr::tr("Delete this project?"));
+        ImGui::Separator();
+        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 26.0f);
+        ImGui::TextUnformatted(m_landingDeleteName.c_str());
+        ImGui::TextDisabled("%s", isUri ? "" : m_landingDeleteRef.c_str());
+        ImGui::Spacing();
+        if (openElsewhere)
+            ImGui::TextUnformatted(materializr::tr(
+                "This project is open in a tab. Close that tab first."));
+        else if (isUri)
+            ImGui::TextUnformatted(materializr::tr(
+                "This project lives in a document provider, so the file itself is "
+                "left where it is. Only its tile is removed."));
+        else
+            ImGui::TextUnformatted(materializr::tr(
+                "The project file will be deleted from this device. This cannot be undone."));
+        ImGui::PopTextWrapPos();
+        ImGui::Spacing();
+        const float bw = materializr::uiSz(120, 0).x;
+        const float bh = materializr::touchMode() ? 44.0f * uiScale() : 0.0f;
+        ImGui::BeginDisabled(openElsewhere);
+        if (ImGui::Button(isUri ? materializr::tr("Remove") : materializr::tr("Delete"),
+                          ImVec2(bw, bh))) {
+            bool ok = true;
+            if (!isUri) {
+                std::error_code ec;
+                std::filesystem::remove(m_landingDeleteRef, ec);
+                ok = !ec;
+                if (ok) {
+                    const std::string thumb = thumbCacheFile(m_landingDeleteRef);
+                    if (!thumb.empty()) std::filesystem::remove(thumb, ec);
+                } else {
+                    showToast(materializr::trFormat("Could not delete %s.",
+                                                    m_landingDeleteName.c_str()));
+                }
+            }
+            if (ok) {
+                removeRecentProject(m_landingDeleteRef);
+                m_landingPage->removeEntry(m_landingDeleteRef);
+            }
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::Button(materializr::tr("Cancel"), ImVec2(bw, bh)))
+            ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
     }
 }
 

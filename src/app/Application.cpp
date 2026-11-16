@@ -9,6 +9,8 @@
 #include <limits>
 #include <map>
 #include <set>
+#include <GeomAbs_SurfaceType.hxx>
+#include <BRepAdaptor_Surface.hxx>
 
 #if defined(__x86_64__) || defined(__i386__) || defined(_M_X64) || defined(_M_IX86)
 #include <xmmintrin.h>
@@ -2518,68 +2520,13 @@ void Application::handleToolAction(int action) {
         case ToolAction::ExtrudeSketch: {
             // "Extrude From" - always creates a new body (Push/Pull is the
             // modify-in-place tool). Priority: selected region(s) > whole
-            // sketch > face silhouette. The region branch is what makes a
+            // sketch(es) > face silhouette. The region branch is what makes a
             // single letter of a text sketch (or the circle inside a
             // rectangle) extrudable on its own - clicking a region selects
             // it, so the explicit pick must win over the whole profile.
+            // Every selected region / sketch counts, across sketches too.
             const auto& sel = m_selection->getSelection();
-            bool started = false;
-            {
-                // Collect every selected region of ONE sketch (Ctrl+click
-                // several letters → one combined extrude).
-                int regionSketch = -1;
-                std::vector<int> regionIdxs;
-                for (const auto& entry : sel) {
-                    if (entry.type != SelectionType::SketchRegion ||
-                        entry.sketchId < 0)
-                        continue;
-                    if (regionSketch < 0) regionSketch = entry.sketchId;
-                    if (entry.sketchId == regionSketch)
-                        regionIdxs.push_back(entry.subShapeIndex);
-                }
-                if (regionSketch >= 0 && !regionIdxs.empty()) {
-                    auto sketch = m_document->getSketch(regionSketch);
-                    if (sketch) {
-                        auto regions = sketch->buildRegions();
-                        std::vector<TopoDS_Face> profileFaces;
-                        for (int idx : regionIdxs) {
-                            if (idx < 0 ||
-                                idx >= static_cast<int>(regions.size()))
-                                continue;
-                            if (!regions[idx].face.IsNull())
-                                profileFaces.push_back(regions[idx].face);
-                        }
-                        if (profileFaces.size() == 1) {
-                            beginInteractiveExtrude(profileFaces.front(),
-                                                    ExtrudeMode::NewBody,
-                                                    /*targetBody=*/-1,
-                                                    regionSketch);
-                            started = true;
-                        } else if (profileFaces.size() > 1) {
-                            TopoDS_Compound comp;
-                            BRep_Builder bb;
-                            bb.MakeCompound(comp);
-                            for (const auto& f : profileFaces)
-                                bb.Add(comp, f);
-                            beginInteractiveExtrude(comp,
-                                                    ExtrudeMode::NewBody,
-                                                    /*targetBody=*/-1,
-                                                    regionSketch);
-                            started = true;
-                        }
-                    }
-                }
-            }
-            if (!started) {
-                for (const auto& entry : sel) {
-                    if (entry.type == SelectionType::Sketch &&
-                        entry.sketchId >= 0) {
-                        extrudeSketchById(entry.sketchId, ExtrudeMode::NewBody);
-                        started = true;
-                        break;
-                    }
-                }
-            }
+            bool started = extrudeSelectedProfiles(ExtrudeMode::NewBody);
             if (!started) {
                 for (const auto& entry : sel) {
                     if (entry.type == SelectionType::Face && !entry.shape.IsNull()) {
@@ -2597,26 +2544,10 @@ void Application::handleToolAction(int action) {
         }
 
         case ToolAction::SubtractSketch: {
-            // Clicking a sketch in the viewport selects a region, so handle that
-            // first; fall back to a whole-sketch selection (from the Items panel).
-            const auto& sel = m_selection->getSelection();
-            bool started = false;
-            for (const auto& entry : sel) {
-                if (entry.type == SelectionType::SketchRegion && entry.sketchId >= 0) {
-                    subtractSketchRegion(entry.sketchId, entry.subShapeIndex);
-                    started = true;
-                    break;
-                }
-            }
-            if (!started) {
-                for (const auto& entry : sel) {
-                    if (entry.type == SelectionType::Sketch && entry.sketchId >= 0) {
-                        extrudeSketchById(entry.sketchId, ExtrudeMode::Subtract);
-                        started = true;
-                        break;
-                    }
-                }
-            }
+            // Clicking a sketch in the viewport selects a region, so those come
+            // first; a whole-sketch selection (from the Items panel) is the
+            // fallback. All of them cut together, like Push/Pull.
+            const bool started = extrudeSelectedProfiles(ExtrudeMode::Subtract);
             if (!started)
                 showToast(materializr::tr("Select a sketch (or a region of one) to cut with first."));
             break;
@@ -4118,11 +4049,28 @@ void Application::handleViewCubeAction(int action) {
     // An in-progress sketch isn't in the Document yet, so the body loop above
     // can't see it. Frame it too - otherwise a ViewCube click during the very
     // first sketch snaps to the tiny default cube instead of the drawing.
+    bool haveBounds = !bbox.IsVoid();
     if (m_activeSketch) {
         glm::vec3 smin, smax;
         if (m_activeSketch->getWorldBounds(smin, smax)) {
-            if (bbox.IsVoid()) { cmin = smin; cmax = smax; }
+            if (!haveBounds) { cmin = smin; cmax = smax; }
             else { cmin = glm::min(cmin, smin); cmax = glm::max(cmax, smax); }
+            haveBounds = true;
+        }
+    }
+    // Every other visible sketch counts as an object too: Home frames the whole
+    // project, and a project that is only sketches (or whose sketches sit away
+    // from its bodies) used to be framed as if they were not there.
+    if (m_document) {
+        for (int sid : m_document->getAllSketchIds()) {
+            if (!m_document->isSketchVisible(sid)) continue;
+            if (m_activeSketch && sid == m_activeSketchId) continue;
+            auto sk = m_document->getSketch(sid);
+            glm::vec3 smin, smax;
+            if (!sk || !sk->getWorldBounds(smin, smax)) continue;
+            if (!haveBounds) { cmin = smin; cmax = smax; }
+            else { cmin = glm::min(cmin, smin); cmax = glm::max(cmax, smax); }
+            haveBounds = true;
         }
     }
     glm::vec3 center = (cmin + cmax) * 0.5f;
@@ -7512,6 +7460,111 @@ void Application::extrudeSketchById(int sketchId, ExtrudeMode mode) {
     if (mode == ExtrudeMode::Subtract && !sketch->isDetachedFromBody())
         targetBody = sketch->getSourceBody();
     beginInteractiveExtrude(profile, mode, targetBody, sketchId);
+}
+
+bool Application::extrudeSelectedProfiles(ExtrudeMode mode) {
+    if (!m_selection || !m_document) return false;
+    const auto& sel = m_selection->getSelection();
+
+    // Faces to sweep, in selection order, plus the sketches they came from.
+    std::vector<TopoDS_Face> faces;
+    std::vector<int> sketchOrder;           // distinct, in first-seen order
+    auto noteSketch = [&](int sid) {
+        if (std::find(sketchOrder.begin(), sketchOrder.end(), sid) == sketchOrder.end())
+            sketchOrder.push_back(sid);
+    };
+
+    // 1. Picked regions, from any number of sketches.
+    {
+        std::map<int, std::vector<Sketch::Region>> regionsOf;
+        for (const auto& e : sel) {
+            if (e.type != SelectionType::SketchRegion || e.sketchId < 0) continue;
+            auto it = regionsOf.find(e.sketchId);
+            if (it == regionsOf.end()) {
+                auto sk = m_document->getSketch(e.sketchId);
+                if (!sk) continue;
+                it = regionsOf.emplace(e.sketchId, sk->buildRegions()).first;
+            }
+            const auto& regs = it->second;
+            if (e.subShapeIndex < 0 || e.subShapeIndex >= static_cast<int>(regs.size())) continue;
+            if (regs[e.subShapeIndex].face.IsNull()) continue;
+            faces.push_back(regs[e.subShapeIndex].face);
+            noteSketch(e.sketchId);
+        }
+    }
+    // 2. Otherwise every selected sketch's whole profile (even-odd islands, so a
+    //    text / SVG sketch keeps its holes).
+    if (faces.empty()) {
+        for (const auto& e : sel) {
+            if (e.type != SelectionType::Sketch || e.sketchId < 0) continue;
+            auto sk = m_document->getSketch(e.sketchId);
+            if (!sk) continue;
+            TopoDS_Shape prof = sk->buildProfileShape();
+            if (prof.IsNull()) {
+                showToast(materializr::tr("This sketch has no closed contour to extrude - "
+                                          "close its open ends first."), 6.0);
+                flagOpenEnds(e.sketchId);
+                continue;
+            }
+            for (TopExp_Explorer fx(prof, TopAbs_FACE); fx.More(); fx.Next())
+                faces.push_back(TopoDS::Face(fx.Current()));
+            noteSketch(e.sketchId);
+        }
+    }
+    if (faces.empty()) return false;
+
+    // One sweep has one direction, so only faces on the first face's plane can
+    // go together. Sketches on other planes are left for another pass, and the
+    // user is told rather than left wondering why they were skipped.
+    bool planar = true;
+    gp_Pln basePln;
+    try {
+        BRepAdaptor_Surface s0(faces.front());
+        if (s0.GetType() == GeomAbs_Plane) basePln = s0.Plane(); else planar = false;
+    } catch (...) { planar = false; }
+    size_t dropped = 0;
+    if (planar && faces.size() > 1) {
+        std::vector<TopoDS_Face> same;
+        for (const auto& f : faces) {
+            bool ok = false;
+            try {
+                BRepAdaptor_Surface sf(f);
+                if (sf.GetType() == GeomAbs_Plane) {
+                    const gp_Pln p = sf.Plane();
+                    ok = p.Axis().Direction().IsParallel(basePln.Axis().Direction(), 1e-6) &&
+                         std::abs(basePln.Distance(p.Location())) < 1e-4;
+                }
+            } catch (...) {}
+            if (ok) same.push_back(f); else ++dropped;
+        }
+        faces.swap(same);
+    }
+    if (dropped > 0)
+        showToast(materializr::trFormat("%d selected contour(s) lie on a different plane and were left out; "
+                                        "extrude them separately.", static_cast<int>(dropped)));
+
+    // Sketch lineage and the cut's preferred host only make sense for ONE sketch.
+    // With several the profile is a fixed shape (no re-derive on a sketch edit).
+    int srcSketch = -1, targetBody = -1;
+    if (sketchOrder.size() == 1) {
+        srcSketch = sketchOrder.front();
+        if (mode == ExtrudeMode::Subtract)
+            if (auto sk = m_document->getSketch(srcSketch))
+                if (!sk->isDetachedFromBody()) targetBody = sk->getSourceBody();
+    }
+
+    TopoDS_Shape profile;
+    if (faces.size() == 1) {
+        profile = faces.front();
+    } else {
+        TopoDS_Compound comp;
+        BRep_Builder bb;
+        bb.MakeCompound(comp);
+        for (const auto& f : faces) bb.Add(comp, f);
+        profile = comp;
+    }
+    beginInteractiveExtrude(profile, mode, targetBody, srcSketch);
+    return true;
 }
 
 void Application::subtractSketchRegion(int sketchId, int regionIndex) {

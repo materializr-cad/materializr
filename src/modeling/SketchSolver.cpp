@@ -1,6 +1,7 @@
 #include "SketchSolver.h"
 #include <cmath>
 #include <algorithm>
+#include <limits>
 
 namespace materializr {
 
@@ -44,6 +45,21 @@ void SketchSolver::seedDistanceFromFirst(Sketch& sketch, const Constraint& c) {
 bool SketchSolver::solve(Sketch& sketch, int maxIterations, double tolerance) {
     m_sketch = &sketch;
     auto& constraints = sketch.getMutableConstraints();
+    // Points are stored as float, so a distance between two of them can only
+    // be hit to about one float ulp of the coordinates involved. At 22 mm from
+    // the origin that is ~2e-6 mm - already past the 1e-6 default, so a
+    // dimension that WAS satisfied to the limit of the representation was
+    // reported unsatisfied and drawn red, then green after the next nudge
+    // (beta 6 tester report). Scale the tolerance to the coordinate size so it
+    // never asks for more precision than the data can hold.
+    {
+        double extent = 1.0;
+        for (const auto& pt : sketch.getPoints())
+            extent = std::max({extent, static_cast<double>(std::fabs(pt.pos.x)),
+                               static_cast<double>(std::fabs(pt.pos.y))});
+        tolerance = std::max(tolerance,
+                             4.0 * static_cast<double>(std::numeric_limits<float>::epsilon()) * extent);
+    }
     // Compute degrees of freedom
     int numPoints = sketch.pointCount();
     int numEquations = 0;

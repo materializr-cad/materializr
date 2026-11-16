@@ -20,10 +20,10 @@ public:
 
     enum class ActionType { None, NewProject, OpenEntry, OpenFileDialog, Dismiss,
                             ExportStep, ExportStl, OpenSettings, OpenHelp,
-                            ImportParts, Exit };
+                            ImportParts, DeleteEntry, Exit };
     struct Action {
         ActionType type = ActionType::None;
-        std::string ref, name;   // OpenEntry / ExportStep / ExportStl
+        std::string ref, name;   // OpenEntry / ExportStep / ExportStl / DeleteEntry
     };
 
     ~LandingPage();
@@ -52,6 +52,10 @@ public:
     // tile that already has a texture, deletes the incoming one instead of
     // leaking it. GL context required.
     void setEntryTexture(const std::string& ref, unsigned int tex);
+
+    // Drop one tile (its project was deleted / forgotten) and free its texture.
+    // Safe to call between render()s, never from inside one. GL context required.
+    void removeEntry(const std::string& ref);
 
     // Draw (when visible) and report what the user picked this frame. The
     // caller owns the consequences - this class never loads or creates

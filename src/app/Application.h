@@ -545,6 +545,9 @@ private:
     void startThumbnailPeeks(const std::vector<std::string>& refs);
     void drainThumbnailPeeks();   // main thread, while the landing page is up
     std::shared_ptr<ThumbJob> m_thumbJob;
+    // Home screen "Delete project...": the tile waiting on the confirmation.
+    std::string m_landingDeleteRef, m_landingDeleteName;
+    bool m_landingDeleteAsk = false;     // open the confirm popup next frame
 
     // Cross-project parts: scratch-load `ref` and open the "Import Parts"
     // modal listing its bodies + sketches. `intoNewProject` (landing-tile
@@ -662,6 +665,10 @@ private:
     // was drawn on (red preview). Used by the region toolbar where viewport
     // clicks land, since clicking a sketch selects a region, not the whole sketch.
     void subtractSketchRegion(int sketchId, int regionIndex);
+    // Extrude / Subtract from the WHOLE selection: every selected region (any
+    // number of sketches) or, with none, every selected sketch's profile, as one
+    // combined profile. Returns false when nothing in the selection qualifies.
+    bool extrudeSelectedProfiles(ExtrudeMode mode);
     TopoDS_Face buildSketchProfileFace(const Sketch& sketch) const;
     void exitSketchMode();
 

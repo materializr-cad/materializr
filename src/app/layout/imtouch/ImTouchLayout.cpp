@@ -338,7 +338,8 @@ void Application::renderImTouchLayout() {
             // like the Items panel's rows; other kinds select plainly.
             auto pick = [&](SelectionEntry entry, bool multiOk) {
                 if (!m_selection) return;
-                if (multiOk && m_multiSelectToggle) m_selection->toggleSelection(entry);
+                if (multiOk && (m_multiSelectToggle || ImGui::GetIO().KeyCtrl))
+                    m_selection->toggleSelection(entry);
                 else                                m_selection->select(entry);
                 if (entry.type == SelectionType::Body)
                     m_selection->setNavigationOnly(true);
@@ -559,7 +560,17 @@ void Application::renderImTouchLayout() {
                             SelectionEntry e;
                             e.type = SelectionType::Sketch;
                             e.sketchId = id;
-                            pick(e, /*multiOk=*/false);
+                            // multiOk: Multi / Ctrl add to the selection, like
+                            // bodies here and like the Items panel.
+                            pick(e, /*multiOk=*/true);
+                        }
+                        // Double-tap OPENS the sketch for editing, as in the
+                        // other layouts. The one being drawn can't be re-entered.
+                        if (act.doubleClicked &&
+                            !(m_inSketchMode && id == m_activeSketchId)) {
+                            editSketch(id);
+                            ImGui::PopID();
+                            break;   // the edit changed state under the id list
                         }
                         bool sgone = false;
                         if (act.rightClicked) ImGui::OpenPopup("sketchCtx");

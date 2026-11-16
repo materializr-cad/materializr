@@ -383,3 +383,33 @@ TEST(DimAdjust, PointOnWrongSideAtRightDistanceIsPulledBack) {
     EXPECT_NEAR(sk.getPoint(p)->pos.y, 4.0f, 1e-3f);
     (void)id;
 }
+
+// A length dimension on a line whose endpoints sit ~23 mm from the origin.
+// Coordinates are float, so the achievable length error there is ~2e-6 mm,
+// above the solver's 1e-6 default: the dimension was reported UNSATISFIED and
+// drawn red although the line measured exactly 25.00 (beta 6 tester report,
+// project 1.8.0b6_1). The tolerance now scales with the coordinates.
+TEST(DimAdjust, LengthAwayFromOriginIsNotReportedUnsatisfied) {
+    Sketch sk;
+    int a = sk.addPoint({3.49165e-06f, 1.53633e-06f});
+    int b = sk.addPoint({-22.8829f, -10.0685f});
+    sk.addLine(a, b);
+
+    Constraint len{};
+    len.type = ConstraintType::Distance;
+    len.entityA = a;
+    len.entityB = b;
+    len.value = 25.0;
+    sk.addConstraint(len);
+
+    SketchSolver solver;
+    EXPECT_TRUE(solver.solve(sk));
+    for (const auto& c : sk.getConstraints()) EXPECT_TRUE(c.isSatisfied);
+
+    // Nudging the value and back, as the tester did, must land satisfied too.
+    for (auto& c : sk.getMutableConstraints()) c.value = 24.0;
+    EXPECT_TRUE(solver.solve(sk));
+    for (auto& c : sk.getMutableConstraints()) c.value = 25.0;
+    EXPECT_TRUE(solver.solve(sk));
+    for (const auto& c : sk.getConstraints()) EXPECT_TRUE(c.isSatisfied);
+}

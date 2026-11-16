@@ -40,6 +40,15 @@ void LandingPage::setEntries(std::vector<Entry> entries) {
     m_entries = std::move(entries);
 }
 
+void LandingPage::removeEntry(const std::string& ref) {
+    for (auto it = m_entries.begin(); it != m_entries.end(); ++it) {
+        if (it->ref != ref) continue;
+        if (it->tex) { GLuint t = it->tex; glDeleteTextures(1, &t); }
+        m_entries.erase(it);
+        return;
+    }
+}
+
 void LandingPage::setEntryTexture(const std::string& ref, unsigned int tex) {
     if (!tex) return;
     for (auto& e : m_entries) {
@@ -73,7 +82,7 @@ std::string fitLabel(const std::string& s, float maxW) {
 }
 
 // What a tile reported this frame: a plain click, or a context-menu pick.
-enum class TileAct { None, Click, CtxOpen, CtxStep, CtxStl, CtxParts };
+enum class TileAct { None, Click, CtxOpen, CtxStep, CtxStl, CtxParts, CtxDelete };
 
 // One tile: label centred above a square preview area. `tex` = 0 draws the
 // placeholder glyph instead of an image. `withContext` adds the right-click
@@ -104,6 +113,9 @@ TileAct tile(const char* id, const std::string& label, unsigned int tex,
         // no cross-file parametrics (see Application::exportRecentProjectAs).
         if (ImGui::MenuItem(materializr::tr("Export as STEP..."))) act = TileAct::CtxStep;
         if (ImGui::MenuItem(materializr::tr("Export as STL..."))) act = TileAct::CtxStl;
+        ImGui::Separator();
+        // Removes the file itself (after a confirmation the caller shows).
+        if (ImGui::MenuItem(materializr::tr("Delete project..."))) act = TileAct::CtxDelete;
         ImGui::EndPopup();
     }
 
@@ -269,6 +281,7 @@ LandingPage::Action LandingPage::render() {
             case TileAct::CtxStep:  action.type = ActionType::ExportStep; break;
             case TileAct::CtxStl:   action.type = ActionType::ExportStl; break;
             case TileAct::CtxParts: action.type = ActionType::ImportParts; break;
+            case TileAct::CtxDelete: action.type = ActionType::DeleteEntry; break;
             case TileAct::None:     break;
             }
         }
