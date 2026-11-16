@@ -22,6 +22,7 @@
 #include <TopoDS.hxx>
 #include <gp_Ax3.hxx>
 #include <gtest/gtest.h>
+#include <cmath>
 #include <memory>
 
 using namespace materializr;
@@ -141,4 +142,78 @@ TEST(GuidedLoftRails, RailThroughTheBasePlaneLoftsBothSides) {
     // ...and is two square pyramids (base 5 x 5, height 2.5) base to base.
     GProp_GProps vp; BRepGProp::VolumeProperties(body, vp);
     EXPECT_NEAR(vp.Mass(), 2.0 * (25.0 * 2.5 / 3.0), 0.5);
+}
+
+namespace {
+// The 11-14-26 tester's examples 3 and 4: a 5 x 5 square on a +Y-normal plane and,
+// in the XY plane, ONE slanted outline line that crosses the base plane at x = -2.5,
+// drawn together with construction lines (the vertical spine, the ground line...)
+// that must play no part in the rail. Returns the single body.
+TopoDS_Shape loftSlantedRail(Document& doc, History& hist, glm::vec2 from, glm::vec2 to) {
+    auto base = std::make_shared<Sketch>();
+    base->setPlane(gp_Pln(gp_Ax3(gp_Pnt(0, 0, 0), gp_Dir(0, 1, 0), gp_Dir(1, 0, 0))));
+    const int a = base->addPoint({2.5f, 2.5f}), b = base->addPoint({-2.5f, 2.5f});
+    const int c = base->addPoint({-2.5f, -2.5f}), d = base->addPoint({2.5f, -2.5f});
+    base->addLine(a, b); base->addLine(b, c); base->addLine(c, d); base->addLine(d, a);
+
+    auto rail = std::make_shared<Sketch>();
+    rail->setPlane(gp_Pln(gp_Ax3(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1), gp_Dir(1, 0, 0))));
+    // Construction first (ids below the cut), then the real outline.
+    const int o  = rail->addPoint({0, 0});
+    const int sp = rail->addPoint({0, to.y > from.y ? to.y : from.y});
+    const int sn = rail->addPoint({0, to.y < from.y ? to.y : from.y});
+    const int firstConstruction = rail->addLine(o, sp);
+    rail->addLine(sp, sn);
+    rail->setConstructionSince(firstConstruction, true);
+    const int p0 = rail->addPoint(from), pm = rail->addPoint(0.5f * (from + to)),
+              p1 = rail->addPoint(to);
+    rail->addLine(p0, pm); rail->addLine(pm, p1);        // the outline, in two pieces
+
+    const int ib = doc.addSketch(base), ir = doc.addSketch(rail);
+    std::vector<TopoDS_Wire> holes; bool closed = false;
+    auto w = LoftOp::sectionFromSketch(base.get(), holes, &closed);
+    EXPECT_TRUE(closed);
+    auto op = std::make_unique<GuidedLoftOp>();
+    op->setBase(w, base->getPlane());
+    op->setBaseSketch(ib);
+    TopoDS_Wire rw = rail->buildOpenWire();
+    EXPECT_FALSE(rw.IsNull()) << "construction lines leaked into / broke the rail";
+    op->addRail(rw, ir);
+    EXPECT_TRUE(hist.pushOperation(std::move(op), doc));
+    EXPECT_EQ(1u, doc.getAllBodyIds().size());
+    return doc.getAllBodyIds().empty() ? TopoDS_Shape() : doc.getBody(doc.getAllBodyIds().front());
+}
+
+double frustum(double h, double s0, double s1) {      // square sides s0 -> s1 over height h
+    const double a0 = s0 * s0, a1 = s1 * s1;
+    return h / 3.0 * (a0 + a1 + std::sqrt(a0 * a1));
+}
+}
+
+// Example 3: apex above, the section WIDENS below the plane.
+TEST(GuidedLoftRails, SlantedRailThroughThePlaneShrinksUpAndWidensDown) {
+    Document doc; History hist;
+    const TopoDS_Shape body = loftSlantedRail(doc, hist, {0.0f, 3.0f}, {-5.0f, -3.0f});
+    ASSERT_FALSE(body.IsNull());
+    EXPECT_TRUE(BRepCheck_Analyzer(body).IsValid());
+    Bnd_Box bb; BRepBndLib::Add(body, bb);
+    double x0, y0, z0, x1, y1, z1; bb.Get(x0, y0, z0, x1, y1, z1);
+    EXPECT_NEAR(y1, 3.0, 0.05);
+    EXPECT_NEAR(y0, -3.0, 0.05);
+    GProp_GProps vp; BRepGProp::VolumeProperties(body, vp);
+    EXPECT_NEAR(vp.Mass(), frustum(3.0, 5.0, 0.0) + frustum(3.0, 5.0, 10.0), 1.0);
+}
+
+// Example 4: the mirror - widens above, closes to a point below.
+TEST(GuidedLoftRails, SlantedRailThroughThePlaneWidensUpAndShrinksDown) {
+    Document doc; History hist;
+    const TopoDS_Shape body = loftSlantedRail(doc, hist, {-5.0f, 2.5f}, {0.0f, -2.5f});
+    ASSERT_FALSE(body.IsNull());
+    EXPECT_TRUE(BRepCheck_Analyzer(body).IsValid());
+    Bnd_Box bb; BRepBndLib::Add(body, bb);
+    double x0, y0, z0, x1, y1, z1; bb.Get(x0, y0, z0, x1, y1, z1);
+    EXPECT_NEAR(y1, 2.5, 0.05);
+    EXPECT_NEAR(y0, -2.5, 0.05);
+    GProp_GProps vp; BRepGProp::VolumeProperties(body, vp);
+    EXPECT_NEAR(vp.Mass(), frustum(2.5, 5.0, 10.0) + frustum(2.5, 5.0, 0.0), 1.0);
 }
