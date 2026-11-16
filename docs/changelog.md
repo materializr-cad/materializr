@@ -5,7 +5,11 @@ All notable changes to Materializr are documented here. Format loosely follows
 
 ## [Unreleased]
 
-The 11-10 tester list.
+## [1.8.0-beta.6] - 2026-11-15
+
+Beta (Settings ▸ Include pre-release builds), desktop and Android. The 11-10,
+11-13 and 11-14 tester lists: typed values for the sketch shapes, snapping and
+moving geometry, loft, and sketch edits that now reach the body.
 
 ### Added
 
@@ -31,6 +35,15 @@ The 11-10 tester list.
   in / circumscribed, corner fillet / chamfer, primitive radius / diameter) are
   remembered across launches.
 - Polygon: a 0 button on the size row (gives the size back to the cursor).
+- **Press X for the Construction tool.** Rebindable in Settings ▸ Navigation.
+- **A start-point marker with Snap to Grid on.** A yellow ring shows the grid
+  intersection a Point, Line, Circle, Rectangle, Arc, Spline or Polygon will start
+  on, before the first click. It hides when an endpoint, midpoint or on-line
+  marker already shows, or when the mouse is far away.
+- **More of the interface speaks your language.** About 20 settings texts,
+  prompts and messages that showed in English now have Spanish, Portuguese,
+  French, German and Italian text, and so do the dimension popup's "(controls
+  geometry)" / "(measures only)" labels and the sketch-mode banner.
 
 ### Changed
 
@@ -38,6 +51,11 @@ The 11-10 tester list.
   each already has -1 and +1. The label sits where they were.
 - **Selected construction lines stay dashed**, in amber rather than the gold of
   selected normal lines.
+- **Moving sketch geometry no longer sticks to invisible snaps.** Dragging a
+  point keeps its endpoint, midpoint and centre snaps and lines up with another
+  point's X or Y when it is close (Full and Max inference); dragging a line or a
+  selection moves it rigidly and only the grid snaps it. A slow drag no longer
+  swallows its first fraction of a millimetre.
 
 ### Fixed
 
@@ -84,6 +102,23 @@ The 11-10 tester list.
   mirror-image walls was lost to a key collision. Arcs that close a circle are one
   circle, and both walls are offered.
 - Android: the test build said 1.7.7 on the home screen.
+- **Pattern, Ctrl+D Duplicate, rotating with the gizmo and plugin sketch edits now
+  rebuild the body.** Before, the sketch changed but the body kept its old
+  holes until you reloaded the project. Finish Sketch also checks the sketch
+  against the last rebuild and queues one if they differ.
+- **"On Vertical Axis" / "On Horizontal Axis" is now exact.** The guide rounded
+  both coordinates to the grid, so a point could be labelled on the axis and still
+  be slightly off it. Only the free coordinate snaps now.
+- **The sketch gizmo follows the points you move** with its centre handle instead
+  of staying behind until release (Rotate still pivots on the start centre).
+- **The selection glow skips construction lines** and follows a spline's curve.
+- **Dimension popup:** Backspace and the buttons work as expected, and the
+  "(Del)" label now reads "(delete dimension)". A size of 0 or a negative value in
+  the shape sizes is handled and refused with a message instead of making a bad
+  shape.
+- **Guided loft: a rail that crosses the base plane** is lofted per side, so a
+  slanted rail through the plane shrinks one way and widens the other instead of
+  reading upside down.
 
 ## [1.8.0-beta.5] - 2026-11-09
 
