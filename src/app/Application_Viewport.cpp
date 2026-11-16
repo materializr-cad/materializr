@@ -3768,8 +3768,8 @@ void Application::renderViewport() {
                                     markDirty();
                                 }
                                 ImGui::SameLine();
-                                ImGui::TextDisabled(drv ? "(controls geometry)"
-                                                        : "(measures only)");
+                                ImGui::TextDisabled("%s", drv ? materializr::tr("(controls geometry)")
+                                                              : materializr::tr("(measures only)"));
                             }
                             // "Make equal" - converts a two-entity dimension
                             // into an Equal constraint on the same pair (equal
@@ -7901,10 +7901,10 @@ void Application::renderViewport() {
     // Sketch mode indicator
     if (m_inSketchMode) {
         materializr::viewportBanner(
-            ImVec4(0.2f, 1.0f, 0.4f, 1.0f),
+            ImVec4(0.2f, 1.0f, 0.4f, 1.0f), "%s",
             materializr::touchMode()
-                ? "SKETCH MODE - Finish Sketch applies, Exit Sketch discards"
-                : "SKETCH MODE - Press Escape to finish");
+                ? materializr::tr("SKETCH MODE - Finish Sketch applies, Exit Sketch discards")
+                : materializr::tr("SKETCH MODE - Press Escape to finish"));
     }
 
     // Inline dimension input while placing a sketch shape. Suppressed while

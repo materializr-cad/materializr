@@ -378,7 +378,7 @@ void Application::renderModernLayout() {
         if (beginFlushBar("##TouchRail",
                           kShellWindowFlags & ~ImGuiWindowFlags_NoScrollbar)) {
             ImGui::SetCursorPosX(10.0f * s);
-            touchui::sectionHeader("Tools");
+            touchui::sectionHeader(materializr::tr("Tools"));
 
             // TWO-COLUMN GRID when the rail is dragged wide: dragging wider
             // used to just stretch the same buttons into slabs; past the
@@ -715,7 +715,7 @@ void Application::renderModernLayout() {
                     if (!stepEditing) {
                         const float footerTop = ImGui::GetCursorPosY();
                         ImGui::Separator();
-                        touchui::sectionHeader("Properties");
+                        touchui::sectionHeader(materializr::tr("Properties"));
                         // AutoResizeY (no max constraint) = exactly content
                         // height; NoScrollbar guarantees it never grows a
                         // scrollbar. History above already reserved this height
