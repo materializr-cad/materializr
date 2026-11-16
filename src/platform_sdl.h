@@ -28,6 +28,11 @@ void platformSleepMs(std::uint32_t ms);
 std::uint64_t platformTicksNs();
 void platformSleepPreciseNs(std::uint64_t ns);
 
+// The device's first preferred UI language as a bare ISO 639-1 code ("zh",
+// "de", ...), or empty when the platform does not tell us. Used once on first
+// run so a Chinese tablet opens in Chinese instead of asking in English.
+std::string platformSystemLanguageCode();
+
 // Per-user writable data directory for Materializr, created if missing, with a
 // trailing path separator ("" if the platform can't provide one). Resolves to
 // the right place everywhere, including Android app storage and the iOS

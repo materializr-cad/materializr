@@ -1,5 +1,6 @@
 #include "i18n.h"
 #include "i18n_catalogue.h"
+#include "i18n_zh_catalogue.h"
 
 #include <algorithm>
 #include <mutex>
@@ -43,6 +44,9 @@ const Cat kCats[] = {
     { kFrCatalogue,   kFrCount,   "Fran\xc3\xa7""ais",  "French"     },
     { kDeCatalogue,   kDeCount,   "Deutsch",     "German"     },
     { kItCatalogue,   kItCount,   "Italiano",    "Italian"    },
+    // Simplified Chinese. Native name is what a Chinese reader scans for, so
+    // the language list stays usable even from an English UI.
+    { kZhCatalogue,   kZhCount,   "简体中文",     "Chinese"    },
 };
 static_assert(sizeof(kCats) / sizeof(kCats[0]) ==
                   static_cast<std::size_t>(Lang::COUNT),

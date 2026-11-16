@@ -7405,7 +7405,7 @@ void Application::renderViewport() {
                     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.95f, 0.65f, 0.25f, 1.0f));
                     ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.75f, 0.48f, 0.12f, 1.0f));
                 }
-                bool clicked = wideButton(m_moveModeToggle ? "Move: On" : "Move: Off");
+                bool clicked = wideButton(m_moveModeToggle ? materializr::tr("Move: On") : materializr::tr("Move: Off"));
                 bool hov = ImGui::IsItemHovered();
                 if (m_moveModeToggle) ImGui::PopStyleColor(3);
                 if (clicked) m_moveModeToggle = !m_moveModeToggle;

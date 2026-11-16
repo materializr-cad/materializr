@@ -175,7 +175,7 @@ void MeasureTool::renderPanel() {
         ImGui::SetNextWindowPos(ImVec2(vp->WorkPos.x + off.x, vp->WorkPos.y + off.y),
                                 ImGuiCond_Appearing);
     }
-    if (!ImGui::Begin("Measure", &open)) { ImGui::End(); return; }
+    if (!ImGui::Begin(materializr::tr("Measure"), &open)) { ImGui::End(); return; }
     // ...and never let a drag park the title bar under the top button row either.
     {
         const ImGuiViewport* vp = ImGui::GetMainViewport();
@@ -196,9 +196,9 @@ void MeasureTool::renderPanel() {
         if (isCurrent) ImGui::PopStyleColor();
         ImGui::SameLine();
     };
-    modeButton("Object",     MeasureMode::Object);
-    modeButton("Edge",       MeasureMode::Edge);
-    modeButton("Line",   MeasureMode::Line);
+    modeButton(materializr::tr("Object"), MeasureMode::Object);
+    modeButton(materializr::tr("Edge"),   MeasureMode::Edge);
+    modeButton(materializr::tr("Line"),   MeasureMode::Line);
     ImGui::NewLine();
     ImGui::Separator();
     ImGui::Spacing();

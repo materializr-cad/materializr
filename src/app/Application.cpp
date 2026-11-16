@@ -1165,6 +1165,20 @@ void Application::initImGui() {
                                              &cfg, kIconRange))
                 std::fprintf(stderr, "Loaded font: %s (icon merge)\n", icons.c_str());
         }
+
+        // Merge a CJK-capable face so the Simplified Chinese catalogue renders
+        // (and any Chinese typed into the Text tool). JetBrains Mono has no
+        // ideographs; without this the whole Chinese UI would be boxes. ImGui
+        // 1.92 loads glyphs on demand, so the merged face costs atlas space only
+        // for characters actually drawn. The bundled file is a full Noto Sans SC
+        // (~9 MB), so any Chinese the user types also has a glyph.
+        std::string cjk = resolveBundledFont("NotoSansSC.ttf");
+        if (fnt && !cjk.empty()) {
+            ImFontConfig cfg;
+            cfg.MergeMode = true;
+            if (io.Fonts->AddFontFromFileTTF(cjk.c_str(), 15.0f * uiScale, &cfg))
+                std::fprintf(stderr, "Loaded font: %s (CJK merge)\n", cjk.c_str());
+        }
     }
 
     m_window->initImGuiBackend();
@@ -2224,6 +2238,21 @@ void Application::saveRememberedUiStateIfChanged() {
 // check) are deliberately not handled here; loadAppSettings/importSettings
 // layer those on top as appropriate. Camera buttons land on both the active
 // and the Settings-dialog "staged" copies so an import takes effect at once.
+// First-run language guess from the device's own locale. Only the languages we
+// ship are mapped; anything else returns -1 so the setup wizard asks instead of
+// silently choosing something the user may not read.
+static int detectSystemLanguage() {
+    const std::string code = materializr::platformSystemLanguageCode();
+    if (code.empty()) return -1;
+    if (code == "zh") return static_cast<int>(materializr::Lang::Chinese);
+    if (code == "es") return static_cast<int>(materializr::Lang::Spanish);
+    if (code == "pt") return static_cast<int>(materializr::Lang::Portuguese);
+    if (code == "fr") return static_cast<int>(materializr::Lang::French);
+    if (code == "de") return static_cast<int>(materializr::Lang::German);
+    if (code == "it") return static_cast<int>(materializr::Lang::Italian);
+    return -1;
+}
+
 void Application::applyAppSettings(const AppSettings& s) {
     m_themeManager->setTheme(s.theme == 1 ? Theme::Light : Theme::Dark);
     // Touch mode drives the UI scale and input/UX model. The scale + fonts are
@@ -2234,11 +2263,15 @@ void Application::applyAppSettings(const AppSettings& s) {
     m_touchMode = s.touchMode;   // staged value for the Settings dialog
     m_uiScaleUser = s.uiScaleUser;
     m_uiLayout = s.uiLayout;     // interface layout - live, no restart needed
-    // UI language - also live. -1 means the user has never chosen, which the
-    // setup wizard turns into its opening question; until then, English.
-    m_language = s.language;
-    setLanguage((s.language > 0 && s.language < languageCount())
-                    ? static_cast<Lang>(s.language)
+    // UI language - also live. -1 means the user has never chosen; on first run
+    // we follow the device's own locale (a Chinese tablet should open in
+    // Chinese, not ask someone who may not read English), and anything we don't
+    // recognise stays -1 so the setup wizard asks.
+    int startupLang = s.language;
+    if (startupLang < 0) startupLang = detectSystemLanguage();
+    m_language = startupLang;
+    setLanguage((startupLang > 0 && startupLang < languageCount())
+                    ? static_cast<Lang>(startupLang)
                     : Lang::English);
     applyDisplayUnitChange(s.displayUnit);
     m_imTouchTree = s.imTouchTree;
