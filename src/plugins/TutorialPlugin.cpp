@@ -296,12 +296,17 @@ void renderLayoutPicker(bool& close) {
     const int current = currentUiLayoutIndex();
     for (int i = 0; i < 3; ++i) {
         const bool active = (current == i);
+        // Card text goes through tr(): the layout names are brand words and stay
+        // as-is, the descriptions are ordinary UI copy and must follow the UI
+        // language.
+        const char* cardName  = materializr::tr(kLayouts[i].name);
+        const char* cardBlurb = materializr::tr(kLayouts[i].blurb);
         // A card = a full-width selectable region with title + wrapped blurb.
         ImGui::PushID(i);
         ImVec2 pad = ImGui::GetStyle().FramePadding;
         const float wrapW = ImGui::GetContentRegionAvail().x - 2.0f * pad.x
                             - uiW(28.0f);
-        ImVec2 blurbSz = ImGui::CalcTextSize(kLayouts[i].blurb, nullptr,
+        ImVec2 blurbSz = ImGui::CalcTextSize(cardBlurb, nullptr,
                                              false, wrapW);
         const float cardH = ImGui::GetTextLineHeightWithSpacing() +
                             blurbSz.y + 3.0f * pad.y;
@@ -321,12 +326,12 @@ void renderLayoutPicker(bool& close) {
             dl->AddCircleFilled(c, uiW(3.2f),
                                 ImGui::GetColorU32(ImGuiCol_CheckMark));
         ImVec2 txt(tl.x + pad.x + uiW(22.0f), tl.y + pad.y);
-        dl->AddText(txt, ImGui::GetColorU32(ImGuiCol_Text), kLayouts[i].name);
+        dl->AddText(txt, ImGui::GetColorU32(ImGuiCol_Text), cardName);
         ImVec2 blurbPos(txt.x + uiW(6.0f),
                         txt.y + ImGui::GetTextLineHeightWithSpacing());
         dl->AddText(ImGui::GetFont(), ImGui::GetFontSize(), blurbPos,
                     ImGui::GetColorU32(ImGuiCol_TextDisabled),
-                    kLayouts[i].blurb, nullptr, wrapW);
+                    cardBlurb, nullptr, wrapW);
         ImGui::PopID();
         ImGui::Spacing();
     }
@@ -381,7 +386,7 @@ void renderTutorial(materializr::PluginContext&) {
                                         ImVec2(FLT_MAX, vp->WorkSize.y * 0.92f));
 
     bool keepOpen = true;
-    if (ImGui::Begin("Getting Started###Tutorial", &keepOpen,
+    if (ImGui::Begin(materializr::tr("Getting Started###Tutorial"), &keepOpen,
                      ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoCollapse |
                      ImGuiWindowFlags_NoMove)) {
         if (g_onLanguage) {
@@ -402,7 +407,7 @@ void renderTutorial(materializr::PluginContext&) {
         }
 
         ImGui::TextDisabled(materializr::tr("Step %d of %d"), g_step + 1, kStepCount);
-        ImGui::SeparatorText(s.title);
+        ImGui::SeparatorText(materializr::tr(s.title));
 
         ImGui::PushTextWrapPos(0.0f); // wrap at the window's right edge
         ImGui::TextUnformatted(s.body);
@@ -450,7 +455,7 @@ void renderTutorial(materializr::PluginContext&) {
             else            g_onPicker = true;   // back to the layout picker
         }
         ImGui::SameLine();
-        if (ImGui::Button(last ? "Finish" : "Next", uiSz(80, 0))) {
+        if (ImGui::Button(last ? materializr::tr("Finish") : materializr::tr("Next"), uiSz(80, 0))) {
             if (last) close();
             else      g_step++;
         }
@@ -459,7 +464,7 @@ void renderTutorial(materializr::PluginContext&) {
         const float rightX = ImGui::GetWindowContentRegionMax().x - skipW;
         if (rightX > ImGui::GetCursorPosX()) ImGui::SameLine(rightX);
         else                                 ImGui::SameLine();
-        if (ImGui::Button(last ? "Close" : "Skip", uiSz(80, 0))) close();
+        if (ImGui::Button(last ? materializr::tr("Close") : materializr::tr("Skip"), uiSz(80, 0))) close();
     }
     ImGui::End();
 

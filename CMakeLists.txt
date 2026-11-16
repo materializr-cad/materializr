@@ -565,6 +565,11 @@ if(MSVC)
     # every test executable in tests/ added below - those hit the same OCCT
     # code paths and need the same fault-to-exception conversion.
     add_compile_options(/EHa)
+    # Source files hold raw UTF-8 (the Simplified Chinese catalogue and its
+    # language name). Without /utf-8 MSVC reads a BOM-less file in the system
+    # code page, which is wrong on a Chinese or Japanese Windows. Global for the
+    # same reason as /EHa: the tests include the same headers.
+    add_compile_options(/utf-8)
 endif()
 
 if(APPLE)

@@ -189,21 +189,21 @@ LandingPage::Action LandingPage::render() {
                          ImVec2(logoSz, logoSz));
             ImGui::SameLine();
         }
-        if (ImGui::Button(ICON_IC_FOLDER "  Open File..."))
+        if (ImGui::Button((std::string(ICON_IC_FOLDER "  ") + materializr::tr("Open File...")).c_str()))
             action.type = ActionType::OpenFileDialog;
         ImGui::SameLine();
-        if (ImGui::Button(ICON_IC_SETTINGS "  Settings"))
+        if (ImGui::Button((std::string(ICON_IC_SETTINGS "  ") + materializr::tr("Settings")).c_str()))
             action.type = ActionType::OpenSettings;
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", materializr::tr("Settings"));
         ImGui::SameLine();
-        if (ImGui::Button(ICON_IC_HELP_CIRCLE "  Help"))
+        if (ImGui::Button((std::string(ICON_IC_HELP_CIRCLE "  ") + materializr::tr("Help")).c_str()))
             action.type = ActionType::OpenHelp;
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", materializr::tr("User guide"));
 #if !defined(MZ_IOS)
         // Quit from the home screen. Before this the only way out was to open
         // a project and exit from there (iOS apps don't quit themselves).
         ImGui::SameLine();
-        if (ImGui::Button(ICON_IC_LOG_OUT "  Exit"))
+        if (ImGui::Button((std::string(ICON_IC_LOG_OUT "  ") + materializr::tr("Exit")).c_str()))
             action.type = ActionType::Exit;
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", materializr::tr("Exit"));
 #endif
@@ -250,7 +250,7 @@ LandingPage::Action LandingPage::render() {
         else col = 0;
     };
 
-    if (tile("new", "New Project", 0, ICON_IC_PLUS, tileW, previewH,
+    if (tile("new", materializr::tr("New Project"), 0, ICON_IC_PLUS, tileW, previewH,
              "Start an empty project", false) == TileAct::Click)
         action.type = ActionType::NewProject;
     nextCell();

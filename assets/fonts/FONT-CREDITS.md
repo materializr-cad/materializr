@@ -16,10 +16,12 @@ are preserved below as required by their licenses.
 | Stencil (Black Ops) | `BlackOpsOne-Regular.ttf` | © The Black Ops One Project Authors (Matt McInerney) | SIL OFL 1.1 |
 | Impact (Anton) | `Anton-Regular.ttf` | © The Anton Project Authors (Vernon Adams) | SIL OFL 1.1 |
 | Script (Pacifico) | `Pacifico-Regular.ttf` | © The Pacifico Project Authors (Vernon Adams) | SIL OFL 1.1 |
+| 中文 (Noto Sans SC) | `NotoSansSC.ttf` (subset: GB2312 level-1 hanzi + symbols + the UI strings) | © 2014-2021 Adobe (http://www.adobe.com/), Reserved Font Name 'Source'; Noto is a trademark of Google LLC | SIL OFL 1.1 |
 | *(UI icons - not in the Text picker)* | `Iconoir.ttf` | Iconoir © Luca Burgio; font build © Silbad (iconoir-font) | MIT |
 
 License texts in `licenses/`:
 - `OFL-1.1.txt` - SIL Open Font License 1.1 (JetBrains Mono, Liberation, Comic Neue, Black Ops One, Anton, Pacifico).
+- `NotoSansSC-OFL.txt` - SIL Open Font License 1.1 (Noto Sans SC / Source Han Sans; Adobe copyright and Reserved Font Name notice).
 - `UFL-1.0.txt` - Ubuntu Font Licence 1.0 (Ubuntu).
 - `DejaVu-copyright.txt` - Bitstream Vera + Arev (DejaVu).
 - `Liberation-copyright.txt` - distribution copyright/license for the Liberation family.

@@ -5252,7 +5252,8 @@ void Application::renderTextToolPanel() {
                                            "Comic (Neue)",
                                            "Stencil (Black Ops)",
                                            "Impact (Anton)",
-                                           "Script (Pacifico)"};
+                                           "Script (Pacifico)",
+                                           "中文 (Noto Sans SC)"};
         static const char* kFontFiles[] = {"JetBrainsMono-Regular.ttf",
                                            "DejaVuSans.ttf",
                                            "DejaVuSerif.ttf",
@@ -5262,7 +5263,8 @@ void Application::renderTextToolPanel() {
                                            "ComicNeue-Regular.ttf",
                                            "BlackOpsOne-Regular.ttf",
                                            "Anton-Regular.ttf",
-                                           "Pacifico-Regular.ttf"};
+                                           "Pacifico-Regular.ttf",
+                                           "NotoSansSC.ttf"};
         static_assert(IM_ARRAYSIZE(kFontNames) == IM_ARRAYSIZE(kFontFiles),
                       "font name/file lists must stay in lockstep");
         static int fontIdx = 0;

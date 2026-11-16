@@ -1,6 +1,7 @@
 #include "core/Units.h"
 #include <cmath>
 #include "Settings.h"
+#include "../i18n.h"   // languageCount(): the language index's upper bound
 
 #include <cctype>
 #include <cstring>
@@ -220,8 +221,18 @@ void applyKv(const std::map<std::string, std::string>& kv, AppSettings& s) {
     }
 
     readIntClamped(kv, "inferenceLevel", s.inferenceLevel, 0, 3);
-    // -1 is meaningful here ("never chosen"), so the floor is -1, not 0.
-    readIntClamped(kv, "language", s.language, -1, 5);
+    // -1 is meaningful here ("never chosen"), so the floor is -1, not 0. The
+    // upper bound must track the shipped catalogue, never a literal: a build
+    // that adds a language (this one adds Simplified Chinese at index 6) would
+    // otherwise read back its own saved value as invalid, and the user's
+    // choice would silently revert on every restart. A value outside the
+    // shipped set means "never chosen" - NOT a clamp onto a neighbouring real
+    // language, which is how a saved Chinese choice used to come back Italian.
+    {
+        int v = s.language;
+        readInt(kv, "language", v);
+        s.language = (v >= -1 && v < materializr::languageCount()) ? v : -1;
+    }
     readBool(kv, "showInferenceToolbarToggle", s.showInferenceToolbarToggle);
     readBool(kv, "exportGreyFills", s.exportGreyFills);
     readBool(kv, "showSelectionMeasurements", s.showSelectionMeasurements);

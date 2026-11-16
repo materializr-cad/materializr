@@ -20,6 +20,19 @@ void platformSleepPreciseNs(std::uint64_t ns) {
     SDL_DelayPrecise(ns);
 }
 
+std::string platformSystemLanguageCode() {
+    int count = 0;
+    SDL_Locale** locales = SDL_GetPreferredLocales(&count);
+    std::string code;
+    if (locales) {
+        for (int i = 0; i < count && code.empty(); ++i) {
+            if (locales[i] && locales[i]->language) code = locales[i]->language;
+        }
+        SDL_free(locales);
+    }
+    return code;
+}
+
 std::string platformPrefPath() {
     char* base = SDL_GetPrefPath("Materializr", "Materializr");
     if (!base) return {};
