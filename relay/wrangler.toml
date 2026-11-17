@@ -1,0 +1,57 @@
+# Materializr bug-report relay. Secrets (never in this file):
+#   GITHUB_APP_PRIVATE_KEY   the materializr-reports GitHub App's .pem
+#   MAINTAINER_TOKEN         long random string; lets maintainers GET /p/<id>
+#   IP_SALT                  random string; salts the stored IP hashes
+name = "materializr-relay"
+main = "src/index.ts"
+compatibility_date = "2026-11-01"
+
+[vars]
+GITHUB_OWNER = "materializr-cad"
+GITHUB_REPO = "materializr"
+GITHUB_APP_ID = "5806934"
+GITHUB_INSTALLATION_ID = "183085462"
+
+# Abuse counters live in one Durable Object (strictly serialised, free tier).
+[[durable_objects.bindings]]
+name = "LIMITER"
+class_name = "Limiter"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Limiter"]
+
+[[r2_buckets]]
+binding = "PUBLIC_FILES"
+bucket_name = "materializr-reports-public"
+
+[[r2_buckets]]
+binding = "PRIVATE_FILES"
+bucket_name = "materializr-reports-private"
+
+# Staging: same code, its own storage, and DRY_RUN so it never touches GitHub.
+[env.staging]
+name = "materializr-relay-staging"
+
+[env.staging.vars]
+GITHUB_OWNER = "materializr-cad"
+GITHUB_REPO = "materializr"
+GITHUB_APP_ID = "5806934"
+GITHUB_INSTALLATION_ID = "183085462"
+DRY_RUN = "1"
+
+[[env.staging.durable_objects.bindings]]
+name = "LIMITER"
+class_name = "Limiter"
+
+[[env.staging.migrations]]
+tag = "v1"
+new_sqlite_classes = ["Limiter"]
+
+[[env.staging.r2_buckets]]
+binding = "PUBLIC_FILES"
+bucket_name = "materializr-reports-public-staging"
+
+[[env.staging.r2_buckets]]
+binding = "PRIVATE_FILES"
+bucket_name = "materializr-reports-private-staging"

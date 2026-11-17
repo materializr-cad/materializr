@@ -803,6 +803,17 @@ add_executable(test_chamfer_at_limit test_chamfer_at_limit.cpp)
 target_link_libraries(test_chamfer_at_limit PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_chamfer_at_limit COMMAND test_chamfer_at_limit)
 
+# test_bug_report - the pre-filled GitHub issue URL/body behind Help > Report a Bug
+add_executable(test_bug_report test_bug_report.cpp)
+target_link_libraries(test_bug_report PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_bug_report COMMAND test_bug_report)
+
+# test_report_sender - reading the relay's reply / building its env JSON (the Send half of Report a Bug)
+add_executable(test_report_sender test_report_sender.cpp ${CMAKE_SOURCE_DIR}/src/core/ReportSender.cpp ${CMAKE_SOURCE_DIR}/src/core/Base64.cpp)
+target_include_directories(test_report_sender PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(test_report_sender PRIVATE CURL::libcurl gtest gtest_main)
+add_test(NAME test_report_sender COMMAND test_report_sender)
+
 # test_chamfer_collinear_edges - two far-apart collinear chamfer edges in one op must stay native (no fake partial-taper bench)
 add_executable(test_chamfer_collinear_edges test_chamfer_collinear_edges.cpp)
 target_link_libraries(test_chamfer_collinear_edges PRIVATE materializr_core gtest gtest_main)

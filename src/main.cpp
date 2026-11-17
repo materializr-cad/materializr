@@ -1,4 +1,5 @@
 #include "app/Application.h"
+#include "core/LogCapture.h"
 #include "core/Verbose.h"
 
 #include <OSD.hxx>
@@ -26,10 +27,13 @@ namespace {
 struct sigaction g_prevSegv;
 void crashBacktrace(int sig, siginfo_t* info, void* ctx) {
     const char* msg = "\n*** crash backtrace ***\n";
-    write(2, msg, std::strlen(msg));
+    // The REAL stderr, not fd 2: fd 2 is a pipe into the log-capture tee, and
+    // a dying process never gives its reader thread time to forward it.
+    const int errFd = materializr::logcapture::originalStderrFd();
+    write(errFd, msg, std::strlen(msg));
     void* frames[40];
     int n = backtrace(frames, 40);
-    backtrace_symbols_fd(frames, n, 2); // async-signal-safe, fd 2 = stderr
+    backtrace_symbols_fd(frames, n, errFd); // async-signal-safe
     if (g_prevSegv.sa_flags & SA_SIGINFO) {
         if (g_prevSegv.sa_sigaction) g_prevSegv.sa_sigaction(sig, info, ctx);
     } else if (g_prevSegv.sa_handler && g_prevSegv.sa_handler != SIG_DFL &&
@@ -186,6 +190,9 @@ int main(int argc, char* argv[]) {
                       << " (continuing with stderr to terminal)" << std::endl;
         }
     }
+    // Keep a tail of stderr in memory for Help > Report a Bug (after the
+    // --verbose redirect above, so a log FILE still receives everything).
+    materializr::logcapture::installStderrTee();
     // Convert OCCT internal faults (SIGSEGV/SIGFPE inside the kernel - e.g. a
     // NURBS-convert on degenerate geometry) into catchable Standard_Failure
     // exceptions, so an op's try/catch (with OCC_CATCH_SIGNALS) refuses the

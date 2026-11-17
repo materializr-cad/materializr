@@ -21,6 +21,7 @@
 #include "app/ProjectSession.h" // Tabs submenu reads session names
 #include <filesystem>
 #include "ui/AboutDialog.h"
+#include "ui/BugReportDialog.h"
 #include "ui/HelpPanel.h"
 #include "ui/LandingPage.h"   // File → New Project dismisses the landing page
 #include "ui/LogoTexture.h"
@@ -705,6 +706,7 @@ void Application::renderHelpMenuItems() {
     // knowing about it. See renderPluginMenuItems.
     renderPluginMenuItems("Help");
     ImGui::Separator();
+    if (ImGui::MenuItem(materializr::tr("Report a Bug..."))) m_bugReportDialog->open();
     if (ImGui::MenuItem(materializr::tr("About Materializr..."))) m_aboutDialog->setVisible(true);
 }
 

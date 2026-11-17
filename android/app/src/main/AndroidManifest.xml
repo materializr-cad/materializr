@@ -45,6 +45,10 @@
     <!-- <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" /> -->
     <!-- <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" /> -->
 
+    <!-- Sends a bug report to the Materializr report service (Help > Report a Bug).
+         The only network use in the app; a normal permission, granted at install. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- Allow access to the vibrator -->
     <uses-permission android:name="android.permission.VIBRATE" />
 

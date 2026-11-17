@@ -1,4 +1,5 @@
 #include "android_platform.h"
+#include "core/LogCapture.h"
 
 #if defined(__ANDROID__)
 
@@ -31,6 +32,7 @@ void* logPump(void*) {
     char buf[1024];
     ssize_t n;
     while ((n = read(g_logPipe[0], buf, sizeof(buf) - 1)) > 0) {
+        materializr::logcapture::append(buf, static_cast<size_t>(n));   // Report a Bug > Log
         if (buf[n - 1] == '\n') --n;
         buf[n] = '\0';
         __android_log_write(ANDROID_LOG_INFO, "Materializr-io", buf);

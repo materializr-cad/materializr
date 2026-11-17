@@ -1,4 +1,5 @@
 #include "mobile_files.h"
+#include "core/ReportSender.h"
 
 #if defined(__ANDROID__)
 
@@ -196,6 +197,33 @@ bool mobileLastOpenWasFallback() {
 
 void mobileShowTextInput() { callStaticVoidNoArg("nativeShowKeyboard"); }
 void mobileHideTextInput() { callStaticVoidNoArg("nativeHideKeyboard"); }
+
+
+// Blocking: calls MaterializrActivity.nativePostReport from the calling worker
+// thread (SDL attaches it to the JVM). Returns "HTTP|status|body" or "ERR|msg".
+std::string androidPostReport(const std::string& url, const std::string& spec) {
+    JNIEnv* env; jobject act; jclass cls;
+    if (!jniActivity(env, act, cls)) return "ERR|The app isn't ready to send yet.";
+    std::string out = "ERR|Couldn't reach the report service.";
+    jmethodID mid = env->GetStaticMethodID(cls, "nativePostReport",
+                                           "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+    if (mid) {
+        jstring ju = env->NewStringUTF(url.c_str());
+        jstring js = env->NewStringUTF(spec.c_str());
+        jobject res = env->CallStaticObjectMethod(cls, mid, ju, js);
+        if (res) {
+            const char* c = env->GetStringUTFChars(static_cast<jstring>(res), nullptr);
+            if (c) { out = c; env->ReleaseStringUTFChars(static_cast<jstring>(res), c); }
+            env->DeleteLocalRef(res);
+        }
+        env->DeleteLocalRef(ju);
+        env->DeleteLocalRef(js);
+    }
+    if (env->ExceptionCheck()) env->ExceptionClear();
+    env->DeleteLocalRef(cls);
+    env->DeleteLocalRef(act);
+    return out;
+}
 
 } // namespace materializr
 

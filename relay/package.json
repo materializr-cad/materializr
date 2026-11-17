@@ -1,0 +1,19 @@
+{
+  "name": "materializr-relay",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Bug-report relay: receives a report from the app, stores attachments in R2, files the GitHub issue as the materializr-reports app.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test \"test/*.test.ts\"",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "deploy:staging": "wrangler deploy --env staging"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261117.1",
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2",
+    "wrangler": "^4.0.0"
+  }
+}

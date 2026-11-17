@@ -23,8 +23,17 @@ The 11-16 tester list.
 
 ### Added
 
-- **Delete project** in the home-screen tile menu (right-click or long-press),
-  with a confirmation. A project that is open in a tab is refused.
+- **Help > Report a Bug.** A "Report a problem" form (Bug / Feature / Question,
+  title, description). Press Send and the report is filed as a GitHub issue for
+  you, with no GitHub account needed. It carries your version, OS, GPU, layout and
+  touch-mode details, and optionally a screenshot of the window (taken with the
+  form hidden; Retake grabs a fresh one), the recent diagnostic log, and a copy of
+  your project. The screenshot and log are public on the issue; the project file is
+  private to the maintainers. Everything is deleted from the report service after
+  14 days. If the service can't be reached, "Open a pre-filled GitHub issue
+  instead" is there as a fallback, and iOS uses that route for now. Nothing is sent
+  unless you press Send. **Android now requests the Internet permission** for this
+  (and only this); `PRIVACY.md` is updated to match.
 - **Angle snap** in Snap & Grid, next to Display unit.
 - **-10 .. +10 steppers in the im-touch shape panels**, as in the other layouts.
 - **Line tool, two ways to draw (now documented, not a bug).** Click (or tap) the

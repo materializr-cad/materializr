@@ -73,6 +73,7 @@ inline void resetFpuForOcct() {
 #include "ui/ThemeManager.h"
 #include "ui/PropertiesPanel.h"
 #include "ui/AboutDialog.h"
+#include "ui/BugReportDialog.h"
 #include "ui/WelcomeScreen.h"
 #include "ui/LandingPage.h"
 #include "ui/LengthField.h"   // trFormat
@@ -321,6 +322,26 @@ Application::Application(bool safeMode, float uiScaleOverride)
     m_themeManager = std::make_unique<ThemeManager>();
     m_propertiesPanel = std::make_unique<PropertiesPanel>();
     m_aboutDialog = std::make_unique<AboutDialog>();
+    m_bugReportDialog = std::make_unique<BugReportDialog>();
+    {
+        BugReportDialog::Hooks h;
+        h.layoutName = [this]() -> std::string {
+            return m_uiLayout == UiLayout::Modern  ? "Modern"
+                 : m_uiLayout == UiLayout::ImTouch ? "ImTouch" : "Classic";
+        };
+        // Same capture a Save does (live sketch flushed, previews cancelled),
+        // written to the report folder instead of the project path - the
+        // current project's path, dirty flag and recovery state are untouched.
+        h.saveProjectCopy = [this](const std::string& path) {
+            if (!m_document) return false;
+            flushActiveSketchToDocument();
+            ProjectHistory hist = captureProjectHistory();
+            return ProjectIO::save(path, *m_document, &hist, nullptr).success;
+        };
+        h.projectName = [this]() -> std::string { return projectDisplayName(); };
+        h.toast = [this](const std::string& t) { showToast(t); };
+        m_bugReportDialog->setHooks(std::move(h));
+    }
     m_welcomeScreen = std::make_unique<WelcomeScreen>();
     m_landingPage = std::make_unique<LandingPage>();
 #if defined(MZ_IOS)
@@ -9133,6 +9154,7 @@ void Application::run() {
             m_helpPanel->render();
             m_shortcutsPanel->render();
             m_aboutDialog->render();
+            m_bugReportDialog->render();
             // Startup dialogs take turns - two dialogs that each OpenPopup
             // every frame at the same stack level close each other endlessly:
             // neither ever draws, while the modal dim eats every touch (the
@@ -9307,6 +9329,9 @@ void Application::run() {
         glClear(GL_COLOR_BUFFER_BIT);
 
         endFrame();
+        // Screenshot for Help > Report a Bug: read the finished frame back
+        // while the dialog is hidden, before the buffer swap.
+        m_bugReportDialog->afterFrameRendered();
 
         // A heavy task queued this frame runs at the top of the next iteration;
         // keep this frame for its progress window to paint behind.

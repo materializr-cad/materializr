@@ -311,6 +311,7 @@ add_executable(materializr
     src/ai/AiSessionController.cpp
     src/ai/AiConnectionTest.cpp
     src/core/Base64.cpp
+    src/core/LogCapture.cpp
     src/core/Document.cpp
     src/core/History.cpp
     src/core/SelectionManager.cpp
@@ -426,11 +427,13 @@ add_executable(materializr
     src/ui/ToastNotification.cpp
     src/ui/ShortcutsPanel.cpp
     src/ui/AboutDialog.cpp
+    src/ui/BugReportDialog.cpp
     src/ui/WelcomeScreen.cpp
     src/ui/LandingPage.cpp
     src/app/ProjectSession.cpp
     src/app/KeyBindings.cpp
     src/ui/UpdateChecker.cpp
+    src/core/ReportSender.cpp
     src/ui/HelpPanel.cpp
     src/io/ProjectIO.cpp
     src/io/ImageDecode.cpp

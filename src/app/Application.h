@@ -77,6 +77,7 @@ class SectionView;
 class Toolbar;
 class HistoryPanel;
 class AboutDialog;
+class BugReportDialog;
 class WelcomeScreen;
 class ShortcutsPanel;
 class HelpPanel;
@@ -952,6 +953,7 @@ private:
     std::unique_ptr<ThemeManager> m_themeManager;
     std::unique_ptr<PropertiesPanel> m_propertiesPanel;
     std::unique_ptr<AboutDialog> m_aboutDialog;
+    std::unique_ptr<BugReportDialog> m_bugReportDialog;   // Help > Report a Bug
     std::unique_ptr<WelcomeScreen> m_welcomeScreen;
     std::unique_ptr<LandingPage> m_landingPage;
     // Parts-picker modal state (see openPartsPicker). The scratch document

@@ -165,6 +165,77 @@ public class MaterializrActivity extends SDLActivity {
         });
     }
 
+    // POST a bug report (multipart) to the relay and return its answer. Blocking:
+    // native calls it from a worker thread. `spec` is one part per line:
+    //   F|name|base64(value)         a text field
+    //   P|name|path|contentType      a file read from `path`
+    // Returns "HTTP|<status>|<body>" for any HTTP answer, "ERR|<message>" otherwise.
+    // Content-Length is always sent (the relay refuses chunked uploads), so the
+    // body length is computed up front and the files are streamed, not buffered.
+    public static String nativePostReport(String urlStr, String spec) {
+        java.net.HttpURLConnection conn = null;
+        try {
+            if (urlStr == null || !urlStr.startsWith("https://")) return "ERR|The report service address is invalid.";
+            final String boundary = "----materializr" + System.nanoTime();
+            final byte[] nl = "\r\n".getBytes("UTF-8");
+            java.util.ArrayList<byte[]> heads = new java.util.ArrayList<>();
+            java.util.ArrayList<byte[]> datas = new java.util.ArrayList<>();
+            java.util.ArrayList<File> files = new java.util.ArrayList<>();
+            long total = 0;
+            for (String line : spec.split("\n")) {
+                if (line.isEmpty()) continue;
+                String[] p = line.split("\\|", 4);
+                if (p.length < 3) continue;
+                byte[] head; byte[] data = null; File file = null;
+                if (p[0].equals("F")) {
+                    data = android.util.Base64.decode(p[2], android.util.Base64.DEFAULT);
+                    head = ("--" + boundary + "\r\nContent-Disposition: form-data; name=\"" + p[1] + "\"\r\n\r\n").getBytes("UTF-8");
+                } else if (p[0].equals("P") && p.length == 4) {
+                    file = new File(p[2]);
+                    if (!file.isFile()) return "ERR|Couldn't read " + p[1] + " to attach it.";
+                    head = ("--" + boundary + "\r\nContent-Disposition: form-data; name=\"" + p[1] + "\"; filename=\"" + p[1]
+                            + "\"\r\nContent-Type: " + p[3] + "\r\n\r\n").getBytes("UTF-8");
+                } else continue;
+                heads.add(head); datas.add(data); files.add(file);
+                total += head.length + (data != null ? data.length : file.length()) + nl.length;
+            }
+            byte[] tail = ("--" + boundary + "--\r\n").getBytes("UTF-8");
+            total += tail.length;
+
+            conn = (java.net.HttpURLConnection) new java.net.URL(urlStr).openConnection();
+            conn.setRequestMethod("POST");
+            conn.setDoOutput(true);
+            conn.setInstanceFollowRedirects(false);
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(90000);
+            conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+            conn.setRequestProperty("User-Agent", "Materializr-report/1 (Android)");
+            conn.setFixedLengthStreamingMode(total);
+            try (OutputStream out = conn.getOutputStream()) {
+                for (int i = 0; i < heads.size(); i++) {
+                    out.write(heads.get(i));
+                    if (datas.get(i) != null) out.write(datas.get(i));
+                    else try (InputStream in = new FileInputStream(files.get(i))) { copy(in, out); }
+                    out.write(nl);
+                }
+                out.write(tail);
+            }
+            int status = conn.getResponseCode();
+            InputStream is = status >= 400 ? conn.getErrorStream() : conn.getInputStream();
+            java.io.ByteArrayOutputStream body = new java.io.ByteArrayOutputStream();
+            if (is != null) {
+                byte[] buf = new byte[4096]; int n;
+                while ((n = is.read(buf)) > 0 && body.size() < 65536) body.write(buf, 0, n);
+                is.close();
+            }
+            return "HTTP|" + status + "|" + body.toString("UTF-8");
+        } catch (Exception e) {
+            return "ERR|Couldn't reach the report service (" + e.getClass().getSimpleName() + ").";
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+    }
+
     // Native polls this each frame while a picker is open. Returns null while
     // pending, "" on cancel, or (open) the temp path / (save) "ok" when ready.
     public static String pollFileResult() {
