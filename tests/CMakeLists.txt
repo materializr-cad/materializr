@@ -613,6 +613,11 @@ add_executable(test_region_adoption test_region_adoption.cpp)
 target_link_libraries(test_region_adoption PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_region_adoption COMMAND test_region_adoption)
 
+# test_contour_scope - a feature applied to picked contours follows only their copies
+add_executable(test_contour_scope test_contour_scope.cpp)
+target_link_libraries(test_contour_scope PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_contour_scope COMMAND test_contour_scope)
+
 # test_mirror_origin - mirror a body about the world origin planes (#153)
 add_executable(test_mirror_origin test_mirror_origin.cpp)
 target_link_libraries(test_mirror_origin PRIVATE materializr_core gtest gtest_main)

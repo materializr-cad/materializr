@@ -332,10 +332,10 @@ void Application::cancelThread() {
 
 void Application::beginInteractiveExtrude(const TopoDS_Shape& profile,
                                           ExtrudeMode mode, int targetBody,
-                                          int sourceSketchId) {
+                                          int sourceSketchId, SketchScope scope) {
     cancelAllInteractivePreviews();
     m_extrudeCtl.beginExtrude(iopContext(), profile, mode, targetBody,
-                              sourceSketchId);
+                              sourceSketchId, scope);
 }
 
 void Application::updateInteractiveExtrude(bool applySnap) {
@@ -2836,6 +2836,7 @@ void Application::updateSketchPattern() {
                     // addLine, which can reallocate the vector `l` lives in.
                     const bool cons = l.isConstruction;
                     const int nl = m_activeSketch->addLine(sIt->second, eIt->second);
+                    m_activeSketch->setElementOrigin(nl, lid);
                     if (cons) m_activeSketch->setElementConstruction(nl, true);
                 }
                 break;
@@ -2847,6 +2848,7 @@ void Application::updateSketchPattern() {
             auto it = remap.find(c.centerPointId);
             if (it != remap.end()) {
                 const int nc = m_activeSketch->addCircle(it->second, c.radius);
+                m_activeSketch->setElementOrigin(nc, c.id);
                 if (c.isConstruction) m_activeSketch->setElementConstruction(nc, true);
             }
         }
@@ -2858,6 +2860,7 @@ void Application::updateSketchPattern() {
             auto ie = remap.find(a.endPointId);
             if (ic != remap.end() && is != remap.end() && ie != remap.end()) {
                 const int na = m_activeSketch->addArc(ic->second, is->second, ie->second, a.radius);
+                m_activeSketch->setElementOrigin(na, a.id);
                 if (a.isConstruction) m_activeSketch->setElementConstruction(na, true);
             }
         }

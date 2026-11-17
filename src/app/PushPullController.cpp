@@ -1,3 +1,4 @@
+#include <map>
 #include "ui/LengthField.h"
 #include "PushPullController.h"
 #include "PushPullPreview.h"
@@ -206,6 +207,7 @@ int PushPullController::onBegin(const IopContext& ctx) {
                 t.profile = regions[ri].face;
                 t.anchor = regions[ri].representativePoint;
                 t.hasAnchor = true;
+                t.wholeSketch = true;
                 if (t.sourceBodyId < 0 && !sketch->isDetachedFromBody() &&
                     ctx.findBodyUnderRegion) {
                     int host = ctx.findBodyUnderRegion(t.profile,
@@ -395,6 +397,13 @@ std::unique_ptr<PushPullOp> PushPullController::makeOp() const {
         else
             op->setSketchSource(static_cast<int>(i), t.sketchId, t.regionIndex);
     }
+    // Whole sketch or picked contours, per sketch: one target taken from the
+    // sketch as a whole makes the sketch's feature a whole-sketch one.
+    std::map<int, bool> whole;
+    for (const auto& t : m_st.targets)
+        if (t.sketchId >= 0) whole[t.sketchId] = whole[t.sketchId] || t.wholeSketch;
+    for (const auto& [sid, w] : whole)
+        op->setSketchScope(sid, w ? SketchScope::Whole : SketchScope::Contours);
     return op;
 }
 

@@ -178,7 +178,14 @@ int PushPullOp::getSketchIdAt(int targetIndex) const {
 // sketch. Used by the cascade walker after a constraint commit. Returns
 // true if at least one profile was rebuilt - caller should then re-execute
 // the op so the body shape catches up.
-bool PushPullOp::rebuildProfileFromSketch(Document& doc, int sketchId, bool adoptNewRegions) {
+void PushPullOp::setSketchScope(int sketchId, SketchScope s) {
+    if (sketchId < 0) return;
+    if (s == SketchScope::Contours) m_contourSketches.insert(sketchId);
+    else { m_contourSketches.erase(sketchId); m_usedSigs.erase(sketchId); }
+}
+
+bool PushPullOp::rebuildProfileFromSketch(Document& doc, int sketchId, bool adoptNewRegions,
+                                          bool isLatest) {
     if (sketchId < 0) return false;
     auto sk = doc.getSketch(sketchId);
     if (!sk) return false;
@@ -258,15 +265,27 @@ bool PushPullOp::rebuildProfileFromSketch(Document& doc, int sketchId, bool adop
     // sketch, so a new closed shape in it gets the same distance and host. Only
     // regions NO target claims, and none of the points recorded at the start
     // fall in.
-    if (adoptNewRegions) {
+    const bool contoursScope = m_contourSketches.count(sketchId) != 0;
+    if (adoptNewRegions && (contoursScope || isLatest)) {
         const auto kit = m_knownPts.find(sketchId);
+        const auto sigIt = m_usedSigs.find(sketchId);
         int tmpl = -1;
         for (size_t i = 0; i < m_targets.size() && tmpl < 0; ++i)
             if (i < m_sketchSourceIds.size() && m_sketchSourceIds[i] == sketchId) tmpl = static_cast<int>(i);
-        if (kit != m_knownPts.end() && !kit->second.empty() && tmpl >= 0) {
+        if (kit != m_knownPts.end() && !kit->second.empty() && tmpl >= 0 &&
+            (!contoursScope || (sigIt != m_usedSigs.end() && !sigIt->second.empty()))) {
             const int host = m_targets[tmpl].sourceBodyId;
             for (int idx : sk->regionsMissingFrom(regions, kit->second)) {
                 if (owner[idx] >= 0 || regions[idx].face.IsNull()) continue;
+                if (contoursScope) {
+                    // Only a copy of a contour this op used (same bounding
+                    // elements, traced back to the originals).
+                    const std::vector<int> sig = sk->faceRootSignature(regions[idx].face);
+                    if (sig.empty() ||
+                        std::find(sigIt->second.begin(), sigIt->second.end(), sig) ==
+                            sigIt->second.end())
+                        continue;
+                }
                 Target t;
                 t.profile = regions[idx].face;
                 t.sourceBodyId = host;
@@ -432,6 +451,21 @@ bool PushPullOp::execute(Document& doc) {
         if (sid < 0 || m_knownPts.count(sid)) continue;
         if (auto sk = doc.getSketch(sid))
             m_knownPts[sid] = sk->drawnRegionSamples(sk->buildRegions());
+    }
+    // Contour-scoped: what bounds each contour used, so its copies can be found.
+    std::set<int> sigsKnown;   // taken once, when the op was made - not re-taken as it adopts
+    for (const auto& [sid, sigs] : m_usedSigs)
+        if (!sigs.empty()) sigsKnown.insert(sid);
+    for (size_t i = 0; i < m_sketchSourceIds.size() && i < m_targets.size(); ++i) {
+        const int sid = m_sketchSourceIds[i];
+        if (sid < 0 || !m_contourSketches.count(sid) || sigsKnown.count(sid) ||
+            m_targets[i].profile.IsNull()) continue;
+        auto sk = doc.getSketch(sid);
+        if (!sk) continue;
+        auto sig = sk->faceRootSignature(m_targets[i].profile);
+        auto& sigs = m_usedSigs[sid];
+        if (!sig.empty() && std::find(sigs.begin(), sigs.end(), sig) == sigs.end())
+            sigs.push_back(std::move(sig));
     }
 
     // A result the preview worker computed on copies of these bodies: apply
@@ -1045,6 +1079,12 @@ std::string PushPullOp::serializeParams() const {
             blob += ";tr" + std::to_string(i) + "=" + m_targetRefs[i].serialize();
         }
     }
+    for (int sid : m_contourSketches) {
+        blob += ";cn" + std::to_string(sid) + "=1";
+        const auto it = m_usedSigs.find(sid);
+        if (it != m_usedSigs.end() && !it->second.empty())
+            blob += ";ug" + std::to_string(sid) + "=" + sketchSigsToString(it->second);
+    }
     // Points inside every drawn region when the op first ran, per sketch.
     for (const auto& [sid, pts] : m_knownPts) {
         if (pts.empty()) continue;
@@ -1096,7 +1136,15 @@ bool PushPullOp::deserializeParams(const std::string& blob) {
         if (end == std::string::npos) end = blob.size();
         std::string key = blob.substr(pos, eq - pos);
         std::string val = blob.substr(eq + 1, end - eq - 1);
-        if (key.size() >= 3 && key[0] == 'k' && key[1] == 'p') {
+        if (key.size() >= 3 && key[0] == 'c' && key[1] == 'n') {
+            m_contourSketches.insert(std::atoi(key.c_str() + 2));
+            any = true;
+        }
+        else if (key.size() >= 3 && key[0] == 'u' && key[1] == 'g') {
+            m_usedSigs[std::atoi(key.c_str() + 2)] = sketchSigsFromString(val);
+            any = true;
+        }
+        else if (key.size() >= 3 && key[0] == 'k' && key[1] == 'p') {
             const int sid = std::atoi(key.c_str() + 2);
             auto& pts = m_knownPts[sid];
             pts.clear();

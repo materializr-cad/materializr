@@ -38,6 +38,7 @@
 #include <TopExp_Explorer.hxx>
 
 #include <algorithm>
+#include <functional>
 #include <cstdio>
 #include <cstring>
 #include <limits>
@@ -1106,6 +1107,7 @@ void Sketch::clear() {
     m_polygons.clear();
     m_constraints.clear();
     m_fillAnchors.clear();
+    m_origin.clear();
     m_nextId = 1;
     m_nextConstraintId = 1;
 }
@@ -2822,6 +2824,114 @@ std::vector<glm::vec2> Sketch::drawnRegionSamples(const std::vector<Region>& reg
                 if (rp.contains(p)) { out.push_back(p); ++added; }
             }
     }
+    return out;
+}
+
+void Sketch::setElementOrigin(int newId, int srcId) {
+    if (newId == srcId) return;
+    m_origin[newId] = elementRoot(srcId);
+}
+
+int Sketch::elementRoot(int id) const {
+    auto it = m_origin.find(id);
+    return it != m_origin.end() ? it->second : id;
+}
+
+std::vector<int> Sketch::faceRootSignature(const TopoDS_Face& face) const {
+    std::vector<int> out;
+    if (face.IsNull()) return out;
+
+    const gp_Ax3 ax = m_plane.Position();
+    const gp_Pnt origin = ax.Location();
+    const gp_Dir xd = ax.XDirection(), yd = ax.YDirection();
+    auto to2D = [&](const gp_Pnt& w) {
+        gp_Vec v(origin, w);
+        return glm::vec2(static_cast<float>(v.Dot(gp_Vec(xd))),
+                         static_cast<float>(v.Dot(gp_Vec(yd))));
+    };
+
+    // One candidate per sketch curve, tested against a 2D point.
+    struct Cand { int id; std::function<bool(glm::vec2)> on; };
+    std::vector<Cand> cands;
+    constexpr float kTol = 1e-2f;   // the region builder's own on-line tolerance
+    auto distSeg = [](glm::vec2 q, glm::vec2 a, glm::vec2 b) {
+        const glm::vec2 ab = b - a;
+        const float l2 = glm::dot(ab, ab);
+        const float t = l2 > 1e-12f ? glm::clamp(glm::dot(q - a, ab) / l2, 0.0f, 1.0f) : 0.0f;
+        return glm::length(q - (a + t * ab));
+    };
+    for (const auto& l : m_lines) {
+        if (l.isConstruction) continue;
+        const SketchPoint* a = getPoint(l.startPointId);
+        const SketchPoint* b = getPoint(l.endPointId);
+        if (!a || !b) continue;
+        const glm::vec2 pa = a->pos, pb = b->pos;
+        cands.push_back({l.id, [=](glm::vec2 q) { return distSeg(q, pa, pb) < kTol; }});
+    }
+    for (const auto& c : m_circles) {
+        if (c.isConstruction) continue;
+        const SketchPoint* ctr = getPoint(c.centerPointId);
+        if (!ctr) continue;
+        const glm::vec2 cp = ctr->pos;
+        const float r = static_cast<float>(c.radius);
+        cands.push_back({c.id, [=](glm::vec2 q) {
+            return std::abs(glm::length(q - cp) - r) < kTol; }});
+    }
+    for (const auto& a : m_arcs) {
+        if (a.isConstruction) continue;
+        const SketchPoint* ctr = getPoint(a.centerPointId);
+        const SketchPoint* s = getPoint(a.startPointId);
+        const SketchPoint* e = getPoint(a.endPointId);
+        if (!ctr || !s || !e) continue;
+        const glm::vec2 cp = ctr->pos;
+        const float r = static_cast<float>(a.radius);
+        const float twoPi = 6.28318530718f;
+        const float a0 = std::atan2(s->pos.y - cp.y, s->pos.x - cp.x);
+        float span = std::atan2(e->pos.y - cp.y, e->pos.x - cp.x) - a0;
+        while (span < 0.0f) span += twoPi;
+        // Arcs run counter-clockwise from start to end. The slack covers the
+        // sample sitting right at an endpoint.
+        const float slack = (kTol * 2.0f) / std::max(r, 1e-3f);
+        cands.push_back({a.id, [=](glm::vec2 q) {
+            if (std::abs(glm::length(q - cp) - r) >= kTol) return false;
+            float d = std::atan2(q.y - cp.y, q.x - cp.x) - a0;
+            while (d < 0.0f) d += twoPi;
+            while (d >= twoPi) d -= twoPi;
+            return d <= span + slack || d >= twoPi - slack;
+        }});
+    }
+    for (const auto& sp : m_splines) {
+        if (sp.isConstruction) continue;
+        std::vector<glm::vec2> poly = sampleSpline2D(sp);
+        if (poly.size() < 2) continue;
+        // The B-spline the fuse emits and this polyline agree to well inside the
+        // chord sag, which is looser than a straight line's tolerance.
+        cands.push_back({sp.id, [poly = std::move(poly), distSeg](glm::vec2 q) {
+            for (size_t i = 0; i + 1 < poly.size(); ++i)
+                if (distSeg(q, poly[i], poly[i + 1]) < 0.05f) return true;
+            return false;
+        }});
+    }
+    if (cands.empty() || cands.size() > 2000) return out;
+
+    std::set<int> roots;
+    try {
+        for (TopExp_Explorer ex(face, TopAbs_EDGE); ex.More(); ex.Next()) {
+            BRepAdaptor_Curve c(TopoDS::Edge(ex.Current()));
+            const double f = c.FirstParameter(), l = c.LastParameter();
+            const double fr[3] = {0.25, 0.5, 0.75};
+            glm::vec2 pts[3];
+            for (int i = 0; i < 3; ++i) pts[i] = to2D(c.Value(f + (l - f) * fr[i]));
+            for (const Cand& cd : cands) {
+                int hit = 0;
+                for (const auto& q : pts) if (cd.on(q)) ++hit;
+                if (hit >= 2) roots.insert(elementRoot(cd.id));
+            }
+        }
+    } catch (...) {
+        return {};
+    }
+    out.assign(roots.begin(), roots.end());
     return out;
 }
 

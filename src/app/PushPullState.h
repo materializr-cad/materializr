@@ -24,6 +24,9 @@ struct PushPullState {
         // region again when region numbering changes (see Sketch::regionAtAnchor).
         glm::vec2 anchor{0.0f};
         bool hasAnchor = false;
+        // Taken from the sketch as a whole (Items list / Push on the sketch)
+        // rather than from a contour picked in the viewport. See SketchScope.h.
+        bool wholeSketch = false;
     };
 
     bool symmetric = false;   // panel checkbox (plane-sketch targets)

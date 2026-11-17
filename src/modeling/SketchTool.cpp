@@ -4943,6 +4943,7 @@ void SketchTool::commitMirror(std::set<int>& outPoints, std::set<int>& outLines)
                 // Read before addLine: it can reallocate the vector `l` lives in.
                 const bool cons = l.isConstruction;
                 int nl = m_sketch->addLine(s, e);
+                m_sketch->setElementOrigin(nl, lid);
                 if (cons) m_sketch->setElementConstruction(nl, true);
                 outLines.insert(nl); outPoints.insert(s); outPoints.insert(e);
             }
@@ -4954,6 +4955,7 @@ void SketchTool::commitMirror(std::set<int>& outPoints, std::set<int>& outLines)
             if (ctr >= 0) {
                 const bool cons = c.isConstruction;
                 const int nc = m_sketch->addCircle(ctr, c.radius);
+                m_sketch->setElementOrigin(nc, cid);
                 if (cons) m_sketch->setElementConstruction(nc, true);
                 outPoints.insert(ctr);
             }
@@ -4968,6 +4970,7 @@ void SketchTool::commitMirror(std::set<int>& outPoints, std::set<int>& outLines)
             if (ctr >= 0 && s >= 0 && e >= 0) {
                 const bool cons = a.isConstruction;
                 const int na = m_sketch->addArc(ctr, e, s, a.radius);
+                m_sketch->setElementOrigin(na, aid);
                 if (cons) m_sketch->setElementConstruction(na, true);
                 outPoints.insert(s); outPoints.insert(e); outPoints.insert(ctr);
             }
@@ -4980,6 +4983,7 @@ void SketchTool::commitMirror(std::set<int>& outPoints, std::set<int>& outLines)
             if (cps.size() >= 2) {
                 const bool cons = sp.isConstruction;
                 const int ns = m_sketch->addSpline(cps);
+                m_sketch->setElementOrigin(ns, sid);
                 if (cons) m_sketch->setElementConstruction(ns, true);
             }
             for (int n2 : cps) outPoints.insert(n2);

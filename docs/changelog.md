@@ -5,6 +5,54 @@ All notable changes to Materializr are documented here. Format loosely follows
 
 ## [Unreleased]
 
+The 11-16 tester list.
+
+### Changed
+
+- **Extrude, Subtract and Push/Pull now remember what they were applied to.**
+  Applied to the **whole sketch** (picked from the Items list, or Extrude/Subtract
+  on the sketch), the feature belongs to the sketch: edit the sketch and every
+  contour in it, old or new, gets the feature. Applied to **contours picked in the
+  viewport** (even if you picked all of them), it follows those contours, and any
+  **copy** of them made with Multiply or Mirror, and leaves everything else in the
+  sketch alone. Cut a hole with one circle, Multiply that circle, and the copies
+  are cut too; a circle you draw by hand next to it is not. This reverses the
+  beta.5 behaviour for picked contours, where every contour drawn later was swept
+  along. Projects saved earlier keep the old behaviour (they have no record of what
+  was picked); remake the feature to get the new one.
+
+### Added
+
+- **Delete project** in the home-screen tile menu (right-click or long-press),
+  with a confirmation. A project that is open in a tab is refused.
+- **Angle snap** in Snap & Grid, next to Display unit.
+- **-10 .. +10 steppers in the im-touch shape panels**, as in the other layouts.
+- **Line tool, two ways to draw (now documented, not a bug).** Click (or tap) the
+  start, then click each next point: the lines chain end to end. Press, drag and
+  release instead: that draws one line and stops, and the next starts from a fresh
+  point.
+- Double-tap a sketch in the im-touch Items list to edit it; Multi / Ctrl now
+  selects several sketches there.
+
+### Fixed
+
+- **Android: three fingers on the screen froze the app.** The system claiming the
+  touch (its three-finger gesture) left the app believing fingers were still
+  down, so every button went dead until it was restarted. A cancelled touch, or
+  losing focus, now clears them.
+- **Stylus:** the pen no longer also arrives as a mouse in touch mode, which
+  cleared the selection and the active tool as it hovered near the screen. (Not
+  yet confirmed on a device.)
+- **Touch dimension popup:** Enter on the number pad no longer applies the whole
+  popup (only **Confirm (Enter)** does), and an open pad follows the -10 .. +10
+  steppers.
+- **Extrude and Subtract take every selected contour,** across sketches, not just
+  the first one (they now match Push/Pull). Contours on a different plane than the
+  first are left out, with a message.
+- **A red dimension** on a sketch away from the origin: the solver asked a float32
+  point for a 1e-6 answer and gave up. Its tolerance now scales with the sketch.
+- **Home view** frames every visible sketch, not only the bodies.
+
 ## [1.8.0-beta.6] - 2026-11-15
 
 Beta (Settings ▸ Include pre-release builds), desktop and Android. The 11-10,

@@ -278,7 +278,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 
 - CONVERTED: 1
 - allowed-by-hand: 93
-- comment: 317
+- comment: 318
 - diagnostic: 13
 - identifier/other: 14
 
@@ -583,6 +583,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | comment | src/modeling/Sketch.cpp | `// cut through the plate remove 3.5 mm^3 instead of ~1138 mm^3. 1e-3 mm is` |
 | comment | src/modeling/Sketch.cpp | `// ~16x float32 resolution at 1000 mm, and far below anything a print or a` |
 | comment | src/modeling/Sketch.cpp | `// ~0.2 mm chords: on a 1 mm radius that is a 0.005 mm sag.` |
+| comment | src/modeling/Sketch.h | `// from one contour (Subtract on a 10 mm circle) should follow its copies, but` |
 | comment | src/modeling/Sketch.h | `// (chord error well under 0.01 mm at ordinary sizes).` |
 | comment | src/modeling/SketchConstraints.h | `// dimension label rather than clicking it. Pixels rather than sketch mm because` |
 | comment | src/modeling/SketchOffset.cpp | `// comfortably more than 1e-3 mm - so an analytic epsilon condemns perfectly` |

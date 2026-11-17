@@ -103,7 +103,7 @@ int ExtrudeController::resolveCutTarget(const IopContext& ctx) const {
 bool ExtrudeController::beginExtrude(const IopContext& ctx,
                                      const TopoDS_Shape& profile,
                                      ExtrudeMode mode, int targetBody,
-                                     int sourceSketchId) {
+                                     int sourceSketchId, SketchScope scope) {
     // Extrude sweeps a profile along its normal - only meaningful for a FLAT
     // profile. A single curved body face (cylinder / sphere / fillet) has no
     // single normal, so extruding it produced garbage geometry; refuse with
@@ -124,6 +124,7 @@ bool ExtrudeController::beginExtrude(const IopContext& ctx,
     m_mode = mode;
     m_targetBody = targetBody;
     m_sketchId = sourceSketchId;
+    m_scope = scope;
     return begin(ctx);
 }
 
@@ -187,6 +188,7 @@ std::unique_ptr<Operation> ExtrudeController::buildOp(const IopContext& ctx) {
     op->setDistance(opDistance());
     op->setMode(ExtrudeMode::NewBody);
     op->setSketchSource(m_sketchId);
+    op->setSketchScope(m_scope);
     return op;
 }
 
@@ -272,6 +274,7 @@ void ExtrudeController::commitCutAll(const IopContext& ctx,
         op->setMode(ExtrudeMode::Subtract);
         op->setTargetBody(id);
         op->setSketchSource(m_sketchId);
+    op->setSketchScope(m_scope);
         if (ctx.history.pushOperation(std::move(op), ctx.doc)) ++done;
     }
     std::fprintf(stdout, "Subtracted %.1f mm from %d of %zu bodies\n",
@@ -303,6 +306,7 @@ std::unique_ptr<Operation> ExtrudeController::buildCommitOp(const IopContext& ct
     op->setMode(ExtrudeMode::Subtract);
     op->setTargetBody(m_targetBody);
     op->setSketchSource(m_sketchId);
+    op->setSketchScope(m_scope);
     std::fprintf(stdout, "Subtracted %.1f mm from body %d\n",
                  std::abs(m_distance), m_targetBody);
     return op;
@@ -533,6 +537,7 @@ void ExtrudeController::onCleanup() {
     m_sweepSign = 1.0;
     m_cutAllBodies = false;
     m_sketchId = -1;
+    m_scope = SketchScope::Whole;
 }
 
 } // namespace materializr

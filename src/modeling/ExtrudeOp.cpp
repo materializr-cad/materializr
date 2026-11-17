@@ -196,7 +196,7 @@ bool sharesBoundary(const TopoDS_Face& old, const TopoDS_Face& now) {
 }
 } // namespace
 
-bool ExtrudeOp::rebuildProfileFromSketch(Document& doc, bool adoptNewRegions) {
+bool ExtrudeOp::rebuildProfileFromSketch(Document& doc, bool adoptNewRegions, bool isLatest) {
     if (m_sketchId < 0) return false;
     auto sk = doc.getSketch(m_sketchId);
     if (!sk) return false;
@@ -210,7 +210,15 @@ bool ExtrudeOp::rebuildProfileFromSketch(Document& doc, bool adoptNewRegions) {
     // not per profile island: a circle added around the extruded one leaves the
     // original a hole in the sketch's even-odd profile, but the disc is still the
     // region that was extruded.
-    if (adoptNewRegions && !m_regionPts.empty() && !m_knownPts.empty()) {
+    //
+    // Which of those it takes depends on what it was applied to (SketchScope.h):
+    // a Whole-scoped feature takes all of them, but only when it is the sketch's
+    // latest feature (several taking the same contour would build it several
+    // times); a Contours-scoped one takes only the ones that are COPIES of the
+    // contours it used - a circle drawn separately is none of its business.
+    const bool contoursScope = m_scope == SketchScope::Contours;
+    if (adoptNewRegions && (contoursScope || isLatest) && !m_regionPts.empty() &&
+        !m_knownPts.empty() && (!contoursScope || !m_usedSigs.empty())) {
         std::vector<glm::vec2> known;
         known.reserve(m_knownPts.size());
         for (const auto& p : m_knownPts)
@@ -227,7 +235,14 @@ bool ExtrudeOp::rebuildProfileFromSketch(Document& doc, bool adoptNewRegions) {
         materializr::Sketch drawnOnly(*sk);
         drawnOnly.setSourceFace(TopoDS_Face());
         const auto regions = drawnOnly.buildRegions();
-        const std::vector<int> fresh = drawnOnly.regionsMissingFrom(regions, known);
+        std::vector<int> fresh = drawnOnly.regionsMissingFrom(regions, known);
+        if (contoursScope && !fresh.empty()) {
+            fresh.erase(std::remove_if(fresh.begin(), fresh.end(), [&](int idx) {
+                const std::vector<int> sig = drawnOnly.faceRootSignature(regions[idx].face);
+                return sig.empty() ||
+                       std::find(m_usedSigs.begin(), m_usedSigs.end(), sig) == m_usedSigs.end();
+            }), fresh.end());
+        }
         if (!fresh.empty()) {
             BRep_Builder bb;
             TopoDS_Compound all;
@@ -508,6 +523,20 @@ bool ExtrudeOp::execute(Document& doc) {
             }
         }
 
+        // A contour-scoped extrude remembers WHICH contours it used by what they
+        // are bounded by (see SketchScope.h), so copies of them can be told from
+        // everything else drawn in the sketch later.
+        if (m_sketchId >= 0 && m_scope == SketchScope::Contours && m_usedSigs.empty()) {
+            if (auto sk = doc.getSketch(m_sketchId)) {
+                for (TopExp_Explorer fx(m_profile, TopAbs_FACE); fx.More(); fx.Next()) {
+                    auto sig = sk->faceRootSignature(TopoDS::Face(fx.Current()));
+                    if (!sig.empty() &&
+                        std::find(m_usedSigs.begin(), m_usedSigs.end(), sig) == m_usedSigs.end())
+                        m_usedSigs.push_back(std::move(sig));
+                }
+            }
+        }
+
         TopoDS_Shape extrudedShape;
 
         // Compute extrude direction from the profile face's normal. A
@@ -765,6 +794,10 @@ std::string ExtrudeOp::serializeParams() const {
             blob += pb;
         }
     }
+    if (m_scope == SketchScope::Contours) {
+        blob += ";scope=1";
+        if (!m_usedSigs.empty()) blob += ";sigs=" + sketchSigsToString(m_usedSigs);
+    }
     if (!m_knownPts.empty()) {
         blob += ";known=";
         char pb[64];
@@ -854,6 +887,8 @@ bool ExtrudeOp::deserializeParams(const std::string& rawBlob) {
         else if (key == "mode")   { m_mode = static_cast<ExtrudeMode>(i); any = true; }
         else if (key == "target") { m_targetBodyId = i; any = true; }
         else if (key == "draft")  { m_draftAngle = d; any = true; }
+        else if (key == "scope")  { m_scope = i == 1 ? SketchScope::Contours : SketchScope::Whole; any = true; }
+        else if (key == "sigs")   { m_usedSigs = sketchSigsFromString(val); any = true; }
         else if (key == "known") {
             m_knownPts.clear();
             size_t q = 0;

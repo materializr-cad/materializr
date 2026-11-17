@@ -119,7 +119,9 @@ inline int rederiveSketchDrivenOps(History& history, Document& doc, int sketchId
     // another) the MOST RECENT one takes it - it is what the user was last doing
     // with the sketch - and the rest leave it alone: every one of them taking it
     // would build it several times. (A lathe takes every region anyway, so when
-    // it is the latest nothing else adopts.)
+    // it is the latest nothing else adopts.) That is for a feature applied to the
+    // sketch AS A WHOLE; one applied to picked contours instead takes only copies
+    // of those, whichever feature it is (SketchScope.h).
     int latestFeature = -1;
     for (int i = 0; i <= applied && i < history.stepCount(); ++i) {
         const Operation* op = history.getStep(i);
@@ -131,7 +133,7 @@ inline int rederiveSketchDrivenOps(History& history, Document& doc, int sketchId
         if (auto* ext = dynamic_cast<ExtrudeOp*>(op)) {
             if (ext->getSketchId() != sketchId) continue;
             ++matched;
-            if (ext->rebuildProfileFromSketch(doc, i == latestFeature) && earliest < 0) earliest = i;
+            if (ext->rebuildProfileFromSketch(doc, true, i == latestFeature) && earliest < 0) earliest = i;
         } else if (auto* pp = dynamic_cast<PushPullOp*>(op)) {
             bool refs = false;
             const int tc = pp->targetCount();
@@ -139,7 +141,7 @@ inline int rederiveSketchDrivenOps(History& history, Document& doc, int sketchId
                 if (pp->getSketchIdAt(t) == sketchId) { refs = true; break; }
             if (!refs) continue;
             ++matched;
-            if (pp->rebuildProfileFromSketch(doc, sketchId, i == latestFeature) && earliest < 0)
+            if (pp->rebuildProfileFromSketch(doc, sketchId, true, i == latestFeature) && earliest < 0)
                 earliest = i;
         } else if (auto* rv = dynamic_cast<RevolveOp*>(op)) {
             if (rv->getSketchId() != sketchId) continue;

@@ -5,6 +5,7 @@
 #include <vector>
 #include <string>
 #include <memory>
+#include <map>
 #include <TopoDS_Wire.hxx>
 #include <TopoDS_Face.hxx>
 #include <gp_Pln.hxx>
@@ -291,6 +292,30 @@ public:
     std::vector<int> regionsMissingFrom(const std::vector<Region>& regions,
                                         const std::vector<glm::vec2>& known) const;
 
+    // --- Element provenance ("derived from") -----------------------------
+    // Multiply, Mirror and friends write COPIES into the sketch. A feature built
+    // from one contour (Subtract on a 10 mm circle) should follow its copies, but
+    // not a circle drawn separately - and nothing in the geometry says which is
+    // which. So every copy remembers the element it came from.
+    //
+    // Stored FLATTENED: setElementOrigin(copy, src) records elementRoot(src), so a
+    // copy of a copy points at the original directly and stays correct after an
+    // intermediate copy (or the original itself) is deleted. Ids are never
+    // reused, so a root id that no longer names an element is still a valid key.
+    void setElementOrigin(int newId, int srcId);
+    // The element `id` was ultimately copied from; `id` itself when it is original.
+    int elementRoot(int id) const;
+    const std::map<int, int>& getElementOrigins() const { return m_origin; }
+    void addRawOrigin(int id, int root) { m_origin[id] = root; }   // ProjectIO
+
+    // The "signature" of a contour: the sorted, de-duplicated ROOT ids of every
+    // non-construction sketch element that bounds `face` (outer wire and holes).
+    // Two contours with equal, non-empty signatures are copies of each other.
+    // Matches by sampling each boundary edge against the sketch's curves, since a
+    // region comes out of a general fuse and carries no element ids. Edges that
+    // match no element (a host face's own outline) are ignored; empty when none do.
+    std::vector<int> faceRootSignature(const TopoDS_Face& face) const;
+
     // True when buildRegions() would be a cache HIT (valid cache + current
     // geometry hash). Lets the per-frame hover pick skip sketches whose
     // regions would need the heavy OCCT fuse - a freshly-unhidden complex
@@ -530,6 +555,7 @@ private:
     std::vector<Constraint> m_constraints;
     int m_nextConstraintId = 1;
     std::vector<glm::vec2> m_fillAnchors; // see getFillAnchors
+    std::map<int, int> m_origin;          // element id -> root element id (see setElementOrigin)
     FaceReference m_faceRefs;
 
     // Cached in 3D, deliberately. The centroid belongs to the FACE, so its

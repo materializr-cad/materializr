@@ -4,6 +4,7 @@
 #include "../core/Document.h"
 #include "GenerationLedger.h"
 #include "FaceLineage.h"
+#include "SketchScope.h"
 #include <TopoDS_Shape.hxx>
 #include <string>
 
@@ -26,6 +27,10 @@ public:
     // is later edited (constraint value change → cascade). -1 means "not from
     // a sketch" (e.g., a face-driven extrude) - those won't cascade.
     void setSketchSource(int sketchId) { m_sketchId = sketchId; }
+    // Whole sketch or specific contours (SketchScope.h). Decides which contours
+    // drawn after this extrude it takes on when the sketch is edited.
+    void setSketchScope(SketchScope s) { m_scope = s; }
+    SketchScope getSketchScope() const { return m_scope; }
 
     // Getters
     double getDistance() const { return m_distance; }
@@ -42,7 +47,13 @@ public:
     // `adoptNewRegions`: also extrude contours drawn in the sketch since this
     // extrude was made (see m_knownPts). Only the sketch-edit cascade asks, and
     // only for the sketch's latest feature; a reload never does.
-    bool rebuildProfileFromSketch(Document& doc, bool adoptNewRegions = false);
+    //
+    // A Contours-scoped extrude adopts only contours that are COPIES of the ones
+    // it used, and may do so whichever feature of the sketch it is; `isLatest`
+    // (the sketch's most recent feature) is what lets a Whole-scoped one take
+    // everything. `adoptNewRegions` is the master switch either way.
+    bool rebuildProfileFromSketch(Document& doc, bool adoptNewRegions = false,
+                                  bool isLatest = true);
 
     // Operation interface
     bool execute(Document& doc) override;
@@ -109,6 +120,11 @@ private:
     // region of the current sketch holding none of them was drawn afterwards.
     // Persisted (known=); absent in older files, which then never adopt.
     std::vector<std::pair<double,double>> m_knownPts;
+    SketchScope m_scope = SketchScope::Whole;
+    // Contours scope only: the Sketch::faceRootSignature of each contour this
+    // extrude used, taken when it was made. A contour drawn later is adopted when
+    // its signature equals one of these (it is a copy of a used one). Persisted.
+    std::vector<std::vector<int>> m_usedSigs;
     // Transient (rebuilt on every load): the saved body's footprint faces,
     // translated onto the sketch plane. Used as the profile when the
     // recorded regions no longer exist in the sketch's current state (the

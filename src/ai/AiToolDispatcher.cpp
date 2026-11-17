@@ -1666,6 +1666,7 @@ ToolResult extrudeSketch(PluginContext& ctx, const nlohmann::json& args) {
     auto op = std::make_unique<ExtrudeOp>();
     op->setProfile(profile);
     op->setSketchSource(sketchId);
+    op->setSketchScope(haveIndices ? SketchScope::Contours : SketchScope::Whole);
     op->setDistance(distance);
     op->setDirection(symmetric ? ExtrudeDirection::Symmetric : ExtrudeDirection::Normal);
     op->setMode(mode);

@@ -830,7 +830,8 @@ private:
     void beginInteractiveExtrude(const TopoDS_Shape& profile,
                                  ExtrudeMode mode = ExtrudeMode::NewBody,
                                  int targetBody = -1,
-                                 int sourceSketchId = -1);
+                                 int sourceSketchId = -1,
+                                 SketchScope scope = SketchScope::Whole);
 
     // Re-execute every enabled ExtrudeOp in history that was originally built
     // from this sketch - called when the user edits a constraint value via

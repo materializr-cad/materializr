@@ -5,6 +5,7 @@
 #include "TopoName.h"
 #include "FaceLineage.h"
 #include "GenerationLedger.h"
+#include "SketchScope.h"
 #include <TopoDS_Face.hxx>
 #include <TopoDS_Shape.hxx>
 #include <gp_Vec.hxx>
@@ -14,6 +15,7 @@
 #include <vector>
 #include <string>
 #include <map>
+#include <set>
 #include <unordered_map>
 #include <cstddef>   // size_t
 
@@ -86,7 +88,17 @@ public:
     // the LATEST step built from the sketch: with several, one of them has to own
     // it and building it more than once is wrong. A reload never does (the saved
     // bodies already say what was pushed).
-    bool rebuildProfileFromSketch(Document& doc, int sketchId, bool adoptNewRegions = false);
+    //
+    // Per source sketch (SketchScope.h): a Whole-scoped sketch adopts every new
+    // contour, when this is its `isLatest` feature; a Contours-scoped one adopts
+    // only copies of the contours it used (Sketch::faceRootSignature), whichever
+    // feature it is. Without setSketchScope a sketch is Whole, as in older files.
+    bool rebuildProfileFromSketch(Document& doc, int sketchId, bool adoptNewRegions = false,
+                                  bool isLatest = true);
+    void setSketchScope(int sketchId, SketchScope s);
+    SketchScope getSketchScope(int sketchId) const {
+        return m_contourSketches.count(sketchId) ? SketchScope::Contours : SketchScope::Whole;
+    }
 
     bool execute(Document& doc) override;
     bool undo(Document& doc) override;
@@ -153,6 +165,11 @@ private:
     // holds none of them was drawn afterwards. Serialized as `kp<sketchId>=`; a
     // file without them (older) simply never adopts.
     std::map<int, std::vector<glm::vec2>> m_knownPts;
+    // Sketches this op was applied to by picking CONTOURS (not the whole sketch),
+    // and for each the signatures of the contours it used. Serialized `cn<sid>=1`
+    // and `ug<sid>=`; absent in older files, which are Whole.
+    std::set<int> m_contourSketches;
+    std::map<int, std::vector<std::vector<int>>> m_usedSigs;
     // Reload support for FACE-driven targets: per-target ordinal index of the
     // profile face within the source body's pre-op shape (see
     // SubShapeIndex.h). 0 = not a face target / not resolvable.

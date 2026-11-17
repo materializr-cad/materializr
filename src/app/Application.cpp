@@ -7493,8 +7493,12 @@ bool Application::extrudeSelectedProfiles(ExtrudeMode mode) {
         }
     }
     // 2. Otherwise every selected sketch's whole profile (even-odd islands, so a
-    //    text / SVG sketch keeps its holes).
+    //    text / SVG sketch keeps its holes). That is the sketch AS A WHOLE, which
+    //    is what decides how the feature treats contours added to it later
+    //    (SketchScope.h); regions picked above are specific contours.
+    bool wholeSketch = false;
     if (faces.empty()) {
+        wholeSketch = true;
         for (const auto& e : sel) {
             if (e.type != SelectionType::Sketch || e.sketchId < 0) continue;
             auto sk = m_document->getSketch(e.sketchId);
@@ -7563,7 +7567,8 @@ bool Application::extrudeSelectedProfiles(ExtrudeMode mode) {
         for (const auto& f : faces) bb.Add(comp, f);
         profile = comp;
     }
-    beginInteractiveExtrude(profile, mode, targetBody, srcSketch);
+    beginInteractiveExtrude(profile, mode, targetBody, srcSketch,
+                            wholeSketch ? SketchScope::Whole : SketchScope::Contours);
     return true;
 }
 
@@ -7585,7 +7590,8 @@ void Application::subtractSketchRegion(int sketchId, int regionIndex) {
         showToast(materializr::tr("That region has no closed contour to cut with."), 6.0);
         return;
     }
-    beginInteractiveExtrude(profile, ExtrudeMode::Subtract, targetBody, sketchId);
+    beginInteractiveExtrude(profile, ExtrudeMode::Subtract, targetBody, sketchId,
+                            SketchScope::Contours);
 }
 
 void Application::alignCameraToActiveSketch() {
