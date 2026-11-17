@@ -278,7 +278,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 
 - CONVERTED: 1
 - allowed-by-hand: 93
-- comment: 318
+- comment: 323
 - diagnostic: 13
 - identifier/other: 14
 
@@ -522,6 +522,10 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | comment | src/modeling/ChamferOp.cpp | `// face than the original session did, and a 11.4 mm setback aimed` |
 | comment | src/modeling/ChamferOp.cpp | `// along a 2 mm face simply cannot build (!IsDone) - the "two-distance` |
 | comment | src/modeling/ChamferOp.cpp | `// mask a dead middle: ChFi3d blended a few mm at each end` |
+| comment | src/modeling/ChamferOp.cpp | `// further along the same line (a 1 mm wall edge at` |
+| comment | src/modeling/ChamferOp.cpp | `// far vertices projected 18 mm out opened a fake` |
+| comment | src/modeling/ChamferOp.cpp | `// 16 mm "gap" - the 4-edge chamfer of a pair of` |
+| comment | src/modeling/ChamferOp.cpp | `// 1 mm edges was benched as partial and rebuilt as a` |
 | comment | src/modeling/ChamferOp.cpp | `// A setback that lands EXACTLY on a neighbouring edge (a 1 mm chamfer` |
 | comment | src/modeling/ChamferOp.cpp | `// on the 1 mm shoulder between a 22 and a 20 mm diameter) consumes the` |
 | diagnostic | src/modeling/ChamferOp.cpp | `"neighbouring face exactly - built %.0e mm "` |
@@ -697,6 +701,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | comment | src/ui/PropertiesPanel.cpp | `// Lengths: display unit -> mm FIRST, then halve a circle's` |
 | comment | src/ui/PropertiesPanel.h | `// Per-body bbox-extent cache for the "Size: X × Y × Z mm" readout.` |
 | comment | src/ui/StepperRow.h | `// value, and pulling an 80 mm extrude down to 50 because you pressed +1 loses` |
+| comment | src/ui/StepperRow.h | `// chose (tester 2026-11-17: from 10 mm they stopped dead at 50, yet once a` |
 | allowed-by-hand | src/ui/Toolbar.cpp | `tip(materializr::tr("Create a stock OCCT primitive (box / cylinder / sphere / cone / torus). Picking one opens` |
 | allowed-by-hand | src/ui/TouchWidgets.h | `const char* suffix = "mm", int decimals = 1,` |
 | allowed-by-hand | src/ui/TouchWidgets.h | `const char* suffix = "mm", int decimals = 1,` |

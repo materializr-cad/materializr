@@ -551,7 +551,18 @@ bool ChamferOp::execute(Document& doc) {
                         if (eline.Distance(v) >
                             std::max(m_distance, dB) * 2.0 + 0.5)
                             continue;
-                        const double t = gp_Vec(pa, v).Dot(dir);
+                        // Clamp to the edge's own extent. A COLLINEAR edge
+                        // further along the same line (a 1 mm wall edge at
+                        // y=0 and another at y=18) puts its chamfer faces
+                        // inside the perpendicular filter above, and their
+                        // far vertices projected 18 mm out opened a fake
+                        // 16 mm "gap" - the 4-edge chamfer of a pair of
+                        // 1 mm edges was benched as partial and rebuilt as a
+                        // corner-fill ramp, a band between the two bevels
+                        // (tester 2026-11-17, 1.8.0b6_3_1). Clamped, a far
+                        // face just touches the end it is nearest.
+                        const double t = std::clamp(
+                            gp_Vec(pa, v).Dot(dir), 0.0, len);
                         lo = std::min(lo, t);
                         hi = std::max(hi, t);
                     }

@@ -36,6 +36,16 @@ The 11-16 tester list.
 
 ### Fixed
 
+- **Chamfering several edges in one go no longer adds a stray band.** Selecting
+  four short wall-base edges and chamfering them together joined the two bevels
+  with an extra ramp, though doing them two at a time came out right. A safety
+  check that spots half-finished chamfers misread edges lying on the same line as
+  one long, gappy edge and threw away a good result. It now measures each edge on
+  its own.
+- **The -10..+10 buttons no longer stop at 50 mm.** Starting from a small value,
+  the Extrude, Push/Pull, Subtract (and other length) buttons stalled at +-50 and
+  only ran free after a viewport drag took the value past it. The ceiling is gone;
+  a radius or thickness still can't go to zero or below.
 - **Android: three fingers on the screen froze the app.** The system claiming the
   touch (its three-finger gesture) left the app believing fingers were still
   down, so every button went dead until it was restarted. A cancelled touch, or

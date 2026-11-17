@@ -803,6 +803,11 @@ add_executable(test_chamfer_at_limit test_chamfer_at_limit.cpp)
 target_link_libraries(test_chamfer_at_limit PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_chamfer_at_limit COMMAND test_chamfer_at_limit)
 
+# test_chamfer_collinear_edges - two far-apart collinear chamfer edges in one op must stay native (no fake partial-taper bench)
+add_executable(test_chamfer_collinear_edges test_chamfer_collinear_edges.cpp)
+target_link_libraries(test_chamfer_collinear_edges PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_chamfer_collinear_edges COMMAND test_chamfer_collinear_edges)
+
 # test_cascade_applied_only - the sketch cascade must not replay from a step above the undo tip
 add_executable(test_cascade_applied_only test_cascade_applied_only.cpp)
 target_link_libraries(test_cascade_applied_only PRIVATE materializr_core gtest gtest_main)

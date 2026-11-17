@@ -58,3 +58,20 @@ TEST(StepperNudge, PositiveOnlyRange) {
     EXPECT_FLOAT_EQ(steppedValue(30.0f, 1.0f, 0.1f, 20.0f), 31.0f);  // already above max
     EXPECT_FLOAT_EQ(steppedValue(30.0f, -1.0f, 0.1f, 20.0f), 29.0f); // heading back
 }
+
+// Tester 2026-11-17: the length steppers (Extrude / Push / Subtract) stopped at
+// +-50 when started below it, but ran free once a drag had gone past 50.
+TEST(StepperNudge, LengthNudgeHasNoCeiling) {
+    float v = 10.0f;
+    for (int i = 0; i < 20; ++i) v = materializr::lengthNudgedValue(v, 10.0f, -50.0f);
+    EXPECT_FLOAT_EQ(v, 210.0f);
+    v = 10.0f;
+    for (int i = 0; i < 20; ++i) v = materializr::lengthNudgedValue(v, -10.0f, -50.0f);
+    EXPECT_FLOAT_EQ(v, -190.0f);
+}
+
+// A positive minimum still means "never zero or negative" (radius, thickness).
+TEST(StepperNudge, LengthNudgeKeepsPositiveMinimum) {
+    EXPECT_FLOAT_EQ(materializr::lengthNudgedValue(0.5f, -1.0f, 0.1f), 0.1f);
+    EXPECT_FLOAT_EQ(materializr::lengthNudgedValue(30.0f, 10.0f, 0.1f), 40.0f);
+}

@@ -995,8 +995,12 @@ void ScaleFaceController::panelBody(const IopContext& ctx, bool& changed) {
     ImGui::TextDisabled("%s", materializr::trFormat("Length: %s", materializr::fmtLength(m_len)).c_str());
     if (materializr::lengthStepperRow("lenStep", &m_len,
                                 /*allowNegative=*/true, 0.5f,
-                                std::max(m_lenMax, 1.0f)))
+                                std::max(m_lenMax, 1.0f))) {
+        // The stepper row has no ceiling; this length is physically bounded
+        // by the hole depth, so hold that one here.
+        m_len = std::min(m_len, std::max(m_lenMax, 1.0f));
         changed = true;
+    }
     if (ctx.cornerCommitUi &&
         materializr::amountLengthField("lenAmt", nullptr, &m_len, /*allowSign=*/false, 0.5f, std::max(m_lenMax, 1.0f)))
         changed = true;

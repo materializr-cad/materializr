@@ -100,8 +100,10 @@ inline std::string trFormat(const char* fmt, const A&... a) {
 //
 // Magnitudes come from the unit table as {10*step, step, 0.1*step}, which for
 // millimetres is exactly {10, 1, 0.1} - the behaviour that was already there.
-// Bounds stay millimetres and keep stepperRow's clamp semantics (a bound only
-// stops motion TOWARDS it), so call sites pass what they always passed.
+// Bounds stay millimetres, but only a POSITIVE minimum is honoured (see
+// lengthNudgedValue): the maximum and any negative floor are ignored, so the
+// buttons never stop at a made-up ceiling. Call sites still pass what they
+// always passed.
 // `showZero` = false drops the 0 button, for a value where zero is not a useful
 // reset (a primitive's size).
 inline bool lengthStepperRow(const char* id, float* mm, bool allowNegative,
@@ -129,7 +131,8 @@ inline bool lengthStepperRow(const char* id, float* mm, bool allowNegative,
     auto step = [&](const char* label, double deltaDisplay) {
         if (button(label)) {
             const float target = static_cast<float>(toMm(toDisplay(*mm) + deltaDisplay));
-            *mm = steppedValue(*mm, target - *mm, minMm, maxMm);
+            (void)maxMm;
+            *mm = lengthNudgedValue(*mm, target - *mm, minMm);
             changed = true;
         }
     };

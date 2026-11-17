@@ -23,6 +23,7 @@
 #include <imgui.h>
 #include <algorithm>
 #include <cstdio>
+#include <limits>
 
 namespace materializr {
 
@@ -37,6 +38,17 @@ inline float steppedValue(float before, float delta, float minV, float maxV) {
     if (delta > 0.0f && before <= maxV) v = std::min(v, maxV);
     if (delta < 0.0f && before >= minV) v = std::max(v, minV);
     return v;
+}
+
+// The nudge the LENGTH steppers use: no ceiling, and no negative floor. The
+// call sites' +-50 / 20 / 10 bounds capped the buttons at a number nobody
+// chose (tester 2026-11-17: from 10 mm they stopped dead at 50, yet once a
+// viewport drag had pushed the value past 50 they ran free). Only a POSITIVE
+// minimum is kept, because there it means "this cannot be zero or negative"
+// (a radius, a wall thickness), not a comfort range.
+inline float lengthNudgedValue(float before, float delta, float minMm) {
+    const float inf = std::numeric_limits<float>::infinity();
+    return steppedValue(before, delta, minMm > 0.0f ? minMm : -inf, inf);
 }
 
 inline bool stepperRow(const char* id, float* value, bool allowNegative,

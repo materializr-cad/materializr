@@ -236,6 +236,10 @@ src/modeling/BooleanOp.cpp: // values (it used to go to 0.1 mm) let OCCT snap di
 src/modeling/ChamferOp.cpp: // face than the original session did, and a 11.4 mm setback aimed
 src/modeling/ChamferOp.cpp: // along a 2 mm face simply cannot build (!IsDone) - the "two-distance
 src/modeling/ChamferOp.cpp: // mask a dead middle: ChFi3d blended a few mm at each end
+src/modeling/ChamferOp.cpp: // further along the same line (a 1 mm wall edge at
+src/modeling/ChamferOp.cpp: // far vertices projected 18 mm out opened a fake
+src/modeling/ChamferOp.cpp: // 16 mm "gap" - the 4-edge chamfer of a pair of
+src/modeling/ChamferOp.cpp: // 1 mm edges was benched as partial and rebuilt as a
 src/modeling/ChamferOp.cpp: // A setback that lands EXACTLY on a neighbouring edge (a 1 mm chamfer
 src/modeling/ChamferOp.cpp: // on the 1 mm shoulder between a 22 and a 20 mm diameter) consumes the
 src/modeling/ChamferOp.cpp: "neighbouring face exactly - built %.0e mm "
@@ -411,6 +415,7 @@ src/ui/PropertiesPanel.cpp: // value to a 1 mm grid on every commit. An Angle is
 src/ui/PropertiesPanel.cpp: // Lengths: display unit -> mm FIRST, then halve a circle's
 src/ui/PropertiesPanel.h: // Per-body bbox-extent cache for the "Size: X × Y × Z mm" readout.
 src/ui/StepperRow.h: // value, and pulling an 80 mm extrude down to 50 because you pressed +1 loses
+src/ui/StepperRow.h: // chose (tester 2026-11-17: from 10 mm they stopped dead at 50, yet once a
 src/ui/Toolbar.cpp: tip(materializr::tr("Create a stock OCCT primitive (box / cylinder / sphere / cone / torus). Picking one opens
 src/ui/TouchWidgets.h: const char* suffix = "mm", int decimals = 1,
 src/ui/TouchWidgets.h: const char* suffix = "mm", int decimals = 1,
