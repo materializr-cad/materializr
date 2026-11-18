@@ -45,6 +45,15 @@ The 11-16 tester list.
 
 ### Fixed
 
+- **Chamfer sizes that can't fit are refused instead of drawn as junk, and the
+  panel says so.** On a part with short edges (a 1 mm wall) a chamfer behaved up to
+  about 0.7 mm, turned strange from 0.8 to 1 mm, and past 1 mm the preview just
+  vanished. Two bevels that collide, or a setback as wide as the face beside the
+  edge, made the fallback builder return valid-looking geometry with 14 to 18 extra
+  faces and less volume than a smaller size. It now refuses those sizes, and the
+  chamfer/fillet panel shows "This size doesn't fit on the selected edges" with a
+  hint, instead of leaving an empty preview. A single edge as wide as its neighbour
+  (1.0 mm here) now builds correctly.
 - **Chamfering several edges in one go no longer adds a stray band.** Selecting
   four short wall-base edges and chamfering them together joined the two bevels
   with an extra ramp, though doing them two at a time came out right. A safety

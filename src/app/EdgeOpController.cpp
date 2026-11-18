@@ -880,6 +880,20 @@ void EdgeOpController::renderEdgeOpPanel(const IopContext& ctx) {
         update(ctx);
     }
 
+    // A size that cannot be built used to just make the preview vanish (the
+    // tester's "it disappears without any error"). Say so, and what to do.
+    if (m_value >= 0.01f && previewRefused()) {
+        ImGui::Spacing();
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.62f, 0.35f, 1.0f));
+        ImGui::TextWrapped("%s", materializr::tr(isFillet
+            ? "This radius doesn't fit on the selected edges, so there is nothing to "
+              "preview. Try a smaller value."
+            : "This size doesn't fit on the selected edges (the faces beside them are "
+              "too small, or the bevels would overlap), so there is nothing to preview. "
+              "Try a smaller value or fewer edges."));
+        ImGui::PopStyleColor();
+    }
+
     // Asymmetric chamfer: a second setback along the other face. Offered for
     // any chamfer whose edges share a common face (a single edge always
     // qualifies; a coplanar edge loop does too). Two arrows: A=amber, B=blue.

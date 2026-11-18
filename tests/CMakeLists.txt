@@ -814,6 +814,12 @@ target_include_directories(test_report_sender PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(test_report_sender PRIVATE CURL::libcurl gtest gtest_main)
 add_test(NAME test_report_sender COMMAND test_report_sender)
 
+# test_chamfer_overlap - a chamfer size that cannot fit is refused, not drawn as junk
+add_executable(test_chamfer_overlap test_chamfer_overlap.cpp)
+target_link_libraries(test_chamfer_overlap PRIVATE materializr_core gtest gtest_main)
+target_compile_definitions(test_chamfer_overlap PRIVATE MZR_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data")
+add_test(NAME test_chamfer_overlap COMMAND test_chamfer_overlap)
+
 # test_chamfer_collinear_edges - two far-apart collinear chamfer edges in one op must stay native (no fake partial-taper bench)
 add_executable(test_chamfer_collinear_edges test_chamfer_collinear_edges.cpp)
 target_link_libraries(test_chamfer_collinear_edges PRIVATE materializr_core gtest gtest_main)

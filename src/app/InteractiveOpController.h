@@ -205,6 +205,10 @@ public:
 
     bool active() const { return m_active; }
     bool previewOk() const { return m_previewOk; }
+    // The last preview at the CURRENT parameters was refused (the op couldn't
+    // build it), as opposed to "no preview yet" or "one is still computing".
+    // Panels use it to say why the preview vanished instead of failing silently.
+    bool previewRefused() const { return !m_previewOk && !m_dispatch.running(); }
 
     // ─── Viewport handles (optional) ─────────────────────────────────────────
     // Ops with an on-screen handle own their hit-test and drag instead of

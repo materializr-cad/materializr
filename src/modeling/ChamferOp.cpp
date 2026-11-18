@@ -593,6 +593,7 @@ bool ChamferOp::execute(Document& doc) {
                 candidate.Nullify();
             }
         }
+        bool usedFallback = false;
         if (candidate.IsNull()) {
             // #55: the native blend can't resolve against a surface feature
             // crossing the edge (a drilled hole or pocket fragments it and
@@ -609,6 +610,7 @@ bool ChamferOp::execute(Document& doc) {
                     m_previousShape, m_edges, m_distance, dB, sharedRef,
                     m_ledger, cutRes, blends)) {
                 candidate = cutRes;
+                usedFallback = true;
                 m_generatedFaces = std::move(blends);
                 std::fprintf(stderr, "[Chamfer] native blend failed - built "
                              "as a swept-wedge cut across the feature "
@@ -625,11 +627,69 @@ bool ChamferOp::execute(Document& doc) {
                 // the ramp and re-pierce the feature (#57). Asymmetric retries
                 // with the distances swapped, mirroring the native retry.
                 candidate = cutRes;
+                usedFallback = true;
                 m_generatedFaces = std::move(blends);
                 std::fprintf(stderr, "[Chamfer] native blend failed - built "
                              "as a corner-fill ramp across the feature "
                              "(#57, d=%.2f/%.2f)\n", m_distance, dB);
             }
+        }
+        // PLAUSIBILITY GATE for the cut/fill fallbacks. They exist for a feature
+        // (hole, pocket) crossing the edge, but they will also "succeed" on a
+        // chamfer that simply cannot fit - two bevels that collide, or a setback
+        // wider than the face beside the edge - and then return valid-looking
+        // junk (tester 2026-11-17: +17 faces for two edges, and the volume went
+        // DOWN as the size went up). A bigger bevel always moves at least as
+        // much material as a smaller one on the same edges, so: find the
+        // largest smaller size that DOES build natively and refuse the fallback
+        // result if it moved less material than that. No native baseline at all
+        // (the feature defeats native at every size - the real fallback use)
+        // means no judgement, and the fallback stands.
+        if (usedFallback && !candidate.IsNull()) {
+            GProp_GProps g0, gc;
+            BRepGProp::VolumeProperties(m_previousShape, g0);
+            BRepGProp::VolumeProperties(candidate, gc);
+            const double v0 = g0.Mass();
+            const double dvCandidate = gc.Mass() - v0;
+
+            const auto savedLedger = m_ledger;
+            const auto savedGenerated = m_generatedFaces;
+            auto buildsAt = [&](double f, TopoDS_Shape& out) {
+                prepare();
+                TopoDS_Shape c = tryBuild(m_distance * f, dB * f);
+                if (c.IsNull() && m_distance2 > 0.0) c = tryBuild(dB * f, m_distance * f);
+                if (c.IsNull() || !BRepCheck_Analyzer(c).IsValid()) return false;
+                out = c;
+                return true;
+            };
+            TopoDS_Shape best;
+            double lo = 0.0;
+            for (double f : {0.5, 0.25, 0.1}) {
+                if (buildsAt(f, best)) { lo = f; break; }
+            }
+            if (lo > 0.0) {
+                double hi = 1.0;
+                for (int it = 0; it < 6; ++it) {
+                    const double mid = 0.5 * (lo + hi);
+                    TopoDS_Shape t;
+                    if (buildsAt(mid, t)) { lo = mid; best = t; } else { hi = mid; }
+                }
+                GProp_GProps gb;
+                BRepGProp::VolumeProperties(best, gb);
+                const double dvBase = gb.Mass() - v0;
+                const bool signFlip = dvBase * dvCandidate < 0.0;
+                if (std::abs(dvBase) > 1e-9 &&
+                    (signFlip || std::abs(dvCandidate) < std::abs(dvBase) * 0.98)) {
+                    std::fprintf(stderr,
+                        "[Chamfer] fallback result rejected: it moves %.4f of volume but "
+                        "a smaller native bevel (%.0f%% of the size) already moves %.4f "
+                        "- the requested size does not fit (d=%.2f/%.2f)\n",
+                        dvCandidate, lo * 100.0, dvBase, m_distance, dB);
+                    candidate.Nullify();
+                }
+            }
+            m_ledger = savedLedger;
+            m_generatedFaces = savedGenerated;
         }
         if (candidate.IsNull() && !nativeBench.IsNull()) {
             // No fallback could build - the partial native blend is still
