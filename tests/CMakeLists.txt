@@ -820,6 +820,12 @@ target_link_libraries(test_chamfer_overlap PRIVATE materializr_core gtest gtest_
 target_compile_definitions(test_chamfer_overlap PRIVATE MZR_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data")
 add_test(NAME test_chamfer_overlap COMMAND test_chamfer_overlap)
 
+# test_i18n_format_safety - no translation may reorder/add printf conversions (would crash trf())
+add_executable(test_i18n_format_safety test_i18n_format_safety.cpp)
+target_include_directories(test_i18n_format_safety PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(test_i18n_format_safety PRIVATE gtest gtest_main)
+add_test(NAME test_i18n_format_safety COMMAND test_i18n_format_safety)
+
 # test_chamfer_collinear_edges - two far-apart collinear chamfer edges in one op must stay native (no fake partial-taper bench)
 add_executable(test_chamfer_collinear_edges test_chamfer_collinear_edges.cpp)
 target_link_libraries(test_chamfer_collinear_edges PRIVATE materializr_core gtest gtest_main)

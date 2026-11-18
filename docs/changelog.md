@@ -45,6 +45,11 @@ The 11-16 tester list.
 
 ### Fixed
 
+- **Two Chinese translations could show wrong numbers or crash.** "Imported %d parts
+  from %s" had its two values swapped (the part count was read as the file name),
+  and the "Selection: points, lines, curves" readout dropped placeholders so the line
+  and curve counts were shifted. Both are corrected, and a new test checks every
+  language so a translation can never reorder or add placeholders again.
 - **Chamfer sizes that can't fit are refused instead of drawn as junk, and the
   panel says so.** On a part with short edges (a 1 mm wall) a chamfer behaved up to
   about 0.7 mm, turned strange from 0.8 to 1 mm, and past 1 mm the preview just

@@ -1193,8 +1193,9 @@ void Application::initImGui() {
         // (and any Chinese typed into the Text tool). JetBrains Mono has no
         // ideographs; without this the whole Chinese UI would be boxes. ImGui
         // 1.92 loads glyphs on demand, so the merged face costs atlas space only
-        // for characters actually drawn. The bundled file is a full Noto Sans SC
-        // (~9 MB), so any Chinese the user types also has a glyph.
+        // for characters actually drawn. The bundled file is a 1.6 MB subset of
+        // Noto Sans SC (GB2312 level-1 hanzi, symbols and every character the
+        // UI strings use), so common Chinese typed into the Text tool has a glyph.
         std::string cjk = resolveBundledFont("NotoSansSC.ttf");
         if (fnt && !cjk.empty()) {
             ImFontConfig cfg;
