@@ -59,7 +59,7 @@ int faceCount(const TopoDS_Shape& s) {
     return n;
 }
 
-bool near(const gp_Pnt& p, double x, double y, double z) {
+bool closeTo(const gp_Pnt& p, double x, double y, double z) {
     return std::abs(p.X() - x) < 1e-6 && std::abs(p.Y() - y) < 1e-6 && std::abs(p.Z() - z) < 1e-6;
 }
 
@@ -72,8 +72,8 @@ TopoDS_Edge edgeBetween(const TopoDS_Shape& body, gp_Pnt a, gp_Pnt b) {
         BRepAdaptor_Curve c(e);
         if (c.GetType() != GeomAbs_Line) continue;
         const gp_Pnt p = c.Value(c.FirstParameter()), q = c.Value(c.LastParameter());
-        if ((near(p, a.X(), a.Y(), a.Z()) && near(q, b.X(), b.Y(), b.Z())) ||
-            (near(q, a.X(), a.Y(), a.Z()) && near(p, b.X(), b.Y(), b.Z())))
+        if ((closeTo(p, a.X(), a.Y(), a.Z()) && closeTo(q, b.X(), b.Y(), b.Z())) ||
+            (closeTo(q, a.X(), a.Y(), a.Z()) && closeTo(p, b.X(), b.Y(), b.Z())))
             return e;
     }
     return {};
