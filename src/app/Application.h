@@ -1301,6 +1301,11 @@ private:
     // Application_Viewport so press-and-hold synthesizes a right-click over the
     // tree, opening a row's context menu just like the classic/modern panels).
     bool m_imTouchTreeHovered = false;
+    // The model tree is a see-through overlay, which makes a long list hard to
+    // read over the model. Once the user scrolls it or presses inside it, it
+    // goes nearly opaque and stays that way until they press anywhere else.
+    bool  m_imTouchTreeEngaged = false;
+    float m_imTouchTreeScrollY = 0.0f;   // last frame's scroll, to spot a scroll
     // Tab strip (classic in-viewport bar / modern pills): hovered this frame.
     // Same purpose - both already call BeginPopupContextItem for Save / Save As
     // / Close, but on touch that menu was UNREACHABLE: the long-press gate arms

@@ -296,6 +296,7 @@ void Application::renderImTouchLayout() {
     //    plus press-and-hold context menus (rename / delete / move-to-folder)
     //    and folder grouping, mirroring ItemsPanel but touch-native.
     m_imTouchTreeHovered = false;   // fed to the long-press gate every frame
+    if (!(m_imTouchTree && m_document)) m_imTouchTreeEngaged = false;   // hidden: start translucent next time
     if (m_imTouchTree && m_document) {
         // Flush to the right edge, in the band BETWEEN the fixed chrome: below
         // the top cluster and the ViewCube (offset 68 + the cube and its roll arrow)
@@ -312,7 +313,10 @@ void Application::renderImTouchLayout() {
         const float treeW = 260.0f * s;
         ImGui::SetNextWindowSizeConstraints(ImVec2(treeW, 0),
                                             ImVec2(treeW, treeMaxH));
-        ImGui::SetNextWindowBgAlpha(0.25f);   // Fusion-browser translucency
+        // Fusion-browser translucency while idle; nearly opaque once the user
+        // has scrolled or pressed in it (see m_imTouchTreeEngaged below), so a
+        // long list is readable over the model.
+        ImGui::SetNextWindowBgAlpha(m_imTouchTreeEngaged ? 0.94f : 0.25f);
         if (ImGui::Begin("##LiteTree", nullptr,
                          kFloat & ~ImGuiWindowFlags_NoScrollbar)) {
             // Report hover (incl. while a row is the active item) so a
@@ -320,6 +324,24 @@ void Application::renderImTouchLayout() {
             m_imTouchTreeHovered = ImGui::IsWindowHovered(
                 ImGuiHoveredFlags_RootAndChildWindows |
                 ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
+            {
+                // Engage on a press inside the tree or any scroll of it (wheel
+                // or a touch drag); release on a press anywhere else. A popup
+                // opened from the tree (colour, row menu) is part of using it,
+                // so a press while one is open leaves the state alone.
+                const ImGuiIO& io = ImGui::GetIO();
+                const bool pressed = ImGui::IsMouseClicked(ImGuiMouseButton_Left) ||
+                                     ImGui::IsMouseClicked(ImGuiMouseButton_Right) ||
+                                     ImGui::IsMouseClicked(ImGuiMouseButton_Middle);
+                const float scrollY = ImGui::GetScrollY();
+                const bool scrolled = std::abs(scrollY - m_imTouchTreeScrollY) > 0.5f ||
+                                      (m_imTouchTreeHovered && io.MouseWheel != 0.0f);
+                m_imTouchTreeScrollY = scrollY;
+                if (scrolled || (pressed && m_imTouchTreeHovered))
+                    m_imTouchTreeEngaged = true;
+                else if (pressed && !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId))
+                    m_imTouchTreeEngaged = false;
+            }
             // (Project name intentionally omitted here - the top-left chip
             // already shows it; dropping the browser's root row reclaims space.)
 
