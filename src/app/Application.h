@@ -231,6 +231,13 @@ private:
     // True only while a load is tessellating in the deferred slot: tells
     // rebuildMeshes to pump a per-body progress frame (safe between frames).
     bool m_pumpMeshProgress = false;
+    // Run `apply` (an edit that adds or changes many bodies) between frames
+    // behind the progress card, then tessellate what it touched on the worker
+    // pool and rebuild the renderer meshes under the same card - instead of
+    // an apparently frozen window (#181). Call from a deferred heavy task only
+    // (renderProgressFrame needs to run between frames). Returns true when the
+    // user hit Cancel during the card.
+    bool runWithMeshProgress(const char* label, const std::function<void()>& apply);
     // Launch-time update check, run on a worker so a slow/unreachable network
     // can't freeze startup (it was a synchronous call with a 10 s timeout -
     // the real cause of the "not responding" on launch). Polled each frame.
@@ -1923,6 +1930,13 @@ private:
     // commit leaves the op in history at the user's values, cancel undoes it.
     enum class PatternKind { Linear, Radial };
     bool m_patternActive = false;
+    // A large pattern's preview is rebuilt behind the progress card, between
+    // frames. Set while one is queued, so a burst of edits (typing a count)
+    // queues a single rebuild that reads the latest values.
+    bool m_patternUpdateQueued = false;
+    // Copies a pattern would make: (count - 1) per source body.
+    long patternCopyCount() const;
+    void updatePatternNow();
     PatternKind m_patternKind = PatternKind::Linear;
     int m_patternBodyId = -1;            // primary source (first selected)
     std::vector<int> m_patternBodyIds;   // every selected source body, in selection order

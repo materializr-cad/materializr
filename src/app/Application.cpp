@@ -1793,8 +1793,14 @@ bool Application::renderProgressFrame(float fraction, const char* label) {
         ImGui::ProgressBar(fraction, ImVec2(-1, 0), pct);
     }
     ImGui::Spacing();
-    if (ImGui::Button(materializr::tr("Cancel"), materializr::uiSz(110, 0)) ||
-        ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
+    // Out of keyboard navigation: the card appears under whatever the user was
+    // typing in, and the Enter that confirms a field (a pattern's copy count)
+    // landed on a focused Cancel and cancelled the operation. A click or
+    // Escape still cancels.
+    ImGui::PushItemFlag(ImGuiItemFlags_NoNav, true);
+    const bool cancelClicked = ImGui::Button(materializr::tr("Cancel"), materializr::uiSz(110, 0));
+    ImGui::PopItemFlag();
+    if (cancelClicked || ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
         m_progressCancelled = true;
     }
     ImGui::End();
@@ -3963,7 +3969,22 @@ void Application::rebuildMeshes() {
     std::vector<int> ids(m_dirtyBodyIds.begin(), m_dirtyBodyIds.end());
     m_dirtyBodyIds.clear();
     if (m_picker) m_picker->invalidate();
+    // Under a progress card (runWithMeshProgress), keep it moving: same
+    // poll-every-body, draw-when-allowed rule as the full rebuild above.
+    DrawThrottle partialThrottle;
+    size_t partialI = 0;
     for (int id : ids) {
+        if (m_pumpMeshProgress) {
+            const float frac = float(partialI) / float(ids.size());
+            pumpStep(partialThrottle, progressFrameWouldDraw(frac),
+                     [] { return DrawThrottle::clock::now(); },
+                     [&] {
+                         renderProgressFrame(frac, "Preparing view\xE2\x80\xA6");
+                         return DrawThrottle::clock::now();
+                     },
+                     [&] { if (m_window) m_window->pollEvents(); });
+        }
+        ++partialI;
         bool exists = false;
         try { (void)m_document->getBody(id); exists = true; } catch (...) {}
         if (!exists || !m_document->isBodyVisible(id)) {

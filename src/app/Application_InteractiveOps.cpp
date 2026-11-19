@@ -729,7 +729,61 @@ void Application::beginPattern(PatternKind kind) {
     updatePattern(); // initial preview
 }
 
+long Application::patternCopyCount() const {
+    const long sources = m_patternBodyIds.empty() ? 1L : static_cast<long>(m_patternBodyIds.size());
+    return std::max(0, m_patternCount - 1) * sources;
+}
+
+// From this many copies the preview takes long enough (each is a body to
+// tessellate and upload) that the window looked frozen; below it the card would
+// only flash.
+static constexpr long kHeavyPatternCopies = 150;
+
 void Application::updatePattern() {
+    if (!m_patternActive || m_patternBodyId < 0) return;
+    if (patternCopyCount() < kHeavyPatternCopies) { updatePatternNow(); return; }
+    // Big: rebuild it between frames behind the progress card. One queued
+    // rebuild covers a burst of edits - it reads the values current when it runs.
+    if (m_patternUpdateQueued) return;
+    m_patternUpdateQueued = true;
+    m_deferredHeavy.queue([this]() {
+        m_patternUpdateQueued = false;
+        if (!m_patternActive || m_patternBodyId < 0 || !m_document) return;
+        if (patternCopyCount() < kHeavyPatternCopies) { updatePatternNow(); return; }
+        const bool cancelled = runWithMeshProgress(
+            materializr::tr("Creating copies\xE2\x80\xA6"), [this]() { updatePatternNow(); });
+        // Cancel on the card = cancel the pattern, same as the popup's Cancel.
+        if (cancelled && m_patternActive) cancelPattern();
+    });
+}
+
+bool Application::runWithMeshProgress(const char* label, const std::function<void()>& apply) {
+    if (!m_document) return false;
+    m_progressCancelled = false;              // -1 below does not reset the latch itself
+    renderProgressFrame(-1.0f, label);
+    struct PumpGuard {
+        bool& flag;
+        bool previous;
+        ~PumpGuard() { flag = previous; }
+    } guard{m_pumpMeshProgress, m_pumpMeshProgress};
+    m_pumpMeshProgress = true;
+    // Tessellate only what this edit added: bodies that already existed may
+    // carry a mesh the pool's plain path must not touch (see queueHeavyImport).
+    const auto before = m_document->getAllBodyIds();
+    const std::set<int> beforeIds(before.begin(), before.end());
+    apply();
+    const bool cancelled = prewarmMeshPool([this, beforeIds]() {
+        std::vector<int> ids;
+        for (int id : m_document->getAllBodyIds())
+            if (!beforeIds.count(id)) ids.push_back(id);
+        return ids;
+    }, label, "heavy-parmesh");
+    rebuildMeshes();   // pool-meshed shapes are cheap here; the rest are pumped under the card
+    m_meshesDirty = false;
+    return cancelled || m_progressCancelled;
+}
+
+void Application::updatePatternNow() {
     if (!m_patternActive || m_patternBodyId < 0) return;
     auto trackBodies = trackBodyChanges(); // marks what this edit changed
 
@@ -782,6 +836,9 @@ void Application::updatePattern() {
 }
 
 void Application::commitPattern() {
+    // A big preview rebuild still waiting for its turn must land before the op
+    // is recorded, or the committed copy would be the previous parameters'.
+    if (m_patternUpdateQueued) { m_patternUpdateQueued = false; updatePatternNow(); }
     auto trackBodies = trackBodyChanges(); // marks what this edit changed
     // The previewed instance IS the final op - record it without re-running
     // it. (It used to already BE a history step by this point, which is what
@@ -794,6 +851,7 @@ void Application::commitPattern() {
 }
 
 void Application::cancelPattern() {
+    m_patternUpdateQueued = false;   // a queued rebuild of a cancelled pattern does nothing
     auto trackBodies = trackBodyChanges(); // marks what this edit changed
     m_patternPreview.clear(*m_document);
     m_patternActive        = false;
