@@ -71,6 +71,7 @@
 #include "modeling/DeleteConstructionOp.h"
 #include "modeling/ReplayOp.h"
 #include "modeling/SketchTransformOp.h"
+#include "core/SketchCascadeTarget.h"
 #include "modeling/PushPullOp.h"
 #include "modeling/TransformOp.h"
 #include "modeling/BatchTransformOp.h"
@@ -5220,6 +5221,12 @@ void Application::renderViewport() {
                                     op->setTransform(trsf);
                                     // Bundle the de-link so undo reverts it too.
                                     if (detachSketches.count(sid)) op->setDetachTarget(1);
+                                    // Sketches drawn on the body this one builds
+                                    // travel with it (#185) - unless they are being
+                                    // dragged themselves, or the link is being cut.
+                                    if (!detachSketches.count(sid))
+                                        materializr::addHostedFollowers(
+                                            *op, skLinks, *m_document, sid, inDragSketches);
                                     m_history->pushOperation(std::move(op), *m_document);
                                 }
                             }

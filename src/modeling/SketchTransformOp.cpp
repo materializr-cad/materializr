@@ -20,6 +20,18 @@ bool SketchTransformOp::execute(Document& doc) {
     next.Transform(m_transform);
     sk->setPlane(next);
 
+    // Sketches riding on the body this one drives take the same transform,
+    // from their own captured pose (absolute, like the primary, so a replay
+    // lands them in the same place every time).
+    for (auto& f : m_followers) {
+        auto fs = doc.getSketch(f.id);
+        if (!fs) continue;
+        if (!f.have) { f.before = fs->getPlane(); f.have = true; }
+        gp_Pln fn = f.before;
+        fn.Transform(m_transform);
+        fs->setPlane(fn);
+    }
+
     // Apply the bundled link-state change (de-link / re-link), capturing the
     // prior state once so undo restores it.
     if (m_detachMode >= 0) {
@@ -48,6 +60,9 @@ bool SketchTransformOp::undo(Document& doc) {
     auto sk = doc.getSketch(m_sketchId);
     if (!sk) return false;
     sk->setPlane(m_planeBefore);
+    for (const auto& f : m_followers)
+        if (f.have)
+            if (auto fs = doc.getSketch(f.id)) fs->setPlane(f.before);
     if (m_detachMode >= 0 && m_haveDetachBefore)
         sk->setDetachedFromBody(m_detachedBefore);
     return true;
@@ -79,6 +94,19 @@ std::string SketchTransformOp::serializeParams() const {
                   a.Direction().X(), a.Direction().Y(), a.Direction().Z(),
                   a.XDirection().X(), a.XDirection().Y(), a.XDirection().Z());
     blob += buf;
+    // followers: id + captured pose (10 numbers each), space separated
+    if (!m_followers.empty()) {
+        blob += ";fol=";
+        for (const auto& f : m_followers) {
+            const gp_Ax3& fa = f.before.Position();
+            std::snprintf(buf, sizeof(buf), "%d %d %.9g %.9g %.9g %.9g %.9g %.9g %.9g %.9g %.9g ",
+                          f.id, f.have ? 1 : 0,
+                          fa.Location().X(), fa.Location().Y(), fa.Location().Z(),
+                          fa.Direction().X(), fa.Direction().Y(), fa.Direction().Z(),
+                          fa.XDirection().X(), fa.XDirection().Y(), fa.XDirection().Z());
+            blob += buf;
+        }
+    }
     blob += ";desc=" + m_description;
     return blob;
 }
@@ -111,6 +139,23 @@ bool SketchTransformOp::deserializeParams(const std::string& blob) {
                                       d[4], d[5], d[6], d[7],
                                       d[8], d[9], d[10], d[11]);
                 any = true;
+            }
+        } else if (key == "fol") {
+            std::vector<double> d(11);
+            const char* c = val.c_str(); char* ce = nullptr;
+            m_followers.clear();
+            for (;;) {
+                int got = 0;
+                for (; got < 11; ++got) { d[got] = std::strtod(c, &ce); if (ce == c) break; c = ce; }
+                if (got < 11) break;
+                Follower f{(int)d[0], gp_Pln(), d[1] != 0};
+                try {
+                    if (f.have)
+                        f.before = gp_Pln(gp_Ax3(gp_Pnt(d[2], d[3], d[4]),
+                                                 gp_Dir(d[5], d[6], d[7]),
+                                                 gp_Dir(d[8], d[9], d[10])));
+                } catch (...) { f.have = false; }
+                m_followers.push_back(f);
             }
         } else if (key == "pb") {
             double d[9];

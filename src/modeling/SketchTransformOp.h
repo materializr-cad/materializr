@@ -3,6 +3,7 @@
 #include <gp_Trsf.hxx>
 #include <gp_Pln.hxx>
 #include <string>
+#include <vector>
 
 namespace materializr {
 
@@ -23,6 +24,13 @@ public:
     // Link-state change to apply alongside the move so one undo reverts both:
     //   -1 = leave as-is, 0 = re-link (clear detached), 1 = de-link (set detached)
     void setDetachTarget(int mode) { m_detachMode = mode; }
+
+    // Sketches drawn on a body this sketch drives: they take the same rigid
+    // transform in this one op, so the body, its host sketch and everything on
+    // it move as a unit and a single undo puts all of it back (issue #185).
+    void addFollower(int sketchId) { m_followers.push_back({sketchId, gp_Pln(), false}); }
+    int followerCount() const { return (int)m_followers.size(); }
+    int getFollowerId(int i) const { return m_followers[i].id; }
 
     bool execute(Document& doc) override;
     bool undo(Document& doc) override;
@@ -45,6 +53,8 @@ private:
     int  m_detachMode = -1;        // see setDetachTarget
     bool m_detachedBefore = false; // captured on first execute, restored on undo
     bool m_haveDetachBefore = false;
+    struct Follower { int id; gp_Pln before; bool have; };
+    std::vector<Follower> m_followers;
     std::string m_description = "Sketch transform";
 };
 

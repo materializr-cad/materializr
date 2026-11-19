@@ -1187,44 +1187,10 @@ const std::map<int, std::set<int>>& Application::sketchBodyLinks() const {
     // + captureDiff per step, fresh map/set nodes) was running per frame.
     if (m_history && m_linkMapRevision == m_history->revision())
         return m_linkMapCache;
-    std::map<int, std::set<int>>& links = m_linkMapCache;
-    links.clear();
-    if (!m_history) return links;
+    if (!m_history) { m_linkMapCache.clear(); return m_linkMapCache; }
     m_linkMapRevision = m_history->revision();
-    int n = m_history->stepCount();
-    for (int i = 0; i < n; ++i) {
-        const Operation* op = m_history->getStep(i);
-        if (!op) continue;
-        std::set<int> srcSketches;
-        if (auto* ext = dynamic_cast<const ExtrudeOp*>(op)) {
-            if (ext->getSketchId() >= 0) srcSketches.insert(ext->getSketchId());
-        } else if (auto* pp = dynamic_cast<const PushPullOp*>(op)) {
-            for (int t = 0; t < pp->targetCount(); ++t)
-                if (pp->getSketchIdAt(t) >= 0) srcSketches.insert(pp->getSketchIdAt(t));
-        } else if (auto* rv = dynamic_cast<const RevolveOp*>(op)) {
-            if (rv->getSketchId() >= 0) srcSketches.insert(rv->getSketchId());
-        } else if (auto* sw = dynamic_cast<const SweepOp*>(op)) {
-            if (sw->getProfileSketchId() >= 0) srcSketches.insert(sw->getProfileSketchId());
-            if (sw->getPathSketchId() >= 0) srcSketches.insert(sw->getPathSketchId());
-        } else if (auto* pj = dynamic_cast<const ProjectSketchOp*>(op)) {
-            if (pj->getSketchId() >= 0) srcSketches.insert(pj->getSketchId());
-        } else if (auto* lf = dynamic_cast<const LoftOp*>(op)) {
-            for (int i = 0; i < lf->profileCount(); ++i)
-                if (lf->getProfileSketchId(i) >= 0) srcSketches.insert(lf->getProfileSketchId(i));
-        } else if (auto* gl = dynamic_cast<const GuidedLoftOp*>(op)) {
-            if (gl->getBaseSketchId() >= 0) srcSketches.insert(gl->getBaseSketchId());
-            for (int i = 0; i < gl->railSketchCount(); ++i)
-                if (gl->getRailSketchId(i) >= 0) srcSketches.insert(gl->getRailSketchId(i));
-        }
-        if (srcSketches.empty()) continue;
-        // Bodies this step touched = created + modified.
-        OperationDiff diff = op->captureDiff();
-        std::set<int> bodies(diff.created.begin(), diff.created.end());
-        for (const auto& [id, _] : diff.modifiedBefore) bodies.insert(id);
-        for (int s : srcSketches)
-            links[s].insert(bodies.begin(), bodies.end());
-    }
-    return links;
+    m_linkMapCache = materializr::computeSketchBodyLinks(*m_history);
+    return m_linkMapCache;
 }
 
 bool Application::bodySafelyRederivable(int bodyId, int viaSketchId) const {
@@ -1344,11 +1310,29 @@ bool Application::cascadeFromSketchEditImpl(int sketchId, double budgetMs, bool 
     // get another chance first: the edit that broke them may since have been
     // undone or corrected. They ride along as "reviving" - enabled but not
     // applied yet - and go back to suspended if they still can't follow.
-    const std::vector<int> reviving =
-        materializr::reviveSuspendedFor(*m_history, sketchId);
+    //
+    // Sketches drawn on a body this sketch drives ride in the same replay: they
+    // travel with it when it is moved (SketchTransformOp followers), so the
+    // features built from THEM have to re-read their sketches too - replaying
+    // them with the profile of the old position cut the wrong place, failed,
+    // and got switched off (issue #185). Rebuilding a profile from an untouched
+    // sketch is a no-op, so an ordinary edit of the host sketch pays nothing.
+    std::vector<int> group{sketchId};
+    for (int f : materializr::hostedFollowerSketches(sketchBodyLinks(), *m_document, sketchId))
+        group.push_back(f);
+    std::vector<int> reviving;
+    for (int sid : group)
+        for (int i : materializr::reviveSuspendedFor(*m_history, sid)) reviving.push_back(i);
+    std::sort(reviving.begin(), reviving.end());
+    reviving.erase(std::unique(reviving.begin(), reviving.end()), reviving.end());
     int matched = 0;
-    int earliest =
-        materializr::rederiveSketchDrivenOps(*m_history, *m_document, sketchId, &matched);
+    int earliest = -1;
+    for (int sid : group) {
+        int m = 0;
+        const int e = materializr::rederiveSketchDrivenOps(*m_history, *m_document, sid, &m);
+        matched += m;
+        if (e >= 0 && (earliest < 0 || e < earliest)) earliest = e;
+    }
     if (!reviving.empty() && (earliest < 0 || reviving.front() < earliest))
         earliest = reviving.front();
     if (earliest < 0) {
@@ -1388,9 +1372,10 @@ bool Application::cascadeFromSketchEditImpl(int sketchId, double budgetMs, bool 
     // from the final one. A fillet/chamfer re-finding its edges from "the
     // sketch the user just edited" (generative anchors) must read the final
     // state or it looks for the old geometry and fails every time.
-    if (auto sk = m_document->getSketch(sketchId))
-        m_document->setCascadeSketchOverride(
-            sketchId, std::make_shared<materializr::Sketch>(*sk));
+    for (int sid : group)
+        if (auto sk = m_document->getSketch(sid))
+            m_document->setCascadeSketchOverride(
+                sid, std::make_shared<materializr::Sketch>(*sk));
 
     // In-sketch budget: History checks it between replayed steps, and the ops
     // that run long booleans (push/pull, lathe) poll it from inside the kernel

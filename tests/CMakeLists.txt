@@ -836,6 +836,11 @@ add_executable(test_cascade_applied_only test_cascade_applied_only.cpp)
 target_link_libraries(test_cascade_applied_only PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_cascade_applied_only COMMAND test_cascade_applied_only)
 
+# test_sketch_move_hosted - sketches drawn on a body travel with the sketch that builds it (#185)
+add_executable(test_sketch_move_hosted test_sketch_move_hosted.cpp)
+target_link_libraries(test_sketch_move_hosted PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_sketch_move_hosted COMMAND test_sketch_move_hosted)
+
 # test_cascade_revival - steps a cascade switched off get another try on the next cascade of their sketch
 add_executable(test_cascade_revival test_cascade_revival.cpp)
 target_link_libraries(test_cascade_revival PRIVATE materializr_core gtest gtest_main)

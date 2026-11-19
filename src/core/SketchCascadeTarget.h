@@ -12,6 +12,7 @@
 #include "../modeling/SweepOp.h"
 #include "../modeling/SketchTransformOp.h"
 #include <functional>
+#include <map>
 #include <set>
 #include <vector>
 
@@ -191,6 +192,90 @@ inline bool opBuiltFromSketch(const Operation* op, int sketchId) {
             if (pp->getSketchIdAt(t) == sketchId) return true;
     }
     return false;
+}
+
+// Which bodies each sketch drives: sketch id -> bodies touched (created or
+// modified) by any step built from it. Application::sketchBodyLinks() memoizes
+// this; it lives here so headless code (and tests) can ask the same question.
+inline std::map<int, std::set<int>> computeSketchBodyLinks(const History& history) {
+    std::map<int, std::set<int>> links;
+    const int n = history.stepCount();
+    for (int i = 0; i < n; ++i) {
+        const Operation* op = history.getStep(i);
+        if (!op) continue;
+        std::set<int> srcSketches;
+        if (auto* ext = dynamic_cast<const ExtrudeOp*>(op)) {
+            if (ext->getSketchId() >= 0) srcSketches.insert(ext->getSketchId());
+        } else if (auto* pp = dynamic_cast<const PushPullOp*>(op)) {
+            for (int t = 0; t < pp->targetCount(); ++t)
+                if (pp->getSketchIdAt(t) >= 0) srcSketches.insert(pp->getSketchIdAt(t));
+        } else if (auto* rv = dynamic_cast<const RevolveOp*>(op)) {
+            if (rv->getSketchId() >= 0) srcSketches.insert(rv->getSketchId());
+        } else if (auto* sw = dynamic_cast<const SweepOp*>(op)) {
+            if (sw->getProfileSketchId() >= 0) srcSketches.insert(sw->getProfileSketchId());
+            if (sw->getPathSketchId() >= 0) srcSketches.insert(sw->getPathSketchId());
+        } else if (auto* pj = dynamic_cast<const ProjectSketchOp*>(op)) {
+            if (pj->getSketchId() >= 0) srcSketches.insert(pj->getSketchId());
+        } else if (auto* lf = dynamic_cast<const LoftOp*>(op)) {
+            for (int k = 0; k < lf->profileCount(); ++k)
+                if (lf->getProfileSketchId(k) >= 0) srcSketches.insert(lf->getProfileSketchId(k));
+        } else if (auto* gl = dynamic_cast<const GuidedLoftOp*>(op)) {
+            if (gl->getBaseSketchId() >= 0) srcSketches.insert(gl->getBaseSketchId());
+            for (int k = 0; k < gl->railSketchCount(); ++k)
+                if (gl->getRailSketchId(k) >= 0) srcSketches.insert(gl->getRailSketchId(k));
+        }
+        if (srcSketches.empty()) continue;
+        OperationDiff diff = op->captureDiff();
+        std::set<int> bodies(diff.created.begin(), diff.created.end());
+        for (const auto& [id, _] : diff.modifiedBefore) bodies.insert(id);
+        for (int s : srcSketches)
+            links[s].insert(bodies.begin(), bodies.end());
+    }
+    return links;
+}
+
+// Sketches that sit on a body `sketchId` drives, and so have to travel with it
+// when `sketchId` is moved - and, one level down, sketches on the bodies THOSE
+// drive. A sketch is "on" a body when its source body is that body (drawn on one
+// of its faces). Moving Sketch 1 moves the body built from it; leaving Sketch 2
+// (drawn on that body) behind strands every feature built from Sketch 2, which
+// then fails to follow and is switched off (issue #185).
+// `exclude`: sketches never reported (the ones already being moved themselves).
+// Ascending ids; `sketchId` itself is never in the result.
+inline std::vector<int> hostedFollowerSketches(const std::map<int, std::set<int>>& links,
+                                               const Document& doc, int sketchId,
+                                               const std::set<int>& exclude = {}) {
+    std::set<int> seen{sketchId};
+    std::vector<int> frontier{sketchId};
+    const std::vector<int> all = doc.getAllSketchIds();
+    while (!frontier.empty()) {
+        const int cur = frontier.back();
+        frontier.pop_back();
+        auto it = links.find(cur);
+        if (it == links.end()) continue;
+        for (int sid : all) {
+            if (seen.count(sid) || exclude.count(sid)) continue;
+            auto sk = doc.getSketch(sid);
+            if (!sk || sk->getSourceBody() < 0 || !it->second.count(sk->getSourceBody())) continue;
+            seen.insert(sid);
+            frontier.push_back(sid);
+        }
+    }
+    seen.erase(sketchId);
+    return std::vector<int>(seen.begin(), seen.end());
+}
+
+// Hand a sketch move the sketches that must travel with it (see
+// hostedFollowerSketches). Nothing is added for a sketch that is detached from
+// its body - its move deliberately leaves the body where it is.
+inline void addHostedFollowers(SketchTransformOp& op,
+                               const std::map<int, std::set<int>>& links,
+                               const Document& doc, int sketchId,
+                               const std::set<int>& exclude = {}) {
+    auto sk = doc.getSketch(sketchId);
+    if (!sk || sk->isDetachedFromBody()) return;
+    for (int f : hostedFollowerSketches(links, doc, sketchId, exclude))
+        op.addFollower(f);
 }
 
 // A cascade that can't make a step follow a sketch edit switches it off
