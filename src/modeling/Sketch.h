@@ -99,6 +99,12 @@ public:
     int addLine(int startPtId, int endPtId, bool fromText = false);
     int addCircle(int centerPtId, double radius);
     int addArc(int centerPtId, int startPtId, int endPtId, double radius);
+    // How far `p` is from the arc ITSELF: from the rim where p lies within the
+    // arc's sweep (counter-clockwise start -> end), otherwise from the nearer
+    // end point. Picking used the whole circle's rim, so an arc could be hit
+    // anywhere along the circle it was cut from (#183). A start point equal to
+    // the end point reads as the full circle. Infinity if a point is missing.
+    float distanceToArc(const SketchArc& arc, glm::vec2 p) const;
     int addRectangle(glm::vec2 corner1, glm::vec2 corner2); // returns first line id
     // A rectangle at any angle: `corners` in order round the edge. Held square by
     // perpendicular constraints and sized by width / height distances.

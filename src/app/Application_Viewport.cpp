@@ -6799,10 +6799,9 @@ void Application::renderViewport() {
                             }
                         }
                         for (const auto& a : m_activeSketch->getArcs()) {
-                            const SketchPoint* ctr = m_activeSketch->getPoint(a.centerPointId);
-                            if (!ctr) continue;
-                            float d = std::abs(glm::distance(pos, ctr->pos) -
-                                               static_cast<float>(a.radius));
+                            if (!m_activeSketch->getPoint(a.centerPointId)) continue;
+                            // The arc itself, not the whole circle it came from (#183).
+                            float d = m_activeSketch->distanceToArc(a, pos);
                             if (d < lineTol && (outCurveId < 0 || d < bestC)) {
                                 outCurveId = a.id; bestC = d;
                             }

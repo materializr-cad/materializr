@@ -2630,12 +2630,10 @@ void SketchTool::handleSelectTool(glm::vec2 pos) {
             }
             float bestArcD = 0.0f;
             for (const auto& a : m_sketch->getArcs()) {
-                const SketchPoint* center = m_sketch->getPoint(a.centerPointId);
-                if (!center) continue;
-                // Approximate as full-circle perimeter - picking on the arc's
-                // sweep range is overkill for selection feel.
-                float d = std::abs(glm::distance(pos, center->pos) -
-                                   static_cast<float>(a.radius));
+                if (!m_sketch->getPoint(a.centerPointId)) continue;
+                // Distance to the arc itself, not the circle it was cut from:
+                // an arc used to be hittable anywhere along that circle (#183).
+                float d = m_sketch->distanceToArc(a, pos);
                 if (d < tol && (nearArc < 0 || d < bestArcD)) {
                     nearArc = a.id;
                     bestArcD = d;
@@ -5486,9 +5484,8 @@ DimPick SketchTool::hitTestDimEntity(glm::vec2 pos) const {
     if (bestCircle >= 0) return {DimEntityKind::Circle, bestCircle};
     float bestAd = 0.0f; int bestArc = -1;
     for (const auto& a : m_sketch->getArcs()) {
-        const SketchPoint* ctr = m_sketch->getPoint(a.centerPointId);
-        if (!ctr) continue;
-        float d = std::abs(glm::distance(pos, ctr->pos) - static_cast<float>(a.radius));
+        if (!m_sketch->getPoint(a.centerPointId)) continue;
+        float d = m_sketch->distanceToArc(a, pos);
         if (d < tol && (bestArc < 0 || d < bestAd)) { bestArc = a.id; bestAd = d; }
     }
     if (bestArc >= 0) return {DimEntityKind::Arc, bestArc};

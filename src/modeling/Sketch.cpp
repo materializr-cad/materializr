@@ -456,6 +456,23 @@ void Sketch::setRectangleSize(int lineId, double width, double height) {
     }
 }
 
+float Sketch::distanceToArc(const SketchArc& arc, glm::vec2 p) const {
+    const SketchPoint* c = getPoint(arc.centerPointId);
+    const SketchPoint* s = getPoint(arc.startPointId);
+    const SketchPoint* e = getPoint(arc.endPointId);
+    if (!c || !s || !e) return std::numeric_limits<float>::infinity();
+    const float twoPi = 2.0f * static_cast<float>(M_PI);
+    auto wrap = [&](float a) { while (a < 0.0f) a += twoPi; while (a >= twoPi) a -= twoPi; return a; };
+    const glm::vec2 v = p - c->pos;
+    const float startA = std::atan2(s->pos.y - c->pos.y, s->pos.x - c->pos.x);
+    const float sweep  = wrap(std::atan2(e->pos.y - c->pos.y, e->pos.x - c->pos.x) - startA);
+    const float at     = wrap(std::atan2(v.y, v.x) - startA);
+    const bool full    = sweep < 1e-5f;                 // start == end: the whole circle
+    if (full || at <= sweep)
+        return std::abs(glm::length(v) - static_cast<float>(arc.radius));
+    return std::min(glm::distance(p, s->pos), glm::distance(p, e->pos));
+}
+
 int Sketch::addArc(int centerPtId, int startPtId, int endPtId, double radius) {
     SketchArc arc;
     arc.id = nextId();
