@@ -2735,67 +2735,38 @@ void Application::handleToolAction(int action) {
             // Operate on the current sketch-element selection, or - if nothing
             // is selected (the common case when the user hasn't switched into
             // Select mode yet) - on the whole sketch.
-            std::set<int> involved;
-            std::set<int> selLines;
+            Sketch::ElementIds src;
             if (m_sketchTool->hasElementSelection()) {
-                involved.insert(m_sketchTool->getSelectedPoints().begin(),
-                                m_sketchTool->getSelectedPoints().end());
-                selLines = m_sketchTool->getSelectedLines();
-                for (int lid : selLines) {
-                    for (const auto& l : m_activeSketch->getLines()) {
-                        if (l.id == lid) {
-                            involved.insert(l.startPointId);
-                            involved.insert(l.endPointId);
-                            break;
-                        }
-                    }
-                }
+                src.points  = m_sketchTool->getSelectedPoints();
+                src.lines   = m_sketchTool->getSelectedLines();
+                src.circles = m_sketchTool->getSelectedCircles();
+                src.arcs    = m_sketchTool->getSelectedArcs();
+                src.splines = m_sketchTool->getSelectedSplines();
             } else {
-                // No selection → entire sketch.
-                for (const auto& p : m_activeSketch->getPoints()) involved.insert(p.id);
-                for (const auto& l : m_activeSketch->getLines())  selLines.insert(l.id);
+                src = m_activeSketch->allElementIds();   // no selection -> entire sketch
             }
-            if (involved.empty()) break;
+            if (src.empty()) break;
 
-            // Copy: duplicate the points + lines, OFFSET by a couple grid steps
-            // so the copy is visibly distinct from the original (landing them
-            // exactly on top read as "nothing happened"), then SELECT the copies
-            // and switch to Select mode so the move gizmo arms over them.
+            // Copy: duplicate everything selected - lines, circles, arcs and
+            // splines as well as points (it used to copy only points and lines,
+            // #182) - OFFSET by a couple grid steps so the copy is visibly
+            // distinct from the original (landing them exactly on top read as
+            // "nothing happened"), then SELECT the copies and switch to Select
+            // mode so the move gizmo arms over them.
             float gstep = m_sketchTool->getGridStep();
             float off = (gstep > 0.0f) ? gstep * 2.0f : 5.0f;
-            glm::vec2 copyOffset(off, off);
             auto before = std::make_shared<Sketch>(*m_activeSketch);
-            std::unordered_map<int, int> remap;
-            for (int oldId : involved) {
-                auto* p = m_activeSketch->getPoint(oldId);
-                if (!p) continue;
-                remap[oldId] = m_activeSketch->addPoint(p->pos + copyOffset);
-            }
-            std::set<int> newLineIds;
-            for (int lid : selLines) {
-                for (const auto& l : m_activeSketch->getLines()) {
-                    if (l.id != lid) continue;
-                    auto sIt = remap.find(l.startPointId);
-                    auto eIt = remap.find(l.endPointId);
-                    if (sIt != remap.end() && eIt != remap.end()) {
-                        int newLine = m_activeSketch->addLine(sIt->second, eIt->second);
-                        newLineIds.insert(newLine);
-                    }
-                    break;
-                }
-            }
+            const Sketch::ElementIds made = m_activeSketch->copyElements(src, glm::vec2(off, off));
             // Record + select the duplicates. setMode FIRST, then select, so the
             // mode switch can't clear the selection - that leaves the copies
             // selected in Select mode, which auto-shows the move gizmo over them
             // so the user can drag them straight off the originals.
-            std::set<int> newPointIds;
-            for (auto& kv : remap) newPointIds.insert(kv.second);
             m_sketchTool->setMode(SketchToolMode::Select);
-            m_sketchTool->setSelection(newPointIds, newLineIds);
+            m_sketchTool->setSelectionFull(made.points, made.lines, made.circles,
+                                           made.arcs, made.splines);
 
             auto after = std::make_shared<Sketch>(*m_activeSketch);
-            if (before->getPoints().size() != after->getPoints().size() ||
-                before->getLines().size()  != after->getLines().size()) {
+            if (before->getPoints().size() != after->getPoints().size()) {
                 auto op = std::make_unique<SketchEditOp>(m_activeSketch, before, after);
                 m_history->pushExecuted(std::move(op), *m_document);
                 if (m_activeSketchId >= 0) requestSketchCascade(m_activeSketchId);

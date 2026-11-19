@@ -504,6 +504,11 @@ add_executable(test_sketch_select_delete_polygon test_sketch_select_delete_polyg
 target_link_libraries(test_sketch_select_delete_polygon PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_sketch_select_delete_polygon COMMAND test_sketch_select_delete_polygon)
 
+# test_sketch_copy_elements - sketch Copy duplicates every element type, not just points and lines (#182)
+add_executable(test_sketch_copy_elements test_sketch_copy_elements.cpp)
+target_link_libraries(test_sketch_copy_elements PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_sketch_copy_elements COMMAND test_sketch_copy_elements)
+
 # test_arc_pick_zone - an arc is picked along the arc itself, not the whole circle it was cut from (#183)
 add_executable(test_arc_pick_zone test_arc_pick_zone.cpp)
 target_link_libraries(test_arc_pick_zone PRIVATE materializr_core gtest gtest_main)

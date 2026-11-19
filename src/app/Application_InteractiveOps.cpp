@@ -2616,6 +2616,7 @@ void Application::beginSketchPattern(PatternKind kind) {
     m_sketchPatternLines.clear();
     m_sketchPatternCircles.clear();
     m_sketchPatternArcs.clear();
+    m_sketchPatternSplines.clear();
     m_sketchPatternSelectAll = !m_sketchTool->hasElementSelection();
     if (!m_sketchPatternSelectAll) {
         m_sketchPatternPts.insert(m_sketchTool->getSelectedPoints().begin(),
@@ -2650,6 +2651,15 @@ void Application::beginSketchPattern(PatternKind kind) {
                 }
             }
         }
+        m_sketchPatternSplines = m_sketchTool->getSelectedSplines();
+        for (int sid : m_sketchPatternSplines) {
+            for (const auto& sp : m_activeSketch->getSplines()) {
+                if (sp.id == sid) {
+                    for (int cp : sp.controlPointIds) m_sketchPatternPts.insert(cp);
+                    break;
+                }
+            }
+        }
     } else {
         for (const auto& p : m_activeSketch->getPoints()) m_sketchPatternPts.insert(p.id);
         for (const auto& l : m_activeSketch->getLines())  m_sketchPatternLines.insert(l.id);
@@ -2662,6 +2672,10 @@ void Application::beginSketchPattern(PatternKind kind) {
             m_sketchPatternPts.insert(a.startPointId);
             m_sketchPatternPts.insert(a.endPointId);
             m_sketchPatternArcs.insert(a.id);
+        }
+        for (const auto& sp : m_activeSketch->getSplines()) {
+            for (int cp : sp.controlPointIds) m_sketchPatternPts.insert(cp);
+            m_sketchPatternSplines.insert(sp.id);
         }
     }
 
@@ -2849,6 +2863,21 @@ void Application::updateSketchPattern() {
                 if (a.isConstruction) m_activeSketch->setElementConstruction(na, true);
             }
         }
+        // Splines: the copy's control points are the remapped ones. (They were
+        // left out, so a patterned spline vanished from the copies - #182.)
+        auto splines = m_activeSketch->getSplines();
+        for (const auto& sp : splines) {
+            if (!m_sketchPatternSplines.count(sp.id)) continue;
+            std::vector<int> cps;
+            for (int cp : sp.controlPointIds) {
+                auto it = remap.find(cp);
+                if (it != remap.end()) cps.push_back(it->second);
+            }
+            if (cps.size() < 2 || cps.size() != sp.controlPointIds.size()) continue;
+            const int ns = m_activeSketch->addSpline(cps);
+            m_activeSketch->setElementOrigin(ns, sp.id);
+            if (sp.isConstruction) m_activeSketch->setElementConstruction(ns, true);
+        }
     }
 }
 
@@ -2875,6 +2904,7 @@ void Application::commitSketchPattern() {
     m_sketchPatternLines.clear();
     m_sketchPatternCircles.clear();
     m_sketchPatternArcs.clear();
+    m_sketchPatternSplines.clear();
 }
 
 void Application::cancelSketchPattern() {
@@ -2888,6 +2918,7 @@ void Application::cancelSketchPattern() {
     m_sketchPatternLines.clear();
     m_sketchPatternCircles.clear();
     m_sketchPatternArcs.clear();
+    m_sketchPatternSplines.clear();
 }
 
 // ── Rotate Plane About Axis ─────────────────────────────────────────────

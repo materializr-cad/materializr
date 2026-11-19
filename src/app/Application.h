@@ -2521,6 +2521,7 @@ private:
     std::set<int> m_sketchPatternLines;
     std::set<int> m_sketchPatternCircles;
     std::set<int> m_sketchPatternArcs;
+    std::set<int> m_sketchPatternSplines;
     bool          m_sketchPatternSelectAll = false; // whole-sketch fallback when nothing was selected
 
     void beginSketchPattern(PatternKind kind);

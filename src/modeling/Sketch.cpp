@@ -456,6 +456,79 @@ void Sketch::setRectangleSize(int lineId, double width, double height) {
     }
 }
 
+Sketch::ElementIds Sketch::allElementIds() const {
+    ElementIds ids;
+    for (const auto& p : m_points)  ids.points.insert(p.id);
+    for (const auto& l : m_lines)   ids.lines.insert(l.id);
+    for (const auto& c : m_circles) ids.circles.insert(c.id);
+    for (const auto& a : m_arcs)    ids.arcs.insert(a.id);
+    for (const auto& s : m_splines) ids.splines.insert(s.id);
+    return ids;
+}
+
+Sketch::ElementIds Sketch::copyElements(const ElementIds& src, glm::vec2 offset) {
+    ElementIds made;
+    std::map<int, int> remap;
+    auto copyPt = [&](int oldId) -> int {
+        auto it = remap.find(oldId);
+        if (it != remap.end()) return it->second;
+        const SketchPoint* p = getPoint(oldId);
+        if (!p) return -1;
+        const int nid = addPoint(p->pos + offset);   // may reallocate m_points: p is dead after
+        remap[oldId] = nid;
+        made.points.insert(nid);
+        return nid;
+    };
+    // Snapshot the element lists: adding to the sketch can reallocate them.
+    const auto lines = m_lines;
+    const auto circles = m_circles;
+    const auto arcs = m_arcs;
+    const auto splines = m_splines;
+    for (int id : src.points) copyPt(id);
+    for (const auto& l : lines) {
+        if (!src.lines.count(l.id)) continue;
+        const int s = copyPt(l.startPointId), e = copyPt(l.endPointId);
+        if (s < 0 || e < 0 || s == e) continue;
+        const int nl = addLine(s, e);
+        setElementOrigin(nl, l.id);
+        if (l.isConstruction) setElementConstruction(nl, true);
+        made.lines.insert(nl);
+    }
+    for (const auto& c : circles) {
+        if (!src.circles.count(c.id)) continue;
+        const int ctr = copyPt(c.centerPointId);
+        if (ctr < 0) continue;
+        const int nc = addCircle(ctr, c.radius);
+        setElementOrigin(nc, c.id);
+        if (c.isConstruction) setElementConstruction(nc, true);
+        made.circles.insert(nc);
+    }
+    for (const auto& a : arcs) {
+        if (!src.arcs.count(a.id)) continue;
+        const int ctr = copyPt(a.centerPointId);
+        const int s = copyPt(a.startPointId), e = copyPt(a.endPointId);
+        if (ctr < 0 || s < 0 || e < 0) continue;
+        const int na = addArc(ctr, s, e, a.radius);
+        setElementOrigin(na, a.id);
+        if (a.isConstruction) setElementConstruction(na, true);
+        made.arcs.insert(na);
+    }
+    for (const auto& sp : splines) {
+        if (!src.splines.count(sp.id)) continue;
+        std::vector<int> cps;
+        for (int cp : sp.controlPointIds) {
+            const int n = copyPt(cp);
+            if (n >= 0) cps.push_back(n);
+        }
+        if (cps.size() < 2) continue;
+        const int ns = addSpline(cps);
+        setElementOrigin(ns, sp.id);
+        if (sp.isConstruction) setElementConstruction(ns, true);
+        made.splines.insert(ns);
+    }
+    return made;
+}
+
 float Sketch::distanceToArc(const SketchArc& arc, glm::vec2 p) const {
     const SketchPoint* c = getPoint(arc.centerPointId);
     const SketchPoint* s = getPoint(arc.startPointId);

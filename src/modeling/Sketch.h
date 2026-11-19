@@ -6,6 +6,7 @@
 #include <string>
 #include <memory>
 #include <map>
+#include <set>
 #include <TopoDS_Wire.hxx>
 #include <TopoDS_Face.hxx>
 #include <gp_Pln.hxx>
@@ -99,6 +100,23 @@ public:
     int addLine(int startPtId, int endPtId, bool fromText = false);
     int addCircle(int centerPtId, double radius);
     int addArc(int centerPtId, int startPtId, int endPtId, double radius);
+    // A set of sketch elements by id - what Copy and the patterns duplicate.
+    struct ElementIds {
+        std::set<int> points, lines, circles, arcs, splines;
+        bool empty() const {
+            return points.empty() && lines.empty() && circles.empty() && arcs.empty() &&
+                   splines.empty();
+        }
+    };
+    // Every element in the sketch (construction ones too).
+    ElementIds allElementIds() const;
+    // Duplicate `src` shifted by `offset`: every line, circle, arc and spline in
+    // it plus the loose points, with the points they use (centres, arc ends,
+    // spline controls) copied once and shared, so connected geometry stays
+    // connected. Copies keep their construction flag and element origin. Points
+    // are never tied to a rim: a shifted copy must not stay stuck to the
+    // original's circle. Returns the ids of everything created.
+    ElementIds copyElements(const ElementIds& src, glm::vec2 offset);
     // How far `p` is from the arc ITSELF: from the rim where p lies within the
     // arc's sweep (counter-clockwise start -> end), otherwise from the nearer
     // end point. Picking used the whole circle's rim, so an arc could be hit
