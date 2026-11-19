@@ -75,6 +75,9 @@ struct AppSettings {
     float touchRightW       = 300.0f;
     // Shell tool-rail width, same convention (edge-tab drag).
     float touchRailW        = 92.0f;
+    // User-arranged tool-rail order (Modern / im-touch), serialized by
+    // touchui::RailOrder: "ctx=key|key;ctx2=key|key". Empty = catalogue order.
+    std::string toolOrder;
 #if defined(MZ_MOBILE)
     // Touch-first default: trackpad mode (one-finger drag = orbit, two-finger
     // pan/zoom). Just the first-run default - the Settings dialog can rebind to

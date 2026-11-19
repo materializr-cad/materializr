@@ -84,6 +84,10 @@ public:
         bool        menu = false;     // opens a menu on a second press: draw a corner wedge
     };
     std::vector<RailTool> railTools() const;
+    // Which selection context railTools() is serving right now - the same
+    // dispatch, as a stable string ("sketch", "none", "body"...). The rails key
+    // the user's saved tool order on it (ui/RailOrder.h).
+    const char* contextKey() const;
     // Fire a plugin RailTool (activate its tool / run its action) - the rail
     // twin of renderPluginButtons' click handling.
     void fireRailPlugin(int index);

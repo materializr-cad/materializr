@@ -2152,6 +2152,7 @@ AppSettings Application::currentSettings() const {
     s.touchRightTab = m_touchRightTab;
     s.touchRightW = m_touchRightW;
     s.touchRailW = m_touchRailW;
+    s.toolOrder = m_railOrder.serialize();
     s.orbitButton = m_orbitButton;
     s.panButton = m_panButton;
     s.levelOrbit = m_viewport->getCamera().isLevelOrbit();
@@ -2322,6 +2323,7 @@ void Application::applyAppSettings(const AppSettings& s) {
     if (m_touchRightW < 200.0f) m_touchRightW = 200.0f;
     if (m_touchRightW > 520.0f) m_touchRightW = 520.0f;
     m_touchRailW = s.touchRailW;
+    m_railOrder.parse(s.toolOrder);
     if (m_touchRailW < 64.0f)  m_touchRailW = 64.0f;
     if (m_touchRailW > 208.0f) m_touchRailW = 208.0f;   // 2-column rail range
     // Camera button bindings are honoured on every platform. Android defaults to
@@ -8455,6 +8457,7 @@ void Application::run() {
             if (m_viewport && m_viewport->getCamera().isAnimating())
                 return true;                         // camera glide needs its frames
             if (!m_threadRecuts.empty()) return true; // async re-cut in flight
+            if (m_railOrder.animating()) return true; // tool rail still sliding into place
             if (m_meshDispatch.anyPending()) return true; // off-thread mesh in flight: land it when it finishes
             for (auto* c : m_iops)
                 if (c->previewPending()) return true; // off-thread preview in flight

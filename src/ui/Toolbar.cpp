@@ -197,6 +197,20 @@ ToolAction Toolbar::render() {
     return action;
 }
 
+const char* Toolbar::contextKey() const {
+    // Mirrors the dispatch in render() / railTools().
+    if (m_sketchMode) return "sketch";
+    if (!m_selection || !m_selection->hasSelection()) return "none";
+    if (m_selection->hasSelectedSketchRegions()) return "regions";
+    if (m_selection->primaryType() == SelectionType::Plane) return "plane";
+    if (m_selection->primaryType() == SelectionType::Axis) return "axis";
+    if (m_selection->hasSelectedSketches()) return "sketches";
+    if (m_selection->hasSelectedFaces()) return "face";
+    if (m_selection->hasSelectedBodies()) return "body";
+    if (m_selection->hasSelectedEdges()) return "edge";
+    return "none";
+}
+
 // THE tool catalogue: which tools the current selection context offers.
 // All three layouts read this - the rails render it directly, and classic
 // gates its own buttons on catalogOffers() (see Toolbar.h). Add a tool HERE

@@ -413,6 +413,7 @@ add_executable(materializr
     src/viewport/SelectionHighlight.cpp
     src/ui/Toolbar.cpp
     src/ui/TouchWidgets.cpp
+    src/ui/RailOrder.cpp
     src/ui/HistoryPanel.cpp
     src/ui/ItemsPanel.cpp
     src/ui/StatusBar.cpp

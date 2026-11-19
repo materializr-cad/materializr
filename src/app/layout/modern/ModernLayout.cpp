@@ -32,6 +32,7 @@
 #include "ui_scale.h"
 
 #include <imgui.h>
+#include <set>
 #include <string>
 #include "../../../i18n.h"
 #include "../../../i18n.h"
@@ -535,16 +536,44 @@ void Application::renderModernLayout() {
                     else handleToolAction(static_cast<int>(t.action));
                 };
 
-                bool done[5] = { false, false, false, false, false };
-                int railIdx = 0;
-                for (const auto& tool : rail) {
-                    if (skip(tool)) continue;
-                    const int g = groupOf(tool);
-                    // Only collapse when the group actually has 2+ members in
-                    // this context; a lone Mirror stays a plain button.
-                    if (g != 0 && count(g) >= 2) {
-                        if (done[g]) continue;
-                        done[g] = true;
+                // One entry per rail button: a plain tool, or a whole group
+                // (placed where its first member sat). The user can drag
+                // entries into their own order (long-press, see RailOrder).
+                struct Entry { std::string key; int group; const Toolbar::RailTool* tool; };
+                std::vector<Entry> entries;
+                {
+                    bool added[5] = { false, false, false, false, false };
+                    std::set<std::string> seen;
+                    for (const auto& t : rail) {
+                        if (skip(t)) continue;
+                        const int g = groupOf(t);
+                        // Only collapse when the group actually has 2+ members
+                        // in this context; a lone Mirror stays a plain button.
+                        if (g != 0 && count(g) >= 2) {
+                            if (added[g]) continue;
+                            added[g] = true;
+                            const char* gName = g == 1 ? "Multiply"
+                                              : g == 2 ? "Transform"
+                                              : g == 4 ? "Repair" : "Import";
+                            entries.push_back({ std::string("group:") + gName, g, nullptr });
+                            continue;
+                        }
+                        std::string k = std::string(t.pluginIndex >= 0 ? "p:" : "a:") +
+                                        (t.label ? t.label : "");
+                        for (int n = 2; !seen.insert(k).second; ++n)
+                            k = k.substr(0, k.find('#')) + "#" + std::to_string(n);
+                        entries.push_back({ k, 0, &t });
+                    }
+                }
+                std::vector<std::string> entryKeys;
+                for (const auto& e : entries) entryKeys.push_back(e.key);
+                const auto order = m_railOrder.arrange(
+                    std::string("modern/") + m_toolbar->contextKey(), entryKeys);
+
+                for (int oi : order) {
+                    const Entry& e = entries[oi];
+                    if (e.group != 0) {
+                        const int g = e.group;
                         const char* gIcon  = g == 1 ? MZ_ICON_COPY
                                            : g == 2 ? MZ_ICON_MOVE
                                            : g == 4 ? MZ_ICON_REPAIR : MZ_ICON_SVG;
@@ -556,9 +585,11 @@ void Application::renderModernLayout() {
                                            : g == 4 ? "##railRepair"
                                                     : "##railImport";
                         ImGui::PushID(2000 + g);
-                        if (touchui::railButton(gLabel, gIcon, tr(gLabel), false, cell(),
-                                                false, /*hasMenu=*/true))
-                            ImGui::OpenPopup(gPopup);
+                        m_railOrder.beginEntry();
+                        bool gClicked = touchui::railButton(gLabel, gIcon, tr(gLabel), false, cell(),
+                                                            false, /*hasMenu=*/true);
+                        gClicked = m_railOrder.item(e.key, gClicked);
+                        if (gClicked) ImGui::OpenPopup(gPopup);
                         tip(materializr::tr(
                             g == 3 ? "Bring outside artwork into the sketch: an "
                                      "SVG outline or an aerofoil section"
@@ -579,14 +610,19 @@ void Application::renderModernLayout() {
                         ImGui::PopID();
                         continue;
                     }
-                    ImGui::PushID(railIdx++); // labels can repeat across groups
+                    const Toolbar::RailTool& tool = *e.tool;
+                    // Keyed by entry, not position: the id has to follow the
+                    // button when the user drags it to another slot.
+                    ImGui::PushID(e.key.c_str());
                     // Circle / Rectangle / Polygon carry `menu`: a corner wedge
                     // on the button, and a second tap while active opens the
                     // origin / sides menu instead of the old extra toggle row.
                     bool inZone = false;
-                    const bool clicked = touchui::railButton(
+                    m_railOrder.beginEntry();
+                    bool clicked = touchui::railButton(
                         tool.label, tool.icon, tr(tool.label), tool.active, cell(),
                         false, tool.menu, &inZone);
+                    clicked = m_railOrder.item(e.key, clicked);
                     tip(materializr::tr(tool.tip));
                     if (tool.pluginIndex >= 0) {
                         if (clicked) m_toolbar->fireRailPlugin(tool.pluginIndex);
@@ -600,6 +636,7 @@ void Application::renderModernLayout() {
                         handleToolAction(static_cast<int>(tool.action));
                     ImGui::PopID();
                 }
+                if (m_railOrder.takeChanged()) saveAppSettings();
             }
 
             // Construction stays reachable with a selection too (its options

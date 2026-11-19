@@ -117,6 +117,7 @@ void applyKv(const std::map<std::string, std::string>& kv, AppSettings& s) {
     readIntClamped(kv, "touchRightTab",  s.touchRightTab, 0, 1);
     readFloat(kv, "touchRightW",         s.touchRightW);
     readFloat(kv, "touchRailW",          s.touchRailW);
+    readString(kv, "toolOrder",          s.toolOrder);
     readIntClamped(kv, "orbitButton",    s.orbitButton, 0, 2);
     readIntClamped(kv, "panButton",      s.panButton,   0, 2);
     readBool(kv, "levelOrbit",           s.levelOrbit);
@@ -466,6 +467,7 @@ bool SettingsIO::save(const std::string& path, const AppSettings& s) {
     ofs << "touchRightTab = "       << s.touchRightTab       << "\n";
     ofs << "touchRightW = "         << s.touchRightW         << "\n";
     ofs << "touchRailW = "          << s.touchRailW          << "\n";
+    ofs << "toolOrder = "           << s.toolOrder           << "\n";
     ofs << "orbitButton = "         << s.orbitButton         << "\n";
     ofs << "panButton = "           << s.panButton           << "\n";
     ofs << "levelOrbit = "          << (s.levelOrbit ? "true" : "false") << "\n";

@@ -35,6 +35,7 @@
 
 #include <cfloat> // FLT_MAX (tool bar height constraint)
 #include <cstring> // strncpy (rename buffers)
+#include <functional>
 #include <imgui.h>
 #include <memory>  // make_unique (DeleteOp)
 #include <set>
@@ -822,12 +823,16 @@ void Application::renderImTouchLayout() {
                         ImGui::CloseCurrentPopup();
                 }
             };
-            auto flatButton = [&](const Toolbar::RailTool& tool, int id) {
-                ImGui::PushID(id); // labels can repeat across groups
+            auto flatButton = [&](const Toolbar::RailTool& tool, const std::string& key) {
+                // Keyed by entry, not position: the id has to follow the
+                // button when the user drags it to another slot.
+                ImGui::PushID(key.c_str());
                 bool inZone = false;
-                const bool clicked = touchui::railButton(
+                m_railOrder.beginEntry();
+                bool clicked = touchui::railButton(
                     tool.label, tool.icon, tr(tool.label), tool.active, 64.0f * s,
                     false, tool.menu, &inZone);
+                clicked = m_railOrder.item(key, clicked);
                 tip(materializr::tr(tool.tip));
                 fire(tool, clicked, /*inPopup=*/false, inZone);
                 ImGui::PopID();
@@ -843,13 +848,15 @@ void Application::renderImTouchLayout() {
                 const Toolbar::RailTool* activeTool = nullptr;
                 for (const auto* t : members)
                     if (t->active) { activeTool = t; break; }
-                if (touchui::railButton(id,
+                m_railOrder.beginEntry();
+                bool gClicked = touchui::railButton(id,
                                         activeTool ? activeTool->icon : groupIcon,
                                         materializr::tr(activeTool ? activeTool->label
                                                                    : groupLabel),
                                         activeTool != nullptr, 64.0f * s,
-                                        false, /*hasMenu=*/true))
-                    ImGui::OpenPopup(popupId);
+                                        false, /*hasMenu=*/true);
+                gClicked = m_railOrder.item(std::string("group:") + id, gClicked);
+                if (gClicked) ImGui::OpenPopup(popupId);
                 tip(materializr::tr(groupTip));
                 if (ImGui::BeginPopup(popupId)) {
                     int idx = 0;
@@ -868,6 +875,40 @@ void Application::renderImTouchLayout() {
                 }
             };
 
+            // Every rail button (a flat tool or a group flyout) is an entry the
+            // user can drag into their own order (long-press, see RailOrder).
+            // The branches below queue entries in the default order; flushRail
+            // draws them in the saved / being-dragged order.
+            struct RailEntry { std::string key; std::function<void()> draw; };
+            std::vector<RailEntry> entries;
+            std::set<std::string> seenKeys;
+            auto queueFlat = [&](const Toolbar::RailTool& t) {
+                std::string k = std::string(t.pluginIndex >= 0 ? "p:" : "a:") +
+                                (t.label ? t.label : "");
+                for (int n = 2; !seenKeys.insert(k).second; ++n)
+                    k = k.substr(0, k.find('#')) + "#" + std::to_string(n);
+                const Toolbar::RailTool* tp = &t;
+                entries.push_back({ k, [&flatButton, tp, k] { flatButton(*tp, k); } });
+            };
+            auto queueGroup = [&](const char* id, const char* popupId,
+                                  const char* groupIcon, const char* groupLabel,
+                                  const char* groupTip,
+                                  const std::vector<const Toolbar::RailTool*>& members) {
+                if (members.empty()) return;
+                entries.push_back({ std::string("group:") + id,
+                    [&group, id, popupId, groupIcon, groupLabel, groupTip, &members] {
+                        group(id, popupId, groupIcon, groupLabel, groupTip, members);
+                    } });
+            };
+            auto flushRail = [&] {
+                std::vector<std::string> keys;
+                for (const auto& e : entries) keys.push_back(e.key);
+                const auto order = m_railOrder.arrange(
+                    std::string("imtouch/") + m_toolbar->contextKey(), keys);
+                for (int oi : order) entries[oi].draw();
+                if (m_railOrder.takeChanged()) saveAppSettings();
+            };
+
             if (!m_inSketchMode) {
                 // Body/feature context: most tools stay flat, but two flyouts
                 // (matching modern's rail):
@@ -880,7 +921,6 @@ void Application::renderImTouchLayout() {
                 // the flyout holds whichever are usable right now - and the
                 // group button doesn't appear at all when none are.
                 std::vector<const Toolbar::RailTool*> multiply, transform, repair;
-                int railIdx = 0;
                 for (const auto& t : tools) {
                     if (t.pluginIndex >= 0 && t.label) {
                         if (std::strcmp(t.label, "Linear") == 0 ||
@@ -903,19 +943,20 @@ void Application::renderImTouchLayout() {
                                t.action == ToolAction::RemoveFace) {
                         repair.push_back(&t); continue;
                     }
-                    flatButton(t, railIdx++);
+                    queueFlat(t);
                 }
-                group("transformGroup", "##bodyTransform", MZ_ICON_MOVE,
+                queueGroup("transformGroup", "##bodyTransform", MZ_ICON_MOVE,
                       "Transform", "Move, rotate or scale the selection",
                       transform);
-                group("multiplyGroup", "##bodyMultiply", MZ_ICON_COPY,
+                queueGroup("multiplyGroup", "##bodyMultiply", MZ_ICON_COPY,
                       "Multiply", "Copy, mirror, pattern or split the selection",
                       multiply);
-                group("repairGroup", "##bodyRepair", MZ_ICON_REPAIR,
+                queueGroup("repairGroup", "##bodyRepair", MZ_ICON_REPAIR,
                       "Repair", "Fix up geometry: fill an opening, stitch "
                       "surfaces into a solid, merge split faces, or take a "
                       "feature back off",
                       repair);
+                flushRail();
             } else {
                 // Sketch mode: the flat catalogue is ~19 buttons - a screen
                 // and a half of scrolling. The DRAWING tools stay flat (they're
@@ -927,7 +968,6 @@ void Application::renderImTouchLayout() {
                 // in catalogue order, so anything unrecognised (future tools)
                 // also lands flat and can't silently vanish from the rail.
                 std::vector<const Toolbar::RailTool*> modify, aids, importers;
-                int railIdx = 0;
                 for (const auto& t : tools) {
                     if (t.pluginIndex >= 0) { modify.push_back(&t); continue; }
                     switch (t.action) {
@@ -952,20 +992,21 @@ void Application::renderImTouchLayout() {
                     case ToolAction::LookAtSketch:
                         aids.push_back(&t); break;
                     default:
-                        flatButton(t, railIdx++); break;
+                        queueFlat(t); break;
                     }
                 }
-                group("modifyGroup", "##sketchModify", MZ_ICON_TRIM, "Modify",
+                queueGroup("modifyGroup", "##sketchModify", MZ_ICON_TRIM, "Modify",
                       "Modify tools: trim, offset, fill, copy, mirror, linear "
                       "and circular patterns",
                       modify);
-                group("importGroup", "##sketchImport", MZ_ICON_SVG, "Import",
+                queueGroup("importGroup", "##sketchImport", MZ_ICON_SVG, "Import",
                       "Bring outside artwork into the sketch: an SVG outline or "
                       "an aerofoil section",
                       importers);
-                group("aidsGroup", "##sketchAids", MZ_ICON_MORE, "More",
+                queueGroup("aidsGroup", "##sketchAids", MZ_ICON_MORE, "More",
                       "Drawing guides level, measure, look at the sketch plane",
                       aids);
+                flushRail();
             }
         }
     }

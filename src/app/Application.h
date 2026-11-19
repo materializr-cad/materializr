@@ -18,6 +18,7 @@
 #include <glm/glm.hpp>
 #include "io/ImageDecode.h"   // DecodedImage - thumbnail peek results
 #include "ui/UpdateChecker.h"
+#include "ui/RailOrder.h"
 #include <TopoDS_Shape.hxx>
 #include "viewport/MeshDispatch.h"
 #ifdef MZR_PARALLEL_MESH_TESTING
@@ -1350,6 +1351,9 @@ private:
     float m_touchRightW = 300.0f;
     // Tool-rail width, same convention (edge-tab drag, persisted).
     float m_touchRailW = 92.0f;
+    // User-arranged tool order for the Modern / im-touch rails (long-press a
+    // tool and drag). Persisted through AppSettings::toolOrder.
+    materializr::touchui::RailOrder m_railOrder;
     // Edge-tab drag state (tap vs drag disambiguation).
     bool m_railTabDragged = false, m_rightTabDragged = false;
 

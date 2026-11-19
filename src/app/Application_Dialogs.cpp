@@ -272,6 +272,13 @@ void Application::renderSettings() {
                     ImGui::TextWrapped("%s", materializr::tr("Classic: the traditional docked panels and menu bar. Modern: a top app bar, tool rail and side panel. im-touch: a near-zero-chrome full-screen viewport with floating controls only. Switches immediately; each layout keeps its own arrangement."));
 
                     ImGui::Spacing();
+                    if (ImGui::Button(materializr::tr("Reset tool order"))) {
+                        m_railOrder.reset();
+                        changed = true;
+                    }
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("%s", materializr::tr("Put the Modern and im-touch tool rails back in their default order. To rearrange a rail, press and hold a tool for a moment, then drag it to a new place."));
+                    ImGui::SameLine();
                     if (ImGui::Button(materializr::tr("Reset panel layout"))) resetLayout();
                     if (ImGui::IsItemHovered())
                         ImGui::SetTooltip("%s", materializr::tr("Restore the default panel arrangement - use this if a panel gets dragged off-screen or docking gets messy. Also re-applies the interface scale to the panel widths."));
