@@ -928,6 +928,19 @@ TreeLeafAction treeLeaf(const char* id, const char* icon, const char* label,
     const float rowBottom =
         ImGui::GetCursorScreenPos().y - ImGui::GetStyle().ItemSpacing.y;
 
+    // A row outside the visible area draws nothing. Everything below goes
+    // straight into the window's draw list, which ImGui does NOT cull: 1000
+    // bodies cost ~64 vertices a row, and a draw list that passes 65535
+    // vertices cannot be indexed with 16 bits - which is all OpenGL ES 3.0 has
+    // (no vertex offsets), so on Android the list rendered as smeared streaks
+    // (#177). The rect is still claimed above, so layout and scrolling are
+    // unchanged; an off-screen row cannot be hovered or tapped anyway.
+    if (!ImGui::IsRectVisible(p, ImVec2(p.x + w, p.y + h))) {
+        ImGui::SetCursorScreenPos(ImVec2(p.x, rowBottom));
+        ImGui::PopID();
+        return act;
+    }
+
     // Eye first - its own exclusive hit area (a row button submitted before
     // it would swallow the taps; same lesson as listRow's checkbox).
     ImGui::SetCursorScreenPos(ImVec2(p.x + indent, p.y));
@@ -1033,6 +1046,14 @@ ListRowAction listRow(const char* id, bool* checked, const char* label,
     // cur.y 673.80 vs max.y 673.00 at s = 1.7).
     const float rowBottom =
         ImGui::GetCursorScreenPos().y - ImGui::GetStyle().ItemSpacing.y;
+
+    // Off-screen rows draw nothing - see treeLeaf (#177): the draw list is not
+    // culled for us, and a long list overflows 16-bit indices on OpenGL ES.
+    if (!ImGui::IsRectVisible(p, ImVec2(p.x + w, p.y + h))) {
+        ImGui::SetCursorScreenPos(ImVec2(p.x, rowBottom));
+        ImGui::PopID();
+        return act;
+    }
 
     // Checkbox (visibility) FIRST, with its own exclusive hit area - a row
     // button submitted before it would claim its clicks (ImGui gives the
