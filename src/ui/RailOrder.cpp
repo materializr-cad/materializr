@@ -4,6 +4,7 @@
 #include <cmath>
 #include <imgui_internal.h> // ImGuiWindow (slide offsets are window-relative)
 #include "ui/TouchTheme.h"
+#include "touch_mode.h"
 #include "ui_scale.h"
 
 namespace materializr {
@@ -175,15 +176,30 @@ bool RailOrder::itemImpl(const std::string& key, bool clicked) {
     m_rects[key] = {mn, mx};
     const float s = materializr::uiScale();
 
-    // Arm: the pressed button has been held still long enough.
-    if (m_dragKey.empty() && ImGui::IsItemActive() && io.MouseDown[0] &&
-        io.MouseDownDuration[0] >= kHoldSeconds) {
+    // Arm. Two ways in:
+    //  - hold still on the pressed button for kHoldSeconds (the touch gesture,
+    //    and what the hold ring below counts down), or
+    //  - with a mouse, simply press and drag a little: a click on a rail
+    //    button never needs to move, so a real drag is unambiguous. (Touch
+    //    keeps the long press so a finger that slides doesn't pick tools up.)
+    if (m_dragKey.empty() && ImGui::IsItemActive() && io.MouseDown[0]) {
         const ImVec2 d(io.MousePos.x - io.MouseClickedPos[0].x,
                        io.MousePos.y - io.MouseClickedPos[0].y);
-        if (d.x * d.x + d.y * d.y <= (12.0f * s) * (12.0f * s)) {
+        const float dist2 = d.x * d.x + d.y * d.y;
+        const float held = io.MouseDownDuration[0];
+        const bool still = dist2 <= (12.0f * s) * (12.0f * s);
+        if ((still && held >= kHoldSeconds) ||
+            (!touchMode() && dist2 > (8.0f * s) * (8.0f * s))) {
             m_dragKey = key;
             m_dragMoved = false;
             m_dragOrder.clear();
+        } else if (still && held > 0.2f) {
+            // Hold ring: the outline fades in so the press visibly "charges".
+            const float t = std::min(1.0f, (held - 0.2f) / (kHoldSeconds - 0.2f));
+            ImDrawList* dl = ImGui::GetWindowDrawList();
+            const ImU32 acc = ImGui::GetColorU32(accentFill());
+            const ImU32 a = (acc & 0x00FFFFFFu) | (static_cast<ImU32>(255.0f * t) << 24);
+            dl->AddRect(mn, mx, a, 12.0f * s, 0, 2.0f * s);
         }
     }
 
