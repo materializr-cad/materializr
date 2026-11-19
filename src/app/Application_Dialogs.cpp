@@ -7818,6 +7818,21 @@ void Application::renderLandingPage() {
     // Thumbnails peeked off-thread since the last frame become textures here,
     // where the GL context lives; tiles fill in as they arrive.
     drainThumbnailPeeks();
+    // The projects open in tabs, so the page can say so and take you back to
+    // one (#184). An untouched blank workspace is not worth a button.
+    {
+        std::vector<LandingPage::OpenTab> open;
+        for (size_t i = 0; i < m_sessions.size(); ++i) {
+            if (sessionIsBlank(i)) continue;
+            LandingPage::OpenTab t;
+            t.index = i;
+            t.name = sessionDisplayLabel(i);
+            t.active = (i == m_activeSession);
+            t.dirty = sessionDirty(i);
+            open.push_back(std::move(t));
+        }
+        m_landingPage->setOpenTabs(std::move(open));
+    }
     // ImTextureID is an integer alias in this imgui config; the logo texture
     // is a plain GL name, so a value cast is exact.
     m_landingPage->setLogoTexture(
@@ -7850,6 +7865,13 @@ void Application::renderLandingPage() {
         m_landingPage->setVisible(false);
         if (!activeSessionIsScratch() && !openNewTab()) break;
         loadProject();
+        break;
+    case AT::SwitchTab:
+        // Back to a project that is already open: the page just closes over it.
+        m_landingPage->setVisible(false);
+        if (act.tab != m_activeSession && !switchToSession(act.tab))
+            m_landingPage->setVisible(true);   // refused: stay where we are
+        m_tabSelectionSync = true;             // classic tab bar re-asserts the selection
         break;
     case AT::ExportStep:
         exportRecentProjectAs(act.ref, act.name, /*asStl=*/false);

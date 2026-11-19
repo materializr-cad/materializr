@@ -248,6 +248,41 @@ LandingPage::Action LandingPage::render() {
     ImGui::Separator();
     ImGui::Spacing();
 
+    // ── Open projects ────────────────────────────────────────────────────
+    // What is already open in a tab, one click to go back to it. Without this
+    // the page gave no sign anything was open (#184).
+    if (!m_openTabs.empty()) {
+        ImGui::TextColored(accentText(), "%s", materializr::tr("Open projects"));
+        const ImGuiStyle& style = ImGui::GetStyle();
+        const float rowRight = ImGui::GetWindowContentRegionMax().x;
+        for (size_t i = 0; i < m_openTabs.size(); ++i) {
+            const OpenTab& t = m_openTabs[i];
+            std::string label = fitLabel(t.name, uiW(260.0f));
+            if (t.dirty) label += " \xe2\x80\xa2";
+            if (t.active) label = std::string(ICON_IC_FOLDER "  ") + label;
+            ImGui::PushID(static_cast<int>(i) + 100000);
+            // Wrap to a new line instead of running off the page.
+            const float w = ImGui::CalcTextSize(label.c_str()).x + style.FramePadding.x * 2.0f;
+            if (i > 0 && ImGui::GetItemRectMax().x + style.ItemSpacing.x + w <=
+                             ImGui::GetWindowPos().x + rowRight)
+                ImGui::SameLine();
+            if (t.active)
+                ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+            if (ImGui::Button(label.c_str())) {
+                action.type = ActionType::SwitchTab;
+                action.tab = t.index;
+                action.name = t.name;
+            }
+            if (t.active) ImGui::PopStyleColor();
+            if (t.active && ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", materializr::tr("Back to the open project"));
+            ImGui::PopID();
+        }
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+    }
+
     // ── The grid ─────────────────────────────────────────────────────────
     ImGui::BeginChild("##LandingGrid", ImVec2(0, 0), false);
     const float tileW = uiW(190.0f);

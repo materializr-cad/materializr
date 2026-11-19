@@ -628,6 +628,16 @@ bool Application::activeSessionIsScratch() const {
     return !m_history || m_history->stepCount() == 0;
 }
 
+bool Application::sessionIsBlank(size_t idx) const {
+    if (idx >= m_sessions.size()) return true;
+    if (idx == m_activeSession) return activeSessionIsScratch();
+    const ProjectSession& s = *m_sessions[idx];
+    if (!s.projectPath.empty()) return false;
+    if (s.document && (!s.document->getAllBodyIds().empty() ||
+                       !s.document->getAllSketchIds().empty())) return false;
+    return !s.history || s.history->stepCount() == 0;
+}
+
 size_t Application::sessionForProjectRef(const std::string& ref) const {
     if (ref.empty()) return m_sessions.size();
     for (size_t i = 0; i < m_sessions.size(); ++i) {

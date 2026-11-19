@@ -477,6 +477,8 @@ private:
     // no geometry, no history) - i.e. safe to load into without displacing
     // anything the user still wants.
     bool activeSessionIsScratch() const;
+    // Any tab (not just the active one) that is an untouched empty workspace.
+    bool sessionIsBlank(size_t idx) const;
     // The open tab already holding this project, or m_sessions.size() for
     // none. Compares the ACTIVE tab against m_currentProjectPath - an inactive
     // session's own `projectPath` is only refreshed when it's stashed on the
