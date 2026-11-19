@@ -1318,7 +1318,7 @@ bool Application::cascadeFromSketchEditImpl(int sketchId, double budgetMs, bool 
     // and got switched off (issue #185). Rebuilding a profile from an untouched
     // sketch is a no-op, so an ordinary edit of the host sketch pays nothing.
     std::vector<int> group{sketchId};
-    for (int f : materializr::hostedFollowerSketches(sketchBodyLinks(), *m_document, sketchId))
+    for (int f : materializr::hostedFollowerSketches(sketchBodyLinks(), *m_history, *m_document, sketchId))
         group.push_back(f);
     std::vector<int> reviving;
     for (int sid : group)

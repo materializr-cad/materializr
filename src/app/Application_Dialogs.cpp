@@ -3558,7 +3558,7 @@ void Application::applySketchMove() {
     op->setSketch(sketchId);
     op->setTransform(trsf);
     // Sketches drawn on the body this one builds travel with it (#185).
-    materializr::addHostedFollowers(*op, sketchBodyLinks(), *m_document, sketchId);
+    materializr::addHostedFollowers(*op, sketchBodyLinks(), *m_history, *m_document, sketchId);
     bool ok = m_history->pushOperation(std::move(op), *m_document);
     if (ok) cascadeFromSketchEdit(sketchId);   // what was built from it follows
     std::fprintf(stderr, "[SketchMove] apply sketch=%d delta=(%.3f, %.3f, %.3f) -> %s\n",
@@ -4643,7 +4643,7 @@ void Application::renderAlignFacePopup() {
             auto op = std::make_unique<SketchTransformOp>();
             op->setSketch(m_alignSketchId);
             op->setTransform(full);
-            materializr::addHostedFollowers(*op, sketchBodyLinks(), *m_document, m_alignSketchId);
+            materializr::addHostedFollowers(*op, sketchBodyLinks(), *m_history, *m_document, m_alignSketchId);
             if (m_history->pushOperation(std::move(op), *m_document))
                 cascadeFromSketchEdit(m_alignSketchId);   // what was built from it follows
             markDirty();

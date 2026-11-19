@@ -5226,7 +5226,7 @@ void Application::renderViewport() {
                                     // dragged themselves, or the link is being cut.
                                     if (!detachSketches.count(sid))
                                         materializr::addHostedFollowers(
-                                            *op, skLinks, *m_document, sid, inDragSketches);
+                                            *op, skLinks, *m_history, *m_document, sid, inDragSketches);
                                     m_history->pushOperation(std::move(op), *m_document);
                                 }
                             }

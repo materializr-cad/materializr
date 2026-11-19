@@ -59,7 +59,7 @@ double minZ(const TopoDS_Shape& s) {
 bool cascade(History& hist, Document& doc, int sid) {
     auto links = computeSketchBodyLinks(hist);
     std::vector<int> group{sid};
-    for (int f : hostedFollowerSketches(links, doc, sid)) group.push_back(f);
+    for (int f : hostedFollowerSketches(links, hist, doc, sid)) group.push_back(f);
     int earliest = -1;
     for (int g : group) {
         int e = rederiveSketchDrivenOps(hist, doc, g);
@@ -95,10 +95,10 @@ std::unique_ptr<SketchTransformOp> moveOp(int sid, double dz) {
 TEST(SketchMoveHosted, FindsTheSketchDrawnOnTheBodyItBuilds) {
     Scene sc;
     auto links = computeSketchBodyLinks(sc.hist);
-    EXPECT_EQ(hostedFollowerSketches(links, sc.doc, sc.s1), std::vector<int>{sc.s2});
-    EXPECT_TRUE(hostedFollowerSketches(links, sc.doc, sc.s2).empty())
+    EXPECT_EQ(hostedFollowerSketches(links, sc.hist, sc.doc, sc.s1), std::vector<int>{sc.s2});
+    EXPECT_TRUE(hostedFollowerSketches(links, sc.hist, sc.doc, sc.s2).empty())
         << "nothing is drawn on the stacked body";
-    EXPECT_TRUE(hostedFollowerSketches(links, sc.doc, sc.s1, {sc.s2}).empty())
+    EXPECT_TRUE(hostedFollowerSketches(links, sc.hist, sc.doc, sc.s1, {sc.s2}).empty())
         << "a sketch already being moved is not carried twice";
 }
 
@@ -108,7 +108,7 @@ TEST(SketchMoveHosted, HostedSketchAndItsFeaturesFollowTheMove) {
     ASSERT_NEAR(minZ(sc.doc.getBody(sc.b2)), 25.0, 1e-6);
 
     auto op = moveOp(sc.s1, 40);
-    addHostedFollowers(*op, computeSketchBodyLinks(sc.hist), sc.doc, sc.s1);
+    addHostedFollowers(*op, computeSketchBodyLinks(sc.hist), sc.hist, sc.doc, sc.s1);
     ASSERT_EQ(op->followerCount(), 1);
     ASSERT_TRUE(sc.hist.pushOperation(std::move(op), sc.doc));
     ASSERT_TRUE(cascade(sc.hist, sc.doc, sc.s1));
@@ -124,7 +124,7 @@ TEST(SketchMoveHosted, HostedSketchAndItsFeaturesFollowTheMove) {
 TEST(SketchMoveHosted, UndoPutsEverythingBack) {
     Scene sc;
     auto op = moveOp(sc.s1, 40);
-    addHostedFollowers(*op, computeSketchBodyLinks(sc.hist), sc.doc, sc.s1);
+    addHostedFollowers(*op, computeSketchBodyLinks(sc.hist), sc.hist, sc.doc, sc.s1);
     ASSERT_TRUE(sc.hist.pushOperation(std::move(op), sc.doc));
     ASSERT_TRUE(cascade(sc.hist, sc.doc, sc.s1));
 
@@ -145,14 +145,14 @@ TEST(SketchMoveHosted, DetachedSketchCarriesNothing) {
     Scene sc;
     sc.doc.getSketch(sc.s1)->setDetachedFromBody(true);
     auto op = moveOp(sc.s1, 40);
-    addHostedFollowers(*op, computeSketchBodyLinks(sc.hist), sc.doc, sc.s1);
+    addHostedFollowers(*op, computeSketchBodyLinks(sc.hist), sc.hist, sc.doc, sc.s1);
     EXPECT_EQ(op->followerCount(), 0);
 }
 
 TEST(SketchMoveHosted, FollowersSurviveSaveAndReload) {
     Scene sc;
     auto op = moveOp(sc.s1, 40);
-    addHostedFollowers(*op, computeSketchBodyLinks(sc.hist), sc.doc, sc.s1);
+    addHostedFollowers(*op, computeSketchBodyLinks(sc.hist), sc.hist, sc.doc, sc.s1);
     ASSERT_TRUE(op->execute(sc.doc));
     const std::string blob = op->serializeParams();
 
@@ -201,7 +201,7 @@ TEST(SketchMoveHosted, PocketCutFromAHostedSketchFollowsTheBody) {
     ASSERT_NEAR(vol(b1), pocketed, 1e-3);
 
     auto op = moveOp(s1, 40);
-    addHostedFollowers(*op, computeSketchBodyLinks(hist), doc, s1);
+    addHostedFollowers(*op, computeSketchBodyLinks(hist), hist, doc, s1);
     ASSERT_EQ(op->followerCount(), 1);
     ASSERT_TRUE(hist.pushOperation(std::move(op), doc));
     ASSERT_TRUE(cascade(hist, doc, s1));
@@ -244,4 +244,28 @@ TEST(SketchMoveHosted, WithoutFollowersThePocketStepCannotFollow) {
     ASSERT_TRUE(hist.pushOperation(moveOp(s1, 40), doc));      // no followers
     EXPECT_FALSE(cascade(hist, doc, s1))
         << "the pocket step cannot follow a body its sketch was left behind by";
+}
+
+// The app heals a "severed" body link by re-adopting a body that has a face
+// coplanar with the sketch - which a base sketch of a moved body can satisfy
+// (its plane meets the body's base face). That made Sketch 1 look hosted on the
+// body it built, and moving Sketch 2 would have dragged Sketch 1 (and so the
+// body) along. A follower must come LATER in the history than what it follows.
+TEST(SketchMoveHosted, BaseSketchReAdoptedByItsBodyIsNotDraggedByTheSketchOnTop) {
+    Scene sc;
+    sc.doc.getSketch(sc.s1)->setSourceBody(sc.b1);          // the heal's result
+    auto links = computeSketchBodyLinks(sc.hist);
+    EXPECT_TRUE(hostedFollowerSketches(links, sc.hist, sc.doc, sc.s2).empty())
+        << "moving the sketch on top must not drag the base sketch";
+    EXPECT_EQ(hostedFollowerSketches(links, sc.hist, sc.doc, sc.s1), std::vector<int>{sc.s2})
+        << "the normal direction still works";
+}
+
+TEST(SketchMoveHosted, SketchOnTheBodyWithNoFeatureYetStillTravels) {
+    Scene sc;
+    // A third sketch drawn on the body but not extruded yet.
+    const int s3 = addRect(sc.doc, 25, 12, 12, 4, 4, sc.b1);
+    auto links = computeSketchBodyLinks(sc.hist);
+    const auto f = hostedFollowerSketches(links, sc.hist, sc.doc, sc.s1);
+    EXPECT_EQ(f, (std::vector<int>{sc.s2, s3}));
 }
