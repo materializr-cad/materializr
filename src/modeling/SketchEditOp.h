@@ -2,9 +2,11 @@
 #include "../core/Operation.h"
 #include "../core/Document.h"
 #include "Sketch.h"
+#include <gp_Pln.hxx>
 #include <memory>
 #include <map>
 #include <set>
+#include <vector>
 
 namespace materializr {
 
@@ -71,6 +73,23 @@ public:
         m_before = std::move(before); m_after = std::move(after);
     }
 
+    // Sketches drawn on a body this sketch drives, carried along when the edit
+    // slid or turned the WHOLE sketch (every point moved rigidly - the sketch
+    // was dragged as one piece). The body rebuilds in the new place, so a sketch
+    // sitting on it has to go with it or its features (cuts, push/pulls) miss
+    // and get switched off (issue #185). Poses are absolute, so a replay lands
+    // them in the same place every time; undo puts them back with the edit.
+    struct FollowerMove { int id; gp_Pln before; gp_Pln after; };
+    void addFollowerMove(int id, const gp_Pln& before, const gp_Pln& after) {
+        m_followerMoves.push_back({id, before, after});
+    }
+    const std::vector<FollowerMove>& followerMoves() const { return m_followerMoves; }
+    // True once the app has looked at this edit for follower motion (done once,
+    // right after the edit is recorded). A reloaded step counts as looked at:
+    // its followers, if any, came back with it.
+    bool followersAnalyzed() const { return m_followersAnalyzed; }
+    void setFollowersAnalyzed(bool v) { m_followersAnalyzed = v; }
+
     // Inline diameter edits made in renderProperties (circleId -> new radius).
     // Each sketchedit step holds a FULL snapshot of the sketch, so a radius
     // edited here is silently overwritten by the next step's snapshot on replay
@@ -94,6 +113,8 @@ private:
     std::shared_ptr<Sketch> m_before;
     std::shared_ptr<Sketch> m_after;
     std::map<int, double> m_editedCircleRadii;
+    std::vector<FollowerMove> m_followerMoves;
+    bool m_followersAnalyzed = false;
 };
 
 } // namespace materializr

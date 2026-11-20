@@ -1,5 +1,6 @@
 #include "BatchTransformOp.h"
 #include "Mate.h"
+#include "Sketch.h"
 #include "MeshFreeGTransform.h"
 
 #include <BRepBuilderAPI_ModifyShape.hxx>
@@ -126,6 +127,17 @@ bool BatchTransformOp::execute(Document& doc) {
                 if (!moved.empty()) doc.setBodyFaceIds(id, std::move(moved));
             }
         }
+        // Sketches riding on the moved bodies take the same rigid motion from their
+        // own captured pose (absolute, so a replay lands them in the same place).
+        m_prevSketchPlanes.clear();
+        if (rigid)
+            for (int sid : m_followSketchIds)
+                if (auto sk = doc.getSketch(sid)) {
+                    m_prevSketchPlanes.push_back({sid, sk->getPlane()});
+                    gp_Pln moved = sk->getPlane();
+                    moved.Transform(rigidTrsf);
+                    sk->setPlane(moved);
+                }
         return !m_previousShapes.empty();
     } catch (...) {
         // Undo whatever landed before the failure, so a half-applied batch
@@ -147,6 +159,9 @@ bool BatchTransformOp::undo(Document& doc) {
                 doc.setBodyFaceIds(id, it->second);
         }
         m_previousShapes.clear();
+        for (const auto& [sid, pln] : m_prevSketchPlanes)
+            if (auto sk = doc.getSketch(sid)) sk->setPlane(pln);
+        m_prevSketchPlanes.clear();
         return true;
     } catch (...) {
         return false;

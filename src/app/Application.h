@@ -863,6 +863,9 @@ private:
     // replay simply rolls back and the model stays as it was saved.
     bool cascadeFromSketchEdit(int sketchId, double budgetMs = -1.0, bool resync = false);
     bool cascadeFromSketchEditImpl(int sketchId, double budgetMs, bool resync);
+    // The edit just recorded slid or turned the whole of `sketchId` as one piece:
+    // move the sketches drawn on the body it drives along with it (#185).
+    void carryHostedSketchesWithEdit(int sketchId);
     // Re-run every feature built from a sketch, so a body saved while it did not
     // match its sketch (a 1.8.0-beta.2 and earlier bug: edits made through the
     // sketch tools never reached the body until an Undo/Redo) follows it again.

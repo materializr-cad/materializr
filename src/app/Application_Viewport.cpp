@@ -4893,6 +4893,28 @@ void Application::renderViewport() {
                             for (auto& [id, _] : m_gizmoDragOriginals) inDragBodies.insert(id);
                             for (auto& [sid, _] : m_sketchGizmoDragSketches) inDragSketches.insert(sid);
                             std::map<int, std::set<int>> skLinks = sketchBodyLinks();
+                            // A body moved on its own takes its sketches with it: the
+                            // sketch that builds it moves and the body is re-derived
+                            // from it (staying parametric), and the sketches drawn on
+                            // the body travel too - except one that only made a separate
+                            // body that is not moving. Move/Rotate only (a scale changes
+                            // dimensions a sketch should not silently absorb).
+                            std::set<int> promotedDrivers;      // driving sketches pulled into the move
+                            std::set<int> carriedFollowers;     // sketches drawn on a moved body
+                            if (gm != GizmoMode::Scale && !inDragBodies.empty()) {
+                                const auto plan = materializr::planBodyMove(
+                                    skLinks, *m_history, *m_document, inDragBodies, inDragSketches);
+                                for (int sid : plan.drivers) {
+                                    auto sk = m_document->getSketch(sid);
+                                    if (!sk) continue;
+                                    promotedDrivers.insert(sid);
+                                    m_sketchGizmoDragSketches.push_back({sid, sk->getPlane()});
+                                    inDragSketches.insert(sid);
+                                }
+                                // Rederived bodies carry their followers inside the sketch
+                                // move; the rest ride along in the body's own transform.
+                                carriedFollowers.insert(plan.followers.begin(), plan.followers.end());
+                            }
                             std::set<int> detachSketches;  // links to break (any moved, linked sketch)
                             std::set<int> bodyAloneDetach; // detached sketches with no SketchTransformOp
                             for (int s : inDragSketches)
@@ -4903,6 +4925,8 @@ void Application::renderViewport() {
                                         detachSketches.insert(s);
                                         bodyAloneDetach.insert(s);
                                     }
+                            // (A promoted driver is in the drag now, so it is not
+                            // detached above - it moves and re-derives its body.)
                             // Unison sketches: in-drag sketches that drive an in-drag
                             // body. On the single-body path these ride along inside the
                             // body's TransformOp (one atomic op, so the sketch always
@@ -4929,7 +4953,8 @@ void Application::renderViewport() {
                                 for (int b : it->second)
                                     if (inDragBodies.count(b)) {
                                         sBodies.insert(b);
-                                        if (!bodySafelyRederivable(b, s)) allSafe = false;
+                                        if (!promotedDrivers.count(s) && !bodySafelyRederivable(b, s))
+                                            allSafe = false;
                                     }
                                 if (allSafe && !sBodies.empty()) {
                                     rederiveSketches.insert(s);
@@ -4945,6 +4970,17 @@ void Application::renderViewport() {
                                     rederiveSketches.insert(s);
                             // Re-derived (linked) sketches must NOT be detached.
                             for (int s : rederiveSketches) detachSketches.erase(s);
+
+                            // Sketches drawn on a body that is re-derived from its moved
+                            // sketch ride in that sketch's move and stay linked; the ones on
+                            // a rigidly moved body go in the body's own transform below.
+                            std::set<int> followerAssigned;
+                            for (int f : carriedFollowers)
+                                if (auto fsk = m_document->getSketch(f);
+                                    fsk && rederiveBodies.count(fsk->getSourceBody())) {
+                                    detachSketches.erase(f);
+                                    bodyAloneDetach.erase(f);
+                                }
 
                             // Shared pivot captured once at drag start.
                             const glm::vec3& pivot = m_gizmoSharedPivot;
@@ -5144,6 +5180,12 @@ void Application::renderViewport() {
                                     desc = buf;
                                 }
                                 auto op = std::make_unique<BatchTransformOp>();
+                                if (gm != GizmoMode::Scale)
+                                    for (int f : carriedFollowers)
+                                        if (auto fsk = m_document->getSketch(f);
+                                            fsk && !rederiveBodies.count(fsk->getSourceBody()) &&
+                                            followerAssigned.insert(f).second)
+                                            op->addFollowSketch(f);
                                 op->setBodies(std::move(batchIds));
                                 op->setTransform(batchG);
                                 op->setLabel(label);
@@ -5188,6 +5230,12 @@ void Application::renderViewport() {
                                         bodyFollowHandled.insert(s);
                                     }
                                 }
+                                if (gm != GizmoMode::Scale)
+                                    for (int f : carriedFollowers)
+                                        if (auto fsk = m_document->getSketch(f);
+                                            fsk && fsk->getSourceBody() == m_gizmoDragBodyId &&
+                                            followerAssigned.insert(f).second)
+                                            op->addFollowSketch(f);
                                 m_history->pushOperation(std::move(op), *m_document);
                             }
 
@@ -5224,9 +5272,19 @@ void Application::renderViewport() {
                                     // Sketches drawn on the body this one builds
                                     // travel with it (#185) - unless they are being
                                     // dragged themselves, or the link is being cut.
-                                    if (!detachSketches.count(sid))
+                                    if (promotedDrivers.count(sid)) {
+                                        // Body moved on its own: the sketches drawn on the
+                                        // bodies this one builds go with it, bar those that
+                                        // only made a separate body that stays put.
+                                        for (int f : carriedFollowers)
+                                            if (auto fsk = m_document->getSketch(f);
+                                                fsk && skLinks[sid].count(fsk->getSourceBody()) &&
+                                                followerAssigned.insert(f).second)
+                                                op->addFollower(f);
+                                    } else if (!detachSketches.count(sid)) {
                                         materializr::addHostedFollowers(
                                             *op, skLinks, *m_history, *m_document, sid, inDragSketches);
+                                    }
                                     m_history->pushOperation(std::move(op), *m_document);
                                 }
                             }

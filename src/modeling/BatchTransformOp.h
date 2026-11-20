@@ -4,6 +4,7 @@
 #include "FaceLineage.h"
 #include <TopoDS_Shape.hxx>
 #include <gp_GTrsf.hxx>
+#include <gp_Pln.hxx>
 #include <map>
 #include <string>
 #include <utility>
@@ -25,6 +26,9 @@ public:
 
     void setBodies(std::vector<int> ids) { m_bodyIds = std::move(ids); }
     void setTransform(const gp_GTrsf& g) { m_gtrsf = g; }
+    // Sketches drawn on the moved bodies: they take the same rigid transform in this
+    // one op (so Undo / Redo move them with the bodies). Move / Rotate only.
+    void addFollowSketch(int sketchId) { m_followSketchIds.push_back(sketchId); }
     void setLabel(std::string l) { m_label = std::move(l); }
     void setDescription(std::string d) { m_desc = std::move(d); }
 
@@ -48,4 +52,6 @@ private:
     // the map, and a partial replay never re-runs the op that minted it).
     std::vector<std::pair<int, TopoDS_Shape>> m_previousShapes;
     std::map<int, materializr::topo::FaceIdMap> m_prevFaceIds;
+    std::vector<int> m_followSketchIds;
+    std::vector<std::pair<int, gp_Pln>> m_prevSketchPlanes;   // captured by execute, restored by undo
 };

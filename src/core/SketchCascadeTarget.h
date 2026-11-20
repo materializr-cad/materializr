@@ -2,7 +2,9 @@
 #include "Operation.h"
 #include "Document.h"
 #include "History.h"
+#include "../modeling/ChamferOp.h"
 #include "../modeling/ExtrudeOp.h"
+#include "../modeling/FilletOp.h"
 #include "../modeling/GuidedLoftOp.h"
 #include "../modeling/LoftOp.h"
 #include "../modeling/ProjectSketchOp.h"
@@ -11,6 +13,12 @@
 #include "../modeling/SketchEditOp.h"
 #include "../modeling/SweepOp.h"
 #include "../modeling/SketchTransformOp.h"
+#include <gp_Ax1.hxx>
+#include <gp_Trsf.hxx>
+#include <gp_Vec.hxx>
+#include <glm/glm.hpp>
+#include <algorithm>
+#include <cmath>
 #include <functional>
 #include <map>
 #include <set>
@@ -300,6 +308,194 @@ inline void addHostedFollowers(SketchTransformOp& op,
     if (!sk || sk->isDetachedFromBody()) return;
     for (int f : hostedFollowerSketches(links, history, doc, sketchId, exclude))
         op.addFollower(f);
+}
+
+// ---------------------------------------------------------------------------
+// Moving a BODY on its own (gizmo on the body, not on its sketch).
+//
+// The body is not just slid where it stands: the sketch that builds it moves
+// with it and the body is re-derived from that sketch, so it stays parametric,
+// and every sketch drawn on the body comes along so nothing is stranded behind.
+// The exception is a sketch drawn on the body that never touched it and only made
+// a SEPARATE body that is not being moved - that one stays with its own body.
+// ---------------------------------------------------------------------------
+struct BodyMovePlan {
+    std::vector<int> drivers;     // sketches that build the moved bodies, safe to move + re-derive
+    std::vector<int> followers;   // sketches drawn on a moved body that travel with it
+    std::vector<int> blocked;     // sketches that build a moved body but cannot be moved with it
+};
+
+// May `bodyId` be rebuilt by moving the sketch that builds it? Only when every
+// step that touches it is something a re-derive replays faithfully: a feature
+// built from one of `allowed` (the driving sketch and the sketches riding on the
+// body), or a fillet / chamfer (which re-find their edges). Anything else - a
+// boolean with another body, an earlier transform, a loft, a pattern - cannot
+// re-attach after the move, so the body is moved rigidly instead.
+inline bool bodyFollowsSketchMove(const History& history, int bodyId,
+                                  const std::set<int>& allowed) {
+    for (int i = 0; i < history.stepCount(); ++i) {
+        const Operation* op = history.getStep(i);
+        if (!op || !op->isEnabled()) continue;
+        const OperationDiff d = op->captureDiff();
+        bool touches = std::find(d.created.begin(), d.created.end(), bodyId) != d.created.end();
+        for (const auto& [id, _] : d.modifiedBefore)
+            if (id == bodyId) { touches = true; break; }
+        if (!touches) continue;
+        const std::set<int> src = opSourceSketches(op);
+        if (!src.empty()) {
+            for (int sid : src)
+                if (!allowed.count(sid)) return false;
+            // Loft / guided loft keep wires, not sketch ids: they do not follow.
+            if (dynamic_cast<const LoftOp*>(op) || dynamic_cast<const GuidedLoftOp*>(op))
+                return false;
+            continue;
+        }
+        if (dynamic_cast<const FilletOp*>(op) || dynamic_cast<const ChamferOp*>(op)) continue;
+        return false;
+    }
+    return true;
+}
+
+inline BodyMovePlan planBodyMove(const std::map<int, std::set<int>>& links,
+                                 const History& history, const Document& doc,
+                                 const std::set<int>& moved,
+                                 const std::set<int>& exclude = {}) {
+    BodyMovePlan plan;
+    std::map<int, int> firstStep;
+    for (int i = 0; i < history.stepCount(); ++i)
+        for (int sid : opSourceSketches(history.getStep(i))) firstStep.emplace(sid, i);
+    auto stepOf = [&](int sid) { auto it = firstStep.find(sid); return it == firstStep.end() ? -1 : it->second; };
+    auto touchesMoved = [&](int sid) {
+        auto it = links.find(sid);
+        if (it == links.end()) return false;
+        for (int b : it->second) if (moved.count(b)) return true;
+        return false;
+    };
+    auto hasFeatures = [&](int sid) { auto it = links.find(sid); return it != links.end() && !it->second.empty(); };
+    // A sketch on a moved body is a FOLLOWER of whatever built that body earlier;
+    // a base sketch the app re-adopted as "hosted" on its own body (see
+    // hostedFollowerSketches) is a driver, not a follower of itself.
+    auto isFollower = [&](int sid, const Sketch& sk) {
+        const int host = sk.getSourceBody();
+        if (host < 0 || !moved.count(host)) return false;
+        for (const auto& [other, bodies] : links) {
+            if (other == sid || !bodies.count(host)) continue;
+            if (stepOf(other) >= 0 && (stepOf(sid) < 0 || stepOf(other) < stepOf(sid))) return true;
+        }
+        return stepOf(sid) < 0;     // no feature yet: it can only be riding on the body
+    };
+    for (int sid : doc.getAllSketchIds()) {
+        if (exclude.count(sid)) continue;
+        auto sk = doc.getSketch(sid);
+        if (!sk || sk->isDetachedFromBody()) continue;
+        if (isFollower(sid, *sk)) {
+            // Drawn on a moved body: goes with it - unless all it ever did was make
+            // a separate body that is not moving.
+            if (!hasFeatures(sid) || touchesMoved(sid)) plan.followers.push_back(sid);
+            continue;
+        }
+        if (touchesMoved(sid)) plan.drivers.push_back(sid);
+    }
+    // A driver can only be moved if everything it builds is moving too, and every
+    // body it builds can be rebuilt by it.
+    std::set<int> allowed(plan.drivers.begin(), plan.drivers.end());
+    allowed.insert(plan.followers.begin(), plan.followers.end());
+    std::vector<int> ok;
+    for (int sid : plan.drivers) {
+        bool good = true;
+        for (int b : links.at(sid))
+            if (!moved.count(b) || !bodyFollowsSketchMove(history, b, allowed)) { good = false; break; }
+        (good ? ok : plan.blocked).push_back(sid);
+    }
+    plan.drivers = std::move(ok);
+    return plan;
+}
+
+// Did this edit do nothing but slide / turn the whole sketch as one piece?
+//
+// True when both snapshots hold the same points (by id), every one of them is
+// carried by ONE rigid motion in the sketch's plane (a rotation and a shift, no
+// stretching or mirroring), the sketch stayed in the same plane, and no circle or
+// arc changed radius. `world` then maps the old position of the sketch to the new
+// one in 3D, ready to apply to a sketch sitting on the body this one drives.
+// A resize, an added line, a single dragged point and the like are not this - the
+// sketches on the body have no obvious place to go, so they stay where they are.
+inline bool sketchRigidMotion(const Sketch& before, const Sketch& after, gp_Trsf& world) {
+    const auto& pb = before.getPoints();
+    const auto& pa = after.getPoints();
+    if (pb.empty() || pb.size() != pa.size()) return false;
+
+    // Same plane (a sketch drag edits points, never the plane).
+    const gp_Ax3& ab = before.getPlane().Position();
+    const gp_Ax3& aa = after.getPlane().Position();
+    if (ab.Location().Distance(aa.Location()) > 1e-9 ||
+        !ab.Direction().IsEqual(aa.Direction(), 1e-9) ||
+        !ab.XDirection().IsEqual(aa.XDirection(), 1e-9))
+        return false;
+
+    std::map<int, glm::dvec2> next;
+    for (const auto& p : pa) next[p.id] = glm::dvec2(p.pos);
+    if (next.size() != pa.size()) return false;
+    std::vector<std::pair<glm::dvec2, glm::dvec2>> pairs;   // old -> new
+    for (const auto& p : pb) {
+        auto it = next.find(p.id);
+        if (it == next.end()) return false;
+        pairs.emplace_back(glm::dvec2(p.pos), it->second);
+    }
+
+    // Turn from the first pair of distinct points; with only coincident points it
+    // is a plain shift.
+    const glm::dvec2 b0 = pairs[0].first, a0 = pairs[0].second;
+    double theta = 0.0;
+    for (const auto& [b, a] : pairs) {
+        const glm::dvec2 vb = b - b0, va = a - a0;
+        const double lb = glm::length(vb), la = glm::length(va);
+        if (lb < 1e-6) continue;
+        if (std::abs(lb - la) > 1e-4) return false;
+        theta = std::atan2(vb.x * va.y - vb.y * va.x, glm::dot(vb, va));
+        break;
+    }
+    const double c = std::cos(theta), sn = std::sin(theta);
+    for (const auto& [b, a] : pairs) {
+        const glm::dvec2 d = b - b0;
+        const glm::dvec2 want(a0.x + c * d.x - sn * d.y, a0.y + sn * d.x + c * d.y);
+        if (glm::length(want - a) > 1e-4) return false;
+    }
+    const glm::dvec2 shift = a0 - b0;
+    if (std::abs(theta) < 1e-9 && glm::length(shift) < 1e-6) return false;   // nothing moved
+
+    // Radii must be untouched (a rigid motion keeps them; a resize does not).
+    auto sameRadii = [](const auto& x, const auto& y) {
+        if (x.size() != y.size()) return false;
+        for (const auto& e : x) {
+            bool found = false;
+            for (const auto& f : y)
+                if (f.id == e.id) { found = std::abs(f.radius - e.radius) < 1e-6; break; }
+            if (!found) return false;
+        }
+        return true;
+    };
+    if (!sameRadii(before.getCircles(), after.getCircles()) ||
+        !sameRadii(before.getArcs(), after.getArcs()))
+        return false;
+
+    // Lift to 3D: turn about the plane normal through the old position of the
+    // first point, then shift. (The frame is handed as x, y = normal x x.)
+    const gp_Ax3& ax = before.getPlane().Position();
+    const gp_Vec xd(ax.XDirection()), yd(ax.YDirection());
+    const gp_Pnt o = ax.Location();
+    const gp_Pnt pivot(o.X() + b0.x * xd.X() + b0.y * yd.X(),
+                       o.Y() + b0.x * xd.Y() + b0.y * yd.Y(),
+                       o.Z() + b0.x * xd.Z() + b0.y * yd.Z());
+    gp_Dir axis(xd.Crossed(yd));
+    gp_Trsf rot;
+    if (std::abs(theta) > 1e-12) rot.SetRotation(gp_Ax1(pivot, axis), theta);
+    gp_Trsf mv;
+    mv.SetTranslation(gp_Vec(shift.x * xd.X() + shift.y * yd.X(),
+                             shift.x * xd.Y() + shift.y * yd.Y(),
+                             shift.x * xd.Z() + shift.y * yd.Z()));
+    world = mv * rot;
+    return true;
 }
 
 // A cascade that can't make a step follow a sketch edit switches it off

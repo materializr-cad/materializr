@@ -1713,7 +1713,29 @@ std::unique_ptr<SketchEditOp> ProjectIO::rehydrateSketchEditOp(
     auto live = doc.getSketch(idBefore);
     if (!live) return nullptr; // sketch id from blob isn't in this document
 
-    return std::make_unique<SketchEditOp>(live, beforeSnap, afterSnap);
+    auto op = std::make_unique<SketchEditOp>(live, beforeSnap, afterSnap);
+    // Optional tail: sketches that rode along with a whole-sketch move.
+    std::string line;
+    auto readFrame = [](std::istringstream& in, gp_Pln& out) -> bool {
+        double d[9];
+        for (double& v : d) if (!(in >> v)) return false;
+        try {
+            out = gp_Pln(gp_Ax3(gp_Pnt(d[0], d[1], d[2]), gp_Dir(d[3], d[4], d[5]),
+                                gp_Dir(d[6], d[7], d[8])));
+        } catch (...) { return false; }
+        return true;
+    };
+    while (std::getline(is, line)) {
+        if (line.rfind("F ", 0) != 0) continue;
+        std::istringstream in(line.substr(2));
+        int fid = -1;
+        gp_Pln before, after;
+        if ((in >> fid) && readFrame(in, before) && readFrame(in, after))
+            op->addFollowerMove(fid, before, after);
+    }
+    // Whatever followers this step has came back with it; nothing left to detect.
+    op->setFollowersAnalyzed(true);
+    return op;
 }
 
 void ProjectIO::parseSketchBody(std::istream& is, Sketch& sk, const char* endTok) {

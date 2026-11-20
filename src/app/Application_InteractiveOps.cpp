@@ -1348,6 +1348,39 @@ bool Application::cascadeFromSketchEdit(int sketchId, double budgetMs, bool resy
     return done;
 }
 
+// Dragging every line of Sketch 1 to a new place rebuilds the body there, but a
+// sketch drawn on that body (Sketch 2, with a pocket cut from it) used to stay
+// put: its features then missed, failed to follow and were switched off. When the
+// step just recorded was a rigid move of the whole sketch, the sketches on its
+// body take the same motion, stored on the step itself so Undo / Redo and any
+// replay carry them with it. Anything else (a resize, one dragged point, a new
+// line) leaves them alone - there is no obvious place for them to go.
+void Application::carryHostedSketchesWithEdit(int sketchId) {
+    if (sketchId < 0 || !m_history || !m_document) return;
+    const int top = m_history->currentStep();
+    if (top < 0) return;
+    auto* se = dynamic_cast<SketchEditOp*>(const_cast<Operation*>(m_history->getStep(top)));
+    if (!se || se->followersAnalyzed()) return;
+    se->setFollowersAnalyzed(true);
+    if (materializr::sketchIdForCascade(se, *m_document) != sketchId) return;
+    auto sk = m_document->getSketch(sketchId);
+    if (!sk || sk->isDetachedFromBody()) return;
+    if (!se->getBeforeSnapshot() || !se->getAfterSnapshot()) return;
+    gp_Trsf world;
+    if (!materializr::sketchRigidMotion(*se->getBeforeSnapshot(), *se->getAfterSnapshot(), world))
+        return;
+    for (int f : materializr::hostedFollowerSketches(sketchBodyLinks(), *m_history,
+                                                     *m_document, sketchId)) {
+        auto fs = m_document->getSketch(f);
+        if (!fs) continue;
+        gp_Pln moved = fs->getPlane();
+        moved.Transform(world);
+        se->addFollowerMove(f, fs->getPlane(), moved);
+        fs->setPlane(moved);
+    }
+    if (!se->followerMoves().empty()) markDirty();
+}
+
 bool Application::cascadeFromSketchEditImpl(int sketchId, double budgetMs, bool resync) {
     if (sketchId < 0 || !m_history || !m_document) return true;
     // A detached sketch has been deliberately broken out of unison with its

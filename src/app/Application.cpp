@@ -7956,6 +7956,7 @@ void Application::markSketchSynced() {
 }
 
 void Application::requestSketchCascade(int sketchId) {
+    carryHostedSketchesWithEdit(sketchId);   // before any cascade reads them
     if (!m_inSketchMode) { cascadeFromSketchEdit(sketchId); return; }
     // MZR_CASCADE_DEFER_MS overrides the "this model is heavy" cut-off
     // (a negative value defers every in-sketch edit - for testing).

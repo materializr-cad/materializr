@@ -23,15 +23,19 @@ SketchEditOp::SketchEditOp(std::shared_ptr<Sketch> liveSketch,
       m_before(std::move(beforeSnapshot)),
       m_after(std::move(afterSnapshot)) {}
 
-bool SketchEditOp::execute(Document& /*doc*/) {
+bool SketchEditOp::execute(Document& doc) {
     if (!m_target || !m_after) return false;
     *m_target = *m_after;
+    for (const auto& f : m_followerMoves)
+        if (auto fs = doc.getSketch(f.id)) fs->setPlane(f.after);
     return true;
 }
 
-bool SketchEditOp::undo(Document& /*doc*/) {
+bool SketchEditOp::undo(Document& doc) {
     if (!m_target || !m_before) return false;
     *m_target = *m_before;
+    for (const auto& f : m_followerMoves)
+        if (auto fs = doc.getSketch(f.id)) fs->setPlane(f.before);
     return true;
 }
 
@@ -369,6 +373,28 @@ std::string SketchEditOp::serializeWithDocument(const Document& doc) const {
     std::ostringstream os;
     writeSketchBody(os, *m_before, sketchId, name, visible, sourceBody);
     writeSketchBody(os, *m_after,  sketchId, name, visible, sourceBody);
+    // Sketches that rode along with a whole-sketch move (see FollowerMove):
+    // "FOLLOWERS n", then per follower its id and the before / after frame as
+    // origin, normal, x-direction. Trailing the two snapshot blocks, which the
+    // loader reads first, so a reader that knows nothing of it just stops early.
+    if (!m_followerMoves.empty()) {
+        os << "FOLLOWERS " << m_followerMoves.size() << "\n";
+        auto frame = [&](const gp_Pln& p) {
+            const gp_Ax3& a = p.Position();
+            char buf[320];
+            std::snprintf(buf, sizeof(buf), " %.12g %.12g %.12g %.12g %.12g %.12g %.12g %.12g %.12g",
+                          a.Location().X(), a.Location().Y(), a.Location().Z(),
+                          a.Direction().X(), a.Direction().Y(), a.Direction().Z(),
+                          a.XDirection().X(), a.XDirection().Y(), a.XDirection().Z());
+            os << buf;
+        };
+        for (const auto& f : m_followerMoves) {
+            os << "F " << f.id;
+            frame(f.before);
+            frame(f.after);
+            os << "\n";
+        }
+    }
     return os.str();
 }
 
