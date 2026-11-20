@@ -598,17 +598,49 @@ OffsetResult offsetChain(const OffsetChain& ch, float d, OffsetCorners corners) 
         OffsetSeg s = src;
         s.sourceId = -1;
         if (src.kind == OffsetSeg::Kind::Spline) {
-            // No exact offset of a B-spline exists, so offset the sampled curve
-            // point by point along its normal. Normals come from the ADJACENT
-            // segment directions averaged at each interior sample, which keeps
-            // a smooth curve smooth instead of faceting it.
+            // No exact offset of a B-spline exists, so offset the sampled curve.
+            // Along smooth stretches that is point by point along the normal, taken
+            // from the ADJACENT segment directions averaged at each sample, which
+            // keeps a smooth curve smooth instead of faceting it. At a sample where
+            // the curve turns sharply (a tight bend sampled coarsely) averaging the
+            // two normals would cut straight across the bend, and the result sits
+            // CLOSER to the source than the offset distance - which pruning then
+            // condemns, leaving a gap. There the offset is that of the polyline
+            // itself: on the opening side a round join (an arc of radius |d| about
+            // the sample), on the closing side both end points (the small loop that
+            // makes is cut out and rejoined by pruneOffset).
             const std::vector<glm::vec2>& q = src.pts;
             s.pts.clear();
             s.pts.reserve(q.size());
+            constexpr float kSmoothTurn = 0.05f;   // rad: gentler than this is smooth
             for (size_t i = 0; i < q.size(); ++i) {
-                glm::vec2 t(0.0f);
-                if (i > 0)             t += glm::normalize(q[i] - q[i - 1]);
-                if (i + 1 < q.size())  t += glm::normalize(q[i + 1] - q[i]);
+                const bool hasIn = i > 0 && glm::length(q[i] - q[i - 1]) > 1e-9f;
+                const bool hasOut = i + 1 < q.size() && glm::length(q[i + 1] - q[i]) > 1e-9f;
+                glm::vec2 tin = hasIn ? glm::normalize(q[i] - q[i - 1]) : glm::vec2(0.0f);
+                glm::vec2 tout = hasOut ? glm::normalize(q[i + 1] - q[i]) : glm::vec2(0.0f);
+                if (hasIn && hasOut) {
+                    const float cr = tin.x * tout.y - tin.y * tout.x;
+                    const float turn = std::atan2(std::abs(cr), glm::dot(tin, tout));
+                    if (turn > kSmoothTurn) {
+                        const glm::vec2 n0 = rightNormal(tin), n1 = rightNormal(tout);
+                        if (cr * d > 0.0f) {                       // opening: round join
+                            const float a0 = std::atan2(n0.y, n0.x);
+                            float da = std::atan2(n1.y, n1.x) - a0;
+                            while (da > static_cast<float>(M_PI)) da -= kTwoPi;
+                            while (da < -static_cast<float>(M_PI)) da += kTwoPi;
+                            const int steps = std::max(1, static_cast<int>(std::ceil(std::abs(da) / 0.1f)));
+                            for (int k = 0; k <= steps; ++k) {
+                                const float a = a0 + da * static_cast<float>(k) / steps;
+                                s.pts.push_back(q[i] + glm::vec2(std::cos(a), std::sin(a)) * d);
+                            }
+                        } else {                                   // closing: both ends
+                            s.pts.push_back(q[i] + n0 * d);
+                            s.pts.push_back(q[i] + n1 * d);
+                        }
+                        continue;
+                    }
+                }
+                glm::vec2 t = tin + tout;
                 float tl = glm::length(t);
                 if (tl < 1e-9f) continue;
                 s.pts.push_back(q[i] + rightNormal(t / tl) * d);
@@ -812,6 +844,96 @@ float signedDistanceToChain(const OffsetChain& ch, glm::vec2 q) {
     return (glm::dot(q - ch.segs[bi].at(bt), n) >= 0.0f) ? best : -best;
 }
 
+namespace {
+
+// Proper crossing of two segments: parameters along each, or false.
+bool segCross(glm::vec2 a0, glm::vec2 a1, glm::vec2 b0, glm::vec2 b1, float& ua, float& ub) {
+    const glm::vec2 r = a1 - a0, q = b1 - b0;
+    const float den = r.x * q.y - r.y * q.x;
+    if (std::abs(den) < 1e-12f) return false;
+    const glm::vec2 w = b0 - a0;
+    ua = (w.x * q.y - w.y * q.x) / den;
+    ub = (w.x * r.y - w.y * r.x) / den;
+    return ua >= 0.0f && ua <= 1.0f && ub >= 0.0f && ub <= 1.0f;
+}
+
+// Pruning cuts the invalid LOOP out of an offset - on the inside of a bend tighter
+// than the offset distance the raw curve overshoots, loops and crosses itself - and
+// keeps the good pieces either side. A general clipper would join them where the
+// loop crosses itself; cutting alone leaves them apart, which is the gap that
+// moved around as the distance changed on tight curves (#186). Join consecutive
+// kept pieces at the crossing of A's tail and B's head, trimming each back to it.
+// Where they do not cross within reach (the offset really is too big for the
+// profile) the gap is left as it was.
+void joinAcrossLoops(std::vector<OffsetSeg>& kept, float ad) {
+    const float step = std::max(0.05f, ad * 0.1f);
+    for (size_t k = 0; k + 1 < kept.size(); ++k) {
+        OffsetSeg& A = kept[k];
+        OffsetSeg& B = kept[k + 1];
+        const float gap = glm::length(A.at(1.0f) - B.at(0.0f));
+        if (gap < 1e-3f) continue;                       // already meet
+        const float reach = std::max(10.0f * ad, 3.0f * gap);
+        auto portion = [&](const OffsetSeg& sg, bool tail, std::vector<glm::vec2>& pts,
+                           float& t0, float& t1) {
+            const float len = std::max(sg.length(), 1e-6f);
+            const float f = std::min(1.0f, reach / len);
+            t0 = tail ? 1.0f - f : 0.0f;
+            t1 = tail ? 1.0f : f;
+            const int n = std::clamp(static_cast<int>(std::ceil(f * len / step)), 2, 400);
+            pts.clear();
+            for (int i = 0; i <= n; ++i)
+                pts.push_back(sg.at(t0 + (t1 - t0) * static_cast<float>(i) / n));
+        };
+        std::vector<glm::vec2> pa, pb;
+        float a0, a1, b0, b1;
+        portion(A, true, pa, a0, a1);
+        portion(B, false, pb, b0, b1);
+        const float la = std::max(A.length(), 1e-6f), lb = std::max(B.length(), 1e-6f);
+        float bestCost = std::numeric_limits<float>::max();
+        float bestTa = 0.0f, bestTb = 0.0f;
+        glm::vec2 bestX(0.0f);
+        const int na = static_cast<int>(pa.size()) - 1, nb = static_cast<int>(pb.size()) - 1;
+        for (int i = 0; i < na; ++i)
+            for (int j = 0; j < nb; ++j) {
+                float ua, ub;
+                if (!segCross(pa[i], pa[i + 1], pb[j], pb[j + 1], ua, ub)) continue;
+                const float ta = a0 + (a1 - a0) * (static_cast<float>(i) + ua) / na;
+                const float tb = b0 + (b1 - b0) * (static_cast<float>(j) + ub) / nb;
+                // The loop being cut out: what A loses past the crossing plus what B
+                // loses before it. The smallest is the nearest crossing to the gap.
+                const float cost = (1.0f - ta) * la + tb * lb;
+                if (cost < bestCost) {
+                    bestCost = cost; bestTa = ta; bestTb = tb;
+                    bestX = pa[i] + (pa[i + 1] - pa[i]) * ua;
+                }
+            }
+        if (bestCost == std::numeric_limits<float>::max()) {
+            // No crossing, but the pieces all but touch (sampling error at a tangent
+            // meeting): close that hairline so they weld into one chain.
+            if (gap <= std::max(0.01f, 0.005f * ad)) {
+                const glm::vec2 mid = 0.5f * (A.at(1.0f) + B.at(0.0f));
+                A.p1 = mid;
+                B.p0 = mid;
+                if (A.kind == OffsetSeg::Kind::Spline && !A.pts.empty()) A.pts.back() = mid;
+                if (B.kind == OffsetSeg::Kind::Spline && !B.pts.empty()) B.pts.front() = mid;
+            }
+            continue;
+        }
+        if (bestTa < 1e-3f || bestTb > 1.0f - 1e-3f) continue;     // would eat a whole piece
+        OffsetSeg na2 = subSeg(A, 0.0f, bestTa);
+        OffsetSeg nb2 = subSeg(B, bestTb, 1.0f);
+        // Both pieces now end / start at exactly the crossing, so they share one point.
+        na2.p1 = bestX;
+        nb2.p0 = bestX;
+        if (na2.kind == OffsetSeg::Kind::Spline && !na2.pts.empty()) na2.pts.back() = bestX;
+        if (nb2.kind == OffsetSeg::Kind::Spline && !nb2.pts.empty()) nb2.pts.front() = bestX;
+        A = std::move(na2);
+        B = std::move(nb2);
+    }
+}
+
+} // anonymous namespace
+
 void pruneOffset(OffsetResult& res, const OffsetChain& src, float d) {
     if (!res.valid) return;
     const float ad = std::abs(d);
@@ -879,6 +1001,7 @@ void pruneOffset(OffsetResult& res, const OffsetChain& src, float d) {
     }
 
     if (kept.size() != res.segs.size()) anyChange = true;
+    joinAcrossLoops(kept, ad);
     res.segs = std::move(kept);
 
     if (res.segs.empty()) {

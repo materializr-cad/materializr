@@ -1226,3 +1226,118 @@ TEST(SketchOffsetApply, RoundOffsetOfAPolygonStaysPlainGeometry) {
     applyOffset(sk, res, nullptr, pts, els);
     EXPECT_EQ(sk.getPolygons().size(), 1u) << "arcs at the corners: not a polygon";
 }
+
+
+// ---------------------------------------------------------------------------
+// #186: several separate chains offset together.
+// ---------------------------------------------------------------------------
+
+namespace {
+size_t runsIn(const SketchTool& t) { return t.getOffsetPreview().size(); }
+}
+
+// The preview showed only the LAST chain (densifySegs replaces its output) while
+// the commit made them all.
+TEST(SketchOffsetMulti, PreviewShowsEveryChainNotJustTheLast) {
+    Sketch sk;
+    const int a0 = sk.addPoint({0.0f, 0.0f}),  a1 = sk.addPoint({10.0f, 0.0f});
+    const int b0 = sk.addPoint({0.0f, 20.0f}), b1 = sk.addPoint({10.0f, 20.0f});
+    const int la = sk.addLine(a0, a1), lb = sk.addLine(b0, b1);
+    SketchTool tool;
+    tool.setSketch(&sk);
+    tool.setMode(SketchToolMode::Select);
+    tool.setSelection({}, {la, lb});
+    tool.setMode(SketchToolMode::Offset);
+    tool.setOffsetDistance(3.0f);
+    ASSERT_TRUE(tool.offsetReady());
+    EXPECT_EQ(runsIn(tool), 2u) << "one offset polyline per chain";
+}
+
+TEST(SketchOffsetMulti, LineAndCircleBothPreview) {
+    Sketch sk;
+    const int a0 = sk.addPoint({13.0f, -6.0f}), a1 = sk.addPoint({13.0f, 9.0f});
+    const int c = sk.addPoint({-9.0f, 2.0f});
+    const int la = sk.addLine(a0, a1);
+    const int ci = sk.addCircle(c, 7.0);
+    SketchTool tool;
+    tool.setSketch(&sk);
+    tool.setMode(SketchToolMode::Select);
+    tool.setSelectionFull({}, {la}, {ci}, {}, {});
+    tool.setMode(SketchToolMode::Offset);
+    ASSERT_TRUE(tool.hasOffsetChain());
+    tool.setOffsetDistance(3.0f);
+    ASSERT_TRUE(tool.offsetReady());
+    EXPECT_EQ(runsIn(tool), 2u) << "the line's offset AND the circle's";
+    const size_t roundBefore = sk.getCircles().size() + sk.getArcs().size();
+    const size_t linesBefore = sk.getLines().size();
+    std::set<int> pts, els;
+    tool.commitOffset(pts, els);
+    EXPECT_EQ(sk.getCircles().size() + sk.getArcs().size(), roundBefore + 1)
+        << "the circle's offset (a circle or a full arc)";
+    EXPECT_EQ(sk.getLines().size(), linesBefore + 1) << "and the commit makes both too";
+}
+
+// Two parallel lines drawn in OPPOSITE directions used to move apart when offset
+// together (each went to the right of its own travel); one drawn the same way
+// moved together. They follow the first line's side in space now.
+TEST(SketchOffsetMulti, ParallelLinesDrawnOppositeWaysOffsetTheSameSide) {
+    for (bool reversed : {false, true}) {
+        Sketch sk;
+        const int a0 = sk.addPoint({0.0f, 0.0f}),  a1 = sk.addPoint({10.0f, 0.0f});
+        const int b0 = sk.addPoint({0.0f, 20.0f}), b1 = sk.addPoint({10.0f, 20.0f});
+        const int la = sk.addLine(a0, a1);
+        const int lb = reversed ? sk.addLine(b1, b0) : sk.addLine(b0, b1);
+        SketchTool tool;
+        tool.setSketch(&sk);
+        tool.setMode(SketchToolMode::Select);
+        tool.setSelection({}, {la, lb});
+        tool.setMode(SketchToolMode::Offset);
+        tool.setOffsetDistance(3.0f);
+        ASSERT_TRUE(tool.offsetReady());
+        std::set<int> pts, els;
+        tool.commitOffset(pts, els);
+        ASSERT_EQ(els.size(), 2u);
+        std::vector<float> shift;
+        for (int id : els)
+            for (const auto& l : sk.getLines())
+                if (l.id == id) {
+                    const float y = sk.getPoint(l.startPointId)->pos.y;
+                    shift.push_back(y > 10.0f ? y - 20.0f : y);      // how far it moved off its source
+                }
+        ASSERT_EQ(shift.size(), 2u);
+        EXPECT_NEAR(std::abs(shift[0]), 3.0f, 1e-3);
+        EXPECT_NEAR(std::abs(shift[1]), 3.0f, 1e-3);
+        EXPECT_GT(shift[0] * shift[1], 0.0f)
+            << "both lines move the same way (reversed=" << reversed << ")";
+    }
+}
+
+
+// #186 example 3: a spline with tight bends left gaps in its offset that moved
+// around as the distance changed. Loops cut out of the inside of a bend are
+// rejoined where they cross, and a bend sampled coarsely gets a round join rather
+// than a chord that cut inside the offset distance - so the offset is one
+// unbroken curve at every distance.
+TEST(SketchOffsetSpline, TightlyBentSplineOffsetsWithoutGaps) {
+    Sketch sk;
+    const glm::vec2 ctrl[] = {{20, 0}, {19, -8}, {18, 6}, {14.2487f, -8}, {10.4974f, 6},
+                              {4, -8}, {-2.49742f, 6}, {-12, -8}, {-21.5026f, 6}};
+    std::vector<int> ids;
+    for (const auto& c : ctrl) ids.push_back(sk.addPoint(c));
+    sk.addSpline(ids);
+    const auto samples = sk.sampleSpline2D(sk.getSplines()[0], 6);
+    OffsetChain ch = walkOffsetChain(sk, samples[samples.size() / 2], 0.5f);
+    ASSERT_TRUE(ch.valid());
+    for (float d : {-6.f, -4.f, -2.f, -1.f, 1.f, 2.f, 4.f, 6.f}) {
+        OffsetResult res = offsetChain(ch, d, OffsetCorners::Round);
+        pruneOffset(res, ch, d);
+        ASSERT_TRUE(res.valid) << "d=" << d;
+        std::vector<std::vector<glm::vec2>> runs;
+        densifySegs(res.segs, runs);
+        EXPECT_EQ(runs.size(), 1u) << "one unbroken offset curve at d=" << d;
+        // And it never comes closer to the source than the distance asked for.
+        for (const auto& run : runs)
+            for (const auto& q : run)
+                EXPECT_GE(distanceToChain(ch, q), std::abs(d) - 0.1f) << "d=" << d;
+    }
+}

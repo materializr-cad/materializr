@@ -5023,12 +5023,20 @@ void SketchTool::recomputeOffsetPreview() {
     if (!m_offsetChain.valid() || std::abs(m_offsetDistance) < 1e-6f) return;
     m_offsetResult = offsetChain(m_offsetChain, m_offsetDistance, m_offsetCorners);
     pruneOffset(m_offsetResult, m_offsetChain, m_offsetDistance);
-    if (m_offsetResult.valid) densifySegs(m_offsetResult.segs, m_offsetPreview);
+    // densifySegs REPLACES its output, so each chain goes through its own buffer
+    // and is appended - handing it m_offsetPreview each time left only the LAST
+    // chain on screen while the commit still made all of them (#186).
+    auto addPreview = [&](const OffsetResult& r) {
+        std::vector<std::vector<glm::vec2>> runs;
+        densifySegs(r.segs, runs);
+        m_offsetPreview.insert(m_offsetPreview.end(), runs.begin(), runs.end());
+    };
+    if (m_offsetResult.valid) addPreview(m_offsetResult);
     for (size_t i = 0; i < m_offsetExtra.size(); ++i) {
         const float d = m_offsetDistance * m_offsetExtraSign[i];
         m_offsetExtraRes[i] = offsetChain(m_offsetExtra[i], d, m_offsetCorners);
         pruneOffset(m_offsetExtraRes[i], m_offsetExtra[i], d);
-        if (m_offsetExtraRes[i].valid) densifySegs(m_offsetExtraRes[i].segs, m_offsetPreview);
+        if (m_offsetExtraRes[i].valid) addPreview(m_offsetExtraRes[i]);
     }
 }
 
@@ -5045,6 +5053,25 @@ float chainWinding(const OffsetChain& ch) {
             a += static_cast<double>(u.x) * v.y - static_cast<double>(v.x) * u.y;
         }
     return a >= 0.0 ? 1.0f : -1.0f;
+}
+
+// Which way an OPEN chain runs, end to end (drawing direction is arbitrary).
+glm::vec2 chainSpan(const OffsetChain& ch) {
+    if (ch.segs.empty()) return glm::vec2(0.0f);
+    return ch.segs.back().at(1.0f) - ch.segs.front().at(0.0f);
+}
+
+// +1 / -1: does `other` offset to the same side as `primary` for the same signed
+// distance? Closed loops keep "outward stays outward" (their winding). Open runs
+// are offset to the RIGHT of travel, and the direction each was drawn in is
+// arbitrary - two parallel lines drawn in opposite directions would otherwise
+// move apart from each other - so they follow the primary's side in space: same
+// sign when they run the same way along it, flipped when they run against it.
+float sameSideSign(const OffsetChain& primary, const OffsetChain& other) {
+    if (primary.closed && other.closed) return chainWinding(other) * chainWinding(primary);
+    if (!primary.closed && !other.closed)
+        return glm::dot(chainSpan(other), chainSpan(primary)) < 0.0f ? -1.0f : 1.0f;
+    return chainWinding(other) * chainWinding(primary);
 }
 } // namespace
 
@@ -5102,7 +5129,7 @@ bool SketchTool::beginOffsetFromSelection() {
     m_offsetExtra.assign(std::make_move_iterator(chains.begin() + 1), std::make_move_iterator(chains.end()));
     m_offsetExtraSign.clear();
     for (const auto& ch : m_offsetExtra)
-        m_offsetExtraSign.push_back(chainWinding(ch) * chainWinding(m_offsetChain));
+        m_offsetExtraSign.push_back(sameSideSign(m_offsetChain, ch));
     m_offsetExtraRes.assign(m_offsetExtra.size(), OffsetResult{});
     m_offsetChainHover.clear();
     m_offsetPhase = OffsetPhase::Distance;
