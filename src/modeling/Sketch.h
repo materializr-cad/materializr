@@ -6,6 +6,7 @@
 #include <string>
 #include <memory>
 #include <map>
+#include <functional>
 #include <set>
 #include <TopoDS_Wire.hxx>
 #include <TopoDS_Face.hxx>
@@ -103,6 +104,9 @@ public:
     // A set of sketch elements by id - what Copy and the patterns duplicate.
     struct ElementIds {
         std::set<int> points, lines, circles, arcs, splines;
+        // Output only (copyElements): the polygon records it made. A polygon is carried
+        // when every edge line of it is in `lines`.
+        std::set<int> polygons;
         bool empty() const {
             return points.empty() && lines.empty() && circles.empty() && arcs.empty() &&
                    splines.empty();
@@ -136,6 +140,21 @@ public:
     bool appendSplineControlPoint(int splineId, int pointId);
     bool popSplineControlPoint(int splineId);   // false if <2 would remain
     int addPolygon(int centerPtId, double radius, int sides, double rotationRad = 0.0);
+    // Polygons whose every edge line is in `lineIds` - the ones a Copy / pattern /
+    // mirror of those lines carries WHOLE (a polygon is a record over its lines and
+    // vertices; copying only the lines leaves plain lines behind). By value: the
+    // caller adds to the sketch while walking them.
+    std::vector<SketchPolygon> polygonsMadeOf(const std::set<int>& lineIds) const;
+    // The line joining points `a` and `b` (either direction), or -1.
+    int lineBetween(int a, int b) const;
+    // Re-create each polygon of `src` over the copied geometry: `mapPoint` takes a
+    // source point id to its copy (or -1), and the copy's edges are looked up among
+    // the sketch's lines. A polygon whose points did not all come across, or whose
+    // edges are missing, is skipped (its lines stay plain lines). Sides and radius
+    // carry over, so the copy edits as a polygon exactly like the original.
+    // Returns the new polygon ids.
+    std::vector<int> copyPolygonRecords(const std::vector<SketchPolygon>& src,
+                                        const std::function<int(int)>& mapPoint);
 
     // Element access
     const std::vector<SketchLine>& getLines() const;

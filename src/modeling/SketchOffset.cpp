@@ -963,16 +963,23 @@ void applyOffset(Sketch& sk, const OffsetResult& res,
         return id;
     };
 
+    // Offsetting a whole polygon (sharp corners) gives a polygon again: gathered
+    // while the lines go in, turned into a record at the end.
+    bool onlyLines = res.closed;
+    std::vector<int> lineVerts;       // the offset vertices, in order
     for (const OffsetSeg& s : res.segs) {
         const bool construction = s.construction != invertConstruction;
         auto made = [&](int id) {
             if (construction) sk.setElementConstruction(id, true);
             outElements.insert(id);
         };
+        if (s.kind != OffsetSeg::Kind::Line) onlyLines = false;
         switch (s.kind) {
         case OffsetSeg::Kind::Line: {
             int a = ptFor(s.p0), b = ptFor(s.p1);
             if (a >= 0 && b >= 0 && a != b) made(sk.addLine(a, b));
+            else onlyLines = false;
+            lineVerts.push_back(a);
             break;
         }
         case OffsetSeg::Kind::Circle: {
@@ -1014,6 +1021,62 @@ void applyOffset(Sketch& sk, const OffsetResult& res,
                 made(sk.addArc(c, a, b, s.r));
             break;
         }
+        }
+    }
+
+    // Whole regular polygon, all corners mitred: the offset is a regular polygon with
+    // the same sides and centre, so keep it as one (it edits by sides and size). The
+    // offset segments do not say where they came from, so match by geometry: a
+    // polygon with this many sides whose every corner has an offset corner on the
+    // same ray from the centre, all at one distance.
+    if (onlyLines && lineVerts.size() >= 3) {
+        const float kTwoPi = 2.0f * static_cast<float>(M_PI);
+        auto angleOf = [](glm::vec2 v) { return std::atan2(v.y, v.x); };
+        for (const SketchPolygon& src : sk.getPolygons()) {
+            if (src.vertexPointIds.size() != lineVerts.size()) continue;
+            const SketchPoint* ctr = sk.getPoint(src.centerPointId);
+            if (!ctr) continue;
+            const glm::vec2 c = ctr->pos;
+            std::vector<glm::vec2> offs;
+            double sum = 0.0;
+            bool ok = true;
+            for (int v : lineVerts) {
+                const SketchPoint* vp = (v >= 0) ? sk.getPoint(v) : nullptr;
+                if (!vp) { ok = false; break; }
+                offs.push_back(vp->pos - c);
+                sum += glm::length(offs.back());
+            }
+            if (!ok) continue;
+            const double r = sum / static_cast<double>(offs.size());
+            if (r < 1e-6) continue;
+            for (const glm::vec2& o : offs)
+                if (std::abs(glm::length(o) - r) > 1e-3 * r + 1e-4) ok = false;
+            if (!ok) continue;
+            // Every source corner must have exactly one offset corner on its ray.
+            std::vector<bool> used(offs.size(), false);
+            for (int sv : src.vertexPointIds) {
+                const SketchPoint* sp = sk.getPoint(sv);
+                if (!sp) { ok = false; break; }
+                const float sa = angleOf(sp->pos - c);
+                bool matched = false;
+                for (size_t i = 0; i < offs.size() && !matched; ++i) {
+                    if (used[i]) continue;
+                    float da = std::fabs(angleOf(offs[i]) - sa);
+                    da = std::min(da, kTwoPi - da);
+                    if (da < 2e-3f) { used[i] = true; matched = true; }
+                }
+                if (!matched) { ok = false; break; }
+            }
+            if (!ok) continue;
+            SketchPolygon np;
+            np.centerPointId = src.centerPointId;
+            np.radius = r;
+            np.sides = static_cast<int>(lineVerts.size());
+            np.isConstruction = src.isConstruction != invertConstruction;
+            np.vertexPointIds = lineVerts;
+            np.lineIds = lineVerts;                   // only its size is read; edges are looked up
+            sk.copyPolygonRecords({np}, [](int id) { return id; });
+            break;   // (the sketch's polygon list just grew: stop walking it)
         }
     }
 }

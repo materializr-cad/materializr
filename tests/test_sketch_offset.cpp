@@ -1188,3 +1188,41 @@ TEST(SketchOffsetTool, ThreeSeparateLinesAllOffset) {
             << "all three lines must be offset (mm/px " << mmPerPx << ")";
     }
 }
+
+
+// #182: offsetting a whole regular polygon with mitred corners gives a polygon
+// (same sides, same centre, larger radius), not just a ring of plain lines.
+TEST(SketchOffsetApply, SharpOffsetOfAPolygonIsAPolygon) {
+    Sketch sk;
+    const int c = sk.addPoint({0, 0});
+    sk.addPolygon(c, 10.0, 6);
+    OffsetChain ch = walkOffsetChain(sk, sk.getPoint(sk.getPolygons()[0].vertexPointIds[0])->pos, 0.5f);
+    ASSERT_TRUE(ch.valid());
+    const float d = outward(ch, 3.0f);
+    OffsetResult res = offsetChain(ch, d, OffsetCorners::Sharp);
+    pruneOffset(res, ch, d);
+    ASSERT_TRUE(res.valid);
+    std::set<int> pts, els;
+    applyOffset(sk, res, nullptr, pts, els);
+    ASSERT_EQ(sk.getPolygons().size(), 2u);
+    const auto& np = sk.getPolygons()[1];
+    EXPECT_EQ(np.sides, 6);
+    EXPECT_EQ(np.centerPointId, c) << "same centre";
+    // The apothem grows by 3, so the circumradius grows by 3 / cos(30 deg).
+    EXPECT_NEAR(np.radius, 10.0 + 3.0 / std::cos(3.14159265 / 6.0), 1e-2);
+}
+
+TEST(SketchOffsetApply, RoundOffsetOfAPolygonStaysPlainGeometry) {
+    Sketch sk;
+    const int c = sk.addPoint({0, 0});
+    sk.addPolygon(c, 10.0, 6);
+    OffsetChain ch = walkOffsetChain(sk, sk.getPoint(sk.getPolygons()[0].vertexPointIds[0])->pos, 0.5f);
+    ASSERT_TRUE(ch.valid());
+    const float d = outward(ch, 3.0f);
+    OffsetResult res = offsetChain(ch, d, OffsetCorners::Round);
+    pruneOffset(res, ch, d);
+    ASSERT_TRUE(res.valid);
+    std::set<int> pts, els;
+    applyOffset(sk, res, nullptr, pts, els);
+    EXPECT_EQ(sk.getPolygons().size(), 1u) << "arcs at the corners: not a polygon";
+}

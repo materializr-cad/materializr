@@ -526,6 +526,11 @@ Sketch::ElementIds Sketch::copyElements(const ElementIds& src, glm::vec2 offset)
         if (sp.isConstruction) setElementConstruction(ns, true);
         made.splines.insert(ns);
     }
+    // A polygon whose edges were all copied is copied AS a polygon, so the copy still
+    // edits by sides / size instead of turning into plain lines.
+    for (int pid : copyPolygonRecords(polygonsMadeOf(src.lines),
+                                      [&](int id) { return copyPt(id); }))
+        made.polygons.insert(pid);
     return made;
 }
 
@@ -626,6 +631,54 @@ int Sketch::addPolygon(int centerPtId, double radius, int sides, double rotation
     polygon.isConstruction = false;
     m_polygons.push_back(polygon);
     return polygon.id;
+}
+
+std::vector<SketchPolygon> Sketch::polygonsMadeOf(const std::set<int>& lineIds) const {
+    std::vector<SketchPolygon> out;
+    for (const auto& p : m_polygons) {
+        if (p.lineIds.empty()) continue;
+        bool whole = true;
+        for (int l : p.lineIds) if (!lineIds.count(l)) { whole = false; break; }
+        if (whole) out.push_back(p);
+    }
+    return out;
+}
+
+int Sketch::lineBetween(int a, int b) const {
+    for (const auto& l : m_lines)
+        if ((l.startPointId == a && l.endPointId == b) || (l.startPointId == b && l.endPointId == a))
+            return l.id;
+    return -1;
+}
+
+std::vector<int> Sketch::copyPolygonRecords(const std::vector<SketchPolygon>& src,
+                                            const std::function<int(int)>& mapPoint) {
+    std::vector<int> made;
+    for (const auto& p : src) {
+        if (p.vertexPointIds.size() < 3 || p.vertexPointIds.size() != p.lineIds.size()) continue;
+        SketchPolygon np;
+        np.centerPointId = mapPoint(p.centerPointId);
+        np.radius = p.radius;
+        np.sides = p.sides;
+        np.isConstruction = p.isConstruction;
+        bool ok = np.centerPointId >= 0;
+        for (int v : p.vertexPointIds) {
+            const int nv = ok ? mapPoint(v) : -1;
+            if (nv < 0) { ok = false; break; }
+            np.vertexPointIds.push_back(nv);
+        }
+        if (!ok) continue;
+        const size_t n = np.vertexPointIds.size();
+        for (size_t i = 0; i < n && ok; ++i) {
+            const int nl = lineBetween(np.vertexPointIds[i], np.vertexPointIds[(i + 1) % n]);
+            if (nl < 0) ok = false; else np.lineIds.push_back(nl);
+        }
+        if (!ok) continue;
+        np.id = nextId();
+        m_polygons.push_back(np);
+        made.push_back(np.id);
+    }
+    return made;
 }
 
 int Sketch::addRectangle(glm::vec2 corner1, glm::vec2 corner2) {

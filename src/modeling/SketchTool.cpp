@@ -4987,6 +4987,11 @@ void SketchTool::commitMirror(std::set<int>& outPoints, std::set<int>& outLines)
             for (int n2 : cps) outPoints.insert(n2);
             break;
         }
+    // A polygon mirrored whole is still a polygon (same sides and size), so the
+    // reflection edits like the original instead of being plain lines.
+    const std::set<int> mirroredLines(m_mirrorLines.begin(), m_mirrorLines.end());
+    m_sketch->copyPolygonRecords(m_sketch->polygonsMadeOf(mirroredLines),
+                                 [&](int id) { return remapPt(id); });
 }
 
 // --- Offset tool ----------------------------------------------------------

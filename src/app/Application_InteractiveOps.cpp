@@ -2896,6 +2896,11 @@ void Application::updateSketchPattern() {
     for (const auto& l : m_activeSketch->getLines())
         lineKeys.insert(std::minmax(l.startPointId, l.endPointId));
 
+    // The polygons the pattern carries whole (read once: *m_activeSketch grows as
+    // copies are added, but only the originals are repeated).
+    const std::vector<materializr::SketchPolygon> patternPolygons =
+        m_activeSketch->polygonsMadeOf(m_sketchPatternLines);
+
     for (int step = 1; step < steps; ++step) {
         std::unordered_map<int,int> remap;
         auto xform = [&](glm::vec2 p) -> glm::vec2 {
@@ -2999,6 +3004,20 @@ void Application::updateSketchPattern() {
             m_activeSketch->setElementOrigin(ns, sp.id);
             if (sp.isConstruction) m_activeSketch->setElementConstruction(ns, true);
         }
+        // Polygons: each copy of a whole polygon is a polygon again (not just its
+        // edges), over the same remapped / welded vertices. The centre point is not
+        // always part of the pattern, so it is placed by the same transform.
+        m_activeSketch->copyPolygonRecords(patternPolygons, [&](int oldId) -> int {
+            auto it = remap.find(oldId);
+            if (it != remap.end()) return it->second;
+            const auto* p = m_activeSketch->getPoint(oldId);
+            if (!p) return -1;
+            const glm::vec2 np = xform(p->pos);
+            const int nid = m_activeSketch->addPoint(np);
+            pointGrid[cellOf(np, 0, 0)].push_back(nid);
+            remap[oldId] = nid;
+            return nid;
+        });
     }
 }
 

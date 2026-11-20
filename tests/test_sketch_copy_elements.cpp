@@ -139,3 +139,63 @@ TEST(SketchCopyElements, CopyDoesNotStayStuckToTheOriginalsRim) {
     ASSERT_EQ(made.points.size(), 1u);
     EXPECT_LT(sk.getPoint(*made.points.begin())->onCurveId, 0);
 }
+
+
+// ---------------------------------------------------------------------------
+// #182 (reporter's follow-up): a copied polygon should be a polygon again, not
+// the plain lines it used to turn into - so it still edits by sides and size.
+// ---------------------------------------------------------------------------
+
+namespace {
+const materializr::SketchPolygon* findPolygon(const Sketch& sk, int id) {
+    for (const auto& p : sk.getPolygons()) if (p.id == id) return &p;
+    return nullptr;
+}
+}
+
+TEST(SketchCopyPolygons, CopyOfAWholePolygonIsAPolygon) {
+    Sketch sk;
+    const int c = sk.addPoint({0, 0});
+    const int pid = sk.addPolygon(c, 10.0, 6);
+    ASSERT_GE(pid, 0);
+    ASSERT_EQ(sk.getPolygons().size(), 1u);
+
+    const auto made = sk.copyElements(sk.allElementIds(), {40.0f, 0.0f});
+    ASSERT_EQ(sk.getPolygons().size(), 2u) << "the copy is a polygon too";
+    ASSERT_EQ(made.polygons.size(), 1u);
+    const auto* np = findPolygon(sk, *made.polygons.begin());
+    ASSERT_NE(np, nullptr);
+    EXPECT_EQ(np->sides, 6);
+    EXPECT_NEAR(np->radius, 10.0, 1e-9);
+    EXPECT_NEAR(posOf(sk, np->centerPointId).x, 40.0f, 1e-4);
+    ASSERT_EQ(np->vertexPointIds.size(), 6u);
+    ASSERT_EQ(np->lineIds.size(), 6u);
+    // Its edges are the copy's own lines, joining its own vertices.
+    for (size_t i = 0; i < 6; ++i) {
+        const int a = np->vertexPointIds[i], b = np->vertexPointIds[(i + 1) % 6];
+        EXPECT_EQ(sk.lineBetween(a, b), np->lineIds[i]);
+        EXPECT_NEAR(glm::distance(posOf(sk, a), posOf(sk, np->centerPointId)), 10.0f, 1e-3);
+    }
+}
+
+TEST(SketchCopyPolygons, OnlySomeEdgesSelectedGivesPlainLines) {
+    Sketch sk;
+    const int c = sk.addPoint({0, 0});
+    sk.addPolygon(c, 10.0, 5);
+    Sketch::ElementIds some;
+    some.lines.insert(sk.getPolygons()[0].lineIds[0]);
+    some.lines.insert(sk.getPolygons()[0].lineIds[1]);
+    sk.copyElements(some, {40.0f, 0.0f});
+    EXPECT_EQ(sk.getPolygons().size(), 1u) << "a partial polygon is not a polygon";
+}
+
+TEST(SketchCopyPolygons, DeletingTheCopyRemovesItsOwnEdgesOnly) {
+    Sketch sk;
+    const int c = sk.addPoint({0, 0});
+    sk.addPolygon(c, 10.0, 4);
+    const auto made = sk.copyElements(sk.allElementIds(), {40.0f, 0.0f});
+    ASSERT_EQ(made.polygons.size(), 1u);
+    sk.removeElement(*made.polygons.begin());
+    EXPECT_EQ(sk.getPolygons().size(), 1u);
+    EXPECT_EQ(sk.getLines().size(), 4u) << "the original's edges are untouched";
+}
