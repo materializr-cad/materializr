@@ -7826,11 +7826,13 @@ void Application::renderLandingPage() {
     // where the GL context lives; tiles fill in as they arrive.
     drainThumbnailPeeks();
     // The projects open in tabs, so the page can say so and take you back to
-    // one (#184). An untouched blank workspace is not worth a button.
+    // one (#184). Every tab is listed, blank "Untitled" ones included, so the row
+    // matches the tab bar; the only one left out is a lone untouched workspace
+    // (the state right after launch), which has nothing to go back to.
     {
         std::vector<LandingPage::OpenTab> open;
         for (size_t i = 0; i < m_sessions.size(); ++i) {
-            if (sessionIsBlank(i)) continue;
+            if (m_sessions.size() == 1 && sessionIsBlank(i)) continue;
             LandingPage::OpenTab t;
             t.index = i;
             t.name = sessionDisplayLabel(i);
