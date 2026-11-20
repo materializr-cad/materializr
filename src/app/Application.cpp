@@ -550,6 +550,13 @@ void Application::wireDocumentConsumers() {
                 queueHeavyImport(std::move(message), std::move(importFn));
             });
     }
+    if (m_pluginContext) {
+        m_pluginContext->_bindHeavyTask(
+            [this](std::string label,
+                   std::function<void(const PluginContext::HeavyProgress&)> task) {
+                runHeavyPluginTask(std::move(label), std::move(task));
+            });
+    }
     // Tell everything that caches DOCUMENT-DERIVED state to rebuild. The
     // setters above only reach consumers Application knows by name; plugins
     // own their render caches in file-local statics this function cannot
@@ -772,7 +779,37 @@ bool Application::switchToSession(size_t idx) {
     if (m_sketchRenderer) m_sketchRenderer->clearCache();
     m_dirtyBodyIds.clear();
     m_meshesDirty = true;
+    queueTabMeshRebuild();
     return true;
+}
+
+// A tab with many bodies used to re-tessellate every one of them inside the
+// frame that clicked it - a frozen window on the way back to a big project (#181).
+// Past a handful of bodies, do it between frames behind the progress card instead,
+// the way opening the project did. The viewport leaves the rebuild alone while
+// this is queued (tabMeshRebuildPending); if the task is ever dropped the normal
+// path simply does it, so a tab can never stay blank.
+void Application::queueTabMeshRebuild() {
+    constexpr size_t kHeavyTabBodies = 15;
+    m_tabMeshQueued = false;
+    if (!m_document || m_document->getAllBodyIds().size() < kHeavyTabBodies) return;
+    m_tabMeshQueued = true;
+    m_deferredHeavy.queue([this]() {
+        m_tabMeshQueued = false;
+        if (!m_document || !m_meshesDirty) return;
+        struct Guard {
+            bool& pump; bool& noCancel; bool pumpPrev, noCancelPrev;
+            ~Guard() { pump = pumpPrev; noCancel = noCancelPrev; }
+        } guard{m_pumpMeshProgress, m_progressNoCancel, m_pumpMeshProgress, m_progressNoCancel};
+        m_progressNoCancel = true;
+        m_pumpMeshProgress = true;
+        m_progressCancelled = false;
+        renderProgressFrame(-1.0f, materializr::tr("Preparing view\xE2\x80\xA6"));
+        // No pool prewarm here, unlike a load: these shapes were tessellated before
+        // the switch, and the pool's plain mesher must only see bare shapes.
+        rebuildMeshes();
+        m_meshesDirty = false;
+    });
 }
 
 void Application::closeSession(size_t idx) {
@@ -1797,11 +1834,13 @@ bool Application::renderProgressFrame(float fraction, const char* label) {
     // typing in, and the Enter that confirms a field (a pattern's copy count)
     // landed on a focused Cancel and cancelled the operation. A click or
     // Escape still cancels.
-    ImGui::PushItemFlag(ImGuiItemFlags_NoNav, true);
-    const bool cancelClicked = ImGui::Button(materializr::tr("Cancel"), materializr::uiSz(110, 0));
-    ImGui::PopItemFlag();
-    if (cancelClicked || ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
-        m_progressCancelled = true;
+    if (!m_progressNoCancel) {
+        ImGui::PushItemFlag(ImGuiItemFlags_NoNav, true);
+        const bool cancelClicked = ImGui::Button(materializr::tr("Cancel"), materializr::uiSz(110, 0));
+        ImGui::PopItemFlag();
+        if (cancelClicked || ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
+            m_progressCancelled = true;
+        }
     }
     ImGui::End();
     endFrame();
@@ -3976,6 +4015,12 @@ void Application::rebuildMeshes() {
     DrawThrottle partialThrottle;
     size_t partialI = 0;
     for (int id : ids) {
+        // Cancelled on a card whose caller undoes its work: stop here. What was not
+        // reached stays dirty, so nothing is lost if the caller keeps any of it.
+        if (m_pumpMeshProgress && m_meshProgressAbortable && m_progressCancelled) {
+            for (size_t k = partialI; k < ids.size(); ++k) m_dirtyBodyIds.insert(ids[k]);
+            break;
+        }
         if (m_pumpMeshProgress) {
             const float frac = float(partialI) / float(ids.size());
             pumpStep(partialThrottle, progressFrameWouldDraw(frac),
@@ -5477,6 +5522,11 @@ bool Application::prewarmMeshPool(std::function<std::vector<int>()> getCandidate
     // own tracked flag skipped that poll too - freezing event processing for
     // however long the (uninterruptible) meshing had left, worse than the
     // original bug.
+    // Cancel on a card that asked for it (see m_meshProgressAbortable) stops the
+    // pool between bodies rather than letting it grind through the batch.
+    options.shouldStop = [this] {
+        return m_pumpMeshProgress && m_meshProgressAbortable && m_progressCancelled;
+    };
     options.onTick = [&](size_t done, size_t total) {
         if (!m_pumpMeshProgress) return;
         const float frac = parallelMeshFraction(done, total);

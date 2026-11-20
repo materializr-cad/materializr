@@ -232,6 +232,19 @@ private:
     // True only while a load is tessellating in the deferred slot: tells
     // rebuildMeshes to pump a per-body progress frame (safe between frames).
     bool m_pumpMeshProgress = false;
+    // With m_pumpMeshProgress: a Cancel on the card stops the per-body rebuild
+    // where it is (the bodies not reached stay dirty) instead of finishing the
+    // whole batch behind a card that no longer moves. Only for callers that undo
+    // what they added when cancelled (runWithMeshProgress).
+    bool m_meshProgressAbortable = false;
+    // The card has no Cancel button: for work that has to finish (the rebuild of
+    // a tab you switched to - there is nothing to go back to mid-way).
+    bool m_progressNoCancel = false;
+    // The incoming tab's meshes are being built between frames behind the card;
+    // the viewport must not do the same rebuild synchronously in its frame.
+    bool m_tabMeshQueued = false;
+    bool tabMeshRebuildPending() const { return m_tabMeshQueued && !m_deferredHeavy.empty(); }
+    void queueTabMeshRebuild();
     // Run `apply` (an edit that adds or changes many bodies) between frames
     // behind the progress card, then tessellate what it touched on the worker
     // pool and rebuild the renderer meshes under the same card - instead of
@@ -239,6 +252,12 @@ private:
     // (renderProgressFrame needs to run between frames). Returns true when the
     // user hit Cancel during the card.
     bool runWithMeshProgress(const char* label, const std::function<void()>& apply);
+    // A plugin's heavy task (a Boolean): queued for the between-frames slot, run
+    // with a Cancel-able progress reporter whose card only appears once the work
+    // has taken a moment, then the bodies it changed are marked for re-meshing
+    // (PluginContext::runHeavy).
+    void runHeavyPluginTask(std::string label,
+                            std::function<void(const std::function<bool(float, const char*)>&)> task);
     // Launch-time update check, run on a worker so a slow/unreachable network
     // can't freeze startup (it was a synchronous call with a 10 s timeout -
     // the real cause of the "not responding" on launch). Polled each frame.

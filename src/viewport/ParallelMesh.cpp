@@ -184,6 +184,7 @@ ParallelMeshBatch parallelMesh(const std::vector<ParallelMeshJob>& jobs,
             while (completedJobs.load() != jobs.size() && liveWorkers.load() != 0) {
                 wake.wait_for(lock, std::chrono::milliseconds(10));
                 if (options.onTick) options.onTick(completedJobs.load(), jobs.size());
+                if (options.shouldStop && options.shouldStop()) abort.store(true);
             }
         } catch (...) {
             batch.path = ParallelMeshPath::Sequential;

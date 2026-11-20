@@ -38,6 +38,16 @@ void PluginContext::_bindHeavyImport(std::function<void(std::string, std::functi
     m_queueHeavyImportFn = std::move(fn);
 }
 
+void PluginContext::runHeavy(std::string label, std::function<void(const HeavyProgress&)> task) {
+    if (m_runHeavyFn) { m_runHeavyFn(std::move(label), std::move(task)); return; }
+    task([](float, const char*) { return false; });
+}
+
+void PluginContext::_bindHeavyTask(
+    std::function<void(std::string, std::function<void(const HeavyProgress&)>)> fn) {
+    m_runHeavyFn = std::move(fn);
+}
+
 InteractiveOp PluginContext::takeRequestedInteractiveOp() {
     const InteractiveOp taken = m_pendingInteractiveOp;
     m_pendingInteractiveOp = InteractiveOp::None;

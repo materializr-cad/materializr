@@ -2,7 +2,10 @@
 #include "core/History.h"
 #include "core/Document.h"
 #include "core/Operation.h"
+#include "modeling/BooleanOp.h"
 #include <BRepPrimAPI_MakeBox.hxx>
+#include <gp_Trsf.hxx>
+#include <BRepBuilderAPI_Transform.hxx>
 #include <map>
 
 // Mock operation that adds a box body to the document
@@ -368,4 +371,39 @@ TEST(HistoryTest, AbortedTransactionalEditRollsBackUntouched) {
     history.setEditAbort({});
     EXPECT_TRUE(history.editStep(0, doc, /*transactional=*/true));
     EXPECT_FALSE(history.lastEditAborted());
+}
+
+
+// #181: a Boolean run behind the progress window can be cancelled from inside the
+// kernel call. Cancel is a clean no-op - nothing is changed, and the fuzzy ladder
+// does not go on to retry at larger tolerances.
+TEST(BooleanOpCancel, CancelFromTheProgressReporterLeavesTheDocumentUntouched) {
+    Document doc;
+    const int a = doc.addBody(BRepPrimAPI_MakeBox(10, 10, 10).Shape(), "A");
+    gp_Trsf t; t.SetTranslation(gp_Vec(5, 5, 5));
+    const int b = doc.addBody(BRepBuilderAPI_Transform(BRepPrimAPI_MakeBox(10, 10, 10).Shape(), t).Shape(), "B");
+    const TopoDS_Shape beforeA = doc.getBody(a);
+
+    int calls = 0;
+    auto op = std::make_unique<BooleanOp>();
+    op->setTargetBodyId(a);
+    op->setToolBodyId(b);
+    op->setMode(BooleanMode::Union);
+    op->setProgressReporter([&](float, const char*) { ++calls; return true; });   // Cancel at once
+    EXPECT_FALSE(op->execute(doc));
+    EXPECT_GT(calls, 0) << "the kernel reported progress, so Cancel had a chance to land";
+    EXPECT_TRUE(doc.getBody(a).IsEqual(beforeA)) << "the target is unchanged";
+    EXPECT_NO_THROW(doc.getBody(b)) << "and the tool was not consumed";
+}
+
+TEST(BooleanOpCancel, WithoutAReporterTheBooleanStillRuns) {
+    Document doc;
+    const int a = doc.addBody(BRepPrimAPI_MakeBox(10, 10, 10).Shape(), "A");
+    gp_Trsf t; t.SetTranslation(gp_Vec(5, 5, 5));
+    const int b = doc.addBody(BRepBuilderAPI_Transform(BRepPrimAPI_MakeBox(10, 10, 10).Shape(), t).Shape(), "B");
+    BooleanOp op;
+    op.setTargetBodyId(a);
+    op.setToolBodyId(b);
+    op.setMode(BooleanMode::Union);
+    EXPECT_TRUE(op.execute(doc));
 }

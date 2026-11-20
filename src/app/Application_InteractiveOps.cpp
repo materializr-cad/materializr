@@ -757,6 +757,26 @@ void Application::updatePattern() {
     });
 }
 
+void Application::runHeavyPluginTask(std::string label,
+                                     std::function<void(const std::function<bool(float, const char*)>&)> task) {
+    m_deferredHeavy.queue([this, label = std::move(label), task = std::move(task)]() {
+        if (!m_document) return;
+        m_progressCancelled = false;
+        const auto before = materializr::snapshotBodies(*m_document);
+        const auto t0 = std::chrono::steady_clock::now();
+        // No card for work that finishes at once: the reporter only draws after
+        // 300 ms. (It keeps answering Cancel either way.)
+        task([this, t0, label](float f, const char* l) {
+            if (std::chrono::steady_clock::now() - t0 < std::chrono::milliseconds(300))
+                return m_progressCancelled;
+            (void)l;   // OCCT's own scope name; the card says what the user asked for
+            return renderProgressFrame(f, label.c_str());
+        });
+        for (int id : materializr::changedBodies(before, *m_document)) markBodyDirty(id);
+        markDirty();
+    });
+}
+
 bool Application::runWithMeshProgress(const char* label, const std::function<void()>& apply) {
     if (!m_document) return false;
     m_progressCancelled = false;              // -1 below does not reset the latch itself
@@ -767,6 +787,13 @@ bool Application::runWithMeshProgress(const char* label, const std::function<voi
         ~PumpGuard() { flag = previous; }
     } guard{m_pumpMeshProgress, m_pumpMeshProgress};
     m_pumpMeshProgress = true;
+    // Cancel here means "undo what you just did" (the callers do), so it may cut
+    // the mesh work short instead of grinding through the whole batch.
+    struct AbortGuard {
+        bool& flag; bool previous;
+        ~AbortGuard() { flag = previous; }
+    } abortGuard{m_meshProgressAbortable, m_meshProgressAbortable};
+    m_meshProgressAbortable = true;
     // Tessellate only what this edit added: bodies that already existed may
     // carry a mesh the pool's plain path must not touch (see queueHeavyImport).
     const auto before = m_document->getAllBodyIds();
@@ -778,9 +805,12 @@ bool Application::runWithMeshProgress(const char* label, const std::function<voi
             if (!beforeIds.count(id)) ids.push_back(id);
         return ids;
     }, label, "heavy-parmesh");
+    // Cancelled: the caller takes the new bodies straight back out, so skip meshing
+    // them and the rebuild that would follow (the freeze after Cancel).
+    if (cancelled || m_progressCancelled) return true;
     rebuildMeshes();   // pool-meshed shapes are cheap here; the rest are pumped under the card
     m_meshesDirty = false;
-    return cancelled || m_progressCancelled;
+    return m_progressCancelled;
 }
 
 void Application::updatePatternNow() {

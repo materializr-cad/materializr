@@ -427,7 +427,8 @@ void Application::renderViewport() {
         m_viewport->resize(fbw, fbh);
 
         landMeshes(); // a finished worker mesh marks its body dirty
-        bool geomChanged = m_meshesDirty || !m_dirtyBodyIds.empty();
+        // (A tab switch's full rebuild is queued behind the progress card.)
+        bool geomChanged = (m_meshesDirty || !m_dirtyBodyIds.empty()) && !tabMeshRebuildPending();
         if (geomChanged) {
             rebuildMeshes();
             m_meshesDirty = false;

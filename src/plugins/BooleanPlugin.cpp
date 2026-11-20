@@ -9,6 +9,7 @@
 #include "../modeling/BooleanOp.h"
 #include <imgui.h>
 #include <cstdio>
+#include <memory>
 #include <string>
 #include <vector>
 #include <set>
@@ -58,30 +59,48 @@ bool refuseMeshOperands(materializr::PluginContext& ctx,
 // cuts all the rest out of the first.
 void runChainedBoolean(materializr::PluginContext& ctx,
                        const std::vector<int>& bodies, BooleanMode mode) {
-    bool allOk = true;
-    for (size_t i = 1; i < bodies.size() && allOk; ++i) {
-        auto op = std::make_unique<BooleanOp>();
-        op->setTargetBodyId(bodies[0]);
-        op->setToolBodyId(bodies[i]);
-        op->setMode(mode);
-        allOk = ctx.history().pushOperation(std::move(op), ctx.document());
-    }
-    if (allOk) { ctx.markMeshesDirty(); ctx.selection().clear(); }
-    else {
-        std::fprintf(stderr, "Boolean failed (%zu bodies)\n", bodies.size());
-        // Say it on screen too. This was stderr-only, so a Union that failed
-        // was indistinguishable from a dead button: no toast, no history step,
-        // no selection change, nothing at all. Subtract has always reported its
-        // failures here; Union and Intersect run the same path and said nothing.
-        ctx.events().publish(materializr::ToastEvent{
-            materializr::tr(mode == BooleanMode::Union
-                ? "Union couldn't make a valid solid from these bodies - they "
-                  "may not overlap, share a coincident face, or the geometry is too "
-                  "degenerate."
-                : "Intersect couldn't make a valid solid from these bodies - they "
-                  "may not overlap, share a coincident face, or the geometry is too "
-                  "degenerate."), 5.0});
-    }
+    materializr::PluginContext* pc = &ctx;
+    // Between frames behind the progress window (it only shows if this takes a
+    // moment), with a Cancel that lands inside the kernel call (#181).
+    ctx.runHeavy(materializr::tr("Boolean\xE2\x80\xA6"),
+                 [pc, bodies, mode](const materializr::PluginContext::HeavyProgress& progress) {
+        auto cancelled = std::make_shared<bool>(false);
+        auto report = [progress, cancelled](float f, const char* l) {
+            const bool c = progress(f, l);
+            if (c) *cancelled = true;
+            return c;
+        };
+        bool allOk = true;
+        for (size_t i = 1; i < bodies.size() && allOk; ++i) {
+            auto op = std::make_unique<BooleanOp>();
+            op->setTargetBodyId(bodies[0]);
+            op->setToolBodyId(bodies[i]);
+            op->setMode(mode);
+            op->setProgressReporter(report);
+            BooleanOp* raw = op.get();
+            allOk = pc->history().pushOperation(std::move(op), pc->document());
+            if (allOk) raw->setProgressReporter({});   // a later replay must not paint a card
+        }
+        if (allOk) pc->selection().clear();   // the host re-meshes only the bodies that changed
+        else if (*cancelled) {
+            pc->events().publish(materializr::ToastEvent{
+                materializr::tr("Boolean cancelled - nothing was changed."), 4.0});
+        } else {
+            std::fprintf(stderr, "Boolean failed (%zu bodies)\n", bodies.size());
+            // Say it on screen too. This was stderr-only, so a Union that failed
+            // was indistinguishable from a dead button: no toast, no history step,
+            // no selection change, nothing at all. Subtract has always reported its
+            // failures here; Union and Intersect run the same path and said nothing.
+            pc->events().publish(materializr::ToastEvent{
+                materializr::tr(mode == BooleanMode::Union
+                    ? "Union couldn't make a valid solid from these bodies - they "
+                      "may not overlap, share a coincident face, or the geometry is too "
+                      "degenerate."
+                    : "Intersect couldn't make a valid solid from these bodies - they "
+                      "may not overlap, share a coincident face, or the geometry is too "
+                      "degenerate."), 5.0});
+        }
+    });
 }
 
 // Subtract is order-dependent, so unlike Union/Intersect we put up a modal: the
@@ -98,27 +117,43 @@ bool g_subtractOpenRequested = false;
 void runSubtractMulti(materializr::PluginContext& ctx,
                       const std::vector<int>& targets,
                       const std::vector<int>& cutters, bool keepCutters) {
-    bool allOk = true;
-    for (int cutter : cutters) {
-        for (size_t i = 0; i < targets.size() && allOk; ++i) {
-            bool lastUse = (i + 1 == targets.size());
-            auto op = std::make_unique<BooleanOp>();
-            op->setTargetBodyId(targets[i]);
-            op->setToolBodyId(cutter);
-            op->setMode(BooleanMode::Subtract);
-            op->setKeepTool(keepCutters || !lastUse);
-            allOk = ctx.history().pushOperation(std::move(op), ctx.document());
+    materializr::PluginContext* pc = &ctx;
+    ctx.runHeavy(materializr::tr("Boolean\xE2\x80\xA6"),
+                 [pc, targets, cutters, keepCutters](const materializr::PluginContext::HeavyProgress& progress) {
+        auto cancelled = std::make_shared<bool>(false);
+        auto report = [progress, cancelled](float f, const char* l) {
+            const bool c = progress(f, l);
+            if (c) *cancelled = true;
+            return c;
+        };
+        bool allOk = true;
+        for (int cutter : cutters) {
+            for (size_t i = 0; i < targets.size() && allOk; ++i) {
+                bool lastUse = (i + 1 == targets.size());
+                auto op = std::make_unique<BooleanOp>();
+                op->setTargetBodyId(targets[i]);
+                op->setToolBodyId(cutter);
+                op->setMode(BooleanMode::Subtract);
+                op->setKeepTool(keepCutters || !lastUse);
+                op->setProgressReporter(report);
+                BooleanOp* raw = op.get();
+                allOk = pc->history().pushOperation(std::move(op), pc->document());
+                if (allOk) raw->setProgressReporter({});
+            }
+            if (!allOk) break;
         }
-        if (!allOk) break;
-    }
-    if (allOk) { ctx.markMeshesDirty(); ctx.selection().clear(); }
-    else {
-        std::fprintf(stderr, "Subtract failed\n");
-        ctx.events().publish(materializr::ToastEvent{
-            materializr::tr("Subtract couldn't make a valid solid from these bodies - "
-                            "they may not overlap, share a coincident face, or the geometry is "
-                            "too degenerate."), 5.0});
-    }
+        if (allOk) pc->selection().clear();   // the host re-meshes only the bodies that changed
+        else if (*cancelled) {
+            pc->events().publish(materializr::ToastEvent{
+                materializr::tr("Subtract cancelled."), 4.0});
+        } else {
+            std::fprintf(stderr, "Subtract failed\n");
+            pc->events().publish(materializr::ToastEvent{
+                materializr::tr("Subtract couldn't make a valid solid from these bodies - "
+                                "they may not overlap, share a coincident face, or the geometry is "
+                                "too degenerate."), 5.0});
+        }
+    });
 }
 
 } // anonymous namespace

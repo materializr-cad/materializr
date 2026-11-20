@@ -83,6 +83,17 @@ public:
     void queueHeavyImport(std::string message, std::function<bool()> importFn);
     void _bindHeavyImport(std::function<void(std::string, std::function<bool()>)> fn);
 
+    // Run `task` in the host's between-frames slot with a cancellable progress
+    // window that only appears if the work takes a moment (a quick operation
+    // never flashes it). `task` receives the progress reporter - hand it to an
+    // Operation with setProgressReporter - which returns true once the user has
+    // pressed Cancel. Bodies the task changes are re-meshed afterwards. Without a
+    // host (headless tests) the task runs at once with a reporter that never
+    // cancels.
+    using HeavyProgress = std::function<bool(float, const char*)>;
+    void runHeavy(std::string label, std::function<void(const HeavyProgress&)> task);
+    void _bindHeavyTask(std::function<void(std::string, std::function<void(const HeavyProgress&)>)> fn);
+
     void registerToolbarButton(ToolbarContribution contrib);
     void registerCommand(CommandContribution contrib);
     void registerMenuItem(MenuContribution contrib);
@@ -110,6 +121,7 @@ private:
     std::function<void()> m_markDirtyFn;
     std::function<bool(std::vector<uint8_t>&)> m_captureViewportPngFn;
     std::function<void(std::string, std::function<bool()>)> m_queueHeavyImportFn;
+    std::function<void(std::string, std::function<void(const HeavyProgress&)>)> m_runHeavyFn;
     InteractiveOp m_pendingInteractiveOp = InteractiveOp::None;
 };
 

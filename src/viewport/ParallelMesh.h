@@ -68,6 +68,11 @@ struct ParallelMeshOptions {
     unsigned workerCount = 0; // zero uses hardware_concurrency
     std::function<void(const ParallelMeshJob&, float, float)> mesh;
     std::function<void(size_t, size_t)> onTick;
+    // Polled with every tick on the calling thread. Once it returns true no worker
+    // starts another job (the one each is in finishes - a tessellation cannot be
+    // interrupted), so a Cancel lands in a body's worth of time instead of the
+    // whole batch's. Unreached jobs come back not ok, like any failed job.
+    std::function<bool()> shouldStop;
     // Fault injection at the two boundaries the mesh catch cannot cover.
     std::function<void()> beforeDequeue;
     std::function<std::thread(std::function<void()>)> launch;

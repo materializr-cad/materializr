@@ -158,6 +158,28 @@ TEST(ParallelMesh, MeshCallsOverlap) {
     EXPECT_EQ(batch.completedJobs, jobs.size());
 }
 
+// Cancel on a progress card has to land in a body's time, not the batch's (#181):
+// once shouldStop says so no worker starts another job, and the jobs never
+// reached come back not ok (the caller forgets their coverage tags).
+TEST(ParallelMesh, ShouldStopLeavesTheRestOfTheBatchUnstarted) {
+    std::vector<ParallelMeshJob> jobs;
+    for (int i = 0; i < 40; ++i)
+        jobs.push_back({i, BRepPrimAPI_MakeBox(1.0 + i, 2.0, 3.0).Shape()});
+    ParallelMeshOptions options;
+    options.workerCount = 1;
+    options.mesh = [&](const auto& job, float defl, float ang) {
+        std::this_thread::sleep_for(Ms(30));      // slow enough that stopping beats finishing
+        mesh(job, defl, ang);
+    };
+    options.shouldStop = [] { return true; };
+    const auto batch = parallelMesh(jobs, kDefl, kAng, options);
+    EXPECT_LT(batch.completedJobs, jobs.size());
+    size_t notOk = 0;
+    for (const auto& r : batch.results) if (!r.ok) ++notOk;
+    EXPECT_GE(notOk, jobs.size() - batch.completedJobs);
+    EXPECT_GT(notOk, jobs.size() / 2) << "most of the batch was never started";
+}
+
 // 2. Reading twice matters: two handles to one loaded shape share its mesh.
 TEST(ParallelMesh, IndependentlyLoadedCopiesAgreePerFace) {
     ProjectFile file;
