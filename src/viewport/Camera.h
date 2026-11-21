@@ -139,6 +139,10 @@ public:
     // ...and the largest (a kilometre). Without a ceiling a long run of zoom-out
     // steps multiplies the view up to infinity and takes the matrices with it.
     static constexpr float kMaxOrthoSize = 1.0e6f;
+    // The farthest a perspective camera may sit from what it looks at: a thousand
+    // kilometres (a country). Hyper-scrolling out of a wall used to fly the camera off
+    // to where the grid broke up and the model could not be found again.
+    static constexpr float kMaxPerspectiveDistance = 1.0e9f;
 
     /// When true (default), orbiting is a level turntable around world up (the
     /// horizon never rolls). When false, orbiting is a free trackball.

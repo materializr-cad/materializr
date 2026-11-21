@@ -231,7 +231,7 @@ void Camera::zoom(float delta)
 
     // Prevent zooming through the target
     float newDistance = distance - zoomAmount;
-    newDistance = std::max(newDistance, 0.1f);
+    newDistance = std::clamp(newDistance, 0.1f, kMaxPerspectiveDistance);
 
     m_position = m_target + glm::normalize(direction) * newDistance;
 }
@@ -271,6 +271,11 @@ void Camera::zoomToward(const glm::vec3& focus, float delta)
     // least 0.1 mm of standoff so the view doesn't degenerate.
     if (glm::length(newPos - newTarget) < 0.1f) return;
     if (glm::length(newPos - focus)     < 0.1f) return;
+    // ...and not so far that the view comes apart (see kMaxPerspectiveDistance). Moving
+    // out is refused past it; moving back in is always allowed.
+    if (factor > 1.0f &&
+        (glm::length(newPos - newTarget) > kMaxPerspectiveDistance ||
+         glm::length(newPos - focus) > kMaxPerspectiveDistance)) return;
     m_position = newPos;
     m_target   = newTarget;
 }

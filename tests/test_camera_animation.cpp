@@ -256,3 +256,23 @@ TEST(CameraAnimation, AnimateToFitGlidesAndLandsWhereZoomToFitDoes) {
     EXPECT_NEAR(glm::length(glide.getPosition() - jump.getPosition()), 0.0f, 1e-2f);
     EXPECT_NEAR(glm::length(glide.getTarget() - jump.getTarget()), 0.0f, 1e-2f);
 }
+
+// #185 follow-up (Iron47): hyper-scrolling out while wedged in a wall flew the camera
+// off until the grid broke up and the model could not be found. A perspective camera
+// now stops a thousand kilometres out, and can always come back in.
+TEST(CameraZoom, PerspectiveZoomOutStopsAtTheLimitAndComesBack) {
+    Camera cam;
+    const glm::vec3 focus = cam.getTarget();
+    for (int i = 0; i < 2000; ++i) {
+        cam.zoomToward(focus, -3.0f);
+        cam.zoom(-3.0f);
+    }
+    const float far = glm::length(cam.getPosition() - cam.getTarget());
+    EXPECT_LE(far, Camera::kMaxPerspectiveDistance * 1.001f);
+    EXPECT_GT(far, 1.0e6f) << "it still goes out a long way before stopping";
+    const glm::mat4 vp = cam.getProjectionMatrix() * cam.getViewMatrix();
+    for (int c = 0; c < 4; ++c)
+        for (int r = 0; r < 4; ++r) EXPECT_TRUE(std::isfinite(vp[c][r]));
+    for (int i = 0; i < 2000; ++i) cam.zoomToward(focus, 3.0f);
+    EXPECT_LT(glm::length(cam.getPosition() - cam.getTarget()), far * 0.01f);
+}
