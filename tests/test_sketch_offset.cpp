@@ -1341,3 +1341,60 @@ TEST(SketchOffsetSpline, TightlyBentSplineOffsetsWithoutGaps) {
                 EXPECT_GE(distanceToChain(ch, q), std::abs(d) - 0.1f) << "d=" << d;
     }
 }
+
+// #182 (Iron47, b861): a sharp peak between two valleys. Where two offset arcs cross
+// under the peak the valid stretch joining them is a few samples long; pruning
+// stepped over it and left a gap that came and went with the distance.
+TEST(SketchOffsetSpline, SharpPeakBetweenValleysLeavesNoGap) {
+    Sketch sk;
+    const glm::vec2 ctrl[] = {{37, 0}, {35, 0}, {34, 2}, {32.9282f, -2}, {32, 1}, {29.6906f, -3},
+                              {27.3812f, 1}, {26, -0.3812f}, {24.0479f, 3}, {22.9761f, -1},
+                              {21.9043f, 3}, {19, -4}, {17.6603f, 1}, {17, -5}, {14, 2},
+                              {11, -1}, {10, 3}, {6.5359f, -3}, {5.19615f, 2}, {1.73205f, -4},
+                              {-1.1547f, 1}, {-3, -4}, {-6, 1}, {-13, -8}, {-18.7735f, 2}, {-27, -5}};
+    std::vector<int> ids;
+    for (const auto& c : ctrl) ids.push_back(sk.addPoint(c));
+    sk.addSpline(ids);
+    const auto samples = sk.sampleSpline2D(sk.getSplines()[0], 6);
+    OffsetChain ch = walkOffsetChain(sk, samples[samples.size() / 2], 0.5f);
+    ASSERT_TRUE(ch.valid());
+    for (float d = -7.f; d <= 7.f; d += 0.25f) {
+        if (std::abs(d) < 0.01f) continue;
+        OffsetResult res = offsetChain(ch, d, OffsetCorners::Round);
+        pruneOffset(res, ch, d);
+        ASSERT_TRUE(res.valid) << "d=" << d;
+        std::vector<std::vector<glm::vec2>> runs;
+        densifySegs(res.segs, runs);
+        EXPECT_EQ(runs.size(), 1u) << "one unbroken offset curve at d=" << d;
+    }
+}
+
+// #182 (Iron47, b861): offsetting a triangle INWARD by more than it can take turns it
+// inside out; the flipped edges sit outside the triangle, farther than |d| from it,
+// and used to survive as three stray corner pieces. The offset has to lie on the
+// side the sign asks for, so there is no result at all.
+TEST(SketchOffsetClosed, InwardOffsetPastTheInradiusGivesNothing) {
+    Sketch sk;
+    const int a = sk.addPoint({-9, 15.5885f}), b = sk.addPoint({-9, -15.5885f}),
+              c = sk.addPoint({18, 0});
+    sk.addLine(a, b); sk.addLine(b, c); sk.addLine(c, a);
+    OffsetChain ch = walkOffsetChain(sk, {-9, 0}, 0.5f);
+    ASSERT_TRUE(ch.valid());
+    ASSERT_TRUE(ch.closed);
+    // Inradius is 9 mm. Which sign is "inward" depends on travel direction, so try
+    // both: the one that goes inside must be refused beyond 9, the other grows.
+    int refused = 0, grew = 0;
+    for (float d : {-42.07f, 42.07f}) {
+        for (OffsetCorners oc : {OffsetCorners::Sharp, OffsetCorners::Round}) {
+            OffsetResult res = offsetChain(ch, d, oc);
+            pruneOffset(res, ch, d);
+            if (!res.valid) { ++refused; continue; }
+            ++grew;
+            std::vector<std::vector<glm::vec2>> runs;
+            densifySegs(res.segs, runs);
+            EXPECT_EQ(runs.size(), 1u) << "outward offset is one closed loop, d=" << d;
+        }
+    }
+    EXPECT_EQ(refused, 2);
+    EXPECT_EQ(grew, 2);
+}

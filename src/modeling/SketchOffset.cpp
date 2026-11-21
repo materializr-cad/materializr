@@ -865,7 +865,7 @@ bool segCross(glm::vec2 a0, glm::vec2 a1, glm::vec2 b0, glm::vec2 b1, float& ua,
 // kept pieces at the crossing of A's tail and B's head, trimming each back to it.
 // Where they do not cross within reach (the offset really is too big for the
 // profile) the gap is left as it was.
-void joinAcrossLoops(std::vector<OffsetSeg>& kept, float ad) {
+void joinAcrossLoops(std::vector<OffsetSeg>& kept, float ad, float weldTol) {
     const float step = std::max(0.05f, ad * 0.1f);
     for (size_t k = 0; k + 1 < kept.size(); ++k) {
         OffsetSeg& A = kept[k];
@@ -907,21 +907,31 @@ void joinAcrossLoops(std::vector<OffsetSeg>& kept, float ad) {
                     bestX = pa[i] + (pa[i + 1] - pa[i]) * ua;
                 }
             }
-        if (bestCost == std::numeric_limits<float>::max()) {
-            // No crossing, but the pieces all but touch (sampling error at a tangent
-            // meeting): close that hairline so they weld into one chain.
-            if (gap <= std::max(0.01f, 0.005f * ad)) {
+        // The pieces all but touch (sampling error at a tangent meeting): close the
+        // hairline so they weld into one chain.
+        auto closeHairline = [&]() {
+            if (gap <= std::max(std::max(0.01f, 0.005f * ad), weldTol)) {
                 const glm::vec2 mid = 0.5f * (A.at(1.0f) + B.at(0.0f));
                 A.p1 = mid;
                 B.p0 = mid;
                 if (A.kind == OffsetSeg::Kind::Spline && !A.pts.empty()) A.pts.back() = mid;
                 if (B.kind == OffsetSeg::Kind::Spline && !B.pts.empty()) B.pts.front() = mid;
             }
+        };
+        if (bestCost == std::numeric_limits<float>::max()) { closeHairline(); continue; }
+        if (bestTa < 1e-3f || bestTb > 1.0f - 1e-3f) {      // would eat a whole piece
+            closeHairline();
             continue;
         }
-        if (bestTa < 1e-3f || bestTb > 1.0f - 1e-3f) continue;     // would eat a whole piece
         OffsetSeg na2 = subSeg(A, 0.0f, bestTa);
         OffsetSeg nb2 = subSeg(B, bestTb, 1.0f);
+        // The far ends are untouched: keep exactly the ends an earlier join gave them.
+        na2.p0 = A.p0;
+        nb2.p1 = B.p1;
+        if (na2.kind == OffsetSeg::Kind::Spline && !na2.pts.empty() && !A.pts.empty())
+            na2.pts.front() = A.pts.front();
+        if (nb2.kind == OffsetSeg::Kind::Spline && !nb2.pts.empty() && !B.pts.empty())
+            nb2.pts.back() = B.pts.back();
         // Both pieces now end / start at exactly the crossing, so they share one point.
         na2.p1 = bestX;
         nb2.p0 = bestX;
@@ -949,8 +959,44 @@ void pruneOffset(OffsetResult& res, const OffsetChain& src, float d) {
                                 : std::max(1e-4f, 1e-3f * ad);
     const float floorDist = ad - eps;
 
+    // A closed profile offset INWARD by more than it can take turns inside out,
+    // and the flipped edges end up outside the profile yet farther than |d| from
+    // it - so distance alone keeps them (#182: a triangle offset by 42 mm gave
+    // three stray corners). The offset must also lie on the side the sign asks
+    // for: right of travel is outside for a counter-clockwise loop.
+    std::vector<glm::vec2> loop;
+    bool wantInside = false;
+    if (src.closed) {
+        std::vector<std::vector<glm::vec2>> runs;
+        densifySegs(src.segs, runs);
+        if (runs.size() == 1 && runs[0].size() >= 4) {
+            loop = std::move(runs[0]);
+            double area = 0.0;
+            for (size_t i = 0; i + 1 < loop.size(); ++i)
+                area += static_cast<double>(loop[i].x) * loop[i + 1].y
+                      - static_cast<double>(loop[i + 1].x) * loop[i].y;
+            if (std::abs(area) > 1e-9)
+                wantInside = (d > 0.0f) ? (area < 0.0) : (area > 0.0);
+            else
+                loop.clear();
+        }
+    }
+    auto insideLoop = [&](glm::vec2 q) {
+        bool in = false;
+        for (size_t i = 0, j = loop.size() - 1; i < loop.size(); j = i++) {
+            const glm::vec2 a = loop[i], b = loop[j];
+            if (((a.y > q.y) != (b.y > q.y)) &&
+                (q.x < (b.x - a.x) * (q.y - a.y) / (b.y - a.y) + a.x))
+                in = !in;
+        }
+        return in;
+    };
+
     auto ok = [&](const OffsetSeg& s, float t) {
-        return distanceToChain(src, s.at(t)) >= floorDist;
+        const glm::vec2 q = s.at(t);
+        if (distanceToChain(src, q) < floorDist) return false;
+        if (!loop.empty() && insideLoop(q) != wantInside) return false;
+        return true;
     };
 
     std::vector<OffsetSeg> kept;
@@ -963,6 +1009,12 @@ void pruneOffset(OffsetResult& res, const OffsetChain& src, float d) {
         const float step = std::max(0.1f, ad * 0.25f);
         int n = static_cast<int>(std::ceil(s.length() / step));
         n = std::clamp(n, 16, 128);
+        // A sampled curve is tested at every one of its own points. Where two
+        // offset arcs cross under a sharp peak, the valid stretch that joins them
+        // can be a few samples long; stepping over it left a gap between the
+        // pieces that moved around as the distance changed (#182).
+        if (s.kind == OffsetSeg::Kind::Spline && s.pts.size() > 2)
+            n = std::clamp(static_cast<int>(s.pts.size()) - 1, n, 2000);
 
         std::vector<bool> good(n + 1);
         for (int i = 0; i <= n; ++i) good[i] = ok(s, static_cast<float>(i) / n);
@@ -1001,7 +1053,9 @@ void pruneOffset(OffsetResult& res, const OffsetChain& src, float d) {
     }
 
     if (kept.size() != res.segs.size()) anyChange = true;
-    joinAcrossLoops(kept, ad);
+    // Pieces cut at the sampled-distance band stop up to a few bands short of
+    // where they would cross; for a sampled curve that is the same size as its error.
+    joinAcrossLoops(kept, ad, hasSpline ? 6.0f * eps : 0.0f);
     res.segs = std::move(kept);
 
     if (res.segs.empty()) {
@@ -1224,7 +1278,10 @@ void densifySegs(const std::vector<OffsetSeg>& segs,
             glm::vec2 d = s.p0 - run.back();
             if (glm::dot(d, d) > kJoinTol2) flush();
         }
-        if (run.empty()) run.push_back(s.at(0.0f));
+        // An arc trimmed to a crossing keeps its stated ends (what gets committed);
+        // its swept geometry can sit a few microns off them.
+        if (run.empty())
+            run.push_back(s.kind == OffsetSeg::Kind::Arc ? s.p0 : s.at(0.0f));
 
         if (s.kind == OffsetSeg::Kind::Line) {
             run.push_back(s.at(1.0f));
@@ -1236,6 +1293,7 @@ void densifySegs(const std::vector<OffsetSeg>& segs,
                         std::ceil(std::abs(s.sweep) / (static_cast<float>(M_PI) / 24.0f))));
             for (int i = 1; i <= n; ++i)
                 run.push_back(s.at(static_cast<float>(i) / static_cast<float>(n)));
+            if (s.kind == OffsetSeg::Kind::Arc) run.back() = s.p1;
         }
     }
     flush();

@@ -278,7 +278,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 
 - CONVERTED: 1
 - allowed-by-hand: 93
-- comment: 323
+- comment: 324
 - diagnostic: 13
 - identifier/other: 14
 
@@ -591,6 +591,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | comment | src/modeling/Sketch.h | `// (chord error well under 0.01 mm at ordinary sizes).` |
 | comment | src/modeling/SketchConstraints.h | `// dimension label rather than clicking it. Pixels rather than sketch mm because` |
 | comment | src/modeling/SketchOffset.cpp | `// comfortably more than 1e-3 mm - so an analytic epsilon condemns perfectly` |
+| comment | src/modeling/SketchOffset.cpp | `// it - so distance alone keeps them (#182: a triangle offset by 42 mm gave` |
 | comment | src/modeling/SketchOffset.cpp | `// accept the (sub-0.1 mm) deviation that comes with it.` |
 | comment | src/modeling/SketchSolver.cpp | `// be hit to about one float ulp of the coordinates involved. At 22 mm from` |
 | comment | src/modeling/SketchSolver.cpp | `// the origin that is ~2e-6 mm - already past the 1e-6 default, so a` |
