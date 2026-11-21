@@ -769,8 +769,9 @@ void Application::runHeavyPluginTask(std::string label,
         task([this, t0, label](float f, const char* l) {
             if (std::chrono::steady_clock::now() - t0 < std::chrono::milliseconds(300))
                 return m_progressCancelled;
-            (void)l;   // OCCT's own scope name; the card says what the user asked for
-            return renderProgressFrame(f, label.c_str());
+            // The task may name the step it is on ("Boolean 2 / 5"); without one the
+            // card says what the user asked for.
+            return renderProgressFrame(f, (l && *l) ? l : label.c_str());
         });
         for (int id : materializr::changedBodies(before, *m_document)) markBodyDirty(id);
         markDirty();

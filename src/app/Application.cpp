@@ -738,7 +738,15 @@ void Application::runPendingHeavyTasks() {
 
 bool Application::switchToSession(size_t idx) {
     if (idx >= m_sessions.size()) return false;
-    if (idx == m_activeSession) return true;
+    if (idx == m_activeSession) {
+        // Back on a tab whose view a Cancel left unbuilt (from the Home Screen).
+        if (m_tabViewCancelled) {
+            m_tabViewCancelled = false;
+            m_meshesDirty = true;
+            queueTabMeshRebuild();
+        }
+        return true;
+    }
     // Mid-gesture state doesn't survive a document swap. A half-drawn sketch
     // is the user's call to resolve - refuse loudly rather than silently
     // committing or dropping it. A thread re-cut owns its body until it
@@ -767,6 +775,11 @@ bool Application::switchToSession(size_t idx) {
     m_sectionEnabled = false;
     m_sectionDirty = true;
 
+    // Where Cancel on the incoming tab's card goes back to. A tab left behind by a
+    // Cancel itself is not one to return to.
+    if (!m_tabSwitchIsBack && m_activeSession < m_sessions.size())
+        pushTabBackStack(m_sessions[m_activeSession].get());
+    m_tabViewCancelled = false;
     adoptSession(idx);
 
     // Shelve the outgoing tab's GPU meshes on EVERY platform (uniform by
@@ -797,19 +810,63 @@ void Application::queueTabMeshRebuild() {
     m_deferredHeavy.queue([this]() {
         m_tabMeshQueued = false;
         if (!m_document || !m_meshesDirty) return;
-        struct Guard {
-            bool& pump; bool& noCancel; bool pumpPrev, noCancelPrev;
-            ~Guard() { pump = pumpPrev; noCancel = noCancelPrev; }
-        } guard{m_pumpMeshProgress, m_progressNoCancel, m_pumpMeshProgress, m_progressNoCancel};
-        m_progressNoCancel = true;
-        m_pumpMeshProgress = true;
-        m_progressCancelled = false;
-        renderProgressFrame(-1.0f, materializr::tr("Preparing view\xE2\x80\xA6"));
-        // No pool prewarm here, unlike a load: these shapes were tessellated before
-        // the switch, and the pool's plain mesher must only see bare shapes.
-        rebuildMeshes();
+        bool cancelled = false;
+        {
+            struct Guard {
+                bool& pump; bool& noCancel; bool& abortable;
+                bool pumpPrev, noCancelPrev, abortablePrev;
+                ~Guard() { pump = pumpPrev; noCancel = noCancelPrev; abortable = abortablePrev; }
+            } guard{m_pumpMeshProgress, m_progressNoCancel, m_meshProgressAbortable,
+                    m_pumpMeshProgress, m_progressNoCancel, m_meshProgressAbortable};
+            // Cancel is offered: a wrong click on a big project is worth backing out of.
+            m_progressNoCancel = false;
+            m_meshProgressAbortable = true;
+            m_pumpMeshProgress = true;
+            m_progressCancelled = false;
+            renderProgressFrame(-1.0f, materializr::tr("Preparing view\xE2\x80\xA6"));
+            // No pool prewarm here, unlike a load: these shapes were tessellated before
+            // the switch, and the pool's plain mesher must only see bare shapes.
+            if (!m_progressCancelled) rebuildMeshes();
+            cancelled = m_progressCancelled && m_meshesDirty;
+            m_progressCancelled = false;
+        }
+        if (cancelled) { cancelTabView(); return; }
         m_meshesDirty = false;
     });
+}
+
+void Application::pushTabBackStack(const ProjectSession* leaving) {
+    if (!leaving) return;
+    forgetTabInBackStack(leaving);
+    m_tabBackStack.push_back(leaving);
+    if (m_tabBackStack.size() > 16) m_tabBackStack.erase(m_tabBackStack.begin());
+}
+
+void Application::forgetTabInBackStack(const ProjectSession* gone) {
+    m_tabBackStack.erase(std::remove(m_tabBackStack.begin(), m_tabBackStack.end(), gone),
+                         m_tabBackStack.end());
+}
+
+// Cancel on the "Preparing view" card: leave the tab being built. Back to the tab the
+// user came from (whose own view then builds behind its own card, which can be
+// cancelled in turn), or to the Home Screen when there is nowhere to go back to.
+void Application::cancelTabView() {
+    while (!m_tabBackStack.empty()) {
+        const ProjectSession* target = m_tabBackStack.back();
+        m_tabBackStack.pop_back();
+        size_t idx = m_sessions.size();
+        for (size_t i = 0; i < m_sessions.size(); ++i)
+            if (m_sessions[i].get() == target) { idx = i; break; }
+        if (idx >= m_sessions.size() || idx == m_activeSession) continue;
+        m_tabSwitchIsBack = true;
+        const bool ok = switchToSession(idx);
+        m_tabSwitchIsBack = false;
+        if (ok) return;
+    }
+    // Nowhere to go back to: the Home Screen. The tab stays as it was, its view built
+    // when it is shown again.
+    m_tabViewCancelled = true;
+    if (m_landingPage) showLandingPage(/*fromStartup=*/false);
 }
 
 void Application::closeSession(size_t idx) {
@@ -840,6 +897,7 @@ void Application::closeSession(size_t idx) {
     // The closing tab's snapshot is no longer unfinished work, and its
     // recovery index returns to the pool by virtue of the session vanishing.
     materializr::clearProjectRecovery(m_sessions[idx]->recoveryIndex);
+    forgetTabInBackStack(m_sessions[idx].get());
     m_sessions.erase(m_sessions.begin() + static_cast<long>(idx));
     bool closedLast = false;
     if (m_sessions.empty()) {
@@ -861,6 +919,10 @@ void Application::closeSession(size_t idx) {
         if (m_sketchRenderer) m_sketchRenderer->clearCache();
         m_dirtyBodyIds.clear();
         m_meshesDirty = true;
+        m_tabViewCancelled = false;
+        // The neighbour that takes over gets the same "Preparing view" card as a click
+        // on its tab would (#181) - closing a tab is also a way to switch to one.
+        queueTabMeshRebuild();
         // An intentional close - clean, or dirty-and-discarded through the
         // prompt - with no other project open lands on the HOME PAGE, not in
         // a bare untitled workspace (Steve, 2026-07-28). With other tabs
@@ -3915,7 +3977,15 @@ void Application::rebuildMeshes() {
         int visible = 0, polls = 0, draws = 0;
         double meshMs = 0.0;
         DrawThrottle throttle;
+        bool stoppedByCancel = false;
         for (int id : ids) {
+            // Cancelled on a card whose caller is leaving this tab (see
+            // queueTabMeshRebuild): stop here. The view stays unbuilt (the dirty flag
+            // is left alone) - it is built if the tab is shown again.
+            if (m_pumpMeshProgress && m_meshProgressAbortable && m_progressCancelled) {
+                stoppedByCancel = true;
+                break;
+            }
             // During a load (deferred slot), keep the window responsive: poll
             // for EVERY body, but draw the progress frame only when the
             // throttle allows. Each draw ends in a vsync'd swap (17 ms at
@@ -3975,6 +4045,7 @@ void Application::rebuildMeshes() {
             else
                 m_edgeRenderer->setBodyEdges(id, shape, deflection);
         }
+        if (stoppedByCancel) return;
         m_dirtyBodyIds.clear();
         // Every visible body has been visited, so whatever the renderers still
         // hold retired is dead: free it now rather than at the next commit.
@@ -4838,6 +4909,33 @@ void Application::ensureSketchSourceFace(int sketchId) {
     TopoDS_Face f = matchPass(/*requireHoles=*/true);
     if (f.IsNull()) f = matchPass(/*requireHoles=*/false);
     if (!f.IsNull()) sk->setSourceFace(f);
+}
+
+void Application::refreshHostFaces(const std::set<int>* onlyBodies) {
+    if (!m_document) return;
+    std::map<int, TopTools_IndexedMapOfShape> faceMaps;   // per host body, built once
+    for (int sid : m_document->getAllSketchIds()) {
+        auto sk = m_document->getSketch(sid);
+        if (!sk || sk->getSourceFace().IsNull() || sk->isDetachedFromBody()) continue;
+        const int bid = sk->getSourceBody();
+        if (bid < 0) continue;
+        if (onlyBodies && !onlyBodies->count(bid)) continue;
+        auto it = faceMaps.find(bid);
+        if (it == faceMaps.end()) {
+            TopTools_IndexedMapOfShape faces;
+            try {
+                const TopoDS_Shape body = m_document->getBody(bid);
+                if (!body.IsNull()) TopExp::MapShapes(body, TopAbs_FACE, faces);
+            } catch (...) {}
+            it = faceMaps.emplace(bid, std::move(faces)).first;
+        }
+        if (it->second.Extent() == 0 || it->second.Contains(sk->getSourceFace())) continue;
+        sk->setSourceFace(TopoDS_Face());
+        ensureSketchSourceFace(sid);
+        if (materializr::isVerbose())
+            std::fprintf(stderr, "[Sketch] sketch %d: its host body %d changed - face re-derived (%s)\n",
+                         sid, bid, sk->getSourceFace().IsNull() ? "none found" : "found");
+    }
 }
 
 // The body owning a planar face coplanar with `pln` (normals parallel,

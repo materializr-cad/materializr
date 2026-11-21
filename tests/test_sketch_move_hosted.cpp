@@ -10,6 +10,7 @@
 #include "core/SketchCascadeTarget.h"
 #include "io/ProjectIO.h"
 #include "modeling/BatchTransformOp.h"
+#include "modeling/ChamferOp.h"
 #include "modeling/ExtrudeOp.h"
 #include "modeling/PushPullOp.h"
 #include "modeling/Sketch.h"
@@ -17,6 +18,12 @@
 #include "modeling/SketchTransformOp.h"
 
 #include <gtest/gtest.h>
+#include <BRepAdaptor_Curve.hxx>
+#include <TopExp_Explorer.hxx>
+#include <TopoDS.hxx>
+#include <TopoDS_Edge.hxx>
+#include <TopExp.hxx>
+#include <TopTools_IndexedMapOfShape.hxx>
 #include <BRepGProp.hxx>
 #include <GProp_GProps.hxx>
 #include <Bnd_Box.hxx>
@@ -552,4 +559,61 @@ TEST(BodyMovePlan, RigidBatchMoveCarriesTheSketchesDrawnOnTheBodies) {
     EXPECT_NEAR(sc.doc.getSketch(sc.s2)->getPlane().Location().Z(), 65.0, 1e-9);
     ASSERT_TRUE(sc.hist.undo(sc.doc));
     EXPECT_NEAR(sc.doc.getSketch(sc.s2)->getPlane().Location().Z(), 25.0, 1e-9);
+}
+
+// #185 round 3 (Iron47): a chamfer built on the bevel another chamfer made was switched
+// off when the body moved, while the first chamfer followed. Its edges are named by
+// the faces beside them, one of which is the earlier chamfer's bevel.
+namespace {
+std::vector<TopoDS_Edge> topEdges(const TopoDS_Shape& s, double z, bool shortOnes) {
+    std::vector<TopoDS_Edge> out;
+    TopTools_IndexedMapOfShape edges;
+    TopExp::MapShapes(s, TopAbs_EDGE, edges);
+    for (int i = 1; i <= edges.Extent(); ++i) {
+        TopoDS_Edge e = TopoDS::Edge(edges(i));
+        BRepAdaptor_Curve c(e);
+        const gp_Pnt a = c.Value(c.FirstParameter()), b = c.Value(c.LastParameter());
+        if (std::abs(a.Z() - z) > 1e-6 || std::abs(b.Z() - z) > 1e-6) continue;
+        const double len = a.Distance(b);
+        if ((len < 5.0) == shortOnes) out.push_back(e);
+    }
+    return out;
+}
+}
+
+TEST(BodyMovePlan, ChamferBuiltOnAChamferFollowsTheMove) {
+    Document doc; History hist;
+    const int s1 = addRect(doc, 0, -10, -10, 20, 20, -1);
+    ASSERT_TRUE(pushExtrude(hist, doc, s1, 25));
+    const int b1 = doc.getAllBodyIds().front();
+    // Chamfer 1: the four vertical corner edges.
+    std::vector<TopoDS_Edge> verticals;
+    TopTools_IndexedMapOfShape allEdges;
+    TopExp::MapShapes(doc.getBody(b1), TopAbs_EDGE, allEdges);
+    for (int i = 1; i <= allEdges.Extent(); ++i) {
+        TopoDS_Edge e = TopoDS::Edge(allEdges(i));
+        BRepAdaptor_Curve c(e);
+        const gp_Pnt a = c.Value(c.FirstParameter()), b = c.Value(c.LastParameter());
+        if (std::abs(a.X() - b.X()) < 1e-6 && std::abs(a.Y() - b.Y()) < 1e-6) verticals.push_back(e);
+    }
+    ASSERT_EQ(verticals.size(), 4u);
+    auto c1 = std::make_unique<ChamferOp>();
+    c1->setBody(b1); c1->setEdges(verticals); c1->setDistance(2.0); c1->setSourceSketch(s1);
+    ASSERT_TRUE(hist.pushOperation(std::move(c1), doc));
+    // Chamfer 2: the short edges where chamfer 1's bevels meet the top face.
+    auto shorts = topEdges(doc.getBody(b1), 25.0, true);
+    ASSERT_EQ(shorts.size(), 4u);
+    auto c2 = std::make_unique<ChamferOp>();
+    c2->setBody(b1); c2->setEdges(shorts); c2->setDistance(0.8); c2->setSourceSketch(s1);
+    ASSERT_TRUE(hist.pushOperation(std::move(c2), doc));
+    auto vol = [&](int id) { GProp_GProps g; BRepGProp::VolumeProperties(doc.getBody(id), g); return g.Mass(); };
+    const double before = vol(b1);
+
+    auto op = moveOp(s1, 40);
+    ASSERT_TRUE(hist.pushOperation(std::move(op), doc));
+    ASSERT_TRUE(cascade(hist, doc, s1));
+    EXPECT_NEAR(minZ(doc.getBody(b1)), 40.0, 1e-6);
+    EXPECT_NEAR(vol(b1), before, 1e-3) << "both chamfers survived the move";
+    for (int i = 0; i < hist.stepCount(); ++i)
+        EXPECT_TRUE(hist.getStep(i)->isEnabled()) << "step " << i << " was switched off";
 }

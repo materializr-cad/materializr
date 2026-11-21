@@ -8,7 +8,9 @@
 #include "../core/Events.h"
 #include "../modeling/BooleanOp.h"
 #include <imgui.h>
+#include <algorithm>
 #include <cstdio>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -54,6 +56,34 @@ bool refuseMeshOperands(materializr::PluginContext& ctx,
     return true;
 }
 
+// One progress bar for a whole run of booleans, not one per boolean: each step reports
+// its own 0..1, which is placed in its slice of the run, and the label says which
+// step it is (#181: a multi-body Union showed a card per merge, filling, vanishing and
+// starting over). Stepping also draws at once, so the bar moves on between merges
+// instead of waiting for the next kernel call to report.
+struct RunProgress {
+    materializr::PluginContext::HeavyProgress progress;
+    std::shared_ptr<bool> cancelled;
+    size_t total = 1;
+    std::shared_ptr<std::string> label = std::make_shared<std::string>();
+
+    // The reporter for step `step` (0-based) of `total`.
+    std::function<bool(float, const char*)> forStep(size_t step) const {
+        RunProgress me = *this;
+        return [me, step](float f, const char*) {
+            const float inStep = f < 0.0f ? 0.0f : (f > 1.0f ? 1.0f : f);
+            const float overall = (static_cast<float>(step) + inStep) / static_cast<float>(me.total);
+            *me.label = std::string(materializr::tr("Boolean")) + " " + std::to_string(step + 1) +
+                        " / " + std::to_string(me.total) + "\xE2\x80\xA6";
+            const bool c = me.progress(overall, me.label->c_str());
+            if (c) *me.cancelled = true;
+            return c;
+        };
+    }
+    // Draw the bar at the start of a step.
+    bool begin(size_t step) const { return forStep(step)(0.0f, ""); }
+};
+
 // Fold every body after the first into bodies[0] (target = the surviving first
 // body, each other a tool, consumed). Union/Intersect combine all; Subtract
 // cuts all the rest out of the first.
@@ -65,18 +95,15 @@ void runChainedBoolean(materializr::PluginContext& ctx,
     ctx.runHeavy(materializr::tr("Boolean\xE2\x80\xA6"),
                  [pc, bodies, mode](const materializr::PluginContext::HeavyProgress& progress) {
         auto cancelled = std::make_shared<bool>(false);
-        auto report = [progress, cancelled](float f, const char* l) {
-            const bool c = progress(f, l);
-            if (c) *cancelled = true;
-            return c;
-        };
+        RunProgress run{progress, cancelled, bodies.size() > 1 ? bodies.size() - 1 : 1};
         bool allOk = true;
         for (size_t i = 1; i < bodies.size() && allOk; ++i) {
+            if (run.begin(i - 1)) { allOk = false; break; }   // cancelled between merges
             auto op = std::make_unique<BooleanOp>();
             op->setTargetBodyId(bodies[0]);
             op->setToolBodyId(bodies[i]);
             op->setMode(mode);
-            op->setProgressReporter(report);
+            op->setProgressReporter(run.forStep(i - 1));
             BooleanOp* raw = op.get();
             allOk = pc->history().pushOperation(std::move(op), pc->document());
             if (allOk) raw->setProgressReporter({});   // a later replay must not paint a card
@@ -121,21 +148,19 @@ void runSubtractMulti(materializr::PluginContext& ctx,
     ctx.runHeavy(materializr::tr("Boolean\xE2\x80\xA6"),
                  [pc, targets, cutters, keepCutters](const materializr::PluginContext::HeavyProgress& progress) {
         auto cancelled = std::make_shared<bool>(false);
-        auto report = [progress, cancelled](float f, const char* l) {
-            const bool c = progress(f, l);
-            if (c) *cancelled = true;
-            return c;
-        };
+        RunProgress run{progress, cancelled, std::max<size_t>(1, cutters.size() * targets.size())};
+        size_t step = 0;
         bool allOk = true;
         for (int cutter : cutters) {
-            for (size_t i = 0; i < targets.size() && allOk; ++i) {
+            for (size_t i = 0; i < targets.size() && allOk; ++i, ++step) {
+                if (run.begin(step)) { allOk = false; break; }
                 bool lastUse = (i + 1 == targets.size());
                 auto op = std::make_unique<BooleanOp>();
                 op->setTargetBodyId(targets[i]);
                 op->setToolBodyId(cutter);
                 op->setMode(BooleanMode::Subtract);
                 op->setKeepTool(keepCutters || !lastUse);
-                op->setProgressReporter(report);
+                op->setProgressReporter(run.forStep(step));
                 BooleanOp* raw = op.get();
                 allOk = pc->history().pushOperation(std::move(op), pc->document());
                 if (allOk) raw->setProgressReporter({});

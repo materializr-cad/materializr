@@ -29,6 +29,7 @@
 #include "viewport/ViewCube.h"
 #include "viewport/Picker.h"
 #include "modeling/SketchRegionWorker.h"
+#include "ui/LandingPage.h"
 #include <TopExp.hxx>
 #include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
 #include <TopTools_IndexedMapOfShape.hxx>
@@ -428,8 +429,18 @@ void Application::renderViewport() {
 
         landMeshes(); // a finished worker mesh marks its body dirty
         // (A tab switch's full rebuild is queued behind the progress card.)
-        bool geomChanged = (m_meshesDirty || !m_dirtyBodyIds.empty()) && !tabMeshRebuildPending();
+        // Cancel on a tab's "Preparing view" card with nowhere to go back to leaves the
+        // tab unbuilt behind the Home Screen; it is built once the Home Screen is gone.
+        if (m_tabViewCancelled && !(m_landingPage && m_landingPage->isVisible())) {
+            m_tabViewCancelled = false;
+            m_meshesDirty = true;
+            queueTabMeshRebuild();
+        }
+        bool geomChanged = (m_meshesDirty || !m_dirtyBodyIds.empty()) &&
+                           !tabMeshRebuildPending() && !m_tabViewCancelled;
         if (geomChanged) {
+            // Sketches drawn on a body that just changed re-derive the face they sit on.
+            refreshHostFaces(m_meshesDirty ? nullptr : &m_dirtyBodyIds);
             rebuildMeshes();
             m_meshesDirty = false;
             // rebuildMeshes() also clears m_dirtyBodyIds on completion.
@@ -4004,6 +4015,17 @@ void Application::renderViewport() {
                         float t = glm::dot(cam.getTarget() - rayO, -viewDir) / denom;
                         if (t > 0.0f) focus = rayO + rayD * t;
                     }
+                }
+                // Zooming OUT from right beside a surface moves only a fraction of the
+                // distance to that surface, so wedged in a thin wall (or between two
+                // close ones) each notch crawls and you cannot get out. Out is not
+                // about what is under the cursor: when the surface is much closer than
+                // the target, step by the target's distance instead. In still homes in
+                // on the surface.
+                if (io.MouseWheel < 0.0f && gotHit &&
+                    glm::length(cam.getPosition() - focus) <
+                        0.25f * glm::length(cam.getPosition() - cam.getTarget())) {
+                    focus = cam.getTarget();
                 }
                 cam.zoomToward(focus, io.MouseWheel);
             }

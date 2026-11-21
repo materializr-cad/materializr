@@ -4,6 +4,7 @@
 #include "EdgeAnchor.h"
 #include "GenerationLedger.h"
 #include "TopoName.h"
+#include "FaceLineage.h"
 #include <TopoDS_Shape.hxx>
 #include <TopoDS_Edge.hxx>
 #include <TopoDS_Face.hxx>
@@ -79,6 +80,9 @@ private:
     std::vector<TopoDS_Edge> m_edges;
     double m_distance = 1.0;
     double m_distance2 = -1.0; // <=0 = symmetric (use m_distance for both faces)
+    // Ids minted for faces of the input nobody had named; reused on a replay of the
+    // same faces (see topo::completeStable).
+    materializr::topo::StableMint m_inMint;
     TopoDS_Shape m_previousShape; // for undo
     // Chamfer faces produced by the last execute(), so a clicked face can be
     // mapped back to this op for re-editing.

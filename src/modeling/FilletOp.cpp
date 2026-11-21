@@ -251,8 +251,8 @@ bool FilletOp::execute(Document& doc) {
         // pair capture, and is restored by undo (partial-replay lifeline).
         materializr::topo::FaceIdMap inLineage;
         if (const auto* im = doc.bodyFaceIds(m_bodyId)) inLineage = *im;
-        materializr::topo::complete(inLineage, m_previousShape,
-                                    [&doc]() { return doc.mintFaceId(); });
+        materializr::topo::completeStable(inLineage, m_previousShape,
+                                          [&doc]() { return doc.mintFaceId(); }, m_inMint);
 
         // Lineage-FIRST edge resolution (parity with ChamferOp, #52): each
         // edge named by its two adjacent faces' ancestry ids - immune to

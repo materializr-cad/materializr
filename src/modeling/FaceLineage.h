@@ -52,6 +52,22 @@ void addId(FaceIdMap& m, const TopoDS_Shape& face, int id);
 void complete(FaceIdMap& m, const TopoDS_Shape& shape,
               const std::function<int()>& mint);
 
+// What an op remembers between runs so the ids it minted for faces nobody named come
+// out the same on a replay. Without this a replay (a sketch or body move re-runs the
+// whole history) hands every face a NEW id, and a step that names an edge by the faces
+// beside it - a chamfer built on another chamfer's bevel - can no longer find it.
+struct StableMint {
+    std::vector<int> ids;                       // one per face minted, in shape order
+    std::vector<std::pair<int, double>> sig;    // that face's surface type + area
+};
+
+// complete(), but reuses `memo`'s ids when the faces to mint for are the same ones as
+// last time: same count, each with the same surface type and area. A move keeps all of
+// that; an edit that changes a face or reorders them does not, and gets fresh ids as
+// before (reusing them there could name the wrong face).
+void completeStable(FaceIdMap& m, const TopoDS_Shape& shape,
+                    const std::function<int()>& mint, StableMint& memo);
+
 FaceIdMap propagate(
     const std::vector<std::pair<const FaceIdMap*, TopoDS_Shape>>& inputs,
     const GenerationLedger& led, const TopoDS_Shape& result);

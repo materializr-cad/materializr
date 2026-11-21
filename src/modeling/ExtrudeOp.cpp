@@ -97,6 +97,21 @@ int pointsInsideFace(const TopoDS_Face& face, std::vector<gp_Pnt>& out,
                 if (cls.State() == TopAbs_IN) { out.push_back(p); ++added; }
             }
         }
+        // A thin frame - a ring a couple of millimetres wide round a large hole - can
+        // have every one of those 25 samples fall in the hole. A face with no points
+        // can not be recorded, and an extrude loaded from a file then replays from its
+        // frozen footprint and stops following its sketch (#185). Look finer.
+        if (added == 0) {
+            constexpr int N = 40;
+            for (int i = 1; i < N && added < maxPts; ++i) {
+                for (int j = 1; j < N && added < maxPts; ++j) {
+                    double u = u0 + (u1 - u0) * i / N, v = v0 + (v1 - v0) * j / N;
+                    gp_Pnt p = surf->Value(u, v);
+                    BRepClass_FaceClassifier cls(face, p, 1e-6);
+                    if (cls.State() == TopAbs_IN) { out.push_back(p); ++added; }
+                }
+            }
+        }
     } catch (...) {}
     return added;
 }

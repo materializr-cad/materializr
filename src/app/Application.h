@@ -245,6 +245,18 @@ private:
     bool m_tabMeshQueued = false;
     bool tabMeshRebuildPending() const { return m_tabMeshQueued && !m_deferredHeavy.empty(); }
     void queueTabMeshRebuild();
+    // The tabs the user came from, most recent last. Held by identity because the
+    // index of a tab moves when another one closes. Cancel on the "Preparing view"
+    // card walks back through it: to the tab you were on, and on from there.
+    std::vector<const ProjectSession*> m_tabBackStack;
+    // A switch made BY Cancel: the tab being left is not somewhere to come back to.
+    bool m_tabSwitchIsBack = false;
+    // Cancel left the active tab unbuilt (nothing to go back to, so it landed on the
+    // Home Screen); its view is built when it is next shown.
+    bool m_tabViewCancelled = false;
+    void pushTabBackStack(const ProjectSession* leaving);
+    void forgetTabInBackStack(const ProjectSession* gone);
+    void cancelTabView();
     // Run `apply` (an edit that adds or changes many bodies) between frames
     // behind the progress card, then tessellate what it touched on the worker
     // pool and rebuild the renderer meshes under the same card - instead of
@@ -754,6 +766,13 @@ private:
     // host face's wires (holes, fillets) into the sketch - and a push/pull
     // of a "circle around an existing hole" wrongly produces a solid bar.
     void ensureSketchSourceFace(int sketchId);
+    // A sketch drawn on a body keeps the 3D face it was drawn on (its regions graft that
+    // face's holes), and only loading a project ever re-derived it. After the host was
+    // rebuilt or moved the old face lingered - at its OLD place, drawn as a phantom
+    // outline that could still be picked (#185). Re-derive it for every sketch whose
+    // host body is in `onlyBodies` (all of them when null) and whose face is no longer
+    // part of that body.
+    void refreshHostFaces(const std::set<int>* onlyBodies);
 
     // Re-adopt the body a free-floating sketch sits flat ON. When a sketch has
     // no body link (never linked, e.g. drawn on a construction plane and used

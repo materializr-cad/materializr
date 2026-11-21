@@ -254,8 +254,8 @@ bool ChamferOp::execute(Document& doc) {
         // and the post-build recording key off.
         materializr::topo::FaceIdMap inLineage;
         if (const auto* im = doc.bodyFaceIds(m_bodyId)) inLineage = *im;
-        materializr::topo::complete(inLineage, m_previousShape,
-                                    [&doc]() { return doc.mintFaceId(); });
+        materializr::topo::completeStable(inLineage, m_previousShape,
+                                          [&doc]() { return doc.mintFaceId(); }, m_inMint);
 
         // Lineage-FIRST edge resolution (#52): each edge is named by its two
         // adjacent faces' ancestry ids - immune to ordinal drift and to the

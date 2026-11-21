@@ -1,7 +1,10 @@
 #include "FaceLineage.h"
 #include "GenerationLedger.h"
 
+#include <BRepAdaptor_Surface.hxx>
+#include <BRepGProp.hxx>
 #include <BRepTools_History.hxx>
+#include <GProp_GProps.hxx>
 #include <TopExp.hxx>
 #include <TopTools_IndexedMapOfShape.hxx>
 #include <TopTools_ListOfShape.hxx>
@@ -10,6 +13,7 @@
 
 #include <TopExp_Explorer.hxx>
 #include <algorithm>
+#include <cmath>
 
 namespace materializr {
 namespace topo {
@@ -105,5 +109,36 @@ void complete(FaceIdMap& m, const TopoDS_Shape& shape,
     for (TopExp_Explorer ex(shape, TopAbs_FACE); ex.More(); ex.Next())
         if (!idsFor(m, ex.Current()))
             addId(m, ex.Current(), mint());
+}
+
+void completeStable(FaceIdMap& m, const TopoDS_Shape& shape,
+                    const std::function<int()>& mint, StableMint& memo) {
+    if (shape.IsNull()) return;
+    std::vector<TopoDS_Shape> todo;
+    std::vector<std::pair<int, double>> sig;
+    for (TopExp_Explorer ex(shape, TopAbs_FACE); ex.More(); ex.Next()) {
+        if (idsFor(m, ex.Current())) continue;
+        todo.push_back(ex.Current());
+        int type = -1;
+        double area = 0.0;
+        try {
+            type = static_cast<int>(BRepAdaptor_Surface(TopoDS::Face(ex.Current())).GetType());
+            GProp_GProps g;
+            BRepGProp::SurfaceProperties(ex.Current(), g);
+            area = g.Mass();
+        } catch (...) {}
+        sig.push_back({type, area});
+    }
+    bool same = memo.ids.size() == todo.size() && memo.sig.size() == sig.size();
+    for (size_t i = 0; same && i < sig.size(); ++i)
+        same = memo.sig[i].first == sig[i].first &&
+               std::abs(memo.sig[i].second - sig[i].second) <=
+                   1e-4 * std::max(1.0, std::abs(sig[i].second));
+    if (!same) {
+        memo.ids.clear();
+        for (size_t i = 0; i < todo.size(); ++i) memo.ids.push_back(mint());
+        memo.sig = std::move(sig);
+    }
+    for (size_t i = 0; i < todo.size(); ++i) addId(m, todo[i], memo.ids[i]);
 }
 } }
