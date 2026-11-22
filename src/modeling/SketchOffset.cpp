@@ -839,6 +839,22 @@ float signedDistanceToChain(const OffsetChain& ch, glm::vec2 q) {
     if (ch.segs.empty()) return 0.0f;
 
     glm::vec2 n = rightNormal(ch.segs[bi].tangent(bt));
+    // Nearest to a corner of the chain: the point lies in the wedge beyond the vertex,
+    // and one edge's normal alone can put it on the wrong side. For the 60-degree
+    // corner of a triangle the outside wedge is 120 degrees wide, so a cursor in part
+    // of it read as INSIDE the triangle and the preview jumped to an inward offset
+    // (#182). The bisector of the two edges' normals is right anywhere in that wedge.
+    const size_t cnt = ch.segs.size();
+    const bool atEnd = bt >= 1.0f - 1e-6f, atStart = bt <= 1e-6f;
+    if (cnt > 1 && (atEnd || atStart)) {
+        const bool hasNeighbour = ch.closed || (atEnd ? bi + 1 < cnt : bi > 0);
+        if (hasNeighbour) {
+            const size_t nb = atEnd ? (bi + 1) % cnt : (bi + cnt - 1) % cnt;
+            const glm::vec2 nn = rightNormal(ch.segs[nb].tangent(atEnd ? 0.0f : 1.0f));
+            const glm::vec2 sum = n + nn;
+            if (glm::length(sum) > 1e-4f) n = glm::normalize(sum);
+        }
+    }
     // Sign from the normal, magnitude from the true distance: at a clamped end
     // the offset is not perpendicular, so the projection would understate it.
     return (glm::dot(q - ch.segs[bi].at(bt), n) >= 0.0f) ? best : -best;
@@ -1056,6 +1072,41 @@ void pruneOffset(OffsetResult& res, const OffsetChain& src, float d) {
     // Pieces cut at the sampled-distance band stop up to a few bands short of
     // where they would cross; for a sampled curve that is the same size as its error.
     joinAcrossLoops(kept, ad, hasSpline ? 6.0f * eps : 0.0f);
+    // A sampled spline offset that grazes a swallowtail - the curve turning inside a
+    // bend about as tight as the offset distance - can lose a stretch a few tenths of a
+    // millimetre long that no crossing of the kept pieces reaches: the loop's own
+    // crossings fall inside the band that was cut away. The offset is one unbroken curve
+    // there, so bridge the pieces with a straight chord when the gap is small beside
+    // the distance (#182). A bigger gap is a real absence and stays one.
+    if (hasSpline && kept.size() > 1) {
+        std::vector<OffsetSeg> bridged;
+        bridged.reserve(kept.size() * 2);
+        for (size_t k = 0; k < kept.size(); ++k) {
+            bridged.push_back(kept[k]);
+            if (k + 1 >= kept.size()) break;
+            // The ends the chain is joined on: an arc's stated end, a spline's last sample.
+            // at() on an arc is computed from its angles and can sit a few thousandths off.
+            auto endOf = [](const OffsetSeg& sg) {
+                return (sg.kind == OffsetSeg::Kind::Spline && !sg.pts.empty()) ? sg.pts.back() : sg.p1;
+            };
+            auto startOf = [](const OffsetSeg& sg) {
+                return (sg.kind == OffsetSeg::Kind::Spline && !sg.pts.empty()) ? sg.pts.front() : sg.p0;
+            };
+            const glm::vec2 a = endOf(kept[k]), b = startOf(kept[k + 1]);
+            const float gap = glm::length(b - a);
+            if (gap > 1e-3f && gap <= 0.35f * ad) {
+                OffsetSeg ln;
+                ln.kind = OffsetSeg::Kind::Line;
+                ln.sourceId = kept[k].sourceId;
+                ln.construction = kept[k].construction;
+                ln.p0 = a;
+                ln.p1 = b;
+                bridged.push_back(std::move(ln));
+                anyChange = true;
+            }
+        }
+        kept = std::move(bridged);
+    }
     res.segs = std::move(kept);
 
     if (res.segs.empty()) {

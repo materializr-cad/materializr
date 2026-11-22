@@ -17,6 +17,8 @@ using materializr::OffsetChain;
 using materializr::OffsetSeg;
 using materializr::Sketch;
 using materializr::walkOffsetChain;
+using materializr::signedDistanceToChain;
+using materializr::distanceToChain;
 
 namespace {
 
@@ -1397,4 +1399,62 @@ TEST(SketchOffsetClosed, InwardOffsetPastTheInradiusGivesNothing) {
     }
     EXPECT_EQ(refused, 2);
     EXPECT_EQ(grew, 2);
+}
+
+// #182 (Iron47, b862): around a triangle the Offset preview jumped to an inward offset
+// (and said the distance was too big) when the cursor was in part of the wedge beyond a
+// corner. A 60-degree corner has a 120-degree outside wedge, wider than one edge's
+// normal covers. Every cursor position outside the triangle reads as outside, on the
+// same side, at the distance to the nearest corner or edge.
+TEST(SketchOffsetClosed, CursorBeyondATriangleCornerIsAlwaysOutside) {
+    Sketch sk;
+    const int a = sk.addPoint({-7, 12.124f}), b = sk.addPoint({-7, -12.124f}), c = sk.addPoint({14, 0});
+    sk.addLine(a, b); sk.addLine(b, c); sk.addLine(c, a);
+    OffsetChain ch = walkOffsetChain(sk, {-7, 0}, 0.5f);
+    ASSERT_TRUE(ch.valid());
+    const float outside = signedDistanceToChain(ch, {100, 100}) > 0 ? 1.0f : -1.0f;
+    for (glm::vec2 corner : {glm::vec2(-7, 12.124f), glm::vec2(-7, -12.124f), glm::vec2(14, 0)}) {
+        for (int deg = 0; deg < 360; deg += 5) {
+            const float r = 3.0f, ang = static_cast<float>(deg) * 3.14159265f / 180.0f;
+            const glm::vec2 q = corner + glm::vec2(std::cos(ang), std::sin(ang)) * r;
+            const float d = signedDistanceToChain(ch, q);
+            EXPECT_NEAR(std::abs(d), distanceToChain(ch, q), 1e-3f);
+            // The directions that land inside the triangle itself are not the point here.
+            const bool insideTri = q.x > -7.0f && q.x < 14.0f &&
+                                   std::abs(q.y) < (14.0f - q.x) / 1.7320508f;
+            if (!insideTri && std::abs(d) > 1e-3f)   // a point ON an edge has no side
+                EXPECT_GT(d * outside, 0.0f) << "corner (" << corner.x << "," << corner.y
+                                              << ") at " << deg << " deg read as inside";
+        }
+    }
+}
+
+// #182 (Iron47, b862): where a spline bends about as tightly as the offset distance, the
+// offset grazes a swallowtail and the stretch it loses is bridged by no crossing of the
+// pieces either side: a gap of a few tenths of a millimetre at one distance (+2.5 here).
+TEST(SketchOffsetSpline, GrazedSwallowtailLeavesNoGap) {
+    Sketch sk;
+    const glm::vec2 ctrl[] = {
+        {55, -14}, {53, -22.5167f}, {52, -15}, {51, -22.5167f}, {48, -14}, {46, -22}, {46, -15},
+        {43.8564f, -23}, {39.9808f, -15}, {39, -25}, {34, -19}, {27, -28}, {15, -18.6667f},
+        {13, -31}, {9, -19}, {5, -29}, {5, -22}, {1, -26}, {-1, -21}, {-6.81056f, -26},
+        {-8.6862f, -19}, {-15, -26}, {-13.3923f, -20}, {-22, -22.3064f}, {-14, -16.1658f},
+        {-26, -16.1658f}, {-21, -13.2791f}, {-31, -12}, {-23, -6}, {-27, -2}};
+    std::vector<int> ids;
+    for (const auto& c : ctrl) ids.push_back(sk.addPoint(c));
+    sk.addSpline(ids);
+    const auto samples = sk.sampleSpline2D(sk.getSplines()[0], 6);
+    OffsetChain ch = walkOffsetChain(sk, samples[samples.size() / 2], 0.5f);
+    ASSERT_TRUE(ch.valid());
+    for (float d = -6.f; d <= 6.f; d += 0.1f) {
+        if (std::abs(d) < 0.01f) continue;
+        for (OffsetCorners oc : {OffsetCorners::Round, OffsetCorners::Sharp}) {
+            OffsetResult res = offsetChain(ch, d, oc);
+            pruneOffset(res, ch, d);
+            ASSERT_TRUE(res.valid) << "d=" << d;
+            std::vector<std::vector<glm::vec2>> runs;
+            densifySegs(res.segs, runs);
+            EXPECT_EQ(runs.size(), 1u) << "one unbroken offset curve at d=" << d;
+        }
+    }
 }
