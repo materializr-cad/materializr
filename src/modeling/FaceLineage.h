@@ -1,4 +1,5 @@
 #pragma once
+#include <string>
 // Face lineage - the "gen" coverage for op-PRODUCED faces (TopoName.h's
 // designed-but-unimplemented general kernel), scoped to the question that
 // actually bites: which op made the face under the cursor, after downstream
@@ -67,6 +68,14 @@ struct StableMint {
 // before (reusing them there could name the wrong face).
 void completeStable(FaceIdMap& m, const TopoDS_Shape& shape,
                     const std::function<int()>& mint, StableMint& memo);
+
+// Save / load a StableMint as two parameter values (ids, "type:area" signatures). The ids
+// a chamfer or fillet minted for unnamed faces are what its stored edge face-id pairs
+// refer to; without them a project reopened from a file hands those faces new ids on the
+// first replay, the pairs match nothing, and the step is switched off (#185).
+std::string mintIdsToString(const StableMint& memo);
+std::string mintSigToString(const StableMint& memo);
+void mintFromStrings(StableMint& memo, const std::string& ids, const std::string& sig);
 
 FaceIdMap propagate(
     const std::vector<std::pair<const FaceIdMap*, TopoDS_Shape>>& inputs,

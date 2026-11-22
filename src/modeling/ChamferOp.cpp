@@ -950,6 +950,9 @@ std::string ChamferOp::serializeParams() const {
         for (size_t i = 0; i < m_genFaceIds.size(); ++i)
             blob += (i ? "," : "") + std::to_string(m_genFaceIds[i]);
     }
+    if (!m_inMint.ids.empty())
+        blob += ";mint=" + materializr::topo::mintIdsToString(m_inMint) +
+                ";msig=" + materializr::topo::mintSigToString(m_inMint);
     std::string anc = EdgeAnchor::serialize(m_edgeAnchors);
     if (!anc.empty()) blob += ";anchor=" + anc;
     // Topological edge names (additive, LAST - length-prefixed opaque blobs
@@ -994,6 +997,8 @@ bool ChamferOp::deserializeParams(const std::string& blob) {
         else if (key == "edges")    { m_edgeIndices = SubShapeIndex::parse(val); any = true; }
         else if (key == "gen")      { m_genFaceIndices = SubShapeIndex::parse(val); any = true; }
         else if (key == "genids")   { m_genFaceIds = SubShapeIndex::parse(val); any = true; }
+        else if (key == "mint")     { m_mintIdsText = val; any = true; }
+        else if (key == "msig")     { materializr::topo::mintFromStrings(m_inMint, m_mintIdsText, val); any = true; }
         else if (key == "refid")    { m_refFaceId = std::atoi(val.c_str()); any = true; }
         else if (key == "edgefaces") {
             m_edgeFaceIdPairs.clear();

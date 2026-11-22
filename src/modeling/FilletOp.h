@@ -72,6 +72,7 @@ private:
     // Ids minted for faces of the input nobody had named; reused on a replay of the
     // same faces (see topo::completeStable).
     materializr::topo::StableMint m_inMint;
+    std::string m_mintIdsText;   // "mint=" read ahead of its "msig="
     TopoDS_Shape m_previousShape; // for undo
     // Fillet (blend) faces produced by the last execute(), so a clicked face can
     // be mapped back to this op for re-editing.

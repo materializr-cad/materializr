@@ -708,6 +708,9 @@ std::string FilletOp::serializeParams() const {
         if (!idx.empty()) blob += ";gen=" + idx;
     }
     // Generative anchors (additive; old readers ignore the key). See EdgeAnchor.
+    if (!m_inMint.ids.empty())
+        blob += ";mint=" + materializr::topo::mintIdsToString(m_inMint) +
+                ";msig=" + materializr::topo::mintSigToString(m_inMint);
     std::string anc = EdgeAnchor::serialize(m_edgeAnchors);
     if (!m_genFaceIds.empty()) {
         blob += ";genids=";
@@ -764,6 +767,8 @@ bool FilletOp::deserializeParams(const std::string& blob) {
         else if (key == "edges")  { m_edgeIndices = SubShapeIndex::parse(val); any = true; }
         else if (key == "gen")    { m_genFaceIndices = SubShapeIndex::parse(val); any = true; }
         else if (key == "genids") { m_genFaceIds = SubShapeIndex::parse(val); any = true; }
+        else if (key == "mint")     { m_mintIdsText = val; any = true; }
+        else if (key == "msig")     { materializr::topo::mintFromStrings(m_inMint, m_mintIdsText, val); any = true; }
         else if (key == "edgefaces") {
             m_edgeFaceIdPairs.clear();
             size_t q = 0;

@@ -1,3 +1,5 @@
+#include <cstdio>
+#include <cstdlib>
 #include "FaceLineage.h"
 #include "GenerationLedger.h"
 
@@ -140,5 +142,44 @@ void completeStable(FaceIdMap& m, const TopoDS_Shape& shape,
         memo.sig = std::move(sig);
     }
     for (size_t i = 0; i < todo.size(); ++i) addId(m, todo[i], memo.ids[i]);
+}
+
+std::string mintIdsToString(const StableMint& memo) {
+    std::string out;
+    for (size_t i = 0; i < memo.ids.size(); ++i)
+        out += (i ? "," : "") + std::to_string(memo.ids[i]);
+    return out;
+}
+
+std::string mintSigToString(const StableMint& memo) {
+    std::string out;
+    char b[64];
+    for (size_t i = 0; i < memo.sig.size(); ++i) {
+        std::snprintf(b, sizeof(b), "%s%d:%.9g", i ? "," : "", memo.sig[i].first, memo.sig[i].second);
+        out += b;
+    }
+    return out;
+}
+
+void mintFromStrings(StableMint& memo, const std::string& ids, const std::string& sig) {
+    StableMint m;
+    for (size_t q = 0; q < ids.size();) {
+        const size_t c = ids.find(',', q);
+        m.ids.push_back(std::atoi(ids.substr(q, c == std::string::npos ? std::string::npos : c - q).c_str()));
+        if (c == std::string::npos) break;
+        q = c + 1;
+    }
+    for (size_t q = 0; q < sig.size();) {
+        const size_t c = sig.find(',', q);
+        const std::string tok = sig.substr(q, c == std::string::npos ? std::string::npos : c - q);
+        const size_t col = tok.find(':');
+        if (col != std::string::npos)
+            m.sig.push_back({std::atoi(tok.c_str()), std::atof(tok.c_str() + col + 1)});
+        if (c == std::string::npos) break;
+        q = c + 1;
+    }
+    // Both lists or neither: a half-read pair would make the next replay reuse ids
+    // against the wrong faces.
+    if (!m.ids.empty() && m.ids.size() == m.sig.size()) memo = std::move(m);
 }
 } }
