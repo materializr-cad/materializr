@@ -6,6 +6,7 @@
 #include "FaceLineage.h"
 #include "SketchScope.h"
 #include <TopoDS_Shape.hxx>
+#include <gp_Ax3.hxx>
 #include <string>
 
 enum class ExtrudeMode { NewBody, Union, Subtract, Intersect };
@@ -131,6 +132,15 @@ private:
     // user later deleted/moved that geometry) - historically correct, and
     // never the catastrophic every-region fallback (#53).
     TopoDS_Shape m_recoveredProfile;
+    // The sketch plane's frame the saved footprint was laid on (it is translated onto the
+    // plane at recovery). A sketch that is later MOVED carries its extrude with it, but
+    // this profile is geometry, not sketch regions, so it stayed where it was and the
+    // body did not follow - everything built on it then failed and was switched off
+    // after Move Sketch on a reopened project (#185). The footprint is carried by the
+    // sketch's motion since this frame. Saved (fpf=) so the next load still knows.
+    gp_Ax3 m_recoveredFrame;
+    bool m_hasRecoveredFrame = false;
+    TopoDS_Shape recoveredOnSketch(const gp_Pln& now) const;
     // The boolean-mode footprint recovery has run (or a save recorded its
     // outcome), so a reload must not pay for the cut again.
     bool m_recoveryTried = false;

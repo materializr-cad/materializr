@@ -196,6 +196,58 @@ bool sharesBoundary(const TopoDS_Face& old, const TopoDS_Face& now) {
 }
 } // namespace
 
+namespace {
+// The faces of a recovered footprint come off the saved body's BASE, whose outward normal
+// points away from the extrusion - against the sketch plane's normal. An extrude sweeps
+// along its profile face's normal, so such a profile went the wrong way: a body made at
+// the wrong side of the sketch, on which everything built afterwards failed. Turn each
+// face to agree with the plane.
+TopoDS_Shape faceToPlane(const TopoDS_Shape& shape, const gp_Pln& pln) {
+    if (shape.IsNull()) return shape;
+    BRep_Builder bb;
+    TopoDS_Compound out;
+    bb.MakeCompound(out);
+    int n = 0;
+    for (TopExp_Explorer fx(shape, TopAbs_FACE); fx.More(); fx.Next()) {
+        TopoDS_Face f = TopoDS::Face(fx.Current());
+        try {
+            BRepAdaptor_Surface bs(f);
+            if (bs.GetType() == GeomAbs_Plane) {
+                gp_Dir nd = bs.Plane().Axis().Direction();
+                if (f.Orientation() == TopAbs_REVERSED) nd.Reverse();
+                if (nd.Dot(pln.Axis().Direction()) < 0.0) f.Reverse();
+            }
+        } catch (...) {}
+        bb.Add(out, f);
+        ++n;
+    }
+    if (n == 0) return shape;
+    if (n == 1) return TopExp_Explorer(out, TopAbs_FACE).Current();
+    return out;
+}
+} // namespace
+
+// The saved footprint, carried along with the sketch plane since it was laid on it.
+TopoDS_Shape ExtrudeOp::recoveredOnSketch(const gp_Pln& now) const {
+    if (m_recoveredProfile.IsNull()) return m_recoveredProfile;
+    if (!m_hasRecoveredFrame) return faceToPlane(m_recoveredProfile, now);
+    const gp_Ax3 to = now.Position();
+    const gp_Ax3& from = m_recoveredFrame;
+    if (from.Location().Distance(to.Location()) < 1e-9 &&
+        from.Direction().IsEqual(to.Direction(), 1e-9) &&
+        from.XDirection().IsEqual(to.XDirection(), 1e-9))
+        return faceToPlane(m_recoveredProfile, now);
+    try {
+        gp_Trsf toLocal, fromLocal;
+        toLocal.SetTransformation(from);       // world -> the frame it was laid on
+        fromLocal.SetTransformation(to);       // world -> the frame the sketch is on now
+        const gp_Trsf carry = fromLocal.Inverted().Multiplied(toLocal);
+        return faceToPlane(BRepBuilderAPI_Transform(m_recoveredProfile, carry, true).Shape(), now);
+    } catch (...) {
+        return faceToPlane(m_recoveredProfile, now);
+    }
+}
+
 bool ExtrudeOp::rebuildProfileFromSketch(Document& doc, bool adoptNewRegions, bool isLatest) {
     if (m_sketchId < 0) return false;
     auto sk = doc.getSketch(m_sketchId);
@@ -277,6 +329,7 @@ bool ExtrudeOp::rebuildProfileFromSketch(Document& doc, bool adoptNewRegions, bo
     // whose footprint couldn't be derived).
     if (!m_regionPts.empty()) {
         const gp_Pln pln = sk->getPlane();
+        const TopoDS_Shape recovered = recoveredOnSketch(pln);
         BRep_Builder bb;
         TopoDS_Compound keep;
         bb.MakeCompound(keep);
@@ -315,7 +368,7 @@ bool ExtrudeOp::rebuildProfileFromSketch(Document& doc, bool adoptNewRegions, bo
         // one on the flat top), so comparing the whole selection to the
         // footprint's total made every other hole look like ballooning and
         // swapped them all out for the one.
-        if (kept > 0 && !m_recoveredProfile.IsNull()) {
+        if (kept > 0 && !recovered.IsNull()) {
             auto areaOf = [](const TopoDS_Shape& s) {
                 GProp_GProps g;
                 BRepGProp::SurfaceProperties(s, g);
@@ -324,7 +377,7 @@ bool ExtrudeOp::rebuildProfileFromSketch(Document& doc, bool adoptNewRegions, bo
             for (size_t k = 0; k < keptFaces.size(); ++k) {
                 double aOrig = 0.0;
                 std::vector<TopoDS_Face> sharedFaces;
-                for (TopExp_Explorer ox(m_recoveredProfile, TopAbs_FACE); ox.More(); ox.Next()) {
+                for (TopExp_Explorer ox(recovered, TopAbs_FACE); ox.More(); ox.Next()) {
                     const TopoDS_Face& of = TopoDS::Face(ox.Current());
                     bool shares = false;
                     for (size_t pi : faceHits[k]) {
@@ -347,7 +400,7 @@ bool ExtrudeOp::rebuildProfileFromSketch(Document& doc, bool adoptNewRegions, bo
                     std::fprintf(stderr, "[Extrude] matched region area %.0f far "
                                  "exceeds the original footprint %.0f - using the "
                                  "saved footprint profile\n", aNow, aOrig);
-                    m_profile = m_recoveredProfile;
+                    m_profile = recovered;
                     return true;
                 }
             }
@@ -370,22 +423,23 @@ bool ExtrudeOp::rebuildProfileFromSketch(Document& doc, bool adoptNewRegions, bo
                                   : TopoDS_Shape(keep);
             return true;
         }
-        if (!m_recoveredProfile.IsNull()) {
+        if (!recovered.IsNull()) {
             // The recorded regions are GONE from the sketch (later deleted /
             // moved). Sweep the historically-correct footprint instead of
             // every region the sketch now has.
             std::fprintf(stderr, "[Extrude] recorded regions missing from the "
                          "sketch - using the saved footprint profile\n");
-            m_profile = m_recoveredProfile;
+            m_profile = recovered;
             return true;
         }
         std::fprintf(stderr, "[Extrude] recorded regions not found in the "
                      "sketch's current shape - falling back to ALL regions\n");
     } else if (!m_recoveredProfile.IsNull()) {
+        const TopoDS_Shape recovered = recoveredOnSketch(sk->getPlane());
         // No recorded points at all (old file whose footprint faces were
         // recovered but couldn't be point-sampled) - the recovered faces are
         // still the exact historical profile; sweep them, never ALL regions.
-        m_profile = m_recoveredProfile;
+        m_profile = recovered;
         std::fprintf(stderr, "[Extrude] no region points - using the saved "
                      "footprint profile directly\n");
         return true;
@@ -823,6 +877,14 @@ std::string ExtrudeOp::serializeParams() const {
             fp = os.str();
         }
         blob += ";fp=" + std::to_string(fp.size()) + ":" + fp;
+        if (m_hasRecoveredFrame) {
+            const gp_Pnt o = m_recoveredFrame.Location();
+            const gp_Dir n = m_recoveredFrame.Direction(), x = m_recoveredFrame.XDirection();
+            char fb[256];
+            std::snprintf(fb, sizeof(fb), ";fpf=%.12g,%.12g,%.12g,%.12g,%.12g,%.12g,%.12g,%.12g,%.12g;",
+                          o.X(), o.Y(), o.Z(), n.X(), n.Y(), n.Z(), x.X(), x.Y(), x.Z());
+            blob += fb;
+        }
     }
     if (m_sketchId < 0 && !m_profile.IsNull()) {
         std::ostringstream os;
@@ -854,6 +916,26 @@ bool ExtrudeOp::deserializeParams(const std::string& rawBlob) {
             }
             m_recoveryTried = true;   // either way, the answer is known
             blob = blob.substr(0, fkey) + blob.substr(payload + n);
+        }
+    }
+    // The frame that footprint was laid on (see m_recoveredFrame): ";fpf=<9 numbers>;".
+    {
+        const size_t k = blob.find(";fpf=");
+        if (k != std::string::npos) {
+            const size_t e = blob.find(';', k + 5);
+            if (e != std::string::npos) {
+                double v[9] = {0, 0, 0, 0, 0, 1, 1, 0, 0};
+                if (std::sscanf(blob.substr(k + 5, e - k - 5).c_str(),
+                                "%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf",
+                                &v[0], &v[1], &v[2], &v[3], &v[4], &v[5], &v[6], &v[7], &v[8]) == 9) {
+                    try {
+                        m_recoveredFrame = gp_Ax3(gp_Pnt(v[0], v[1], v[2]), gp_Dir(v[3], v[4], v[5]),
+                                                  gp_Dir(v[6], v[7], v[8]));
+                        m_hasRecoveredFrame = true;
+                    } catch (...) {}
+                }
+                blob = blob.substr(0, k) + blob.substr(e);
+            }
         }
     }
     // Optional trailing BREP blob (face-driven profile): "brep=<len>:<raw>".
@@ -952,6 +1034,12 @@ bool ExtrudeOp::rehydrateFromReload(const ReloadState& state, Document& doc) {
         // which corrupts the body and breaks every downstream fillet/chamfer.
         // For old files that carry no seeds, derive them here too so the
         // replay stops grabbing every region.
+        if (m_sketchId >= 0 && !m_recoveredProfile.IsNull() && !m_hasRecoveredFrame) {
+            if (auto skf = doc.getSketch(m_sketchId)) {
+                m_recoveredFrame = skf->getPlane().Position();   // a file from before the frame was kept
+                m_hasRecoveredFrame = true;
+            }
+        }
         if (m_sketchId >= 0 && !state.createdAfter.empty()) {
             auto sk = doc.getSketch(m_sketchId);
             const TopoDS_Shape& made = state.createdAfter.front().second;
@@ -964,6 +1052,8 @@ bool ExtrudeOp::rehydrateFromReload(const ReloadState& state, Document& doc) {
                     rb.MakeCompound(rc);
                     for (const auto& f : faces) rb.Add(rc, f);
                     m_recoveredProfile = unifyProfile(rc);
+                    m_recoveredFrame = pln.Position();
+                    m_hasRecoveredFrame = true;
                 }
                 if (m_regionPts.empty()) {
                     std::vector<std::pair<double,double>> pts =
@@ -1029,6 +1119,8 @@ bool ExtrudeOp::rehydrateFromReload(const ReloadState& state, Document& doc) {
                         rb.MakeCompound(rc);
                         for (const auto& f : faces) rb.Add(rc, f);
                         m_recoveredProfile = unifyProfile(rc);
+                    m_recoveredFrame = pln.Position();
+                    m_hasRecoveredFrame = true;
                     }
                     if (m_regionPts.empty()) {
                         std::vector<std::pair<double,double>> pts =

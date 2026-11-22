@@ -617,3 +617,81 @@ TEST(BodyMovePlan, ChamferBuiltOnAChamferFollowsTheMove) {
     for (int i = 0; i < hist.stepCount(); ++i)
         EXPECT_TRUE(hist.getStep(i)->isEnabled()) << "step " << i << " was switched off";
 }
+
+// #185 (Iron47): Move Sketch on a REOPENED project switched off everything built on the
+// first extrude. A reopened extrude whose recorded regions are no longer in the sketch
+// sweeps the footprint saved with its body - geometry on the plane at load time - and
+// that did not move with the sketch, so the body stayed behind and the Push/Pull and
+// chamfers on it failed. The footprint now travels with the sketch plane.
+namespace {
+// What Application::rebuildHistoryFromProject does for a reloaded extrude: a fresh op from
+// the saved params, rehydrated against the saved result body.
+std::unique_ptr<ExtrudeOp> reloadedExtrude(const std::string& params, int bodyId,
+                                           const TopoDS_Shape& saved, Document& doc) {
+    auto op = std::make_unique<ExtrudeOp>();
+    EXPECT_TRUE(op->deserializeParams(params));
+    Operation::ReloadState rs;
+    rs.created.push_back(bodyId);
+    rs.createdAfter.push_back({bodyId, saved});
+    EXPECT_TRUE(op->rehydrateFromReload(rs, doc));
+    return op;
+}
+}
+
+TEST(ReloadedExtrude, FollowsASketchMovedAfterTheReload) {
+    // The original project.
+    Document orig; History histOrig;
+    const int s = addRect(orig, 0, -10, -10, 20, 20, -1);
+    ASSERT_TRUE(pushExtrude(histOrig, orig, s, 25));
+    const int b = orig.getAllBodyIds().front();
+    const std::string params = histOrig.getStep(0)->serializeParams();
+    const TopoDS_Shape saved = orig.getBody(b);
+
+    // The reopened one: the sketch's contour has since changed, so the recorded region is
+    // gone and the saved footprint is what the extrude sweeps.
+    Document doc;
+    const int s2 = addRect(doc, 0, 30, 30, 20, 20, -1);
+    ASSERT_EQ(s2, s);
+    auto op = reloadedExtrude(params, b, saved, doc);
+    ASSERT_TRUE(op->rebuildProfileFromSketch(doc));
+    ASSERT_TRUE(op->execute(doc));
+    ASSERT_NEAR(minZ(doc.getBody(b)), 0.0, 1e-6) << "setup: the footprint is swept where it was";
+
+    // The sketch is moved (what Move Sketch does), then the extrude is replayed.
+    ASSERT_TRUE(op->undo(doc));
+    auto sk = doc.getSketch(s);
+    gp_Trsf t; t.SetTranslation(gp_Vec(0, 0, 40));
+    gp_Pln moved = sk->getPlane();
+    moved.Transform(t);
+    sk->setPlane(moved);
+    ASSERT_TRUE(op->rebuildProfileFromSketch(doc));
+    ASSERT_TRUE(op->execute(doc));
+    EXPECT_NEAR(minZ(doc.getBody(b)), 40.0, 1e-6) << "the body went with the sketch";
+}
+
+TEST(ReloadedExtrude, TheFootprintFrameSurvivesSaveAndLoad) {
+    Document orig; History histOrig;
+    const int s = addRect(orig, 0, -10, -10, 20, 20, -1);
+    ASSERT_TRUE(pushExtrude(histOrig, orig, s, 25));
+    const int b = orig.getAllBodyIds().front();
+    const TopoDS_Shape saved = orig.getBody(b);
+
+    Document doc;
+    addRect(doc, 0, 30, 30, 20, 20, -1);
+    auto op = reloadedExtrude(histOrig.getStep(0)->serializeParams(), b, saved, doc);
+    // Saved again, then opened a second time with the sketch somewhere else.
+    const std::string again = op->serializeParams();
+    EXPECT_NE(again.find(";fpf="), std::string::npos);
+    Document doc2;
+    const int s3 = addRect(doc2, 40, 30, 30, 20, 20, -1);
+    auto op2 = std::make_unique<ExtrudeOp>();
+    ASSERT_TRUE(op2->deserializeParams(again));
+    Operation::ReloadState rs;
+    rs.created.push_back(b);
+    rs.createdAfter.push_back({b, saved});
+    ASSERT_TRUE(op2->rehydrateFromReload(rs, doc2));
+    ASSERT_TRUE(op2->rebuildProfileFromSketch(doc2));
+    ASSERT_TRUE(op2->execute(doc2));
+    EXPECT_NEAR(minZ(doc2.getBody(b)), 40.0, 1e-6)
+        << "the saved frame says where the footprint was; the sketch is now 40 higher (sketch " << s3 << ")";
+}
