@@ -251,6 +251,9 @@ private:
     std::vector<const ProjectSession*> m_tabBackStack;
     // A switch made BY Cancel: the tab being left is not somewhere to come back to.
     bool m_tabSwitchIsBack = false;
+    // The switch was asked for from the Home Screen's open-projects strip, which has
+    // already hidden the page by the time it calls in.
+    bool m_tabSwitchFromHome = false;
     // Cancel left the active tab unbuilt (nothing to go back to, so it landed on the
     // Home Screen); its view is built when it is next shown.
     bool m_tabViewCancelled = false;
@@ -312,6 +315,8 @@ private:
     // touch shell's top bar, and nothing else - the Ctrl+Z shortcut has its
     // own copy in handleShortcuts pending a merge).
     void undoWithCascade();
+    bool deferHeavyUndoRedo(bool redo);
+    bool m_inDeferredUndoRedo = false;
     void redoWithCascade();
     // Sketch-aware undo for the touch shell's top-bar Undo button: in sketch
     // mode it mirrors the Ctrl+Z sketch behaviour (cancel an in-progress shape

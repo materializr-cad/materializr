@@ -559,6 +559,27 @@ public:
     // Resize that rectangle to width × height, holding its centre fixed.
     void setRectangleSize(int lineId, double width, double height);
 
+    // Rotate a set of points about `center`, each from its recorded `originals`
+    // position, by `rad`. Built for the Rotate gizmo, which re-applies it every
+    // frame (and again from the typed angle), so it always starts from
+    // `baseConstraints` - the constraints as they stood before the rotation
+    // began - rather than from whatever the previous call left behind.
+    //
+    // The constraints that pin a shape to the sketch axes cannot survive a
+    // rotation: a rectangle made of Horizontal/Vertical sides was flattened by
+    // the solver the moment the gizmo turned it, because every quarter-turn
+    // asked a side to be horizontal and vertical at once. For sides that are
+    // rotated whole (both ends in the set):
+    //   - a quarter turn swaps Horizontal <-> Vertical;
+    //   - any other angle swaps them for the relationships they implied
+    //     (sides parallel to each other, the two directions square), which
+    //     hold at every angle;
+    //   - a Fixed point that is rotated is re-pinned where it lands, and a
+    //     Distance between two rotated points turns its remembered direction.
+    void rotatePointsAbout(const std::vector<std::pair<int, glm::vec2>>& originals,
+                           glm::vec2 center, double rad,
+                           const std::vector<Constraint>& baseConstraints);
+
     // --- Constraints (entirely opt-in; only user-applied constraints land here) ---
     // The solver reads from and writes back to this vector. Constraints persist
     // with the sketch so multiple sketches don't share solver state and project

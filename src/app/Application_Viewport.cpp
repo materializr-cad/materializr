@@ -6641,12 +6641,8 @@ void Application::renderViewport() {
                             if (std::abs(angDeg - snapped) < 3.0f) angDeg = snapped;
                             m_sketchGizmoRotateDegrees = angDeg;
                             float rad = angDeg * static_cast<float>(M_PI) / 180.0f;
-                            float ca = std::cos(rad), sa = std::sin(rad);
-                            for (auto& [id, orig] : m_sketchGizmoOriginals) {
-                                glm::vec2 d = orig - m_sketchGizmoCenter;
-                                glm::vec2 r(d.x * ca - d.y * sa, d.x * sa + d.y * ca);
-                                m_activeSketch->movePoint(id, m_sketchGizmoCenter + r);
-                            }
+                            m_activeSketch->rotatePointsAbout(m_sketchGizmoOriginals, m_sketchGizmoCenter,
+                                                              rad, m_sketchGizmoBefore->getConstraints());
                         }
                     } else {
                         glm::vec2 delta = cur - m_sketchGizmoAnchor;
@@ -6755,12 +6751,8 @@ void Application::renderViewport() {
                             (void)materializr::parseFinite(m_sketchGizmoRotateBuf, deg);
                             m_sketchGizmoRotateDegrees = deg;
                             float rad = deg * static_cast<float>(M_PI) / 180.0f;
-                            float ca = std::cos(rad), sa = std::sin(rad);
-                            for (auto& [id, orig] : m_sketchGizmoOriginals) {
-                                glm::vec2 d = orig - m_sketchGizmoCenter;
-                                glm::vec2 r(d.x * ca - d.y * sa, d.x * sa + d.y * ca);
-                                m_activeSketch->movePoint(id, m_sketchGizmoCenter + r);
-                            }
+                            m_activeSketch->rotatePointsAbout(m_sketchGizmoOriginals, m_sketchGizmoCenter,
+                                                              rad, m_sketchGizmoBefore->getConstraints());
                         }
                         ImGui::Separator();
                         bool apply  = ImGui::Button(materializr::tr("Apply"), materializr::uiSz(70, 0)) || typedEnter;
@@ -6771,12 +6763,8 @@ void Application::renderViewport() {
                             float deg = m_sketchGizmoRotateDegrees;
                             (void)materializr::parseFinite(m_sketchGizmoRotateBuf, deg);
                             float rad = deg * static_cast<float>(M_PI) / 180.0f;
-                            float ca = std::cos(rad), sa = std::sin(rad);
-                            for (auto& [id, orig] : m_sketchGizmoOriginals) {
-                                glm::vec2 d = orig - m_sketchGizmoCenter;
-                                glm::vec2 r(d.x * ca - d.y * sa, d.x * sa + d.y * ca);
-                                m_activeSketch->movePoint(id, m_sketchGizmoCenter + r);
-                            }
+                            m_activeSketch->rotatePointsAbout(m_sketchGizmoOriginals, m_sketchGizmoCenter,
+                                                              rad, m_sketchGizmoBefore->getConstraints());
                             bool changed = false;
                             for (auto& [id, orig] : m_sketchGizmoOriginals) {
                                 if (auto* p = m_activeSketch->getPoint(id))
@@ -6805,6 +6793,8 @@ void Application::renderViewport() {
                         } else if (cancel) {
                             for (auto& [id, orig] : m_sketchGizmoOriginals)
                                 m_activeSketch->movePoint(id, orig);
+                            if (m_sketchGizmoBefore)
+                                m_activeSketch->getMutableConstraints() = m_sketchGizmoBefore->getConstraints();
                             m_sketchGizmoHandle = SketchGizmoHandle::None;
                             m_sketchGizmoBefore.reset();
                             m_sketchGizmoOriginals.clear();

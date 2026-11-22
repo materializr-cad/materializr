@@ -1332,3 +1332,8 @@ target_link_libraries(probe_report_holes PRIVATE materializr_core)
 add_executable(test_construction_visibility test_construction_visibility.cpp)
 target_link_libraries(test_construction_visibility PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_construction_visibility COMMAND test_construction_visibility)
+
+# test_sketch_rotate_constraints - the rotate gizmo must not flatten an H/V rectangle (#187)
+add_executable(test_sketch_rotate_constraints test_sketch_rotate_constraints.cpp)
+target_link_libraries(test_sketch_rotate_constraints PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_sketch_rotate_constraints COMMAND test_sketch_rotate_constraints)

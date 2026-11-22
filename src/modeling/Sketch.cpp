@@ -1264,6 +1264,96 @@ bool constraintIsArcRadius(const Sketch& sk, const Constraint& c) {
     return false;
 }
 
+void Sketch::rotatePointsAbout(const std::vector<std::pair<int, glm::vec2>>& originals,
+                               glm::vec2 center, double rad,
+                               const std::vector<Constraint>& baseConstraints) {
+    const double ca = std::cos(rad), sa = std::sin(rad);
+    auto rot = [&](glm::vec2 d) {
+        return glm::vec2(float(d.x * ca - d.y * sa), float(d.x * sa + d.y * ca));
+    };
+
+    std::set<int> inSet;
+    for (const auto& o : originals) inSet.insert(o.first);
+
+    // Start from the constraints as they were, with ids that cannot collide
+    // with the ones this call adds.
+    m_constraints = baseConstraints;
+    int maxId = 0;
+    for (const auto& c : m_constraints) maxId = std::max(maxId, c.id);
+    m_nextConstraintId = std::max(maxId + 1, 1);
+
+    const double halfPi = 1.5707963267948966;
+    const double q = std::round(rad / halfPi);
+    const bool quarterTurn = std::abs(rad - q * halfPi) < 1e-4;
+    const bool oddQuarter  = quarterTurn && (std::llround(q) % 2 != 0);
+
+    std::map<int, const SketchLine*> lineById;
+    for (const auto& l : m_lines) lineById[l.id] = &l;
+    auto wholeLine = [&](int lineId) {
+        auto it = lineById.find(lineId);
+        return it != lineById.end() &&
+               inSet.count(it->second->startPointId) &&
+               inSet.count(it->second->endPointId);
+    };
+
+    std::vector<int> hLines, vLines;
+    if (!(quarterTurn && !oddQuarter)) {
+        for (auto& c : m_constraints) {
+            if ((c.type == ConstraintType::Horizontal || c.type == ConstraintType::Vertical)
+                && wholeLine(c.entityA)) {
+                if (oddQuarter) {
+                    c.type = (c.type == ConstraintType::Horizontal)
+                                 ? ConstraintType::Vertical : ConstraintType::Horizontal;
+                } else if (c.type == ConstraintType::Horizontal) {
+                    hLines.push_back(c.entityA);
+                } else {
+                    vLines.push_back(c.entityA);
+                }
+            }
+        }
+    }
+    if (!quarterTurn && (!hLines.empty() || !vLines.empty())) {
+        std::set<int> dropIds;
+        for (const auto& c : m_constraints)
+            if ((c.type == ConstraintType::Horizontal || c.type == ConstraintType::Vertical)
+                && wholeLine(c.entityA))
+                dropIds.insert(c.id);
+        m_constraints.erase(
+            std::remove_if(m_constraints.begin(), m_constraints.end(),
+                           [&](const Constraint& c) { return dropIds.count(c.id) > 0; }),
+            m_constraints.end());
+        auto add = [&](ConstraintType t, int a, int b) {
+            Constraint c; c.id = 0; c.type = t; c.entityA = a; c.entityB = b;
+            c.isSatisfied = true;
+            addConstraint(c);
+        };
+        for (size_t i = 1; i < hLines.size(); ++i) add(ConstraintType::Parallel, hLines[0], hLines[i]);
+        for (size_t i = 1; i < vLines.size(); ++i) add(ConstraintType::Parallel, vLines[0], vLines[i]);
+        if (!hLines.empty() && !vLines.empty())
+            add(ConstraintType::Perpendicular, hLines[0], vLines[0]);
+    }
+
+    // Move the points, remembering where each landed for the Fixed pins.
+    std::map<int, glm::vec2> landed;
+    for (const auto& [id, orig] : originals) {
+        glm::vec2 np = center + rot(orig - center);
+        landed[id] = np;
+        movePoint(id, np);
+    }
+    for (auto& c : m_constraints) {
+        if (c.type == ConstraintType::Fixed) {
+            auto it = landed.find(c.entityA);
+            if (it != landed.end()) { c.value = it->second.x; c.valueY = it->second.y; }
+        } else if (c.type == ConstraintType::Distance &&
+                   inSet.count(c.entityA) && inSet.count(c.entityB) &&
+                   (c.orientX != 0.0 || c.orientY != 0.0)) {
+            const double ox = c.orientX, oy = c.orientY;
+            c.orientX = ox * ca - oy * sa;
+            c.orientY = ox * sa + oy * ca;
+        }
+    }
+}
+
 int Sketch::addConstraint(const Constraint& c) {
     Constraint copy = c;
     copy.id = m_nextConstraintId++;

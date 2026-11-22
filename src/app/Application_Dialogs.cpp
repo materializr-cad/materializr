@@ -7878,8 +7878,10 @@ void Application::renderLandingPage() {
     case AT::SwitchTab:
         // Back to a project that is already open: the page just closes over it.
         m_landingPage->setVisible(false);
+        m_tabSwitchFromHome = true;
         if (act.tab != m_activeSession && !switchToSession(act.tab))
             m_landingPage->setVisible(true);   // refused: stay where we are
+        m_tabSwitchFromHome = false;
         m_tabSelectionSync = true;             // classic tab bar re-asserts the selection
         break;
     case AT::ExportStep:

@@ -12,6 +12,10 @@
 #include <cstring>
 #include <iostream>
 
+#if defined(_WIN32)
+#include <windows.h>
+#endif
+
 #if defined(__linux__)
 #include <execinfo.h>
 #include <signal.h>
@@ -152,6 +156,23 @@ struct CurlGlobalGuard {
     CurlGlobalGuard() { curl_global_init(CURL_GLOBAL_DEFAULT); }
     ~CurlGlobalGuard() { curl_global_cleanup(); }
 } g_curlGlobalGuard;
+
+#if defined(_WIN32)
+// The exe is a console program, so a console window opens first. QuickEdit mode freezes
+// a console's output the moment it is clicked (the click starts a text selection, and
+// every write to the console then blocks until a key is pressed) - and the app writes
+// its startup log there, so a click on that window froze the whole program before its
+// own window appeared (#188). Mouse selection is not something the console is used for.
+struct ConsoleQuickEditOff {
+    ConsoleQuickEditOff() {
+        HANDLE in = GetStdHandle(STD_INPUT_HANDLE);
+        DWORD mode = 0;
+        if (in && in != INVALID_HANDLE_VALUE && GetConsoleMode(in, &mode))
+            SetConsoleMode(in, (mode & ~static_cast<DWORD>(ENABLE_QUICK_EDIT_MODE)) |
+                                   ENABLE_EXTENDED_FLAGS);
+    }
+} g_consoleQuickEditOff;   // runs before main: the window is up while the DLLs load
+#endif
 
 } // namespace
 

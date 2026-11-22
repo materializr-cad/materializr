@@ -777,8 +777,18 @@ bool Application::switchToSession(size_t idx) {
 
     // Where Cancel on the incoming tab's card goes back to. A tab left behind by a
     // Cancel itself is not one to return to.
-    if (!m_tabSwitchIsBack && m_activeSession < m_sessions.size())
-        pushTabBackStack(m_sessions[m_activeSession].get());
+    // The Home Screen counts as a place to go back to (a null entry): a tab opened from
+    // it, then cancelled, returns there rather than to whatever tab sat behind it.
+    if (!m_tabSwitchIsBack) {
+        if (m_tabSwitchFromHome || (m_landingPage && m_landingPage->isVisible())) {
+            m_tabBackStack.erase(std::remove(m_tabBackStack.begin(), m_tabBackStack.end(),
+                                             static_cast<const ProjectSession*>(nullptr)),
+                                 m_tabBackStack.end());
+            m_tabBackStack.push_back(nullptr);
+        } else if (m_activeSession < m_sessions.size()) {
+            pushTabBackStack(m_sessions[m_activeSession].get());
+        }
+    }
     m_tabViewCancelled = false;
     adoptSession(idx);
 
@@ -854,6 +864,7 @@ void Application::cancelTabView() {
     while (!m_tabBackStack.empty()) {
         const ProjectSession* target = m_tabBackStack.back();
         m_tabBackStack.pop_back();
+        if (!target) break;   // the Home Screen
         size_t idx = m_sessions.size();
         for (size_t i = 0; i < m_sessions.size(); ++i)
             if (m_sessions[i].get() == target) { idx = i; break; }
@@ -1854,6 +1865,12 @@ bool Application::renderProgressFrame(float fraction, const char* label) {
     if (fraction == 0.0f) m_progressCancelled = false;
     if (!would) return m_progressCancelled;
 
+    // What the task last said is what the keep-alive pump repeats between its own
+    // reports. It used to repaint an unlabelled spinner, so a Boolean's "Boolean 11 / 29"
+    // bar flipped to a bare sweeping one and back (#181).
+    m_heavyProgressFrac = fraction;
+    m_heavyProgressLabel = label ? label : "";
+
     m_window->pollEvents();
     int fbw = 0, fbh = 0;
     m_window->framebufferSize(fbw, fbh);   // SDL backend (upstream used glfw here)
@@ -1925,7 +1942,38 @@ bool Application::progressFrameWouldDraw(float fraction) const {
 // src/app/layout/LayoutCommon.cpp; the per-layout chrome is under
 // src/app/layout/{classic,modern,imtouch}/.
 
+// An Undo/Redo that re-runs a Boolean (or anything on a big project) blocks the window
+// for as long as that takes, and nothing said so (#181). Run it between frames behind
+// the card instead; a light step is left to run in the frame as it always did.
+bool Application::deferHeavyUndoRedo(bool redo) {
+    if (m_inDeferredUndoRedo || m_inSketchMode || !m_history || !m_document) return false;
+    const int at = m_history->currentStep() + (redo ? 1 : 0);
+    const Operation* op = m_history->getStep(at);
+    if (!op || !op->isEnabled()) return false;
+    constexpr size_t kHeavyBodies = 15;
+    const bool heavy = op->typeId() == "boolean" ||
+                       m_document->getAllBodyIds().size() >= kHeavyBodies;
+    if (!heavy) return false;
+    m_deferredHeavy.queue([this, redo]() {
+        if (!m_history || !m_document) return;
+        struct Guard {
+            bool& noCancel; bool prev; bool& flag;
+            ~Guard() { noCancel = prev; flag = false; }
+        } guard{m_progressNoCancel, m_progressNoCancel, m_inDeferredUndoRedo};
+        m_progressNoCancel = true;
+        m_inDeferredUndoRedo = true;
+        renderProgressFrame(-1.0f, redo ? materializr::tr("Redoing\xE2\x80\xA6")
+                                        : materializr::tr("Undoing\xE2\x80\xA6"));
+        if (m_selection) m_selection->clear();
+        m_hoveredBodyId = -1;
+        if (redo) { if (m_history->canRedo()) redoWithCascade(); }
+        else      { if (m_history->canUndo()) undoWithCascade(); }
+    });
+    return true;
+}
+
 void Application::undoWithCascade() {
+    if (deferHeavyUndoRedo(false)) return;
     auto trackBodies = trackBodyChanges();
     m_history->undo(*m_document);
     const int idx = m_history->lastUndoneStep();
@@ -1935,6 +1983,7 @@ void Application::undoWithCascade() {
 }
 
 void Application::redoWithCascade() {
+    if (deferHeavyUndoRedo(true)) return;
     auto trackBodies = trackBodyChanges();
     m_history->redo(*m_document);
     const int idx = m_history->lastRedoneStep();
@@ -3371,6 +3420,8 @@ void Application::handleShortcuts() {
             // Ctrl+Z then undoes committed elements as usual.
             if (m_inSketchMode && m_sketchTool && m_sketchTool->isPlacing()) {
                 m_sketchTool->onCancel();
+            } else if (m_history->canUndo() && !m_inSketchMode && deferHeavyUndoRedo(false)) {
+                // queued: runs between frames behind the progress card
             } else if (m_history->canUndo() &&
                        // In sketch mode, NEVER undo past the sketch's own edits
                        // into the host body - rolling the body back while the
@@ -3410,7 +3461,9 @@ void Application::handleShortcuts() {
         // hammering undo produces.
         if (!m_edgeCtl.active() && !m_extrudeCtl.active() && !m_ppCtl.active() &&
             m_deferredHeavy.empty()) {
-            if (m_history->canRedo()) {
+            if (m_history->canRedo() && !m_inSketchMode && deferHeavyUndoRedo(true)) {
+                // queued: runs between frames behind the progress card
+            } else if (m_history->canRedo()) {
                 auto trackBodies = trackBodyChanges(); // re-tessellate only what changes
                 m_history->redo(*m_document);
                 const int idx = m_history->lastRedoneStep();
@@ -3667,6 +3720,8 @@ void Application::handleShortcuts() {
             if (m_activeSketch) {
                 for (auto& [id, orig] : m_sketchGizmoOriginals)
                     m_activeSketch->movePoint(id, orig);
+                if (m_sketchGizmoBefore)
+                    m_activeSketch->getMutableConstraints() = m_sketchGizmoBefore->getConstraints();
             }
             m_sketchGizmoHandle = SketchGizmoHandle::None;
             m_sketchGizmoBefore.reset();
