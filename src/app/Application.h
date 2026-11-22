@@ -254,6 +254,9 @@ private:
     // The switch was asked for from the Home Screen's open-projects strip, which has
     // already hidden the page by the time it calls in.
     bool m_tabSwitchFromHome = false;
+    // The session entered from the Home Screen by the latest switch (null once another
+    // switch has been made); closing it goes back to the Home Screen.
+    const ProjectSession* m_enteredFromHome = nullptr;
     // Cancel left the active tab unbuilt (nothing to go back to, so it landed on the
     // Home Screen); its view is built when it is next shown.
     bool m_tabViewCancelled = false;
@@ -517,6 +520,7 @@ private:
     // etc.) the just-created session is cleaned up again. False = nothing
     // happened (the refusal already toasted).
     bool openNewTab();
+    void loadProjectIntoNewTab(bool fromHome);
     // True when the active tab is an untouched empty workspace (no project,
     // no geometry, no history) - i.e. safe to load into without displacing
     // anything the user still wants.

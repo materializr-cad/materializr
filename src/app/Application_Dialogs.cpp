@@ -7848,13 +7848,22 @@ void Application::renderLandingPage() {
         static_cast<unsigned int>(layoutui::logoTexture()));
     const LandingPage::Action act = m_landingPage->render();
     using AT = LandingPage::ActionType;
+    // A tab made from the Home Screen remembers that it was: Cancel on its loading card,
+    // or closing it, goes back to the Home Screen (#184). The page has already been
+    // hidden by the time the tab is made, so say so explicitly.
+    auto openTabFromHome = [this]() {
+        m_tabSwitchFromHome = true;
+        const bool ok = openNewTab();
+        m_tabSwitchFromHome = false;
+        return ok;
+    };
     switch (act.type) {
     case AT::NewProject:
         m_landingPage->setVisible(false);
         // An empty tab is reused; otherwise a new one, so the project behind
         // the page survives (same rule as the recent tiles below).
         if (activeSessionIsScratch()) closeProject();
-        else openNewTab();
+        else openTabFromHome();
         break;
     case AT::OpenEntry: {
         m_landingPage->setVisible(false);
@@ -7866,14 +7875,14 @@ void Application::renderLandingPage() {
         // session via File → Home Screen, so loading in place would displace
         // work the user only meant to set aside. An untouched empty
         // workspace is loaded into directly - no point stacking a blank tab.
-        if (!activeSessionIsScratch() && !openNewTab()) break;
+        if (!activeSessionIsScratch() && !openTabFromHome()) break;
         openRecentProject(rp);   // resolves URIs, bumps the MRU, toasts failures
         break;
     }
     case AT::OpenFileDialog:
         m_landingPage->setVisible(false);
-        if (!activeSessionIsScratch() && !openNewTab()) break;
-        loadProject();
+        if (activeSessionIsScratch()) loadProject();      // an empty tab is loaded into
+        else loadProjectIntoNewTab(/*fromHome=*/true);    // otherwise the tab is made after the pick
         break;
     case AT::SwitchTab:
         // Back to a project that is already open: the page just closes over it.

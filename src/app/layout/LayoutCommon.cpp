@@ -312,8 +312,14 @@ void Application::renderViewportTabBar() {
             tif |= ImGuiTabItemFlags_SetSelected;
         if (sessionDirty(i)) tif |= ImGuiTabItemFlags_UnsavedDocument;
         bool open = true;
-        const bool visible =
-            ImGui::BeginTabItem(sessionDisplayLabel(i).c_str(), &open, tif);
+        // The ID is the SESSION's, not its title: ImGui keys the selected tab on the
+        // label, so a tab renamed by the project it just loaded (Untitled -> its file
+        // name) looked like the selected tab had vanished, ImGui fell back to the first
+        // tab, and the check below took that for a click - Open File from the Home
+        // Screen then dropped you back on the tab you had left (#184).
+        const std::string tabLabel = sessionDisplayLabel(i) + "###tab" +
+            std::to_string(reinterpret_cast<std::uintptr_t>(m_sessions[i].get()));
+        const bool visible = ImGui::BeginTabItem(tabLabel.c_str(), &open, tif);
         if (ImGui::BeginPopupContextItem("tabctx")) {
             renderTabMenuItems(i);
             ImGui::EndPopup();

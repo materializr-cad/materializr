@@ -779,8 +779,9 @@ bool Application::switchToSession(size_t idx) {
     // Cancel itself is not one to return to.
     // The Home Screen counts as a place to go back to (a null entry): a tab opened from
     // it, then cancelled, returns there rather than to whatever tab sat behind it.
+    const bool fromHome = m_tabSwitchFromHome || (m_landingPage && m_landingPage->isVisible());
     if (!m_tabSwitchIsBack) {
-        if (m_tabSwitchFromHome || (m_landingPage && m_landingPage->isVisible())) {
+        if (fromHome) {
             m_tabBackStack.erase(std::remove(m_tabBackStack.begin(), m_tabBackStack.end(),
                                              static_cast<const ProjectSession*>(nullptr)),
                                  m_tabBackStack.end());
@@ -791,6 +792,8 @@ bool Application::switchToSession(size_t idx) {
     }
     m_tabViewCancelled = false;
     adoptSession(idx);
+    // The tab just entered from the Home Screen, so closing it goes back there.
+    m_enteredFromHome = (fromHome && !m_tabSwitchIsBack) ? m_sessions[idx].get() : nullptr;
 
     // Shelve the outgoing tab's GPU meshes on EVERY platform (uniform by
     // design - an invisible tab holds no GPU memory) and queue the incoming
@@ -883,6 +886,10 @@ void Application::cancelTabView() {
 void Application::closeSession(size_t idx) {
     if (idx >= m_sessions.size()) return;
     const bool wasActive = (idx == m_activeSession);
+    // A tab entered from the Home Screen and closed straight away goes back there.
+    const bool backToHome = wasActive && m_enteredFromHome &&
+                            m_sessions[idx].get() == m_enteredFromHome;
+    if (m_sessions[idx].get() == m_enteredFromHome) m_enteredFromHome = nullptr;
     // Closing the tab you are sketching in ends that sketch with it. The sketch
     // session lives on the Application, not on the session, so without this it
     // outlived the tab: the next New Project came up with the same sketch open
@@ -939,6 +946,7 @@ void Application::closeSession(size_t idx) {
         // a bare untitled workspace (Steve, 2026-07-28). With other tabs
         // still open, the neighbor takes over instead, browser-style.
         if (closedLast) showLandingPage(/*fromStartup=*/true);
+        else if (backToHome && m_landingPage) showLandingPage(/*fromStartup=*/false);
     } else if (m_activeSession > idx) {
         // The vector shifted under the active index; the session object (and
         // the mirrors into it) are untouched.
@@ -5293,6 +5301,20 @@ void Application::loadProject() {
     FileDialogs::openFile("Open Project",
         {{"Materializr Project", "*.mzr *.materializr"}, {"All Files", "*"}},
         [this](const std::string& path) { openProjectPath(path); });
+}
+
+// The picker first, the tab after: a tab made beforehand was an empty "Untitled" left
+// behind when the picker was cancelled, and sat in the way when it was not (#184). The
+// file goes into a tab of its own unless the open one is untouched, and an already-open
+// project just gets its tab shown.
+void Application::loadProjectIntoNewTab(bool fromHome) {
+    FileDialogs::openFile("Open Project",
+        {{"Materializr Project", "*.mzr *.materializr"}, {"All Files", "*"}},
+        [this, fromHome](const std::string& path) {
+            m_tabSwitchFromHome = fromHome;
+            openProjectInNewTab(path);
+            m_tabSwitchFromHome = false;
+        });
 }
 
 void Application::openProjectPath(const std::string& path) {
