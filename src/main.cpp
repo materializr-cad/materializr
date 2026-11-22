@@ -1,6 +1,7 @@
 #include "app/Application.h"
 #include "core/LogCapture.h"
 #include "core/Verbose.h"
+#include "core/WinStdio.h"
 
 #include <OSD.hxx>
 #include <Standard_Failure.hxx>
@@ -157,26 +158,14 @@ struct CurlGlobalGuard {
     ~CurlGlobalGuard() { curl_global_cleanup(); }
 } g_curlGlobalGuard;
 
-#if defined(_WIN32)
-// The exe is a console program, so a console window opens first. QuickEdit mode freezes
-// a console's output the moment it is clicked (the click starts a text selection, and
-// every write to the console then blocks until a key is pressed) - and the app writes
-// its startup log there, so a click on that window froze the whole program before its
-// own window appeared (#188). Mouse selection is not something the console is used for.
-struct ConsoleQuickEditOff {
-    ConsoleQuickEditOff() {
-        HANDLE in = GetStdHandle(STD_INPUT_HANDLE);
-        DWORD mode = 0;
-        if (in && in != INVALID_HANDLE_VALUE && GetConsoleMode(in, &mode))
-            SetConsoleMode(in, (mode & ~static_cast<DWORD>(ENABLE_QUICK_EDIT_MODE)) |
-                                   ENABLE_EXTENDED_FLAGS);
-    }
-} g_consoleQuickEditOff;   // runs before main: the window is up while the DLLs load
-#endif
-
 } // namespace
 
 int main(int argc, char* argv[]) {
+#if defined(_WIN32)
+    // First thing: this is a GUI-subsystem exe with no console of its own (#188).
+    // Hooks up the launching terminal, if any, so --help and the log still show.
+    materializr::winstdio::init();
+#endif
     // Line-buffer stdout even when it's a pipe (journald, a log file). Block
     // buffering held MINUTES of prints and flushed them in one burst, giving
     // every journal line the same timestamp - which made an input-storm

@@ -58,9 +58,13 @@ void installStderrTee() {
     std::fflush(stderr);
     int fds[2] = {-1, -1};
 #if defined(_WIN32)
+    // stderr's own descriptor: 2 normally, but a GUI-subsystem exe that was
+    // re-pointed at a terminal or NUL (core/WinStdio.h) has it on a later one.
+    const int errFd = _fileno(stderr);
+    if (errFd < 0) return;
     if (_pipe(fds, 1 << 16, _O_BINARY) != 0) return;
-    const int orig = _dup(2);          // -1 for a GUI build with no console: fine
-    if (_dup2(fds[1], 2) != 0) { _close(fds[0]); _close(fds[1]); return; }
+    const int orig = _dup(errFd);      // -1 when there is nowhere to forward: fine
+    if (_dup2(fds[1], errFd) != 0) { _close(fds[0]); _close(fds[1]); return; }
     _close(fds[1]);
 #define MZ_LC_READ(fd, buf, n)  _read((fd), (buf), static_cast<unsigned>(n))
 #define MZ_LC_WRITE(fd, buf, n) _write((fd), (buf), static_cast<unsigned>(n))

@@ -534,6 +534,14 @@ target_link_libraries(materializr PRIVATE Threads::Threads)
 # ─── Windows specifics ───────────────────────────────────────────────────────
 # Everything here is gated on Windows/MSVC, so the Linux build is unaffected.
 if(WIN32)
+    # GUI subsystem: double-clicking the exe opens only its window. As a console
+    # program it opened a black console first, and clicking that froze the app
+    # (#188). main() is still the entry point (no WinMain), hence /ENTRY. Output
+    # to a terminal is re-attached at the top of main() - see core/WinStdio.h.
+    set_target_properties(materializr PROPERTIES WIN32_EXECUTABLE ON)
+    if(MSVC)
+        target_link_options(materializr PRIVATE /ENTRY:mainCRTStartup)
+    endif()
     # GL loader (opengl32.dll only provides GL 1.1). GLEW comes from vcpkg.
     find_package(GLEW REQUIRED)
     target_link_libraries(materializr PRIVATE GLEW::GLEW)
