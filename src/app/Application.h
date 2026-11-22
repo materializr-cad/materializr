@@ -254,9 +254,11 @@ private:
     // The switch was asked for from the Home Screen's open-projects strip, which has
     // already hidden the page by the time it calls in.
     bool m_tabSwitchFromHome = false;
-    // The session entered from the Home Screen by the latest switch (null once another
-    // switch has been made); closing it goes back to the Home Screen.
-    const ProjectSession* m_enteredFromHome = nullptr;
+    // Every tab that was entered from the Home Screen. Closing one of them goes back to the
+    // Home Screen, however many switches there have been since (open two from Home, flip
+    // between them, close both: Home, not the tab that was behind the page). Held by
+    // identity; a tab leaves the set when it closes.
+    std::set<const ProjectSession*> m_homeEntered;
     // Cancel left the active tab unbuilt (nothing to go back to, so it landed on the
     // Home Screen); its view is built when it is next shown.
     bool m_tabViewCancelled = false;
@@ -627,7 +629,7 @@ private:
     // doesn't exist in the destination project/tab at all.
     void exportSketchesToNewProject(const std::vector<int>& sketchIds);
     void sendSketchesToTab(const std::vector<int>& sketchIds, size_t tabIndex);
-    void loadProject();         // File dialog → loadProjectAt
+    void loadProject(bool fromHome = false);   // File dialog → loadProjectAt
     // The post-picker half of loadProject(): focus-if-open, unsaved-changes
     // guard, load, Open Recent. Also what a dropped .mzr runs.
     void openProjectPath(const std::string& path);

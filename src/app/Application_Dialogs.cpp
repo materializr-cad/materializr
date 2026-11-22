@@ -7880,8 +7880,8 @@ void Application::renderLandingPage() {
         break;
     }
     case AT::OpenFileDialog:
-        m_landingPage->setVisible(false);
-        if (activeSessionIsScratch()) loadProject();      // an empty tab is loaded into
+        // The page stays up behind the picker and goes when a file is chosen (#184).
+        if (activeSessionIsScratch()) loadProject(/*fromHome=*/true);   // an empty tab is loaded into
         else loadProjectIntoNewTab(/*fromHome=*/true);    // otherwise the tab is made after the pick
         break;
     case AT::SwitchTab:

@@ -193,3 +193,66 @@ TEST(ReloadThenMove, ChamferedFrameFollowsAMovedSketch) { runScene(false); }
 // A file saved before the unnamed-face ids were kept (runScene(true) strips the mint= of its
 // chamfers) cannot follow a move with a chamfer built on another chamfer: the second one's
 // edges are named by ids that are lost, and it is switched off. Everything else follows.
+
+// The same chamfered frame moved LIVE, several times and along different axes, with no
+// save/reopen in between (Iron47's b866 projects: "a single move breaks the second chamfer,
+// a few more moves, especially along Z, break another"). Every step must stay on and the
+// body must follow each move; undoing each move must put the body back.
+static bool moveSketchLive(History& hist, Document& doc, int sid, double dx, double dy, double dz) {
+    auto mv = std::make_unique<SketchTransformOp>();
+    mv->setSketch(sid);
+    gp_Trsf t; t.SetTranslation(gp_Vec(dx, dy, dz));
+    mv->setTransform(t);
+    if (!hist.pushOperation(std::move(mv), doc)) return false;
+    const int earliest = rederiveSketchDrivenOps(hist, doc, sid);
+    if (earliest < 0) return true;
+    doc.setCascadeSketchOverride(sid, std::make_shared<Sketch>(*doc.getSketch(sid)));
+    const bool ok = hist.editStep(earliest, doc, /*transactional=*/true);
+    doc.clearCascadeSketchOverrides();
+    return ok;
+}
+
+TEST(LiveMoves, ChamferedFrameSurvivesRepeatedMoves) {
+    Document doc; History hist;
+    const int sid = doc.addSketch(frameSketch(), "Sketch 1");
+    auto ext = std::make_unique<ExtrudeOp>();
+    ext->setSketchSource(sid);
+    ext->setDistance(20.0);
+    ASSERT_TRUE(ext->rebuildProfileFromSketch(doc));
+    ASSERT_TRUE(hist.pushOperation(std::move(ext), doc));
+    const int b = doc.getAllBodyIds().front();
+    auto verticals = edgesWhere(doc.getBody(b), outerVertical);
+    auto c1 = std::make_unique<ChamferOp>();
+    c1->setBody(b); c1->setEdges(verticals); c1->setDistance(1.4); c1->setSourceSketch(sid);
+    ASSERT_TRUE(hist.pushOperation(std::move(c1), doc));
+    auto shorts = edgesWhere(doc.getBody(b), shortTop);
+    auto c2 = std::make_unique<ChamferOp>();
+    c2->setBody(b); c2->setEdges(shorts); c2->setDistance(0.6); c2->setSourceSketch(sid);
+    ASSERT_TRUE(hist.pushOperation(std::move(c2), doc));
+    const double built = vol(doc.getBody(b));
+
+    struct Mv { double x, y, z; } moves[] = {
+        {0, 0, 40}, {16, 0, 0}, {0, 0, 18}, {0, 0, -7.5}, {3.25, -4.5, 0}, {0, 0, 0.3}, {-20, 10, -50},
+    };
+    double ax = 0, ay = 0, az = 0;
+    int n = 0;
+    for (const auto& m : moves) {
+        ++n;
+        ASSERT_TRUE(moveSketchLive(hist, doc, sid, m.x, m.y, m.z)) << "move " << n << " failed at step " << hist.lastEditFailStep();
+        ax += m.x; ay += m.y; az += m.z;
+        for (int i = 0; i < 3; ++i)
+            EXPECT_TRUE(hist.getStep(i)->isEnabled()) << "move " << n << ": step " << i << " [" << hist.getStep(i)->typeId() << "] switched off";
+        ASSERT_EQ(doc.getAllBodyIds().size(), 1u);
+        EXPECT_NEAR(minZ(doc.getBody(doc.getAllBodyIds().front())), az, 1e-5) << "move " << n;
+        EXPECT_NEAR(vol(doc.getBody(doc.getAllBodyIds().front())), built, 1e-3) << "move " << n;
+    }
+    (void)ax; (void)ay;
+
+    // Undo every move: the chamfers and the body come back each time.
+    for (int k = n; k >= 1; --k) {
+        ASSERT_TRUE(hist.undo(doc)) << "undo " << k;
+        for (int i = 0; i < 3; ++i)
+            EXPECT_TRUE(hist.getStep(i)->isEnabled()) << "after undo " << k << ": step " << i << " switched off";
+        EXPECT_NEAR(vol(doc.getBody(doc.getAllBodyIds().front())), built, 1e-3) << "after undo " << k;
+    }
+}

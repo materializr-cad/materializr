@@ -793,7 +793,7 @@ bool Application::switchToSession(size_t idx) {
     m_tabViewCancelled = false;
     adoptSession(idx);
     // The tab just entered from the Home Screen, so closing it goes back there.
-    m_enteredFromHome = (fromHome && !m_tabSwitchIsBack) ? m_sessions[idx].get() : nullptr;
+    if (fromHome && !m_tabSwitchIsBack) m_homeEntered.insert(m_sessions[idx].get());
 
     // Shelve the outgoing tab's GPU meshes on EVERY platform (uniform by
     // design - an invisible tab holds no GPU memory) and queue the incoming
@@ -887,9 +887,8 @@ void Application::closeSession(size_t idx) {
     if (idx >= m_sessions.size()) return;
     const bool wasActive = (idx == m_activeSession);
     // A tab entered from the Home Screen and closed straight away goes back there.
-    const bool backToHome = wasActive && m_enteredFromHome &&
-                            m_sessions[idx].get() == m_enteredFromHome;
-    if (m_sessions[idx].get() == m_enteredFromHome) m_enteredFromHome = nullptr;
+    const bool backToHome = wasActive && m_homeEntered.count(m_sessions[idx].get()) > 0;
+    m_homeEntered.erase(m_sessions[idx].get());
     // Closing the tab you are sketching in ends that sketch with it. The sketch
     // session lives on the Application, not on the session, so without this it
     // outlived the tab: the next New Project came up with the same sketch open
@@ -5297,10 +5296,17 @@ void Application::openRecentProject(const AppSettings::RecentProject& r) {
     }); });
 }
 
-void Application::loadProject() {
+// `fromHome`: asked for on the Home Screen, which stays up while the picker is open and
+// only goes away once a file has been chosen - hiding it first showed whatever tab sat
+// behind it, and left the user there if they cancelled (#184).
+void Application::loadProject(bool fromHome) {
     FileDialogs::openFile("Open Project",
         {{"Materializr Project", "*.mzr *.materializr"}, {"All Files", "*"}},
-        [this](const std::string& path) { openProjectPath(path); });
+        [this, fromHome](const std::string& path) {
+            if (path.empty()) return;
+            if (fromHome && m_landingPage) m_landingPage->setVisible(false);
+            openProjectPath(path);
+        });
 }
 
 // The picker first, the tab after: a tab made beforehand was an empty "Untitled" left
@@ -5311,6 +5317,8 @@ void Application::loadProjectIntoNewTab(bool fromHome) {
     FileDialogs::openFile("Open Project",
         {{"Materializr Project", "*.mzr *.materializr"}, {"All Files", "*"}},
         [this, fromHome](const std::string& path) {
+            if (path.empty()) return;
+            if (fromHome && m_landingPage) m_landingPage->setVisible(false);
             m_tabSwitchFromHome = fromHome;
             openProjectInNewTab(path);
             m_tabSwitchFromHome = false;
