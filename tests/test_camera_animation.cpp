@@ -276,3 +276,24 @@ TEST(CameraZoom, PerspectiveZoomOutStopsAtTheLimitAndComesBack) {
     for (int i = 0; i < 2000; ++i) cam.zoomToward(focus, 3.0f);
     EXPECT_LT(glm::length(cam.getPosition() - cam.getTarget()), far * 0.01f);
 }
+
+// Wedged in a thin wall the camera is a fraction of a millimetre from the surface it
+// zooms about, and each notch out moved it a few hundredths of a millimetre: scrolling
+// as fast as the wheel goes did not get out (#185, Iron47). A notch out now moves at
+// least a millimetre.
+TEST(CameraZoom, ZoomingOutFromBesideASurfaceGetsAwayQuickly) {
+    Camera cam;
+    cam.setTarget(glm::vec3(0.0f));
+    cam.setPosition(glm::vec3(0.0f, 0.0f, 0.3f));          // 0.3 mm from the surface
+    const glm::vec3 focus(0.0f);
+    for (int i = 0; i < 8; ++i) cam.zoomToward(focus, -1.0f);
+    EXPECT_GT(glm::length(cam.getPosition() - focus), 7.0f)
+        << "eight notches out reach several millimetres";
+    // Out in the open the step is still proportional, not a fixed jump.
+    cam.setPosition(glm::vec3(0.0f, 0.0f, 500.0f));
+    const float before = glm::length(cam.getPosition() - focus);
+    cam.zoomToward(focus, -1.0f);
+    const float after = glm::length(cam.getPosition() - focus);
+    EXPECT_LT(after, before * 1.5f);
+    EXPECT_GT(after, before * 1.01f);
+}

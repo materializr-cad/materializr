@@ -143,6 +143,12 @@ public:
     // kilometres (a country). Hyper-scrolling out of a wall used to fly the camera off
     // to where the grid broke up and the model could not be found again.
     static constexpr float kMaxPerspectiveDistance = 1.0e9f;
+    // A perspective zoom OUT moves the camera at least this far (mm) per notch. A notch is a
+    // fraction of the distance to the zoom focus, so wedged in a thin wall, or between two
+    // surfaces a millimetre apart, it moved the camera by a few hundredths of a millimetre
+    // and "hyper-scrolling" got you nowhere (#185, Iron47). Past a millimetre the fraction
+    // is the larger step again.
+    static constexpr float kMinZoomOutStep = 1.0f;
 
     /// When true (default), orbiting is a level turntable around world up (the
     /// horizon never rolls). When false, orbiting is a free trackball.

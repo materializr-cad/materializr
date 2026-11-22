@@ -265,6 +265,11 @@ void Camera::zoomToward(const glm::vec3& focus, float delta)
         m_target   += slide;
         return;
     }
+    if (factor > 1.0f) {
+        const float toFocus = glm::length(m_position - focus);
+        if (toFocus > 1e-4f && toFocus * (factor - 1.0f) < kMinZoomOutStep)
+            factor = std::min(10.0f, 1.0f + kMinZoomOutStep / toFocus);
+    }
     glm::vec3 newPos    = focus + (m_position - focus) * factor;
     glm::vec3 newTarget = focus + (m_target   - focus) * factor;
     // Don't let the camera pass through (or onto) the focus point - keep at
