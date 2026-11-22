@@ -1343,6 +1343,11 @@ add_executable(test_sketch_rect_drag test_sketch_rect_drag.cpp)
 target_link_libraries(test_sketch_rect_drag PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_sketch_rect_drag COMMAND test_sketch_rect_drag)
 
+# test_sketch_edit_keeps_host - replaying a sketch's edits keeps the body it is drawn on (#185)
+add_executable(test_sketch_edit_keeps_host test_sketch_edit_keeps_host.cpp)
+target_link_libraries(test_sketch_edit_keeps_host PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_sketch_edit_keeps_host COMMAND test_sketch_edit_keeps_host)
+
 # test_reload_then_move - a saved and reopened history still follows a moved sketch (#185)
 add_executable(test_reload_then_move test_reload_then_move.cpp)
 target_link_libraries(test_reload_then_move PRIVATE materializr_core gtest gtest_main)

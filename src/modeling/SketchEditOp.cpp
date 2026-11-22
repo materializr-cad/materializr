@@ -1,6 +1,7 @@
 #include "ui/LengthField.h"
 #include "core/Units.h"
 #include "SketchEditOp.h"
+#include <TopoDS_Face.hxx>
 #include "SketchSolver.h"
 #include <imgui.h>
 #include <algorithm>
@@ -23,9 +24,25 @@ SketchEditOp::SketchEditOp(std::shared_ptr<Sketch> liveSketch,
       m_before(std::move(beforeSnapshot)),
       m_after(std::move(afterSnapshot)) {}
 
+// Put a snapshot's GEOMETRY into the live sketch without touching which body it is drawn on.
+// The host link (source body / face, detached flag) is not something an edit changes, and the
+// snapshots of a REOPENED project do not carry it (the loader reads it for the live sketch only),
+// so copying the whole sketch wrote "no host" over a sketch drawn on a body every time a replay
+// walked through its edits. The next move of the sketch under it then left that sketch behind,
+// and the features built from it could no longer follow (#185).
+static void assignKeepingHost(Sketch& target, const Sketch& snapshot) {
+    const int host = target.getSourceBody();
+    const bool detached = target.isDetachedFromBody();
+    const TopoDS_Face face = target.getSourceFace();
+    target = snapshot;
+    target.setSourceBody(host);
+    target.setDetachedFromBody(detached);
+    if (!face.IsNull()) target.setSourceFace(face);
+}
+
 bool SketchEditOp::execute(Document& doc) {
     if (!m_target || !m_after) return false;
-    *m_target = *m_after;
+    assignKeepingHost(*m_target, *m_after);
     for (const auto& f : m_followerMoves)
         if (auto fs = doc.getSketch(f.id)) fs->setPlane(f.after);
     return true;
@@ -33,7 +50,7 @@ bool SketchEditOp::execute(Document& doc) {
 
 bool SketchEditOp::undo(Document& doc) {
     if (!m_target || !m_before) return false;
-    *m_target = *m_before;
+    assignKeepingHost(*m_target, *m_before);
     for (const auto& f : m_followerMoves)
         if (auto fs = doc.getSketch(f.id)) fs->setPlane(f.before);
     return true;
