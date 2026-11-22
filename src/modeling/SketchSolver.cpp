@@ -224,6 +224,30 @@ bool SketchSolver::solve(Sketch& sketch, int maxIterations, double tolerance) {
         if (len > 1e-10f) { c.orientX = d.x / len; c.orientY = d.y / len; }
     }
 
+    // A relaxation that diverges does not stop: it carries the points out to 1e12
+    // and beyond, and because the convergence tolerance scales with the size of
+    // the sketch it can even report that as "solved". The result is saved into
+    // the project and breaks every view of it (#187, build 865: a dragged
+    // rectangle ended at 1e13 and the whole viewport went with it). Remember
+    // where everything was so such a pass can be thrown away instead.
+    std::vector<std::pair<int, glm::vec2>> beforeSolve;
+    beforeSolve.reserve(sketch.getPoints().size());
+    for (const auto& pt : sketch.getPoints()) beforeSolve.push_back({pt.id, pt.pos});
+    auto runawayAndUndone = [&]() {
+        constexpr float kRunaway = 1e7f;   // 10 km of sketch: not a drawing
+        bool bad = false;
+        for (const auto& pt : sketch.getPoints())
+            if (!std::isfinite(pt.pos.x) || !std::isfinite(pt.pos.y) ||
+                std::fabs(pt.pos.x) > kRunaway || std::fabs(pt.pos.y) > kRunaway) {
+                bad = true;
+                break;
+            }
+        if (!bad) return false;
+        for (const auto& [id, pos] : beforeSolve) sketch.movePoint(id, pos);
+        for (auto& c : constraints) c.isSatisfied = false;
+        return true;
+    };
+
     // Iterative relaxation
     for (int iter = 0; iter < maxIterations; ++iter) {
         double maxError = 0.0;
@@ -249,6 +273,7 @@ bool SketchSolver::solve(Sketch& sketch, int maxIterations, double tolerance) {
         }
 
         if (maxError <= tolerance) {
+            if (runawayAndUndone()) return false;
             // Mark all as satisfied
             for (auto& c : constraints) {
                 c.isSatisfied = true;
@@ -258,6 +283,7 @@ bool SketchSolver::solve(Sketch& sketch, int maxIterations, double tolerance) {
         }
     }
 
+    runawayAndUndone();
     refreshReferenceValues();
     return false;
 }
@@ -604,6 +630,32 @@ double SketchSolver::computeError(const Constraint& c, const Sketch& sketch) con
     return 0.0;
 }
 
+// Swing `lineB` (keeping its length) until it points along `dir`, pivoting on
+// whichever end does not belong to `lineA`.
+//
+// Parallel and Perpendicular read A's direction from A's own end points, so a
+// correction that moves a point A shares with B changes the very direction it
+// is chasing. For two sides that meet at a corner (a rectangle's neighbours)
+// that made each pass overshoot by the ratio of the side lengths: any rectangle
+// longer on B's side than on A's spun itself out to 1e12 under a drag (#187).
+// Pivoting on the shared corner and moving B's far end leaves A untouched, so
+// the correction lands in one step.
+static void turnLineTo(Sketch& sketch, const SketchLine& lineA, const SketchLine& lineB,
+                       glm::vec2 dir) {
+    const SketchPoint* sb = sketch.getPoint(lineB.startPointId);
+    const SketchPoint* eb = sketch.getPoint(lineB.endPointId);
+    if (!sb || !eb) return;
+    const float len = glm::length(eb->pos - sb->pos);
+    auto onA = [&](int id) {
+        return id == lineA.startPointId || id == lineA.endPointId;
+    };
+    const bool startShared = onA(lineB.startPointId);
+    const bool endShared   = onA(lineB.endPointId);
+    if (startShared && endShared) return;   // both ends are A's: nothing to swing
+    if (endShared) sketch.movePoint(lineB.startPointId, eb->pos - dir * len);
+    else           sketch.movePoint(lineB.endPointId,   sb->pos + dir * len);
+}
+
 void SketchSolver::applyCorrection(const Constraint& c, Sketch& sketch, double error) const {
     switch (c.type) {
         case ConstraintType::Coincident: {
@@ -728,15 +780,48 @@ void SketchSolver::applyCorrection(const Constraint& c, Sketch& sketch, double e
             const SketchPoint* epA = sketch.getPoint(lineA->endPointId);
             if (!spA || !epA || !spB || !epB) return;
 
-            // Rotate line B's endpoint to be parallel to line A
             glm::vec2 dirA = epA->pos - spA->pos;
-            float lenA = glm::length(dirA);
-            if (lenA < 1e-10f) return;
+            glm::vec2 dirB = epB->pos - spB->pos;
+            const float lenA = glm::length(dirA);
+            const float lenB = glm::length(dirB);
+            if (lenA < 1e-10f || lenB < 1e-10f) return;
             dirA /= lenA;
+            dirB /= lenB;
 
-            float lenB = glm::length(epB->pos - spB->pos);
-            glm::vec2 newEndB = spB->pos + dirA * lenB;
-            sketch.movePoint(lineB->endPointId, newEndB);
+            // The error above is the cross product, which is zero for parallel
+            // AND anti-parallel, so opposite sides of a rectangle (which run in
+            // opposite directions round the loop) are both "satisfied". Keep B
+            // pointing the way it already points: forcing it onto +dirA flipped
+            // such a side end for end the moment a drag nudged it off exact, and
+            // the shape tore itself apart (#187).
+            const float sgn = glm::dot(dirA, dirB) < 0.0f ? -1.0f : 1.0f;
+
+            const bool shared =
+                lineA->startPointId == lineB->startPointId || lineA->startPointId == lineB->endPointId ||
+                lineA->endPointId   == lineB->startPointId || lineA->endPointId   == lineB->endPointId;
+            if (shared) {
+                // Lines that meet at a corner: swing B about that corner.
+                turnLineTo(sketch, *lineA, *lineB, dirA * sgn);
+                break;
+            }
+
+            // Otherwise meet halfway: turn BOTH lines about their own midpoints to
+            // the average direction, each keeping its length and position. Swinging
+            // only B about its start (and leaving A where it was) is not a
+            // projection - round a closed quadrilateral of two parallel pairs the
+            // passes shrank the area to nothing, which also satisfies "parallel"
+            // (#187).
+            glm::vec2 mean = dirA + sgn * dirB;
+            const float ml = glm::length(mean);
+            mean = ml > 1e-6f ? mean / ml : dirA;
+            const glm::vec2 midA = (spA->pos + epA->pos) * 0.5f;
+            const glm::vec2 midB = (spB->pos + epB->pos) * 0.5f;
+            const int aS = lineA->startPointId, aE = lineA->endPointId;
+            const int bS = lineB->startPointId, bE = lineB->endPointId;
+            sketch.movePoint(aS, midA - mean * (lenA * 0.5f));
+            sketch.movePoint(aE, midA + mean * (lenA * 0.5f));
+            sketch.movePoint(bS, midB - mean * (sgn * lenB * 0.5f));
+            sketch.movePoint(bE, midB + mean * (sgn * lenB * 0.5f));
             break;
         }
 
@@ -762,11 +847,13 @@ void SketchSolver::applyCorrection(const Constraint& c, Sketch& sketch, double e
             if (lenA < 1e-10f) return;
             dirA /= lenA;
 
-            // Perpendicular direction: rotate 90 degrees
+            // Perpendicular direction: the quarter turn of A that B is already
+            // closest to. Always taking +90 flipped a side that sits at -90
+            // (the next side round a clockwise-wound rectangle) through half a
+            // turn, which is the same tear as in Parallel above (#187).
             glm::vec2 perpDir(-dirA.y, dirA.x);
-            float lenB = glm::length(epB->pos - spB->pos);
-            glm::vec2 newEndB = spB->pos + perpDir * lenB;
-            sketch.movePoint(lineB->endPointId, newEndB);
+            if (glm::dot(epB->pos - spB->pos, perpDir) < 0.0f) perpDir = -perpDir;
+            turnLineTo(sketch, *lineA, *lineB, perpDir);
             break;
         }
 

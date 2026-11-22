@@ -1338,6 +1338,11 @@ add_executable(test_sketch_rotate_constraints test_sketch_rotate_constraints.cpp
 target_link_libraries(test_sketch_rotate_constraints PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_sketch_rotate_constraints COMMAND test_sketch_rotate_constraints)
 
+# test_sketch_rect_drag - dragging a rotated rectangle / parallel quad must not tear it apart (#187)
+add_executable(test_sketch_rect_drag test_sketch_rect_drag.cpp)
+target_link_libraries(test_sketch_rect_drag PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_sketch_rect_drag COMMAND test_sketch_rect_drag)
+
 # test_reload_then_move - a saved and reopened history still follows a moved sketch (#185)
 add_executable(test_reload_then_move test_reload_then_move.cpp)
 target_link_libraries(test_reload_then_move PRIVATE materializr_core gtest gtest_main)
