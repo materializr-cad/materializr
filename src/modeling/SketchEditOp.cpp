@@ -25,7 +25,7 @@ SketchEditOp::SketchEditOp(std::shared_ptr<Sketch> liveSketch,
       m_after(std::move(afterSnapshot)) {}
 
 // Put a snapshot's GEOMETRY into the live sketch without touching which body it is drawn on.
-// The host link (source body / face, detached flag) is not something an edit changes, and the
+// The host link (source body, detached flag) is not something an edit changes, and the
 // snapshots of a REOPENED project do not carry it (the loader reads it for the live sketch only),
 // so copying the whole sketch wrote "no host" over a sketch drawn on a body every time a replay
 // walked through its edits. The next move of the sketch under it then left that sketch behind,
@@ -33,11 +33,12 @@ SketchEditOp::SketchEditOp(std::shared_ptr<Sketch> liveSketch,
 static void assignKeepingHost(Sketch& target, const Sketch& snapshot) {
     const int host = target.getSourceBody();
     const bool detached = target.isDetachedFromBody();
-    const TopoDS_Face face = target.getSourceFace();
     target = snapshot;
     target.setSourceBody(host);
     target.setDetachedFromBody(detached);
-    if (!face.IsNull()) target.setSourceFace(face);
+    // The source FACE is deliberately NOT carried over: it is the host's face as it was when the
+    // snapshot was taken, and a live one goes stale the moment the body moves - regions fused with
+    // a face at the old place gave the Push/Pull the wrong profile (#185).
 }
 
 bool SketchEditOp::execute(Document& doc) {
