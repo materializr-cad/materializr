@@ -3,11 +3,27 @@
 All notable changes to Materializr are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer.
 
-## [Unreleased]
+## [1.8.0] - 2026-11-23
 
-The 11-16 tester list.
+The first stable 1.8.0, after six betas. Everything in the beta entries below is in
+it; this entry adds what changed since beta.6: the 11-16 tester list, the sketch-move
+and Home Screen reports (#176 to #188), and a Windows launch with no console window.
+
+**Known issue.** A chamfer built on another chamfer can still lose its edges when the
+sketch under it is moved by some distances (a Y move of about 4.5 mm on one test
+part). The feature is switched off with a message rather than drawn wrongly, and
+deleting and re-applying it fixes it.
 
 ### Changed
+
+- **Windows opens only its own window.** The program no longer starts a black console
+  beside the app. Clicking that console used to freeze the program before its window
+  appeared (#188). Started from a terminal it still prints there (`--help`, logs).
+- **Moving a sketch now takes the sketches drawn on its body with it,** and so does moving
+  the body itself, so the features built from them (Push/Pull, chamfers, a hole cut from
+  one) follow instead of being switched off (#185). A saved project that is reopened
+  follows a move too, and a chamfer built on a chamfer keeps its edges. A project saved
+  before this keeps a chamfer-on-chamfer switched off until it is rebuilt once.
 
 - **Extrude, Subtract and Push/Pull now remember what they were applied to.**
   Applied to the **whole sketch** (picked from the Items list, or Extrude/Subtract
@@ -23,6 +39,15 @@ The 11-16 tester list.
 
 ### Added
 
+- **Simplified Chinese** is the seventh interface language (Settings > General).
+- **Tool rails can be rearranged.** Long-press a tool and drag it; with a mouse it drags
+  straight away, and holding shows a charging outline (#180).
+- **The Home Screen lists the projects open in tabs** and switches to one with a click;
+  Open File there shows the file picker first and only then makes a tab, and a tab opened
+  from Home closes back to Home (#184).
+- **Progress and Cancel for the slow spots:** big body patterns, Booleans, switching to a
+  heavy tab and Undo/Redo of a Boolean now run behind a card with a Cancel instead of
+  freezing the window (#181).
 - **Help > Report a Bug.** A "Report a problem" form (Bug / Feature / Question,
   title, description). Press Send and the report is filed as a GitHub issue for
   you, with no GitHub account needed. It carries your version, OS, GPU, layout and
@@ -45,6 +70,27 @@ The 11-16 tester list.
 
 ### Fixed
 
+- **Rotating a selection in a sketch keeps its shape** (#187). A rectangle's sides are
+  held horizontal and vertical, and turning it asked the solver for sides that were
+  both at once, so it collapsed to a line. The constraints are now rewritten for the
+  rotation (a quarter turn swaps them, any other angle keeps the sides parallel and
+  square).
+- **Dragging a corner of a rotated rectangle, or of a four-sided shape held by parallel
+  sides, no longer tears it apart** (#187). Parallel and Perpendicular could flip a side
+  end for end or overshoot at a shared corner until the points ran off to 1e12 and
+  broke the whole view. A solve that runs away is now undone instead of kept.
+- **A sketch drawn on a body stays with it through repeated moves** (#185). Replaying a
+  sketch's edits used to wipe which body it was drawn on, so the second move left it
+  behind and the features made from it stopped following.
+- **Copy, Multiply, patterns, Mirror and Offset handle every kind of curve** (#182,
+  #186): splines repeat, polygons stay polygons, Offset previews every chain, follows
+  one side of parallel lines and no longer leaves gaps on tight or sharp splines.
+- **Picking an arc** works along the arc itself, not the whole circle it came from
+  (#183).
+- **Camera:** a perspective zoom-out stops a thousand kilometres out and always moves
+  at least a millimetre per notch, so you can scroll out from beside a thin wall.
+- **Android im-touch lists** draw nothing for off-screen rows, which fixes smeared text,
+  and the Items box goes nearly opaque while you work in it (#177).
 - **Two Chinese translations could show wrong numbers or crash.** "Imported %d parts
   from %s" had its two values swapped (the part count was read as the file name),
   and the "Selection: points, lines, curves" readout dropped placeholders so the line

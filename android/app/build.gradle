@@ -52,8 +52,8 @@ android {
                                                          : 'arm64-v8a'
         def allAbi    = project.hasProperty('allAbi')
         def abiList   = allAbi ? ['arm64-v8a', 'x86_64'] : [targetAbi]
-        versionCode 56
-        def vName = '1.8.0-beta.6'
+        versionCode 57
+        def vName = '1.8.0'
         versionName vName
 
         externalNativeBuild {
