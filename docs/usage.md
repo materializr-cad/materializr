@@ -105,9 +105,12 @@ crash-recovery snapshot.
   Classic, as pills in the top bar in Modern, and as a project-name chip that
   opens a sheet in im-touch. Right-click a tab (or use its ⋮) for Save,
   Save As and Close.
-- **File → Home Screen** shows the grid of recent projects with thumbnails.
-  It doesn't close what you're working on - the × returns you to it, and
-  opening a project from there lands in a new tab.
+- **File → Home Screen** shows the grid of recent projects with thumbnails,
+  and an **Open projects** strip listing every tab you have open - click one
+  to switch to it. It doesn't close what you're working on - the × returns you
+  to it. Opening a project from there lands in a new tab (Open File shows the
+  picker first, and only then makes the tab), and a tab opened from Home
+  closes back to Home.
 - **Settings → General → Reopen last session on launch** brings back every
   tab you had open when you quit.
 

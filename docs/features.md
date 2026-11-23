@@ -222,16 +222,26 @@ as you drag or type:
   autosave on/off + interval. Preferences persist across launches in a
   forward-compatible config file.
 - **Help menu** - User Guide, Keyboard Shortcuts, Check for Updates (queries
-  GitHub for the latest release), About dialog with credits.
+  GitHub for the latest release), **Report a Bug** (bug report, feature
+  request or question sent to GitHub, with an optional screenshot, log and
+  project copy - nothing is sent until you press Send), About dialog with
+  credits.
+- **Languages** - English, Spanish, Portuguese, French, German, Italian and
+  Simplified Chinese (Settings → General).
+- **Rearrangeable tool rails** - long-press a tool and drag it to a new place.
+- **Progress and Cancel** - big body patterns, Booleans, switching to a heavy
+  tab and Undo/Redo of a Boolean run behind a card with a Cancel button
+  instead of freezing the window.
 - **Toast notifications**.
 - **Tabbed projects** - several projects open at once, each with its own
   history, camera and crash-recovery snapshot. Ctrl+Tab cycles them. The tab
   strip is drawn per layout (classic: inside the viewport; modern: pills in
   the top bar; im-touch: a chip that opens a sheet).
 - **Home screen** - a grid of recent projects with thumbnails baked into the
-  save files, plus New Project. Reachable any time from File → Home Screen,
-  and it no longer closes what you're working on: opening something from
-  there lands in a new tab.
+  save files, an **Open projects** strip that switches to any open tab with a
+  click, plus New Project. Reachable any time from File → Home Screen, and it
+  doesn't close what you're working on: opening something from there lands in
+  a new tab, which closes back to Home.
 - **Reopen last session** - optionally brings back every tab you had open
   when you quit (Settings → General).
 - **Crash recovery** - per-tab snapshots; a crash with several projects open

@@ -27,7 +27,7 @@ modeling, threads, SVG & text engraving, STEP/STL/SVG/DXF/OBJ/3MF exchange.
 | iPad | [on the App Store](https://apps.apple.com/us/app/materializr/id6787741207) | install from the App Store |
 | Android (Google Play) | [on Google Play](https://play.google.com/store/apps/details?id=org.ravenhold.materializr) | install + auto-update from the Play Store; tablets recommended |
 | Android (F-Droid) | [on F-Droid](https://f-droid.org/packages/com.materializr.app/) | install + auto-update from the F-Droid app; tablets recommended |
-| Android (latest APK) | `Materializr-*-arm64-v8a.apk` | sideload (enable "install unknown apps") for the freshest fixes; tablets recommended |
+| Android (latest APK) | `materializr-*-arm64-v8a.apk` | sideload (enable "install unknown apps") for the freshest fixes; tablets recommended |
 | macOS (Apple Silicon) | `Materializr-*-arm64.dmg` | open the `.dmg`, drag **Materializr** to Applications - see the first-launch note below |
 
 > **Linux glibc requirement:** the AppImage is built on a current toolchain, so
@@ -79,7 +79,8 @@ It's also **young software built quickly, so expect rough edges - there are
 bugs we haven't found yet.** The good news: operations validate their results
 and *refuse* rather than silently produce garbage, so a failed action leaves
 your model untouched instead of corrupting it. Still: **save often**, and if
-something behaves oddly, a bug report is the most useful thing you can send.
+something behaves oddly, a bug report is the most useful thing you can send
+(**Help → Report a Bug** sends one straight to GitHub).
 
 ## What it does
 
@@ -125,7 +126,9 @@ with auto-save, crash/hang recovery, undo everywhere.
 the near-zero-chrome im-touch for tablets), chosen on first launch with a
 live preview and a tour that teaches the app in the layout you picked.
 Select any face, edge or vertex for instant measurement readouts (area,
-radius, length, centre - with totals across a multi-selection).
+radius, length, centre - with totals across a multi-selection). The interface
+is available in seven languages (English, Spanish, Portuguese, French, German,
+Italian and Simplified Chinese), and the tool rails can be rearranged to taste.
 
 **Exchange** - STEP, IGES and **BREP** import/export, **STL import** (with
 accuracy control - sketch directly on a scanned part's flat faces),
