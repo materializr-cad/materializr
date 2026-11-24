@@ -30,8 +30,9 @@ when you press Send.
 - **Android:** the app asks for the Internet permission for one purpose only,
   the optional **Report a Bug** feature below. It makes no other network
   requests. The update checker is not included in mobile builds.
-- **iOS:** the app makes no network requests of its own. Report a Bug opens a
-  pre-filled GitHub page in your browser instead.
+- **iOS:** the only network request the app makes is the optional
+  **Report a Bug** feature below, and only when you press Send. (iOS has no
+  separate Internet permission to ask for.)
 
 ## Report a Bug (optional)
 

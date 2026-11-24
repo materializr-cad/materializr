@@ -12,6 +12,7 @@
 #if defined(MZ_IOS)
 
 #include "app/Application.h"
+#include "core/LogCapture.h"
 #include "core/Verbose.h"
 #include "ios_platform.h"
 
@@ -25,6 +26,10 @@ int main(int /*argc*/, char* /*argv*/[]) {
     // install the background-lifecycle watch. Must run before constructing
     // Application (which loads settings and touches OCCT).
     materializr::iosInitRuntime();
+
+    // Keep a tail of stderr in memory so Help > Report a Bug can attach the log,
+    // as on the other platforms.
+    materializr::logcapture::installStderrTee();
 
     // Convert OCCT internal faults (SIGSEGV/SIGFPE inside the kernel) into
     // catchable Standard_Failure exceptions, matching the other platforms.

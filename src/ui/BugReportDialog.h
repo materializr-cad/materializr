@@ -1,12 +1,12 @@
 #pragma once
 // Help > Report a Bug. Collects a description, a screenshot taken with this
-// dialog hidden, and (optionally) a copy of the project, then opens a
-// pre-filled GitHub issue in the user's browser. The app posts nothing itself:
-// the user reviews and submits the issue under their own GitHub login, so no
-// token ships in the binary and mobile builds need no network permission.
-// GitHub has no API for attaching files, so the screenshot / project are saved
-// next to each other and the user drags them into the issue (desktop: "Open
-// folder"; mobile: the system share sheet).
+// dialog hidden, an optional log and (optionally) a copy of the project, and
+// Send posts them to the report relay (core/ReportSender), which files the
+// GitHub issue - every platform, no GitHub account, no token in the binary.
+// The fallback opens a pre-filled GitHub issue in the browser instead; GitHub
+// has no API for attaching files there, so the screenshot / project are saved
+// side by side and the user drags them into the issue (desktop: "Open folder";
+// mobile: the system share sheet).
 
 #include "../core/ReportSender.h"
 

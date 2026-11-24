@@ -3,6 +3,15 @@
 All notable changes to Materializr are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow SemVer.
 
+## [Unreleased]
+
+### Added
+
+- **Report a Bug sends from inside the app on iOS / iPadOS too.** Send files the
+  report as a GitHub issue, as on desktop and Android, instead of opening a
+  pre-filled GitHub page; that page is still the fallback. The "Log" attachment
+  is now offered on iOS as well. `PRIVACY.md` is updated to match.
+
 ## [1.8.0] - 2026-11-23
 
 The first stable 1.8.0, after six betas. Everything in the beta entries below is in

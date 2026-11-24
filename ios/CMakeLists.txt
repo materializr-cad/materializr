@@ -86,6 +86,7 @@ list(FILTER MZ_SOURCES EXCLUDE REGEX "/AiAssistantPlugin\\.cpp$") # same reason 
 set(MZ_OBJCXX_SOURCES
     "${MZ_SRC}/ios_platform.mm"
     "${MZ_SRC}/ios_files.mm"
+    "${MZ_SRC}/ios_report.mm"
     "${MZ_SRC}/ios_storekit.mm")
 set_source_files_properties(${MZ_OBJCXX_SOURCES} PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
 

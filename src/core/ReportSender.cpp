@@ -102,14 +102,17 @@ ReportSendResult sendReport(const std::string& url, const std::vector<ReportFiel
     return r;
 }
 
-#elif defined(MZ_MOBILE)   // iOS: no networking build
+#elif defined(MZ_IOS)
 
-bool reportSenderAvailable() { return false; }
+bool reportSenderAvailable() { return true; }
 
-ReportSendResult sendReport(const std::string&, const std::vector<ReportField>&,
-                            const std::vector<ReportFile>&) {
+ReportSendResult sendReport(const std::string& url, const std::vector<ReportField>& fields,
+                            const std::vector<ReportFile>& files) {
+    int status = 0;
+    std::string body, err;
+    if (iosPostReport(url, fields, files, status, body, err)) return parseRelayReply(status, body);
     ReportSendResult r;
-    r.message = "Sending reports from inside the app isn't available on this platform.";
+    r.message = err.empty() ? "Couldn't reach the report service." : err;
     return r;
 }
 
