@@ -1280,12 +1280,16 @@ void Application::renderImTouchLayout() {
             // had to be a popup of its own to fit, which is what put a popup
             // inside this popup.
             //
-            // Capped against the VIEWPORT, not a bare constant: a fixed height
-            // that happens to exceed the screen just hides the bottom of the
-            // dialog, which is how the pad's Enter key went missing the first
-            // time. Screen height wins whenever it's the smaller of the two.
-            const float vpH = ImGui::GetMainViewport()->Size.y;
-            const float maxPopupH = std::min(760.0f * s, vpH * 0.88f);
+            // Capped against the WORK RECT, not a bare constant or the raw
+            // viewport: a height that exceeds the visible area just hides the
+            // bottom of the dialog (the pad's Enter key, then the Go Here /
+            // Disable / Delete row on iPad). The work rect excludes the iOS
+            // status bar and home indicator; ImGui's own popup placement clamps
+            // to the full screen and would let the dialog run under them, so
+            // it is pinned bottom-left over the strip and grows upward instead.
+            const float maxPopupH = std::min(760.0f * s, ws.y - 2.0f * m);
+            ImGui::SetNextWindowPos(ImVec2(stripX, wp.y + ws.y - m), ImGuiCond_Always,
+                                    ImVec2(0.0f, 1.0f));
             ImGui::SetNextWindowSizeConstraints(ImVec2(420.0f * s, 0),
                                                 ImVec2(420.0f * s, maxPopupH));
             if (ImGui::BeginPopup("##LiteStepProps")) {
@@ -1325,11 +1329,21 @@ void Application::renderImTouchLayout() {
                         // popup sizes to the child while the child sizes to the
                         // popup, and the result was a short popup anchored
                         // halfway down the screen with its lower half off it.
-                        const float footerH = 44.0f * s +
-                                              ImGui::GetStyle().ItemSpacing.y * 2.0f;
-                        const float headerH = 80.0f * s;   // title + separator
-                        const float childH =
-                            std::max(200.0f * s, maxPopupH - footerH - headerH);
+                        //
+                        // Measured, not guessed: the header is wherever the
+                        // cursor is now (it grows with the Disabled / Undone /
+                        // failure lines), and below the child come Apply, a
+                        // separator, the Go Here / Disable / Delete row and the
+                        // popup's bottom padding. Leaving the action row out of
+                        // this sum is what pushed it off the bottom.
+                        const ImGuiStyle& st = ImGui::GetStyle();
+                        const float btnH = 44.0f * s;
+                        const float belowChildH = st.ItemSpacing.y + btnH +   // Apply
+                                                  st.ItemSpacing.y + 1.0f +   // separator
+                                                  st.ItemSpacing.y + btnH +   // action row
+                                                  st.WindowPadding.y + 2.0f;
+                        const float childH = std::max(
+                            120.0f * s, maxPopupH - ImGui::GetCursorPosY() - belowChildH);
                         ImGui::BeginChild("##props", ImVec2(0.0f, childH), true);
                         ImGui::PushItemWidth(
                             ImGui::CalcTextSize("0000000").x +
