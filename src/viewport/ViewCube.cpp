@@ -2,6 +2,7 @@
 #include "Camera.h"
 #include "../touch_mode.h"
 #include "../ui_scale.h"   // uiScale - the widget tracks the interface size
+#include "../i18n.h"
 
 #include <imgui.h>
 #include <glm/glm.hpp>
@@ -424,6 +425,43 @@ ViewCubeAction ViewCube::render(Camera& camera, bool invertDrag, bool lightMode,
             cubeHover = true;
             if (cubeClicked()) {
                 m_pendingClick = ViewCubeAction::Home;
+                m_cubeDragging = false;
+            }
+        }
+    }
+
+    // --- Orthographic button, just below Home. Lit while the view is orthographic;
+    //     the glyph is a box drawn in parallel projection (two offset squares
+    //     joined at the corners), the picture of what the button gives you.
+    {
+        ImVec2 oc(center.x + widgetR + 22.0f * ts, center.y - widgetR + 0.0f * ts);
+        float dx = mp.x - oc.x, dy = mp.y - oc.y;
+        const bool on = camera.isOrthographic();
+        const bool hover = m_orthoEnabled && std::sqrt(dx * dx + dy * dy) < 10.0f * ts;
+        ImU32 fill = !m_orthoEnabled ? ink(90)
+                   : hover           ? IM_COL32(255, 220, 80, 255)
+                   : on              ? IM_COL32(70, 140, 235, 255)
+                                     : ink(230);
+        const ImU32 glyph = (on && !hover && m_orthoEnabled) ? IM_COL32(255, 255, 255, 255)
+                                                              : paper(255);
+        dl->AddCircleFilled(oc, 8.0f * ts, fill);
+        dl->AddCircle      (oc, 8.0f * ts, paper(255), 0, 1.2f * ts);
+        // Two offset squares: a box seen in parallel projection. Kept to two
+        // outlines - joined at the corners it turned to mush at 1x.
+        const float w = 1.2f * ts;
+        const ImVec2 f0(oc.x - 4.2f * ts, oc.y - 1.2f * ts), f1(oc.x + 1.2f * ts, oc.y + 4.2f * ts);
+        const ImVec2 b0(oc.x - 1.2f * ts, oc.y - 4.2f * ts), b1(oc.x + 4.2f * ts, oc.y + 1.2f * ts);
+        dl->AddRect(b0, b1, glyph, 0.0f, 0, w);
+        dl->AddRectFilled(f0, f1, fill);
+        dl->AddRect(f0, f1, glyph, 0.0f, 0, w);
+        if (hover) {
+            cubeHover = true;
+            if (!materializr::touchMode())
+                ImGui::SetTooltip("%s", materializr::tr(on
+                    ? "Back to perspective"
+                    : "Orthographic view (faces the selected face)"));
+            if (cubeClicked()) {
+                m_pendingClick = ViewCubeAction::Ortho;
                 m_cubeDragging = false;
             }
         }

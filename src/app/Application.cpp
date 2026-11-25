@@ -4223,6 +4223,10 @@ void Application::handleViewCubeAction(int action) {
             handleViewCubeAction(static_cast<int>(ViewCubeAction::FrontTopRight));
             return;
 
+        case ViewCubeAction::Ortho:
+            toggleOrthographicView();
+            return;
+
         case ViewCubeAction::RollLeft:
         case ViewCubeAction::RollRight: {
             glm::vec3 viewDir = glm::normalize(cam.getTarget() - cam.getPosition());
@@ -4338,6 +4342,125 @@ void Application::handleViewCubeAction(int action) {
     cam.setPosition(center + dir * (radius * 3.0f)); // approx; zoomToFit refines
     cam.setUp(up);
     cam.zoomToFit(cmin, cmax);
+}
+
+void Application::toggleOrthographicView() {
+    if (!m_viewport) return;
+    Camera& cam = m_viewport->getCamera();
+
+    // Sketch mode owns the projection (it is orthographic by design).
+    if (m_inSketchMode) return;
+
+    // Already orthographic: ease back to perspective. leaveOrthographic keeps
+    // the framing, so there is no pop.
+    if (cam.isOrthographic()) {
+        cam.leaveOrthographic();
+        return;
+    }
+
+    const glm::vec3 target0 = cam.getTarget();
+    const glm::vec3 fwd0 = target0 - cam.getPosition();
+    glm::vec3 prevUp = cam.getUp();
+
+    // A selected body face: look straight at it from its outward side and frame it.
+    if (m_selection && m_document) {
+        for (const SelectionEntry& e : m_selection->getSelection()) {
+            if (e.type != SelectionType::Face || e.shape.IsNull() ||
+                e.shape.ShapeType() != TopAbs_FACE) continue;
+            const TopoDS_Face face = TopoDS::Face(e.shape);
+            try {
+                Bnd_Box bb;
+                BRepBndLib::Add(face, bb);
+                if (bb.IsVoid()) continue;
+                double x0, y0, z0, x1, y1, z1;
+                bb.Get(x0, y0, z0, x1, y1, z1);
+                const glm::vec3 fmin((float)x0, (float)y0, (float)z0);
+                const glm::vec3 fmax((float)x1, (float)y1, (float)z1);
+                const glm::vec3 center = (fmin + fmax) * 0.5f;
+
+                // BRepGProp_Face::Normal is already outward (orientation applied).
+                BRepGProp_Face gpFace(face);
+                double u1, u2, v1, v2;
+                gpFace.Bounds(u1, u2, v1, v2);
+                gp_Pnt p;
+                gp_Vec nv;
+                gpFace.Normal(0.5 * (u1 + u2), 0.5 * (v1 + v2), p, nv);
+                if (nv.Magnitude() < 1e-9) continue;
+                const glm::vec3 normal = glm::normalize(glm::vec3(
+                    (float)nv.X(), (float)nv.Y(), (float)nv.Z()));
+
+                // Up: keep the user's orientation (their up projected onto the
+                // face; for a horizontal face, their forward instead), then land
+                // it on the nearest 90 degrees of the face's own axes so the view
+                // is square to the face rather than cocked at the old yaw.
+                glm::vec3 up = prevUp - normal * glm::dot(prevUp, normal);
+                if (glm::length(up) < 0.1f) {
+                    up = fwd0 - normal * glm::dot(fwd0, normal);
+                    if (glm::length(up) < 0.1f)
+                        up = glm::cross(normal, glm::vec3(1, 0, 0));
+                    if (glm::length(up) < 0.1f)
+                        up = glm::cross(normal, glm::vec3(0, 0, 1));
+                }
+                up = glm::normalize(up);
+                BRepAdaptor_Surface surf(face);
+                if (surf.GetType() == GeomAbs_Plane) {
+                    const gp_Ax3 ax = surf.Plane().Position();
+                    const glm::vec3 fy((float)ax.YDirection().X(),
+                                       (float)ax.YDirection().Y(),
+                                       (float)ax.YDirection().Z());
+                    glm::vec3 fx = glm::cross(fy, normal);
+                    if (glm::length(fx) > 1e-4f) {
+                        fx = glm::normalize(fx);
+                        const float dY = glm::dot(up, fy), dX = glm::dot(up, fx);
+                        up = (std::abs(dY) >= std::abs(dX)) ? (dY >= 0.0f ? fy : -fy)
+                                                            : (dX >= 0.0f ? fx : -fx);
+                    }
+                }
+
+                const float half = std::max(0.5f * glm::length(fmax - fmin) * 1.2f, 1.0f);
+                // Stand off far enough to be clear of the part the face belongs to.
+                float standoff = std::max(half * 4.0f, 10.0f);
+                try {
+                    Bnd_Box body;
+                    BRepBndLib::Add(m_document->getBody(e.bodyId), body);
+                    if (!body.IsVoid()) {
+                        double a0, b0, c0, a1, b1, c1;
+                        body.Get(a0, b0, c0, a1, b1, c1);
+                        standoff = std::max(standoff,
+                            (float)std::sqrt((a1 - a0) * (a1 - a0) + (b1 - b0) * (b1 - b0) +
+                                             (c1 - c0) * (c1 - c0)));
+                    }
+                } catch (...) {}
+
+                cam.setTarget(center);
+                cam.setPosition(center + normal * standoff);
+                cam.setUp(up);
+                cam.setOrthoSize(half);
+                cam.setOrthographic(true);
+                return;
+            } catch (...) {}
+        }
+    }
+
+    // Nothing to face: the same view, without the perspective. The ortho box is
+    // sized to what the perspective view showed at the target. A view that is
+    // already nearly along an axis lands on it exactly.
+    const float dist = std::max(glm::length(fwd0), 1e-3f);
+    glm::vec3 dir = -fwd0 / dist;
+    const float half = std::max(dist * std::tan(glm::radians(cam.getFov()) * 0.5f), 1e-3f);
+    static const glm::vec3 kAxes[6] = {{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
+    const float kSnapCos = std::cos(glm::radians(8.0f));
+    for (const glm::vec3& ax : kAxes)
+        if (glm::dot(dir, ax) > kSnapCos) { dir = ax; break; }
+    glm::vec3 up = prevUp - dir * glm::dot(prevUp, dir);
+    if (glm::length(up) < 0.1f) {
+        up = fwd0 - dir * glm::dot(fwd0, dir);
+        if (glm::length(up) < 0.1f) up = glm::cross(dir, glm::vec3(1, 0, 0));
+    }
+    cam.setPosition(target0 + dir * std::max(half * 4.0f, 10.0f));
+    cam.setUp(glm::normalize(up));
+    cam.setOrthoSize(half);
+    cam.setOrthographic(true);
 }
 
 std::string Application::projectDisplayName() const {
