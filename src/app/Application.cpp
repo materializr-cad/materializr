@@ -1085,9 +1085,10 @@ void Application::resetLayout() {
         ImGui::SaveIniSettingsToDisk(p);
 }
 
-// Where to read/write imgui.ini. On Linux we keep the relative "imgui.ini" path
-// (the AppImage runs from a user-writable cwd, which is the existing behaviour
-// the user prefers). On Windows the exe usually launches from Program Files,
+// Where to read/write imgui.ini. On Linux and macOS it lives in the per-user
+// config folder next to settings.cfg (XDG_CONFIG_HOME, else ~/.config/materializr)
+// instead of wherever the program happened to be launched from (#191); a layout
+// already sitting in the old place is copied across once. On Windows the exe usually launches from Program Files,
 // which is read-only without admin - the write would silently fail and ImGui
 // would fall back to its tiny "everything stacked at (0,0)" defaults. Anchor
 // the file under %APPDATA% there so it's both writable and per-user.
@@ -1118,6 +1119,27 @@ static const char* computeImguiIniPath() {
         s_imguiIniPath = base + "/imgui.ini";
     } else {
         s_imguiIniPath = "imgui.ini";
+    }
+#elif (defined(__linux__) && !defined(__ANDROID__)) || (defined(__APPLE__) && !defined(MZ_IOS))
+    {
+        std::string dir = SettingsIO::defaultPath();   // <config>/materializr/settings.cfg
+        const auto slash = dir.find_last_of('/');
+        s_imguiIniPath = "imgui.ini";                  // last resort: the old behaviour
+        if (slash != std::string::npos) {
+            dir.resize(slash);
+            std::error_code ec;
+            std::filesystem::create_directories(dir, ec);
+            const std::string target = dir + "/imgui.ini";
+            if (!ec) {
+                // First run after the move: carry the old layout over, leaving
+                // the original file where it was.
+                if (!std::filesystem::exists(target, ec) &&
+                    std::filesystem::exists("imgui.ini", ec)) {
+                    std::filesystem::copy_file("imgui.ini", target, ec);
+                }
+                s_imguiIniPath = target;
+            }
+        }
     }
 #else
     s_imguiIniPath = "imgui.ini";
