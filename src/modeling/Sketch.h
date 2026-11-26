@@ -235,6 +235,15 @@ public:
     // Same test without changing anything: is `pointId` a corner roundCorner could act on?
     bool isRoundableCorner(int pointId) const;
 
+    // Delete the point `pointId` where exactly two straight lines meet (and nothing
+    // else is attached) WITHOUT losing the line: both lines and the point go, and one
+    // line runs between their far ends instead - the same line when the two were
+    // collinear, a shortcut across when they were at an angle (#190). Returns false,
+    // changing nothing, when the point is not such a join, when it belongs to a
+    // polygon or a text outline (those keep their own delete rules), or when the far
+    // ends are already joined by a line. `newLineId`, when given, receives the line.
+    bool joinLinesAt(int pointId, int* newLineId = nullptr);
+
     // CONSTRUCTION GEOMETRY: reference lines, circles, arcs and splines that
     // help you draw but are not part of the shape. The contract is that they
     // have NO effect on anything the sketch produces - regions, profile wires,

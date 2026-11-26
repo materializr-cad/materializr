@@ -7630,7 +7630,21 @@ void Application::deleteSelectedSketchElements() {
         // two shared vertices, ...) can't have a later id lose its
         // owning-polygon protection because an earlier id already cascaded
         // that polygon away.
-        std::vector<int> ids(pts.begin(), pts.end());
+        // A point where two lines meet is DELETED without taking the lines with it:
+        // they become one line between their far ends (#190). Not when one of
+        // those lines is selected too - that selection means "delete the line".
+        std::vector<int> pointIds;
+        for (int pid : pts) {
+            bool lineAlsoSelected = false;
+            for (const auto& ln : m_activeSketch->getLines())
+                if ((ln.startPointId == pid || ln.endPointId == pid) && lns.count(ln.id)) {
+                    lineAlsoSelected = true;
+                    break;
+                }
+            if (!lineAlsoSelected && m_activeSketch->joinLinesAt(pid)) continue;
+            pointIds.push_back(pid);
+        }
+        std::vector<int> ids(pointIds.begin(), pointIds.end());
         ids.insert(ids.end(), lns.begin(), lns.end());
         ids.insert(ids.end(), crc.begin(), crc.end());
         ids.insert(ids.end(), arcs.begin(), arcs.end());

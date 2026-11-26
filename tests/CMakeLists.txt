@@ -613,6 +613,11 @@ add_executable(test_sketch_corner test_sketch_corner.cpp)
 target_link_libraries(test_sketch_corner PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_sketch_corner COMMAND test_sketch_corner)
 
+# test_sketch_join_lines - deleting a point between two lines keeps the line (#190)
+add_executable(test_sketch_join_lines test_sketch_join_lines.cpp)
+target_link_libraries(test_sketch_join_lines PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_sketch_join_lines COMMAND test_sketch_join_lines)
+
 # test_delete_sketch - sketch deletion goes through History and is undoable
 add_executable(test_delete_sketch test_delete_sketch.cpp)
 target_link_libraries(test_delete_sketch PRIVATE materializr_core gtest gtest_main)
