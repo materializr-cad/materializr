@@ -7871,6 +7871,20 @@ void Application::renderLandingPage() {
         else openTabFromHome();
         break;
     case AT::OpenEntry: {
+        // A file that is gone is reported and dropped from the list WITHOUT making a
+        // tab for it first: the tab was created before the load, so the failed load
+        // left an empty project behind and the Home Screen gone (#184).
+        if (act.ref.rfind("content:", 0) != 0) {
+            std::error_code existsEc;
+            if (!std::filesystem::exists(act.ref, existsEc)) {
+                showToast(materializr::trFormat(
+                    "Couldn't open \"%s\" - the file may have moved or been deleted.",
+                    act.name.empty() ? act.ref : act.name));
+                removeRecentProject(act.ref);
+                showLandingPage(/*fromStartup=*/false);   // tiles without the dead one
+                break;
+            }
+        }
         m_landingPage->setVisible(false);
         AppSettings::RecentProject rp;
         rp.ref = act.ref;
