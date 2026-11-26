@@ -5656,15 +5656,13 @@ void Application::renderMirrorToolPanel() {
         ImGui::SameLine();
         if (ImGui::Button(materializr::tr("Cancel"))) {
             m_mirrorPickingLine = false;
-            m_sketchTool->cancelMirror();
-            m_sketchTool->setMode(SketchToolMode::Select);
+            m_sketchTool->abortMirror();
         }
     }
     ImGui::End();
     if (!open) {
         m_mirrorPickingLine = false;
-        m_sketchTool->cancelMirror();
-        m_sketchTool->setMode(SketchToolMode::Select);
+        m_sketchTool->abortMirror();
     }
 }
 
