@@ -111,12 +111,6 @@ public:
     /// Toggle orthographic projection. Pan and zoom preserve this mode; orbit clears it.
     void setOrthographic(bool ortho) { finishBlend(); m_orthographic = ortho; }
     bool isOrthographic() const { return m_orthographic; }
-
-private:
-    /// Turntable orbit around the world up axis (Y). Yaw spins around Y; pitch
-    /// changes elevation, clamped short of the poles. The up vector is held level
-    /// with the ground (never rolls), so the horizon stays flat.
-    void orbitLevel(float yawDelta, float pitchDelta);
     /// Drop orthographic projection WITHOUT a visible pop. Perspective is eased
     /// in as a dolly-zoom: it starts at a tiny FOV (practically orthographic) with
     /// the camera far back on its view ray, then widens to the resting FOV over
@@ -124,6 +118,12 @@ private:
     /// framing throughout. (Flipping the flag outright made the first orbit out
     /// of a sketch snap in scale and parallax; tick() drives the blend.)
     void leaveOrthographic();
+
+private:
+    /// Turntable orbit around the world up axis (Y). Yaw spins around Y; pitch
+    /// changes elevation, clamped short of the poles. The up vector is held level
+    /// with the ground (never rolls), so the horizon stays flat.
+    void orbitLevel(float yawDelta, float pitchDelta);
 
 public:
     /// Settle a running ortho->perspective blend at its end state (no-op idle).

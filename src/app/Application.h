@@ -368,6 +368,9 @@ private:
     // Settings > Navigation > Keyboard shortcuts: the list, click-to-rebind.
     void renderKeyBindingsSettings(bool& changed);
     void handleViewCubeAction(int action);
+    // The ViewCube's Ortho button: face-on ortho view of the selected face, a flat
+    // ortho copy of the current view when nothing is selected, or back to perspective.
+    void toggleOrthographicView();
     void rebuildMeshes();
     glm::vec2 screenToSketch(float sx, float sy, float vpW, float vpH);
 

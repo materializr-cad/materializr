@@ -21,7 +21,10 @@ enum class ViewCubeAction {
     // re-orient a snapped ortho view (e.g. Top) without un-snapping.
     RollLeft, RollRight,
     // Snap to the default 3/4 isometric view (FrontTopRight equivalent).
-    Home
+    Home,
+    // Orthographic on demand: square the view up to the selected face (or flatten
+    // the current view when nothing is selected); pressed again, back to perspective.
+    Ortho
 };
 
 class ViewCube {
@@ -60,6 +63,10 @@ public:
     float widgetCenterX() const { return m_widgetCenterX; }
     float widgetBottomY() const { return m_widgetBottomY; }
 
+    // The ortho button is dimmed and inert while something else owns the
+    // projection (sketch mode keeps the view orthographic).
+    void setOrthoButtonEnabled(bool on) { m_orthoEnabled = on; }
+
 private:
     float m_size = 120.0f;
     float m_extraLeft = 0.0f;
@@ -67,6 +74,7 @@ private:
     float m_widgetCenterX = 0.0f;
     float m_widgetBottomY = 0.0f;
     bool  m_lastHovered = false;
+    bool  m_orthoEnabled = true;
     // Cube drag-to-orbit state: a press on a face arms a pending snap; if the
     // user drags before releasing, treat it as a free orbit instead and
     // suppress the snap on release.

@@ -7393,6 +7393,7 @@ void Application::renderViewport() {
         m_viewCube->setExtraOffset(8.0f * uisVc, -8.0f * uisVc); // centre Home in the corner
     else
         m_viewCube->setExtraOffset(0.0f, 0.0f);
+    m_viewCube->setOrthoButtonEnabled(!m_inSketchMode);
     ViewCubeAction vcAction = m_viewCube->render(
         m_viewport->getCamera(), m_invertCubeDrag,
         m_themeManager && m_themeManager->getTheme() == Theme::Light,
