@@ -5098,6 +5098,10 @@ void Application::renderConstructionAxisPanel() {
         if (i < 2 && !materializr::touchMode()) ImGui::SameLine();
     }
     ImGui::TextDisabled("%s", materializr::tr("Point the axis passes through. Drag the gizmo later (after Apply) to fine-tune."));
+    if (m_axisOpKindIdx == 4 && !m_axisOpExtraEdges.empty())
+        ImGui::TextColored(materializr::accentText(),
+                           materializr::tr("Apply adds an axis along each of the %d selected edges."),
+                           static_cast<int>(m_axisOpExtraEdges.size()) + 1);
 
     ImGui::Separator();
     bool applyClicked  = ImGui::Button(materializr::tr("Apply"), materializr::uiSz(120, 0));
