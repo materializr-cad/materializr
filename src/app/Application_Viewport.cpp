@@ -3953,6 +3953,8 @@ void Application::renderViewport() {
             // drag-to-scroll: a vertical drag over any panel scrolls it, but
             // over the 3D canvas the one-finger drag stays an orbit.
             if (m_window) m_window->setTouchOnCanvas(viewportHovered);
+            // A rail tool held for reordering owns the drag: no scroll latch (#180).
+            if (m_window) m_window->setTouchDragOwned(m_railOrder.dragging());
         }
         // A queued typed rotation (Rotate panel -> Apply) is serviced by the gizmo
         // code in this block even though the cursor is on the panel, not the viewport.

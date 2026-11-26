@@ -143,6 +143,10 @@ public:
     // drag-to-scroll: a vertical drag over any panel scrolls it, but a drag over
     // the canvas must stay an orbit.
     void setTouchOnCanvas(bool v) { m_touchOnCanvas = v; }
+    // Something in the UI owns the current one-finger drag (a rail tool picked
+    // up to reorder it): a vertical drag over the panel must NOT latch into
+    // drag-to-scroll, which releases the button and drops what was held (#180).
+    void setTouchDragOwned(bool v) { m_touchDragOwned = v; }
 
 private:
     SDL_Window* m_window = nullptr;
@@ -212,6 +216,7 @@ private:
     bool  m_leftReleaseWasGesture = false; // last left-up was a 2-finger takeover
     bool  m_touchOverViewport = false;    // current touch is over the canvas OR Items panel
     bool  m_touchOnCanvas = false;        // current touch is strictly over the 3D canvas
+    bool  m_touchDragOwned = false;       // see setTouchDragOwned
     // One-finger drag-to-scroll over a panel (touch mode). A vertical-dominant
     // drag converts the press into mobile-style flick scrolling of the hovered
     // window; a horizontal drag is left to widgets (sliders) untouched.
