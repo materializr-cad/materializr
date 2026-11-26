@@ -566,6 +566,11 @@ private:
     // (Ctrl+Tab, menus, a refused switch snapping back) so the bar re-asserts
     // the visual selection exactly once instead of fighting user clicks.
     bool m_tabSelectionSync = true;
+    // Classic tab bar: a right-clicked background tab is highlighted while its menu is up
+    // without becoming the open project (#192); the flag holds the real selection back
+    // until the menu closes. m_tabCtxMenuSeen: a tab menu was drawn this frame.
+    bool m_tabCtxHold = false;
+    bool m_tabCtxMenuSeen = false;
     // One-shot: raise the Settings window on the next render. Set by every
     // explicit open request - an already-open window buried under the home
     // page otherwise never surfaces.

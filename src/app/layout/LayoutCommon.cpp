@@ -319,6 +319,7 @@ void Application::renderViewportTabBar() {
         const size_t tabsBefore = m_sessions.size();
         const bool visible = ImGui::BeginTabItem(tabLabel.c_str(), &open, tif);
         if (ImGui::BeginPopupContextItem("tabctx")) {
+            m_tabCtxMenuSeen = true;
             renderTabMenuItems(i);
             ImGui::EndPopup();
         }
@@ -330,8 +331,27 @@ void Application::renderViewportTabBar() {
             ImGui::EndTabItem();
             // Outside sync frames, a visible non-active tab = a user click.
             // A refused switch re-arms the sync so the visual snaps back.
+            //
+            // ImGui also selects a tab when it is RIGHT-clicked, which is how its menu
+            // opens. That is not a request to go there: it used to bring the project
+            // forward (and load it) just to show a menu or close it (#192). Only a left
+            // click switches. While the menu is up the right-clicked tab stays
+            // highlighted, as in any menu, and the real selection returns once it closes.
             if (!listChanged && !syncing && i != m_activeSession) {
-                if (!switchToSession(i)) m_tabSelectionSync = true;
+                const bool leftClick = ImGui::IsMouseClicked(ImGuiMouseButton_Left) ||
+                                       ImGui::IsMouseDown(ImGuiMouseButton_Left) ||
+                                       ImGui::IsMouseReleased(ImGuiMouseButton_Left);
+                const bool rightClick = ImGui::IsMouseClicked(ImGuiMouseButton_Right) ||
+                                        ImGui::IsMouseDown(ImGuiMouseButton_Right) ||
+                                        ImGui::IsMouseReleased(ImGuiMouseButton_Right);
+                if (leftClick) {
+                    m_tabCtxHold = false;
+                    if (!switchToSession(i)) m_tabSelectionSync = true;
+                } else if (rightClick) {
+                    m_tabCtxHold = true;
+                } else if (!m_tabCtxHold) {
+                    m_tabSelectionSync = true;
+                }
             }
         }
         if (listChanged) {
@@ -346,6 +366,14 @@ void Application::renderViewportTabBar() {
         }
         ImGui::PopID();
     }
+    // The menu is gone and no button is down: the highlight goes back to the real tab.
+    if (m_tabCtxHold && !m_tabCtxMenuSeen &&
+        !ImGui::IsMouseDown(ImGuiMouseButton_Right) &&
+        !ImGui::IsMouseReleased(ImGuiMouseButton_Right)) {
+        m_tabCtxHold = false;
+        m_tabSelectionSync = true;
+    }
+    m_tabCtxMenuSeen = false;
     if (!closedOne &&
         ImGui::TabItemButton("+", ImGuiTabItemFlags_Trailing |
                                       ImGuiTabItemFlags_NoTooltip))
