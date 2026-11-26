@@ -245,20 +245,17 @@ private:
     bool m_tabMeshQueued = false;
     bool tabMeshRebuildPending() const { return m_tabMeshQueued && !m_deferredHeavy.empty(); }
     void queueTabMeshRebuild();
-    // The tabs the user came from, most recent last. Held by identity because the
-    // index of a tab moves when another one closes. Cancel on the "Preparing view"
-    // card walks back through it: to the tab you were on, and on from there.
+    // The places the user came from, most recent last: a tab, or a null entry for the
+    // Home Screen. Held by identity because the index of a tab moves when another one
+    // closes. Cancel on the "Preparing view" card walks back through it, and so does
+    // closing the active tab: back to wherever you were before, tab or Home Screen,
+    // the way a browser does (#184).
     std::vector<const ProjectSession*> m_tabBackStack;
     // A switch made BY Cancel: the tab being left is not somewhere to come back to.
     bool m_tabSwitchIsBack = false;
     // The switch was asked for from the Home Screen's open-projects strip, which has
     // already hidden the page by the time it calls in.
     bool m_tabSwitchFromHome = false;
-    // Every tab that was entered from the Home Screen. Closing one of them goes back to the
-    // Home Screen, however many switches there have been since (open two from Home, flip
-    // between them, close both: Home, not the tab that was behind the page). Held by
-    // identity; a tab leaves the set when it closes.
-    std::set<const ProjectSession*> m_homeEntered;
     // Cancel left the active tab unbuilt (nothing to go back to, so it landed on the
     // Home Screen); its view is built when it is next shown.
     bool m_tabViewCancelled = false;

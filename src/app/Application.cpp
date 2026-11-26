@@ -739,6 +739,14 @@ void Application::runPendingHeavyTasks() {
 bool Application::switchToSession(size_t idx) {
     if (idx >= m_sessions.size()) return false;
     if (idx == m_activeSession) {
+        // Choosing the tab that is already open from the Home Screen is still a trip
+        // from Home: closing it should go back there.
+        if (m_tabSwitchFromHome || (m_landingPage && m_landingPage->isVisible())) {
+            m_tabBackStack.erase(std::remove(m_tabBackStack.begin(), m_tabBackStack.end(),
+                                             static_cast<const ProjectSession*>(nullptr)),
+                                 m_tabBackStack.end());
+            m_tabBackStack.push_back(nullptr);
+        }
         // Back on a tab whose view a Cancel left unbuilt (from the Home Screen).
         if (m_tabViewCancelled) {
             m_tabViewCancelled = false;
@@ -792,8 +800,6 @@ bool Application::switchToSession(size_t idx) {
     }
     m_tabViewCancelled = false;
     adoptSession(idx);
-    // The tab just entered from the Home Screen, so closing it goes back there.
-    if (fromHome && !m_tabSwitchIsBack) m_homeEntered.insert(m_sessions[idx].get());
 
     // Shelve the outgoing tab's GPU meshes on EVERY platform (uniform by
     // design - an invisible tab holds no GPU memory) and queue the incoming
@@ -886,9 +892,6 @@ void Application::cancelTabView() {
 void Application::closeSession(size_t idx) {
     if (idx >= m_sessions.size()) return;
     const bool wasActive = (idx == m_activeSession);
-    // A tab entered from the Home Screen and closed straight away goes back there.
-    const bool backToHome = wasActive && m_homeEntered.count(m_sessions[idx].get()) > 0;
-    m_homeEntered.erase(m_sessions[idx].get());
     // Closing the tab you are sketching in ends that sketch with it. The sketch
     // session lives on the Application, not on the session, so without this it
     // outlived the tab: the next New Project came up with the same sketch open
@@ -928,7 +931,21 @@ void Application::closeSession(size_t idx) {
         // cancel happened above, while its document was still alive.)
         m_sectionEnabled = false;
         m_sectionDirty = true;
-        applySessionState(std::min(idx, m_sessions.size() - 1));
+        // Where to land: the last place visited before this one - a tab, or the Home
+        // Screen - not whichever tab happens to sit next to it in the strip (#184).
+        // The history is held by identity, so it is read after the erase above.
+        size_t landOn = std::min(idx, m_sessions.size() - 1);
+        bool backToHome = false;
+        while (!closedLast && !m_tabBackStack.empty()) {
+            const ProjectSession* prev = m_tabBackStack.back();
+            m_tabBackStack.pop_back();
+            if (!prev) { backToHome = true; break; }
+            bool found = false;
+            for (size_t i = 0; i < m_sessions.size(); ++i)
+                if (m_sessions[i].get() == prev) { landOn = i; found = true; break; }
+            if (found) break;
+        }
+        applySessionState(landOn);
         if (m_shapeRenderer) m_shapeRenderer->clear();
         if (m_edgeRenderer) m_edgeRenderer->clear();
         m_meshDispatch = materializr::MeshDispatch{};

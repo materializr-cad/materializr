@@ -7250,6 +7250,11 @@ static GLuint uploadThumbTexture(const DecodedImage& img) {
 
 void Application::showLandingPage(bool fromStartup) {
     if (!m_landingPage) return;
+    // Going to the Home Screen from a tab is leaving that tab: remember it, so closing
+    // whatever is opened from here comes back to it, or to Home, in the order visited
+    // (#184).
+    if (!fromStartup && !m_landingPage->isVisible() && m_activeSession < m_sessions.size())
+        pushTabBackStack(m_sessions[m_activeSession].get());
     m_landingPage->setCanDismiss(!fromStartup);
     // Tiles go up IMMEDIATELY: refs + names from the MRU, plus any preview the
     // cache can serve straight away (a small PNG read). Anything that needs
