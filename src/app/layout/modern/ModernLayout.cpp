@@ -215,8 +215,13 @@ void Application::renderModernLayout() {
                               ImGuiWindowFlags_HorizontalScrollbar |
                               ImGuiWindowFlags_NoBackground |
                               ImGuiWindowFlags_NoSavedSettings);
-            for (size_t i = 0; i < m_sessions.size(); ++i) {
-                ImGui::PushID(static_cast<int>(i));
+            // Drag a pill sideways past its neighbour to reorder (#192). Touch keeps the
+            // "Move Left/Right" menu items instead: a finger drag here scrolls the strip.
+            static bool s_pillDragged = false;
+            if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) s_pillDragged = false;
+            bool movedPill = false;
+            for (size_t i = 0; i < m_sessions.size() && !movedPill; ++i) {
+                ImGui::PushID(m_sessions[i].get());
                 std::string label = elide(sessionDisplayLabel(i), maxLabelW);
                 if (sessionDirty(i)) label += " \xe2\x80\xa2";
                 const bool active = (i == m_activeSession);
@@ -226,9 +231,19 @@ void Application::renderModernLayout() {
                 ImGui::PushStyleColor(ImGuiCol_Text,
                     ImGui::GetColorU32(active ? touchui::textPrimary()
                                               : touchui::textDim()));
-                if (ImGui::Button(label.c_str(), ImVec2(0, pillH)) && !active)
+                const bool pillClicked = ImGui::Button(label.c_str(), ImVec2(0, pillH));
+                if (pillClicked && !active && !s_pillDragged)
                     switchToSession(i);
                 ImGui::PopStyleColor(2);
+                if (!materializr::touchMode() && ImGui::IsItemActive() &&
+                    ImGui::IsMouseDragging(ImGuiMouseButton_Left, 6.0f * s)) {
+                    const float mx = ImGui::GetIO().MousePos.x;
+                    if (mx < ImGui::GetItemRectMin().x && i > 0) {
+                        moveSession(i, i - 1); movedPill = true; s_pillDragged = true;
+                    } else if (mx > ImGui::GetItemRectMax().x && i + 1 < m_sessions.size()) {
+                        moveSession(i, i + 1); movedPill = true; s_pillDragged = true;
+                    }
+                }
                 // Hover on the pill itself feeds the long-press gate, so a
                 // press-and-hold reaches this menu on touch (m_tabBarHovered).
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup))

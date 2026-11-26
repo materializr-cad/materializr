@@ -901,6 +901,40 @@ void Application::cancelTabView() {
     if (m_landingPage) showLandingPage(/*fromStartup=*/false);
 }
 
+void Application::moveSession(size_t from, size_t to) {
+    if (from >= m_sessions.size() || to >= m_sessions.size() || from == to) return;
+    const ProjectSession* active =
+        m_activeSession < m_sessions.size() ? m_sessions[m_activeSession].get() : nullptr;
+    auto moved = std::move(m_sessions[from]);
+    m_sessions.erase(m_sessions.begin() + static_cast<long>(from));
+    m_sessions.insert(m_sessions.begin() + static_cast<long>(to), std::move(moved));
+    for (size_t k = 0; k < m_sessions.size(); ++k)
+        if (m_sessions[k].get() == active) { m_activeSession = k; break; }
+    ++m_tabBarGen;
+    m_tabSelectionSync = true;
+}
+
+void Application::applyTabOrder(const std::vector<const ProjectSession*>& order) {
+    if (order.size() != m_sessions.size()) return;
+    std::vector<std::unique_ptr<ProjectSession>> next;
+    next.reserve(order.size());
+    std::vector<bool> used(m_sessions.size(), false);
+    for (const ProjectSession* p : order) {
+        bool found = false;
+        for (size_t k = 0; k < m_sessions.size(); ++k)
+            if (!used[k] && m_sessions[k].get() == p) { used[k] = true; found = true; break; }
+        if (!found) return;   // not a permutation: leave the order alone
+    }
+    const ProjectSession* active =
+        m_activeSession < m_sessions.size() ? m_sessions[m_activeSession].get() : nullptr;
+    for (const ProjectSession* p : order)
+        for (auto& u : m_sessions)
+            if (u && u.get() == p) { next.push_back(std::move(u)); break; }
+    m_sessions = std::move(next);
+    for (size_t k = 0; k < m_sessions.size(); ++k)
+        if (m_sessions[k].get() == active) { m_activeSession = k; break; }
+}
+
 void Application::closeSession(size_t idx) {
     if (idx >= m_sessions.size()) return;
     const bool wasActive = (idx == m_activeSession);
