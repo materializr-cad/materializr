@@ -278,7 +278,7 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 
 - CONVERTED: 1
 - allowed-by-hand: 93
-- comment: 325
+- comment: 327
 - diagnostic: 13
 - identifier/other: 14
 
@@ -497,6 +497,8 @@ classifier is heuristic; rows it cannot decide are pinned in the script's OVERRI
 | comment | src/core/MeshParams.h | `// gross misses - the autumn wall fan was 3.9 mm off at 0.01.` |
 | comment | src/core/MeshParams.h | `// format string's second half reads as a user-facing "mm" readout.` |
 | diagnostic | src/core/MeshParams.h | `std::fprintf(stderr, "[Mesh] %s face strayed %.3f mm from its surface (limit %.3f): %s -> %.3f mm\n",` |
+| comment | src/core/ReportSender.h | `//   iOS      NSURLSession upload (ios_report.mm)` |
+| comment | src/core/ReportSender.h | `// Implemented in ios_report.mm. True when an HTTP answer came back (any status),` |
 | comment | src/core/SheetSpec.h | `// offset = (T/2)·tan(θ/2). For a 90° corner in 12.7 mm ply this is 6.35 mm.` |
 | comment | src/core/SketchSignature.h | `// mm), construction flags, constraints with their values, fill anchors.` |
 | comment | src/core/SketchSignature.h | `// Hash point positions and circle/arc radii too (quantised to 1e-4 mm)` |
