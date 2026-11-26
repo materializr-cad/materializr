@@ -7851,6 +7851,19 @@ void Application::renderLandingPage() {
     // is a plain GL name, so a value cast is exact.
     m_landingPage->setLogoTexture(
         static_cast<unsigned int>(layoutui::logoTexture()));
+    // Modern and im-touch have no menu bar: on the Home Screen the emblem is
+    // the same menu button the project view has (Classic keeps its bar, #197).
+    if (m_uiLayout == UiLayout::Classic) {
+        m_landingPage->setLogoMenu(nullptr);
+    } else {
+        m_landingPage->setLogoMenu([this](float side) {
+            if (layoutui::logoMenuButton("homelogomenu", side))
+                ImGui::OpenPopup("##TouchOverflow");
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", materializr::tr("Menu: file, edit, view, help and settings"));
+            renderTouchOverflowPopup();
+        });
+    }
     const LandingPage::Action act = m_landingPage->render();
     using AT = LandingPage::ActionType;
     // A tab made from the Home Screen remembers that it was: Cancel on its loading card,

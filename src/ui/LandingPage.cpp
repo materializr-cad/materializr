@@ -195,7 +195,10 @@ LandingPage::Action LandingPage::render() {
     // reaches for is where their hand already expects it.
     {
         const ImGuiStyle& style = ImGui::GetStyle();
-        if (m_logoTex) {
+        if (m_logoMenu) {
+            m_logoMenu(ImGui::GetFrameHeight());
+            ImGui::SameLine();
+        } else if (m_logoTex) {
             const float logoSz = ImGui::GetTextLineHeight() * 1.5f;
             ImGui::Image(static_cast<ImTextureID>(static_cast<intptr_t>(m_logoTex)),
                          ImVec2(logoSz, logoSz));
