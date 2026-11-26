@@ -1142,11 +1142,10 @@ void Application::renderRotatePanel() {
 
     materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(230, 0));
-    ImGui::Begin("##RotatePanel", nullptr,
-        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize);
+    materializr::toolDialogBegin("##RotatePanel", nullptr,
+        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
+        ImGuiWindowFlags_AlwaysAutoResize, materializr::tr("Rotate"));
     materializr::toolDialogRemember(uiScale());
-    materializr::opDialogDragGrip(uiScale());
 
     ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Rotate (degrees)"));
     ImGui::Separator();
@@ -1258,11 +1257,10 @@ void Application::renderMovePanel() {
 
     materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(230, 0));
-    ImGui::Begin("##MovePanel", nullptr,
-        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize);
+    materializr::toolDialogBegin("##MovePanel", nullptr,
+        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
+        ImGuiWindowFlags_AlwaysAutoResize, materializr::tr("Move"));
     materializr::toolDialogRemember(uiScale());
-    materializr::opDialogDragGrip(uiScale());
 
     ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Move"));
     ImGui::Separator();
@@ -1373,11 +1371,10 @@ void Application::renderScalePanel() {
 
     materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(230, 0));
-    ImGui::Begin("##ScalePanel", nullptr,
-        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize);
+    materializr::toolDialogBegin("##ScalePanel", nullptr,
+        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
+        ImGuiWindowFlags_AlwaysAutoResize, materializr::tr("Scale"));
     materializr::toolDialogRemember(uiScale());
-    materializr::opDialogDragGrip(uiScale());
 
     const bool mm = (m_scaleUnitMode == ScaleUnitMode::Millimeter);
     // Two calls, not one format string with a conditional: TextColored is
@@ -1653,7 +1650,7 @@ void Application::renderSketchPatternPopup() {
     const char* title = (m_sketchPatternKind == PatternKind::Linear)
                             ? "Sketch Linear Pattern"
                             : "Sketch Circular Pattern";
-    ImGui::Begin(title, nullptr,
+    materializr::toolDialogBegin(title, nullptr,
         ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoSavedSettings |
         ImGuiWindowFlags_AlwaysAutoResize);
@@ -1830,7 +1827,7 @@ void Application::renderPatternPanel() {
     const char* title = (m_patternKind == PatternKind::Linear)
                             ? "Linear Pattern"
                             : "Circular Pattern";
-    ImGui::Begin(title, nullptr,
+    materializr::toolDialogBegin(title, nullptr,
         ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoSavedSettings |
         ImGuiWindowFlags_AlwaysAutoResize);
@@ -2101,7 +2098,7 @@ void Application::renderThreadPanel() {
 
     materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(280, 0), ImGuiCond_Appearing);
-    ImGui::Begin("Thread", nullptr,
+    materializr::toolDialogBegin("Thread", nullptr,
         ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoSavedSettings |
         ImGuiWindowFlags_AlwaysAutoResize);
@@ -2280,7 +2277,7 @@ void Application::renderSweepPanel() {
     if (!m_sweepActive) return;
     materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(300, 0), ImGuiCond_Appearing);
-    ImGui::Begin("Sweep", nullptr,
+    materializr::toolDialogBegin("Sweep", nullptr,
         ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
         ImGuiWindowFlags_AlwaysAutoResize);
     materializr::toolDialogRemember(uiScale());
@@ -2333,7 +2330,7 @@ void Application::renderLoftPanel() {
     // drag the popup somewhere convenient (same pattern as Pattern panel).
     materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(280, 0), ImGuiCond_Appearing);
-    ImGui::Begin("Loft", nullptr,
+    materializr::toolDialogBegin("Loft", nullptr,
         ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoSavedSettings |
         ImGuiWindowFlags_AlwaysAutoResize);
@@ -2799,7 +2796,7 @@ void Application::renderMeshTracePanel() {
 
     materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(300, 0), ImGuiCond_Appearing);
-    ImGui::Begin("Mesh Trace", nullptr,
+    materializr::toolDialogBegin("Mesh Trace", nullptr,
                  ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
                  ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_AlwaysAutoResize);
     materializr::toolDialogRemember(uiScale());
@@ -2822,7 +2819,7 @@ void Application::renderMeshTraceSetupDialog() {
 
     materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(300, 0), ImGuiCond_Appearing);
-    ImGui::Begin("Set Up Tracing Planes", nullptr,
+    materializr::toolDialogBegin("Set Up Tracing Planes", nullptr,
                  ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
                  ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_AlwaysAutoResize);
     materializr::toolDialogRemember(uiScale());
@@ -2923,7 +2920,7 @@ void Application::renderRefImagePanel() {
 
     materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(300, 0), ImGuiCond_Appearing);
-    ImGui::Begin("Reference Image", nullptr,
+    materializr::toolDialogBegin("Reference Image", nullptr,
                  ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
                  ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_AlwaysAutoResize);
     materializr::toolDialogRemember(uiScale());
@@ -3051,10 +3048,12 @@ void Application::renderRefImageCalibrationPopup(int planeId) {
     }
 
     bool calibOpen = true;
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(540, 0), ImGuiCond_Appearing);
-    ImGui::Begin("Calibrate Image Scale", &calibOpen,
+    materializr::toolDialogBegin("Calibrate Image Scale", &calibOpen,
                  ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoSavedSettings |
                  ImGuiWindowFlags_AlwaysAutoResize);
+    materializr::toolDialogRemember(uiScale());
 
     ImGui::TextWrapped("%s", materializr::tr("Click two points a KNOWN distance apart (e.g. two marks on the ruler in your photo), then enter that distance."));
     ImGui::Spacing();
@@ -3213,7 +3212,7 @@ void Application::renderBoundaryFillPanel() {
 
     materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(280, 0), ImGuiCond_Appearing);
-    ImGui::Begin("Boundary Fill", nullptr,
+    materializr::toolDialogBegin("Boundary Fill", nullptr,
         ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
         ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_AlwaysAutoResize);
     materializr::toolDialogRemember(uiScale());
@@ -3250,7 +3249,7 @@ void Application::renderPatchPanel() {
 
     materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(300, 0), ImGuiCond_Appearing);
-    ImGui::Begin("Patch", nullptr,
+    materializr::toolDialogBegin("Patch", nullptr,
         ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
         ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_AlwaysAutoResize);
     materializr::toolDialogRemember(uiScale());
@@ -3474,7 +3473,7 @@ void Application::renderSketchMovePanel() {
 
     materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(340, 0), ImGuiCond_Appearing);
-    if (!ImGui::Begin("Move Sketch###SketchMove", &m_sketchMovePanelOpen,
+    if (!materializr::toolDialogBegin("Move Sketch###SketchMove", &m_sketchMovePanelOpen,
                       ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking |
                       ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::End(); return;
@@ -3811,7 +3810,7 @@ void Application::renderConstructionPlanePanel() {
 
     materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(280, 0), ImGuiCond_Appearing);
-    ImGui::Begin("Construction Plane", nullptr,
+    materializr::toolDialogBegin("Construction Plane", nullptr,
         ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoSavedSettings |
         ImGuiWindowFlags_AlwaysAutoResize);
@@ -4171,7 +4170,7 @@ void Application::renderRevolvePopup() {
             m_revolveBodyId = bodies.front();
         }
     }
-    ImGui::Begin(lathe ? "Lathe###RevolvePopup" : "Revolve###RevolvePopup", nullptr,
+    materializr::toolDialogBegin(lathe ? "Lathe###RevolvePopup" : "Revolve###RevolvePopup", nullptr,
         ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoSavedSettings |
         ImGuiWindowFlags_AlwaysAutoResize);
@@ -4553,7 +4552,7 @@ void Application::renderAlignFacePopup() {
     if (!m_alignActive) return;
     materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(360, 0), ImGuiCond_Appearing);
-    ImGui::Begin("Lay Flat on Plane", nullptr,
+    materializr::toolDialogBegin("Lay Flat on Plane", nullptr,
         ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
         ImGuiWindowFlags_AlwaysAutoResize);
     materializr::toolDialogRemember(uiScale());
@@ -4703,7 +4702,7 @@ void Application::renderRotatePlaneAboutAxisPopup() {
 
     materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(340, 0), ImGuiCond_Appearing);
-    ImGui::Begin("Rotate Plane About Axis", nullptr,
+    materializr::toolDialogBegin("Rotate Plane About Axis", nullptr,
         ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoSavedSettings |
         ImGuiWindowFlags_AlwaysAutoResize);
@@ -5045,7 +5044,7 @@ void Application::renderConstructionAxisPanel() {
 
     materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(280, 0), ImGuiCond_Appearing);
-    ImGui::Begin("Construction Axis", nullptr,
+    materializr::toolDialogBegin("Construction Axis", nullptr,
         ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoSavedSettings |
         ImGuiWindowFlags_AlwaysAutoResize);
@@ -5143,7 +5142,7 @@ void Application::renderSectionPanel() {
     materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowBgAlpha(0.92f);
     bool open = true;
-    if (ImGui::Begin("Section View", &open,
+    if (materializr::toolDialogBegin("Section View", &open,
                      ImGuiWindowFlags_AlwaysAutoResize |
                      ImGuiWindowFlags_NoSavedSettings)) {
         materializr::toolDialogRemember(uiScale());
@@ -5244,7 +5243,7 @@ void Application::renderTextToolPanel() {
     materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowBgAlpha(0.92f);
     bool open = true;
-    if (ImGui::Begin("Text", &open,
+    if (materializr::toolDialogBegin("Text", &open,
                      ImGuiWindowFlags_AlwaysAutoResize |
                      ImGuiWindowFlags_NoSavedSettings)) {
         materializr::toolDialogRemember(uiScale());
@@ -5383,7 +5382,7 @@ void Application::renderAirfoilToolPanel() {
     materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowBgAlpha(0.92f);
     bool open = true;
-    if (ImGui::Begin(materializr::tr("Airfoil Section###AirfoilTool"), &open,
+    if (materializr::toolDialogBegin(materializr::tr("Airfoil Section###AirfoilTool"), &open,
                      ImGuiWindowFlags_AlwaysAutoResize |
                      ImGuiWindowFlags_NoSavedSettings)) {
         materializr::toolDialogRemember(uiScale());
@@ -5512,7 +5511,7 @@ void Application::renderSvgToolPanel() {
     materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowBgAlpha(0.92f);
     bool open = true;
-    if (ImGui::Begin("Import SVG", &open,
+    if (materializr::toolDialogBegin("Import SVG", &open,
                      ImGuiWindowFlags_AlwaysAutoResize |
                      ImGuiWindowFlags_NoSavedSettings)) {
         materializr::toolDialogRemember(uiScale());
@@ -5584,7 +5583,7 @@ void Application::renderMirrorToolPanel() {
     materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowBgAlpha(0.92f);
     bool open = true;
-    if (ImGui::Begin("Mirror", &open,
+    if (materializr::toolDialogBegin("Mirror", &open,
                      ImGuiWindowFlags_AlwaysAutoResize |
                      ImGuiWindowFlags_NoSavedSettings)) {
         materializr::toolDialogRemember(uiScale());
@@ -5663,7 +5662,7 @@ void Application::renderPolygonToolPanel() {
     ImGui::SetNextWindowBgAlpha(0.92f);
     bool open = true;
     auto& spec = m_sketchTool->polygonSpec();
-    if (ImGui::Begin("Polygon", &open,
+    if (materializr::toolDialogBegin("Polygon", &open,
                      ImGuiWindowFlags_AlwaysAutoResize |
                      ImGuiWindowFlags_NoSavedSettings)) {
         materializr::toolDialogRemember(uiScale());
@@ -5797,7 +5796,7 @@ void Application::renderShapeToolPanel() {
     materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowBgAlpha(0.92f);
     bool open = true;
-    if (ImGui::Begin(title.c_str(), &open,
+    if (materializr::toolDialogBegin(title.c_str(), &open,
                      ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) {
         materializr::toolDialogRemember(uiScale());
         const char* hint = "";
@@ -5966,7 +5965,7 @@ void Application::renderCornerToolPanel() {
     materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowBgAlpha(0.92f);
     bool open = true;
-    if (ImGui::Begin("Corner", &open,
+    if (materializr::toolDialogBegin("Corner", &open,
                      ImGuiWindowFlags_AlwaysAutoResize |
                      ImGuiWindowFlags_NoSavedSettings)) {
         materializr::toolDialogRemember(uiScale());
@@ -6031,7 +6030,7 @@ void Application::renderOffsetToolPanel() {
     materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowBgAlpha(0.92f);
     bool open = true;
-    if (ImGui::Begin("Offset", &open,
+    if (materializr::toolDialogBegin("Offset", &open,
                      ImGuiWindowFlags_AlwaysAutoResize |
                      ImGuiWindowFlags_NoSavedSettings)) {
         materializr::toolDialogRemember(uiScale());
@@ -6139,7 +6138,7 @@ void Application::renderPrimitivePopup() {
     // hides the viewport's body / selection.
     materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(260, 0), ImGuiCond_Appearing);
-    ImGui::Begin(titles[k], nullptr,
+    materializr::toolDialogBegin(titles[k], nullptr,
                  ImGuiWindowFlags_NoResize |
                  ImGuiWindowFlags_NoSavedSettings |
                  ImGuiWindowFlags_AlwaysAutoResize);
@@ -6346,7 +6345,7 @@ void Application::renderStlImportDialog() {
 
     materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(300, 0), ImGuiCond_Appearing);
-    ImGui::Begin("Import STL", nullptr,
+    materializr::toolDialogBegin("Import STL", nullptr,
                  ImGuiWindowFlags_NoResize |
                  ImGuiWindowFlags_NoSavedSettings |
                  ImGuiWindowFlags_AlwaysAutoResize);
@@ -6849,12 +6848,14 @@ void Application::recomputeUnfold() {
 void Application::renderUnfoldDialog() {
     if (!m_unfoldDialogActive || !m_unfoldPattern) return;
 
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(560, 580), ImGuiCond_Appearing);
-    if (!ImGui::Begin("Flat Pattern", &m_unfoldDialogActive,
-                      ImGuiWindowFlags_NoSavedSettings)) {
+    if (!materializr::toolDialogBegin("Flat Pattern", &m_unfoldDialogActive,
+                                      ImGuiWindowFlags_NoSavedSettings)) {
         ImGui::End();
         return;
     }
+    materializr::toolDialogRemember(uiScale());
 
     // Persist the current rigidity/thickness back onto the source body.
     auto persistSheet = [&]() {

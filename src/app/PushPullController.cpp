@@ -1,3 +1,4 @@
+#include "ui/ToolDialog.h"
 #include <map>
 #include "ui/LengthField.h"
 #include "PushPullController.h"
@@ -779,12 +780,11 @@ void PushPullController::renderPushPullPanel(const IopContext& ctx) {
     ImGui::SetNextWindowSizeConstraints(ImVec2(240.0f * s, 0.0f),
                                         ImVec2(240.0f * s, 100000.0f));
     const ImVec2 hostPos = ImGui::GetWindowPos(), hostSize = ImGui::GetWindowSize();
-    ImGui::Begin("##PushPullInput", nullptr,
-        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking |
-        ImGuiWindowFlags_AlwaysAutoResize);
+    materializr::toolDialogBegin("##PushPullInput", nullptr,
+        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
+        ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_AlwaysAutoResize,
+        materializr::tr("Push / Pull"));
     materializr::toolDialogRemember(s, /*align=*/!ppAnchored);
-    opDialogDragGrip(s);
 
     if (!imTouch) {   // im-touch: just the value well below
         ImGui::TextUnformatted(materializr::trFormat(m_st.symmetric ? "Distance per side (%s)"

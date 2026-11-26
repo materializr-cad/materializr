@@ -1,3 +1,4 @@
+#include "ui/ToolDialog.h"
 #include "ui/LengthField.h"
 #include "ui/StepperRow.h"
 #include "FaceOpControllers.h"
@@ -2352,12 +2353,12 @@ void MoveFaceController::renderMoveFacePanel(const IopContext& ctx,
     materializr::toolDialogPlace(uiScale);
     ImGui::SetNextWindowSizeConstraints(ImVec2(240.0f * uiScale, 0.0f),
                                         ImVec2(240.0f * uiScale, 100000.0f));
-    ImGui::Begin("##MoveFaceInput", nullptr,
-        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking |
-        ImGuiWindowFlags_AlwaysAutoResize);
+    materializr::toolDialogBegin("##MoveFaceInput", nullptr,
+        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
+        ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_AlwaysAutoResize,
+        isRot ? materializr::tr("Tilt / Twist Face")
+              : isScl ? materializr::tr("Scale Face") : materializr::tr("Move Face"));
     materializr::toolDialogRemember(uiScale);
-    opDialogDragGrip(uiScale);
     if (isRot) {
         // Colour the label to the active ring (red = axis B, green = A).
         ImVec4 lc = (m_st.moveFaceGrab == 1) ? ImVec4(0.4f, 0.95f, 0.45f, 1.0f)

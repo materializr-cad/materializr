@@ -4,7 +4,11 @@
 #include <algorithm>
 #include <cmath>
 #include <vector>
+#include <string>
+#include "ui/OpDialogGrip.h"
 #include "ui/ToolDialogSpot.h"
+#include "ui/UiTheme.h"
+#include "ui_scale.h"
 
 namespace materializr {
 
@@ -29,6 +33,7 @@ namespace materializr {
 // The viewport window's rect (screen px), refreshed every frame by the viewport.
 struct ToolDialogHost {
     float x = 0, y = 0, w = 0, h = 0; float chromeBottom = 0;
+    bool grip = false;           // Modern / im-touch frame: grip + heading; Classic: title bar
     int lastSettleFrame = -10;   // last frame a dialog was still being lined up (see below)
 };
 inline ToolDialogHost& toolDialogHost() { static ToolDialogHost h; return h; }
@@ -72,6 +77,46 @@ inline ImVec2 toolDialogCorner(float s, ImGuiID selfId = 0) {
 // ImGuiCond_Appearing on purpose, so a dialog the user is dragging is never snapped back.
 inline void toolDialogPlace(float s) {
     ImGui::SetNextWindowPos(toolDialogCorner(s), ImGuiCond_Appearing, ImVec2(1.0f, 0.0f));
+}
+
+// Begin() for a tool dialog, framed the way the layout frames them - the same for every
+// tool, so none looks like a one-off:
+//  - Classic: ImGui's own title bar (no collapse arrow - a tool dialog has nothing to fold).
+//  - Modern / im-touch: no title bar; the three-dot grip along the top moves it, then the
+//    title as a heading, then (when `open` is given) a close x.
+// `name` is the window's identity and, before any "###", its title. A hidden name ("##Id")
+// has no title of its own: `classicTitle` is shown in Classic, and the other layouts leave
+// the dialog's own first line to say what it is.
+inline bool toolDialogBegin(const char* name, bool* open, ImGuiWindowFlags flags,
+                            const char* classicTitle = nullptr) {
+    // Never scroll sideways: focusing a field wider than the window (a long translated
+    // label) scrolled the whole dialog left, cutting off the first characters of every row.
+    ImGui::SetNextWindowScroll(ImVec2(0.0f, -1.0f));
+    const bool hidden = name[0] == '#' && name[1] == '#';
+    if (!toolDialogHost().grip) {
+        std::string id(name);
+        if (hidden && classicTitle) id = std::string(classicTitle) + "###" + (name + 2);
+        flags = (flags & ~ImGuiWindowFlags_NoTitleBar) | ImGuiWindowFlags_NoCollapse;
+        return ImGui::Begin(id.c_str(), open, flags);
+    }
+    if (!ImGui::Begin(name, nullptr, flags | ImGuiWindowFlags_NoTitleBar)) return false;
+    const float s = uiScale();
+    opDialogDragGrip(s);
+    if (!hidden) {
+        std::string title(name);
+        const size_t hh = title.find("###");
+        if (hh != std::string::npos) title.erase(hh);
+        ImGui::TextColored(accentText(), "%s", title.c_str());
+        if (open) {
+            const float bw = ImGui::GetFontSize() + 8.0f * s;
+            ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - bw);
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+            if (ImGui::SmallButton("x##tdclose")) *open = false;
+            ImGui::PopStyleColor();
+        }
+        ImGui::Separator();
+    }
+    return true;
 }
 
 // After Begin(): (1) on its first frames a dialog is lined up on the shared spot by its

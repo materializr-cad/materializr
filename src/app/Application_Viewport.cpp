@@ -398,6 +398,7 @@ void Application::renderViewport() {
             materializr::ToolDialogHost& th = materializr::toolDialogHost();
             th.x = wp.x; th.y = wp.y; th.w = ws.x; th.h = ws.y;
             th.chromeBottom = materializr::viewportTopChromeBottom();
+            th.grip = !classicLayout();
             // Classic: the project tab strip sits at the top of this window.
             if (classicLayout()) th.chromeBottom = std::max(th.chromeBottom, wp.y + 34.0f * uiScale());
         }

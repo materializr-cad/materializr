@@ -1,4 +1,5 @@
 #include "ui/LengthField.h"
+#include "ui/ToolDialog.h"
 #include "UiTheme.h"
 #include "ui_scale.h"
 #include "MeasureTool.h"
@@ -164,24 +165,21 @@ void MeasureTool::renderPanel() {
     // Appearing too, for the size: a height ballooned by an earlier resize is
     // saved in imgui.ini and would otherwise come back every time (#171).
     ImGui::SetNextWindowSize(uiSz(320, 0), ImGuiCond_Appearing);
-    // Open clear of the floating button clusters every layout draws along the
-    // top and left edges. ImGui's default spot (top-left) put the title bar -
-    // and its close button - underneath them in the touch layout, leaving a
-    // window that could be neither closed nor resized (#171). Appearing, not
-    // FirstUseEver: a bad spot saved to imgui.ini must not stick.
-    {
-        const ImGuiViewport* vp = ImGui::GetMainViewport();
-        const ImVec2 off = uiSz(130, 120);
-        ImGui::SetNextWindowPos(ImVec2(vp->WorkPos.x + off.x, vp->WorkPos.y + off.y),
-                                ImGuiCond_Appearing);
+    // Opens in the shared tool-dialog spot, which is clear of the floating button clusters
+    // every layout draws along the top and left edges (#171: ImGui's default top-left spot
+    // put the title bar - and its close button - underneath them in the touch layout). Not
+    // saved in imgui.ini: a bad spot saved there must not stick.
+    materializr::toolDialogPlace(uiScale());
+    if (!materializr::toolDialogBegin(materializr::tr("Measure"), &open,
+                                      ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking)) {
+        ImGui::End(); return;
     }
-    if (!ImGui::Begin(materializr::tr("Measure"), &open)) { ImGui::End(); return; }
+    materializr::toolDialogRemember(uiScale());
     // ...and never let a drag park the title bar under the top button row either.
     {
-        const ImGuiViewport* vp = ImGui::GetMainViewport();
-        const float minY = vp->WorkPos.y + uiSz(0, 100).y;
+        const float minY = materializr::toolDialogHost().chromeBottom;
         const ImVec2 pos = ImGui::GetWindowPos();
-        if (pos.y < minY) ImGui::SetWindowPos(ImVec2(pos.x, minY));
+        if (minY > 0.0f && pos.y < minY) ImGui::SetWindowPos(ImVec2(pos.x, minY));
     }
     // A Close button in the body as well: the title bar's is tiny and, in the
     // touch layouts, easy to lose behind other controls.

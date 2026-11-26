@@ -1,3 +1,4 @@
+#include "ui/ToolDialog.h"
 #include "ui/LengthField.h"
 #include "ExtrudeController.h"
 #include "core/BodyChanges.h"
@@ -412,12 +413,11 @@ void ExtrudeController::renderExtrudePanel(const IopContext& ctx) {
     ImGui::SetNextWindowSizeConstraints(ImVec2(240.0f * s, 0.0f),
                                         ImVec2(240.0f * s, 100000.0f));
     const ImVec2 hostPos = ImGui::GetWindowPos(), hostSize = ImGui::GetWindowSize();
-    ImGui::Begin("##ExtrudeInput", nullptr,
-        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking |
-        ImGuiWindowFlags_AlwaysAutoResize);
+    materializr::toolDialogBegin("##ExtrudeInput", nullptr,
+        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
+        ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_AlwaysAutoResize,
+        materializr::tr("Extrude"));
     materializr::toolDialogRemember(s, /*align=*/!extAnchored);
-    opDialogDragGrip(s);
 
     if (!imTouch) {   // im-touch: just the value well below
         ImGui::Text("%s", materializr::trFormat("Extrude Distance (%s)", materializr::unitSuffix()).c_str());

@@ -1,3 +1,4 @@
+#include "ui/ToolDialog.h"
 #include "ui/LengthField.h"
 #include "EdgeOpController.h"
 #include "core/BodyChanges.h"
@@ -816,12 +817,11 @@ void EdgeOpController::renderEdgeOpPanel(const IopContext& ctx) {
     ImGui::SetNextWindowSizeConstraints(ImVec2(240.0f * s, 0.0f),
                                         ImVec2(240.0f * s, 100000.0f));
     const ImVec2 hostPos = ImGui::GetWindowPos(), hostSize = ImGui::GetWindowSize();
-    ImGui::Begin("##EdgeOpInput", nullptr,
-        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking |
-        ImGuiWindowFlags_AlwaysAutoResize);
+    materializr::toolDialogBegin("##EdgeOpInput", nullptr,
+        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
+        ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_AlwaysAutoResize,
+        isFillet ? materializr::tr("Fillet") : materializr::tr("Chamfer"));
     materializr::toolDialogRemember(s, /*align=*/!anchored);
-    opDialogDragGrip(s);
 
     if (!imTouch) {   // im-touch: just the value well below
         ImGui::Text("%s", label.c_str());

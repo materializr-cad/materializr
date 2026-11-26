@@ -1,7 +1,6 @@
 #pragma once
 #include <imgui.h>
 #include <algorithm>
-#include "ui/ToolDialog.h"   // where these dialogs open (every op dialog uses both)
 
 namespace materializr {
 
