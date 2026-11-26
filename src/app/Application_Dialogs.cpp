@@ -7898,6 +7898,21 @@ void Application::renderLandingPage() {
         m_tabSwitchFromHome = false;
         m_tabSelectionSync = true;             // classic tab bar re-asserts the selection
         break;
+    // The right-click menu on an open project. The page stays up: these are errands
+    // on a tab, not a way off the page. Save needs the project open, so it comes
+    // forward behind the page; closing a clean one does not touch it (#192).
+    case AT::TabSave:
+        if (activateTabFor(act.tab)) saveProjectQuick();
+        m_tabSelectionSync = true;
+        break;
+    case AT::TabSaveAs:
+        if (activateTabFor(act.tab)) saveProject();
+        m_tabSelectionSync = true;
+        break;
+    case AT::TabClose:
+        requestCloseTab(act.tab);
+        m_tabSelectionSync = true;
+        break;
     case AT::ExportStep:
         exportRecentProjectAs(act.ref, act.name, /*asStl=*/false);
         break;   // page stays up - export is a side errand, not a departure

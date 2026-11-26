@@ -259,6 +259,11 @@ private:
     // Cancel left the active tab unbuilt (nothing to go back to, so it landed on the
     // Home Screen); its view is built when it is next shown.
     bool m_tabViewCancelled = false;
+    // Close tab `i` from a menu, its x, or Ctrl+W. A clean tab in the background is
+    // simply closed, without being switched to first or loaded: there is nothing to
+    // save and no reason to show it. A tab with unsaved changes still comes forward,
+    // because the save prompt works on the open project (#192).
+    void requestCloseTab(size_t i);
     void pushTabBackStack(const ProjectSession* leaving);
     void forgetTabInBackStack(const ProjectSession* gone);
     void cancelTabView();

@@ -28,6 +28,8 @@ const KeyActionInfo kActions[] = {
 
     { KeyAction::NextTab,    "next_tab",    "Next project tab",     "Tabs", KeyScope::Anywhere, withCtrl(ImGuiKey_Tab) },
     { KeyAction::PrevTab,    "prev_tab",    "Previous project tab", "Tabs", KeyScope::Anywhere, withCtrlShift(ImGuiKey_Tab) },
+    { KeyAction::NewTab,     "new_tab",     "New project tab",      "Tabs", KeyScope::Anywhere, withCtrl(ImGuiKey_T) },
+    { KeyAction::CloseTab,   "close_tab",   "Close project tab",    "Tabs", KeyScope::Anywhere, withCtrl(ImGuiKey_W) },
 
     { KeyAction::ResetCamera,    "reset_camera",    "Reset the camera",   "View", KeyScope::Anywhere, bare(ImGuiKey_Home) },
     { KeyAction::FrameSelection, "frame_selection", "Frame the selection (or everything, if none)", "View", KeyScope::Model, bare(ImGuiKey_F) },

@@ -30,11 +30,13 @@ public:
 
     enum class ActionType { None, NewProject, OpenEntry, OpenFileDialog, Dismiss,
                             ExportStep, ExportStl, OpenSettings, OpenHelp,
-                            ImportParts, DeleteEntry, Exit, SwitchTab };
+                            ImportParts, DeleteEntry, Exit, SwitchTab,
+                            // Right-click menu on an open project (#192); `tab` is its index.
+                            TabSave, TabSaveAs, TabClose };
     struct Action {
         ActionType type = ActionType::None;
         std::string ref, name;   // OpenEntry / ExportStep / ExportStl / DeleteEntry
-        size_t tab = 0;          // SwitchTab: OpenTab::index
+        size_t tab = 0;          // SwitchTab / Tab*: OpenTab::index
     };
 
     ~LandingPage();

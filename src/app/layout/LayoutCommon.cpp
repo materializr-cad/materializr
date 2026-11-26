@@ -249,11 +249,8 @@ void Application::renderTabMenuItems(size_t i) {
         if (activateTabFor(i)) saveProject();
     }
     ImGui::Separator();
-    if (ImGui::MenuItem(materializr::tr("Close Tab"))) {
-        if (activateTabFor(i))
-            guardedOpen([this]() { closeSession(m_activeSession); saveAppSettings(); },
-                        /*closingTab=*/true);
-    }
+    if (ImGui::MenuItem(materializr::tr("Close Tab")))
+        requestCloseTab(i);
 }
 
 bool Application::openNewTab() {
@@ -327,8 +324,7 @@ void Application::renderViewportTabBar() {
         }
         // The menu can close this very tab (or any other): `i` no longer names the tab
         // this item was drawn for, and what follows must not read it as a click on
-        // whatever now sits at `i`. Closing used to land on the neighbour at the same
-        // index, which hid this; it now lands where you were before (#184).
+        // whatever now sits at `i` (#184).
         const bool listChanged = m_sessions.size() != tabsBefore;
         if (visible) {
             ImGui::EndTabItem();
@@ -344,10 +340,8 @@ void Application::renderViewportTabBar() {
             break;
         }
         if (!open) {
-            // The tab's × - same guarded flow as the menu item.
-            if (activateTabFor(i))
-                guardedOpen([this]() { closeSession(m_activeSession); saveAppSettings(); },
-                        /*closingTab=*/true);
+            // The tab's × - same flow as the menu item.
+            requestCloseTab(i);
             closedOne = true;   // indices may have shifted; finish this frame
         }
         ImGui::PopID();

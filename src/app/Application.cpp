@@ -854,6 +854,18 @@ void Application::queueTabMeshRebuild() {
     });
 }
 
+void Application::requestCloseTab(size_t i) {
+    if (i >= m_sessions.size()) return;
+    if (i != m_activeSession && !sessionDirty(i)) {
+        closeSession(i);
+        saveAppSettings();
+        return;
+    }
+    if (activateTabFor(i))
+        guardedOpen([this]() { closeSession(m_activeSession); saveAppSettings(); },
+                    /*closingTab=*/true);
+}
+
 void Application::pushTabBackStack(const ProjectSession* leaving) {
     if (!leaving) return;
     forgetTabInBackStack(leaving);
@@ -3611,6 +3623,12 @@ void Application::handleShortcuts() {
             switchToSession(prevTab ? (m_activeSession + n - 1) % n
                                     : (m_activeSession + 1) % n);
         }
+    }
+    // Ctrl+T / Ctrl+W: new tab / close this tab, as in a browser (#192). Inert while
+    // the Home Screen covers the window, like Ctrl+Tab.
+    if (!landingPageUp()) {
+        if (keyPressed(KeyAction::NewTab)) openNewTab();
+        if (keyPressed(KeyAction::CloseTab)) requestCloseTab(m_activeSession);
     }
     // Plain D - Dimension tool in sketch mode (Onshape-style). Ctrl+D stays
     // Duplicate (handled below); text-input focus swallows the key.
