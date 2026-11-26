@@ -1,5 +1,6 @@
 #include "ui/UiTheme.h"
 #include "ui/OpDialogGrip.h"
+#include "ui/ToolDialog.h"
 #include "ui_scale.h"
 #include "touch_mode.h"
 #include "gl_common.h"
@@ -393,6 +394,13 @@ void Application::renderViewport() {
         ImVec2 wp = ImGui::GetWindowPos(), ws = ImGui::GetWindowSize();
         m_viewportWinX = wp.x; m_viewportWinY = wp.y;
         m_viewportWinW = ws.x; m_viewportWinH = ws.y;
+        {   // Where tool dialogs line up (ui/ToolDialog.h)
+            materializr::ToolDialogHost& th = materializr::toolDialogHost();
+            th.x = wp.x; th.y = wp.y; th.w = ws.x; th.h = ws.y;
+            th.chromeBottom = materializr::viewportTopChromeBottom();
+            // Classic: the project tab strip sits at the top of this window.
+            if (classicLayout()) th.chromeBottom = std::max(th.chromeBottom, wp.y + 34.0f * uiScale());
+        }
     }
 
     // Classic: the project tab strip lives at the top of the viewport (and

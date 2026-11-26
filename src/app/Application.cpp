@@ -1,4 +1,5 @@
 #include "ui/UiTheme.h"
+#include "ui/ToolDialog.h"
 #include "gl_common.h"
 #include "platform_sdl.h"
 
@@ -2395,6 +2396,13 @@ AppSettings Application::currentSettings() const {
     s.touchRightW = m_touchRightW;
     s.touchRailW = m_touchRailW;
     s.toolOrder = m_railOrder.serialize();
+    {
+        const materializr::ToolDialogSpot& sp = materializr::toolDialogSpot();
+        const float us = std::max(0.25f, materializr::uiScale());
+        s.toolDialogSpotSet = sp.set;
+        s.toolDialogRightOff = sp.rightOff / us;
+        s.toolDialogTopOff = sp.topOff / us;
+    }
     s.orbitButton = m_orbitButton;
     s.panButton = m_panButton;
     s.levelOrbit = m_viewport->getCamera().isLevelOrbit();
@@ -2510,9 +2518,17 @@ void Application::unpackToolSwitches(int b) {
 // what was last written, write the settings again. Cheap - an int compare.
 void Application::saveRememberedUiStateIfChanged() {
     const int sw = packToolSwitches();
-    if (sw == m_savedToolSwitches && m_menuSectionsOpen == m_savedMenuSections) return;
+    // The dialog spot follows the pointer while a dialog is dragged; write it once
+    // the drag is over, not every frame of it.
+    const materializr::ToolDialogSpot& sp = materializr::toolDialogSpot();
+    const bool spotChanged = sp.set != m_savedDialogSpot.set ||
+                             sp.rightOff != m_savedDialogSpot.rightOff ||
+                             sp.topOff != m_savedDialogSpot.topOff;
+    const bool spotDue = spotChanged && !ImGui::IsMouseDown(ImGuiMouseButton_Left);
+    if (sw == m_savedToolSwitches && m_menuSectionsOpen == m_savedMenuSections && !spotDue) return;
     m_savedToolSwitches = sw;
     m_savedMenuSections = m_menuSectionsOpen;
+    m_savedDialogSpot = sp;
     saveAppSettings();
 }
 
@@ -2566,6 +2582,14 @@ void Application::applyAppSettings(const AppSettings& s) {
     if (m_touchRightW > 520.0f) m_touchRightW = 520.0f;
     m_touchRailW = s.touchRailW;
     m_railOrder.parse(s.toolOrder);
+    {
+        materializr::ToolDialogSpot& sp = materializr::toolDialogSpot();
+        const float us = std::max(0.25f, materializr::uiScale());
+        sp.set = s.toolDialogSpotSet;
+        sp.rightOff = std::min(0.0f, s.toolDialogRightOff * us);
+        sp.topOff = std::max(0.0f, s.toolDialogTopOff * us);
+        m_savedDialogSpot = sp;
+    }
     if (m_touchRailW < 64.0f)  m_touchRailW = 64.0f;
     if (m_touchRailW > 208.0f) m_touchRailW = 208.0f;   // 2-column rail range
     // Camera button bindings are honoured on every platform. Android defaults to
@@ -8920,6 +8944,9 @@ void Application::run() {
                 return true;                         // camera glide needs its frames
             if (!m_threadRecuts.empty()) return true; // async re-cut in flight
             if (m_railOrder.animating()) return true; // tool rail still sliding into place
+            // A tool dialog that has just opened is still being lined up on its spot.
+            if (ImGui::GetFrameCount() <= materializr::toolDialogHost().lastSettleFrame + 1)
+                return true;
             if (m_meshDispatch.anyPending()) return true; // off-thread mesh in flight: land it when it finishes
             for (auto* c : m_iops)
                 if (c->previewPending()) return true; // off-thread preview in flight

@@ -810,11 +810,7 @@ void EdgeOpController::renderEdgeOpPanel(const IopContext& ctx) {
         ImGui::SetNextWindowPos(ImVec2(ax, ay), ImGuiCond_Appearing);
         anchored = true;
     }
-    if (!anchored)
-        ImGui::SetNextWindowPos(ImVec2(
-            std::max(ImGui::GetWindowPos().x + 6.0f,
-                     ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - 250.0f * s),
-            ImGui::GetWindowPos().y + 50), ImGuiCond_Appearing);
+    if (!anchored) materializr::toolDialogPlace(s);
     // Pin the width (min == max) so moving the panel can't feed back into the
     // value field's content-avail width and ratchet the window wider.
     ImGui::SetNextWindowSizeConstraints(ImVec2(240.0f * s, 0.0f),
@@ -824,6 +820,7 @@ void EdgeOpController::renderEdgeOpPanel(const IopContext& ctx) {
         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking |
         ImGuiWindowFlags_AlwaysAutoResize);
+    materializr::toolDialogRemember(s, /*align=*/!anchored);
     opDialogDragGrip(s);
 
     if (!imTouch) {   // im-touch: just the value well below

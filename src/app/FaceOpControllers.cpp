@@ -2349,14 +2349,14 @@ void MoveFaceController::renderMoveFacePanel(const IopContext& ctx,
               : isScl ? "SCALE FACE (about its centre)"
                       : "MOVE FACE (slide in plane)");
 
-    ImGui::SetNextWindowPos(ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - 250.0f * uiScale,
-                                   ImGui::GetWindowPos().y + 50), ImGuiCond_Appearing);
+    materializr::toolDialogPlace(uiScale);
     ImGui::SetNextWindowSizeConstraints(ImVec2(240.0f * uiScale, 0.0f),
                                         ImVec2(240.0f * uiScale, 100000.0f));
     ImGui::Begin("##MoveFaceInput", nullptr,
         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking |
         ImGuiWindowFlags_AlwaysAutoResize);
+    materializr::toolDialogRemember(uiScale);
     opDialogDragGrip(uiScale);
     if (isRot) {
         // Colour the label to the active ring (red = axis B, green = A).
