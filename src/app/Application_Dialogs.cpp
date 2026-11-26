@@ -3952,9 +3952,24 @@ void Application::renderConstructionPlanePanel() {
     }
 
     // Gizmo for the preview plane appears automatically (the popup auto-
-    // selects the just-pushed plane). Switch modes with W/E or click the
-    // plane after committing.
-    ImGui::TextDisabled("%s", materializr::tr("W = Move gizmo, E = Rotate gizmo."));
+    // selects the just-pushed plane). W / E switch it from the keyboard; the
+    // toggle is the way there without one - touch had no route to Rotate (#201).
+    if (m_gizmo) {
+        const GizmoMode gm = m_gizmo->getMode();
+        if (ImGui::RadioButton(materializr::tr("Move"), gm != GizmoMode::Rotate)) {
+            m_gizmo->setMode(GizmoMode::Translate);
+            m_selection->setNavigationOnly(false);
+        }
+        ImGui::SameLine();
+        if (ImGui::RadioButton(materializr::tr("Rotate"), gm == GizmoMode::Rotate)) {
+            m_gizmo->setMode(GizmoMode::Rotate);
+            m_selection->setNavigationOnly(false);
+        }
+        if (!materializr::touchMode()) {
+            ImGui::SameLine();
+            ImGui::TextDisabled("%s", materializr::tr("(W / E)"));
+        }
+    }
 
     // Type-an-exact-angle rotation. Applies on top of whatever the popup
     // base orientation + gizmo edits produced; lets the user dial in a
