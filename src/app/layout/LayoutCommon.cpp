@@ -319,18 +319,29 @@ void Application::renderViewportTabBar() {
         // Screen then dropped you back on the tab you had left (#184).
         const std::string tabLabel = sessionDisplayLabel(i) + "###tab" +
             std::to_string(reinterpret_cast<std::uintptr_t>(m_sessions[i].get()));
+        const size_t tabsBefore = m_sessions.size();
         const bool visible = ImGui::BeginTabItem(tabLabel.c_str(), &open, tif);
         if (ImGui::BeginPopupContextItem("tabctx")) {
             renderTabMenuItems(i);
             ImGui::EndPopup();
         }
+        // The menu can close this very tab (or any other): `i` no longer names the tab
+        // this item was drawn for, and what follows must not read it as a click on
+        // whatever now sits at `i`. Closing used to land on the neighbour at the same
+        // index, which hid this; it now lands where you were before (#184).
+        const bool listChanged = m_sessions.size() != tabsBefore;
         if (visible) {
             ImGui::EndTabItem();
             // Outside sync frames, a visible non-active tab = a user click.
             // A refused switch re-arms the sync so the visual snaps back.
-            if (!syncing && i != m_activeSession) {
+            if (!listChanged && !syncing && i != m_activeSession) {
                 if (!switchToSession(i)) m_tabSelectionSync = true;
             }
+        }
+        if (listChanged) {
+            closedOne = true;   // indices shifted; finish this frame
+            ImGui::PopID();
+            break;
         }
         if (!open) {
             // The tab's × - same guarded flow as the menu item.
