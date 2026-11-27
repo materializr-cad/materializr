@@ -1839,3 +1839,6 @@ follow a path, use Sweep.",它始终保持相对底面居中。若要让截面�
 1734,Desktop-style. A menu bar on top and every panel visible at once. Best with a mouse and keyboard.,桌面风格。顶部菜单栏，所有面板同时显示。最适合鼠标和键盘。
 1735,"Clean and focused. A tool rail on the left, tabbed panels on the right, everything else out of the way. Great on any screen.",简洁专注。左侧工具栏，右侧分页面板，其余元素收起。适合各种屏幕。
 1736,Built for fingers. A full-screen model with floating buttons and big touch targets. Made for tablets.,为手指而设计。全屏模型、浮动按钮和大触控区域。适合平板。
+1737,Move Left,左移
+1738,Move Right,右移
+1739,Drag the ring to rotate the selection,拖动圆环以旋转所选对象

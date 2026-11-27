@@ -363,7 +363,13 @@ void Application::renderViewportTabBar() {
                 const bool rightClick = ImGui::IsMouseClicked(ImGuiMouseButton_Right) ||
                                         ImGui::IsMouseDown(ImGuiMouseButton_Right) ||
                                         ImGui::IsMouseReleased(ImGuiMouseButton_Right);
-                if (leftClick) {
+                if (leftClick && (m_tabCtxHold || m_tabCtxSwallowLeft)) {
+                    // This tab is only highlighted because its menu is (or was just)
+                    // up, and the click went to closing the menu - clicking away from a
+                    // menu never also clicks what is under it. Stay where you are.
+                    m_tabCtxSwallowLeft = true;
+                    m_tabSelectionSync = true;
+                } else if (leftClick) {
                     m_tabCtxHold = false;
                     if (!switchToSession(i)) m_tabSelectionSync = true;
                 } else if (rightClick) {
@@ -385,6 +391,14 @@ void Application::renderViewportTabBar() {
         }
         ImGui::PopID();
     }
+    // A left press while a tab's menu is up closes the menu, and nothing else, until
+    // the button is let go.
+    if (m_tabCtxHold && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+        m_tabCtxSwallowLeft = true;
+    if (m_tabCtxSwallowLeft && !m_tabCtxHold &&
+        !ImGui::IsMouseDown(ImGuiMouseButton_Left) &&
+        !ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+        m_tabCtxSwallowLeft = false;
     // The menu is gone and no button is down: the highlight goes back to the real tab.
     if (m_tabCtxHold && !m_tabCtxMenuSeen &&
         !ImGui::IsMouseDown(ImGuiMouseButton_Right) &&

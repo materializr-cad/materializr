@@ -8944,6 +8944,7 @@ void Application::run() {
                 return true;                         // camera glide needs its frames
             if (!m_threadRecuts.empty()) return true; // async re-cut in flight
             if (m_railOrder.animating()) return true; // tool rail still sliding into place
+            if (m_pillSlide.animating()) return true; // Modern tab pills still sliding
             // A tool dialog that has just opened is still being lined up on its spot.
             if (ImGui::GetFrameCount() <= materializr::toolDialogHost().lastSettleFrame + 1)
                 return true;
