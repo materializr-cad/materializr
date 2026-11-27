@@ -5382,7 +5382,7 @@ void Application::renderAirfoilToolPanel() {
     materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowBgAlpha(0.92f);
     bool open = true;
-    if (materializr::toolDialogBegin(materializr::tr("Airfoil Section###AirfoilTool"), &open,
+    if (materializr::toolDialogBegin((std::string(materializr::tr("Airfoil Section")) + "###AirfoilTool").c_str(), &open,
                      ImGuiWindowFlags_AlwaysAutoResize |
                      ImGuiWindowFlags_NoSavedSettings)) {
         materializr::toolDialogRemember(uiScale());
