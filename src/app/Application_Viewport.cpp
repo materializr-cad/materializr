@@ -6562,6 +6562,61 @@ void Application::renderViewport() {
 
                             // Rotate ring (behind the arrows so arrowheads aren't clipped).
                             gdl->AddCircle(sc, ringR, colRing, 64, 2.5f);
+
+                            // Say what the ring is for (#189). Two small arrowheads on
+                            // it, pointing away from each other along the ring, read as
+                            // "slide me round" at a glance; without them it looked like
+                            // one more highlight around the centre.
+                            {
+                                const float phi = -0.785398f;            // upper right, clear of the arms
+                                const glm::vec2 rad(std::cos(phi), std::sin(phi));
+                                const glm::vec2 tg(-rad.y, rad.x);
+                                const ImVec2 pr(sc.x + rad.x * ringR, sc.y + rad.y * ringR);
+                                const float hw = gzTouch ? 9.0f : 6.0f;   // half width
+                                const float hl = gzTouch ? 14.0f : 10.0f; // length
+                                for (int dir = -1; dir <= 1; dir += 2) {
+                                    const glm::vec2 d = tg * static_cast<float>(dir);
+                                    const ImVec2 tip(pr.x + d.x * (hl + 3.0f), pr.y + d.y * (hl + 3.0f));
+                                    const ImVec2 b1(pr.x + d.x * 3.0f + rad.x * hw, pr.y + d.y * 3.0f + rad.y * hw);
+                                    const ImVec2 b2(pr.x + d.x * 3.0f - rad.x * hw, pr.y + d.y * 3.0f - rad.y * hw);
+                                    gdl->AddTriangleFilled(tip, b1, b2, colRing);
+                                }
+                            }
+                            if (hover == SketchGizmoHandle::Rotate && !gzTouch &&
+                                m_sketchGizmoHandle == SketchGizmoHandle::None)
+                                ImGui::SetTooltip("%s", materializr::tr("Drag the ring to rotate the selection"));
+
+                            // While rotating: a scale round the ring, one notch per
+                            // step the drag snaps to - the Angle snap setting, or every
+                            // 5 degrees when that is off. Notches count from where the
+                            // drag started, since that is what the angle is measured
+                            // from; the start notch is the long one.
+                            if (m_sketchGizmoHandle == SketchGizmoHandle::Rotate) {
+                                const int snapDeg = m_sketchTool->getAngleSnapDeg();
+                                const int stepDeg = snapDeg > 0 ? snapDeg : 5;
+                                glm::vec2 v0 = m_sketchGizmoAnchor - m_sketchGizmoCenter;
+                                if (glm::length(v0) > 1e-4f && stepDeg <= 90) {
+                                    v0 = glm::normalize(v0);
+                                    const int count = 360 / stepDeg;
+                                    for (int k = 0; k < count; ++k) {
+                                        const float a = static_cast<float>(k * stepDeg) *
+                                                        static_cast<float>(M_PI) / 180.0f;
+                                        const glm::vec2 dsk(v0.x * std::cos(a) - v0.y * std::sin(a),
+                                                            v0.x * std::sin(a) + v0.y * std::cos(a));
+                                        glm::vec2 dsc = dsk.x * vx + dsk.y * vy;
+                                        if (glm::length(dsc) < 1e-4f) continue;
+                                        dsc = glm::normalize(dsc);
+                                        const bool major = (k == 0);
+                                        const bool quarter = ((k * stepDeg) % 90) == 0;
+                                        const float len = major ? 16.0f : quarter ? 11.0f : 6.0f;
+                                        const ImU32 tc = major ? IM_COL32(255, 240, 80, 255)
+                                                               : IM_COL32(220, 180, 60, 200);
+                                        gdl->AddLine(ImVec2(sc.x + dsc.x * (ringR - len), sc.y + dsc.y * (ringR - len)),
+                                                     ImVec2(sc.x + dsc.x * ringR,         sc.y + dsc.y * ringR),
+                                                     tc, major ? 2.5f : 1.5f);
+                                    }
+                                }
+                            }
                             // Axis arrows.
                             gdl->AddLine(sc, ex, colX, 3.0f);
                             gdl->AddLine(sc, ey, colY, 3.0f);
@@ -6637,10 +6692,18 @@ void Application::renderViewport() {
                         if (glm::length(v0) > 1e-4f && glm::length(v1) > 1e-4f) {
                             float angRad = std::atan2(v1.y, v1.x) - std::atan2(v0.y, v0.x);
                             float angDeg = angRad * 180.0f / static_cast<float>(M_PI);
-                            // Soft 15° snap: lock when within 3° of an increment so
-                            // the user can ride the snap without it feeling sticky.
-                            float snapped = std::round(angDeg / 15.0f) * 15.0f;
-                            if (std::abs(angDeg - snapped) < 3.0f) angDeg = snapped;
+                            // Soft snap to the Angle snap setting (15 degrees by default;
+                            // 0 = off, a smooth drag): lock when within 3° of an
+                            // increment (a quarter of it for the small ones) so the user
+                            // can ride the snap without it feeling sticky. The scale drawn
+                            // on the ring shows these same steps.
+                            const int snapDeg = m_sketchTool->getAngleSnapDeg();
+                            if (snapDeg > 0) {
+                                const float inc = static_cast<float>(snapDeg);
+                                const float snapped = std::round(angDeg / inc) * inc;
+                                if (std::abs(angDeg - snapped) < std::min(3.0f, inc * 0.25f))
+                                    angDeg = snapped;
+                            }
                             m_sketchGizmoRotateDegrees = angDeg;
                             float rad = angDeg * static_cast<float>(M_PI) / 180.0f;
                             m_activeSketch->rotatePointsAbout(m_sketchGizmoOriginals, m_sketchGizmoCenter,

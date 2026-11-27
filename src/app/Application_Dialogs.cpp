@@ -7267,6 +7267,11 @@ static GLuint uploadThumbTexture(const DecodedImage& img) {
 
 void Application::showLandingPage(bool fromStartup) {
     if (!m_landingPage) return;
+    // Going to the Home Screen from a tab is leaving that tab: remember it, so closing
+    // whatever is opened from here comes back to it, or to Home, in the order visited
+    // (#184).
+    if (!fromStartup && !m_landingPage->isVisible() && m_activeSession < m_sessions.size())
+        pushTabBackStack(m_sessions[m_activeSession].get());
     m_landingPage->setCanDismiss(!fromStartup);
     // Tiles go up IMMEDIATELY: refs + names from the MRU, plus any preview the
     // cache can serve straight away (a small PNG read). Anything that needs
@@ -7863,6 +7868,19 @@ void Application::renderLandingPage() {
     // is a plain GL name, so a value cast is exact.
     m_landingPage->setLogoTexture(
         static_cast<unsigned int>(layoutui::logoTexture()));
+    // Modern and im-touch have no menu bar: on the Home Screen the emblem is
+    // the same menu button the project view has (Classic keeps its bar, #197).
+    if (m_uiLayout == UiLayout::Classic) {
+        m_landingPage->setLogoMenu(nullptr);
+    } else {
+        m_landingPage->setLogoMenu([this](float side) {
+            if (layoutui::logoMenuButton("homelogomenu", side))
+                ImGui::OpenPopup("##TouchOverflow");
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", materializr::tr("Menu: file, edit, view, help and settings"));
+            renderTouchOverflowPopup();
+        });
+    }
     const LandingPage::Action act = m_landingPage->render();
     using AT = LandingPage::ActionType;
     // A tab made from the Home Screen remembers that it was: Cancel on its loading card,
@@ -7883,6 +7901,20 @@ void Application::renderLandingPage() {
         else openTabFromHome();
         break;
     case AT::OpenEntry: {
+        // A file that is gone is reported and dropped from the list WITHOUT making a
+        // tab for it first: the tab was created before the load, so the failed load
+        // left an empty project behind and the Home Screen gone (#184).
+        if (act.ref.rfind("content:", 0) != 0) {
+            std::error_code existsEc;
+            if (!std::filesystem::exists(act.ref, existsEc)) {
+                showToast(materializr::trFormat(
+                    "Couldn't open \"%s\" - the file may have moved or been deleted.",
+                    act.name.empty() ? act.ref : act.name));
+                removeRecentProject(act.ref);
+                showLandingPage(/*fromStartup=*/false);   // tiles without the dead one
+                break;
+            }
+        }
         m_landingPage->setVisible(false);
         AppSettings::RecentProject rp;
         rp.ref = act.ref;
@@ -7909,6 +7941,21 @@ void Application::renderLandingPage() {
             m_landingPage->setVisible(true);   // refused: stay where we are
         m_tabSwitchFromHome = false;
         m_tabSelectionSync = true;             // classic tab bar re-asserts the selection
+        break;
+    // The right-click menu on an open project. The page stays up: these are errands
+    // on a tab, not a way off the page. Save needs the project open, so it comes
+    // forward behind the page; closing a clean one does not touch it (#192).
+    case AT::TabSave:
+        if (activateTabFor(act.tab)) saveProjectQuick();
+        m_tabSelectionSync = true;
+        break;
+    case AT::TabSaveAs:
+        if (activateTabFor(act.tab)) saveProject();
+        m_tabSelectionSync = true;
+        break;
+    case AT::TabClose:
+        requestCloseTab(act.tab);
+        m_tabSelectionSync = true;
         break;
     case AT::ExportStep:
         exportRecentProjectAs(act.ref, act.name, /*asStl=*/false);

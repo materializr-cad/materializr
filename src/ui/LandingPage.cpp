@@ -195,7 +195,10 @@ LandingPage::Action LandingPage::render() {
     // reaches for is where their hand already expects it.
     {
         const ImGuiStyle& style = ImGui::GetStyle();
-        if (m_logoTex) {
+        if (m_logoMenu) {
+            m_logoMenu(ImGui::GetFrameHeight());
+            ImGui::SameLine();
+        } else if (m_logoTex) {
             const float logoSz = ImGui::GetTextLineHeight() * 1.5f;
             ImGui::Image(static_cast<ImTextureID>(static_cast<intptr_t>(m_logoTex)),
                          ImVec2(logoSz, logoSz));
@@ -276,6 +279,22 @@ LandingPage::Action LandingPage::render() {
             if (t.active) ImGui::PopStyleColor();
             if (t.active && ImGui::IsItemHovered())
                 ImGui::SetTooltip("%s", materializr::tr("Back to the open project"));
+            // The same Save / Save As / Close Tab the tab strip offers, here too (#192).
+            // Chosen items are handed back as actions, so nothing changes the open
+            // tabs while this page is still drawing them.
+            if (ImGui::BeginPopupContextItem("openTabCtx")) {
+                if (ImGui::MenuItem(materializr::tr("Save"))) {
+                    action.type = ActionType::TabSave;   action.tab = t.index;
+                }
+                if (ImGui::MenuItem(materializr::tr("Save As..."))) {
+                    action.type = ActionType::TabSaveAs; action.tab = t.index;
+                }
+                ImGui::Separator();
+                if (ImGui::MenuItem(materializr::tr("Close Tab"))) {
+                    action.type = ActionType::TabClose;  action.tab = t.index;
+                }
+                ImGui::EndPopup();
+            }
             ImGui::PopID();
         }
         ImGui::Spacing();

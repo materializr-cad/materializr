@@ -475,8 +475,26 @@ void SketchTool::onMouseMove(glm::vec2 pos) {
 
 void SketchTool::onMouseUp(glm::vec2 /*pos*/) {
     if (m_isDragging) {
+        const bool singlePoint = dragPoints().size() == 1;
+        const int dropped = m_dragPointId;
         m_isDragging = false;
         m_dragPointId = -1;
+        // A single point let go exactly on another point JOINS it, as drawing a line to
+        // an existing point does. Without this, a corner dragged onto a line's end looked
+        // closed but was two separate points, and the contour never closed (#203).
+        if (m_sketch && singlePoint && dropped >= 0) {
+            if (const SketchPoint* d = m_sketch->getPoint(dropped)) {
+                int target = -1;
+                float best = 1e-3f;
+                for (const auto& p : m_sketch->getPoints()) {
+                    if (p.id == dropped) continue;
+                    const float dist = glm::length(p.pos - d->pos);
+                    if (dist <= best) { best = dist; target = p.id; }
+                }
+                if (target >= 0 && m_sketch->mergePointInto(dropped, target) && m_solver)
+                    m_solver->solve(*m_sketch);
+            }
+        }
         // No more drag - clear any drag-time inference guides so the overlay
         // doesn't linger after the user releases the mouse.
         m_activeInferences.clear();

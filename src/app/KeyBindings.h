@@ -15,7 +15,7 @@ namespace materializr {
 enum class KeyAction : int {
     Save, Open, ImportStep, ExportStep,
     Undo, Redo, Duplicate, SelectAll, Delete,
-    NextTab, PrevTab,
+    NextTab, PrevTab, NewTab, CloseTab,
     ResetCamera, FrameSelection, TogglePanels,
     GizmoTranslate, GizmoRotate, GizmoScale,
     DimensionTool, ConstructionTool,

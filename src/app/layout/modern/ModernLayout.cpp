@@ -216,8 +216,18 @@ void Application::renderModernLayout() {
                               ImGuiWindowFlags_HorizontalScrollbar |
                               ImGuiWindowFlags_NoBackground |
                               ImGuiWindowFlags_NoSavedSettings);
+            // Drag a pill sideways past its neighbour to reorder (#192). Touch keeps the
+            // "Move Left/Right" menu items instead: a finger drag here scrolls the strip.
+            // The pills slide into their new places as the rail's tools do, and the
+            // one being dragged looks picked up.
+            static bool s_pillDragged = false;
+            if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) s_pillDragged = false;
+            // A move is applied after the strip is drawn: every pill is drawn every
+            // frame, so each one's slide carries on from where it was.
+            size_t moveFrom = 0, moveTo = 0;
+            bool movePill = false;
             for (size_t i = 0; i < m_sessions.size(); ++i) {
-                ImGui::PushID(static_cast<int>(i));
+                ImGui::PushID(m_sessions[i].get());
                 std::string label = elide(sessionDisplayLabel(i), maxLabelW);
                 if (sessionDirty(i)) label += " \xe2\x80\xa2";
                 const bool active = (i == m_activeSession);
@@ -227,9 +237,31 @@ void Application::renderModernLayout() {
                 ImGui::PushStyleColor(ImGuiCol_Text,
                     ImGui::GetColorU32(active ? touchui::textPrimary()
                                               : touchui::textDim()));
-                if (ImGui::Button(label.c_str(), ImVec2(0, pillH)) && !active)
+                m_pillSlide.begin();
+                const bool pillClicked = ImGui::Button(label.c_str(), ImVec2(0, pillH));
+                const bool held = !materializr::touchMode() && ImGui::IsItemActive() &&
+                                  ImGui::IsMouseDragging(ImGuiMouseButton_Left, 6.0f * s);
+                if (held) {
+                    ImDrawList* dl = ImGui::GetWindowDrawList();
+                    const ImU32 acc = ImGui::GetColorU32(touchui::accentFill());
+                    const float r = ImGui::GetStyle().FrameRounding;
+                    dl->AddRectFilled(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(),
+                                      (acc & 0x00FFFFFFu) | 0x38000000u, r);
+                    dl->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), acc, r,
+                                0, 2.0f * s);
+                }
+                m_pillSlide.end(m_sessions[i].get());
+                if (pillClicked && !active && !s_pillDragged)
                     switchToSession(i);
                 ImGui::PopStyleColor(2);
+                if (held && !movePill) {
+                    const float mx = ImGui::GetIO().MousePos.x;
+                    if (mx < ImGui::GetItemRectMin().x && i > 0) {
+                        moveFrom = i; moveTo = i - 1; movePill = true; s_pillDragged = true;
+                    } else if (mx > ImGui::GetItemRectMax().x && i + 1 < m_sessions.size()) {
+                        moveFrom = i; moveTo = i + 1; movePill = true; s_pillDragged = true;
+                    }
+                }
                 // Hover on the pill itself feeds the long-press gate, so a
                 // press-and-hold reaches this menu on touch (m_tabBarHovered).
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup))
@@ -245,6 +277,7 @@ void Application::renderModernLayout() {
             // switch from the tab menu it may be off to one side.
             ImGui::EndChild();
             ImGui::PopStyleVar(2);
+            if (movePill) moveSession(moveFrom, moveTo);
 
             // "+" stays OUTSIDE the scrolling region: a new tab must never be
             // something you have to scroll to reach.

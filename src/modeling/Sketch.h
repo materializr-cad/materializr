@@ -235,6 +235,25 @@ public:
     // Same test without changing anything: is `pointId` a corner roundCorner could act on?
     bool isRoundableCorner(int pointId) const;
 
+    // Delete the point `pointId` where exactly two straight lines meet (and nothing
+    // else is attached) WITHOUT losing the line: both lines and the point go, and one
+    // line runs between their far ends instead - the same line when the two were
+    // collinear, a shortcut across when they were at an angle (#190). Returns false,
+    // changing nothing, when the point is not such a join, when it belongs to a
+    // polygon or a text outline (those keep their own delete rules), or when the far
+    // ends are already joined by a line. `newLineId`, when given, receives the line.
+    bool joinLinesAt(int pointId, int* newLineId = nullptr);
+
+    // Join two points that sit at the same place: everything that used `dropId` (lines,
+    // arcs, circles, splines, constraints) uses `keepId` instead, and `dropId` goes. A
+    // contour whose corner was two separate points at one position is open to the
+    // contour builder however closed it looks; dragging a point onto another used to
+    // leave exactly that (#203). Refuses, changing nothing, when the two are the ends of
+    // one line (it would collapse), when either belongs to a polygon, or when an id is
+    // unknown. Constraints that tied the two to each other go with the merge, as do
+    // lines it leaves doubled up.
+    bool mergePointInto(int dropId, int keepId);
+
     // CONSTRUCTION GEOMETRY: reference lines, circles, arcs and splines that
     // help you draw but are not part of the shape. The contract is that they
     // have NO effect on anything the sketch produces - regions, profile wires,
