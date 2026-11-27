@@ -475,8 +475,26 @@ void SketchTool::onMouseMove(glm::vec2 pos) {
 
 void SketchTool::onMouseUp(glm::vec2 /*pos*/) {
     if (m_isDragging) {
+        const bool singlePoint = dragPoints().size() == 1;
+        const int dropped = m_dragPointId;
         m_isDragging = false;
         m_dragPointId = -1;
+        // A single point let go exactly on another point JOINS it, as drawing a line to
+        // an existing point does. Without this, a corner dragged onto a line's end looked
+        // closed but was two separate points, and the contour never closed (#203).
+        if (m_sketch && singlePoint && dropped >= 0) {
+            if (const SketchPoint* d = m_sketch->getPoint(dropped)) {
+                int target = -1;
+                float best = 1e-3f;
+                for (const auto& p : m_sketch->getPoints()) {
+                    if (p.id == dropped) continue;
+                    const float dist = glm::length(p.pos - d->pos);
+                    if (dist <= best) { best = dist; target = p.id; }
+                }
+                if (target >= 0 && m_sketch->mergePointInto(dropped, target) && m_solver)
+                    m_solver->solve(*m_sketch);
+            }
+        }
         // No more drag - clear any drag-time inference guides so the overlay
         // doesn't linger after the user releases the mouse.
         m_activeInferences.clear();
@@ -4794,7 +4812,8 @@ bool SketchTool::beginMirror() {
     m_mirrorPoints.clear();  m_mirrorLines.clear(); m_mirrorCircles.clear();
     m_mirrorArcs.clear();    m_mirrorSplines.clear();
 
-    if (hasElementSelection()) {
+    m_mirrorFromSelection = hasElementSelection();
+    if (m_mirrorFromSelection) {
         m_mirrorPoints  = m_selectedPoints;
         m_mirrorLines   = m_selectedLines;
         m_mirrorCircles = m_selectedCircles;
@@ -4836,6 +4855,33 @@ void SketchTool::cancelMirror() {
     m_mirrorActive = false;
     m_mirrorPoints.clear(); m_mirrorLines.clear(); m_mirrorCircles.clear();
     m_mirrorArcs.clear();   m_mirrorSplines.clear();
+}
+
+void SketchTool::abortMirror() {
+    const bool restore = m_mirrorFromSelection;
+    std::set<int> pts = m_mirrorPoints, lines = m_mirrorLines, circles = m_mirrorCircles,
+                  arcs = m_mirrorArcs, splines = m_mirrorSplines;
+    cancelMirror();
+    m_mirrorFromSelection = false;
+    setMode(SketchToolMode::Select);
+    if (!restore || !m_sketch) return;
+    // Only ids that still exist - the sketch may have changed under the tool.
+    auto keep = [](std::set<int>& ids, auto exists) {
+        for (auto it = ids.begin(); it != ids.end();)
+            it = exists(*it) ? std::next(it) : ids.erase(it);
+    };
+    auto inList = [](const auto& list) {
+        return [&list](int id) {
+            for (const auto& e : list) if (e.id == id) return true;
+            return false;
+        };
+    };
+    keep(pts,     [this](int id) { return m_sketch->getPoint(id) != nullptr; });
+    keep(lines,   inList(m_sketch->getLines()));
+    keep(circles, inList(m_sketch->getCircles()));
+    keep(arcs,    inList(m_sketch->getArcs()));
+    keep(splines, inList(m_sketch->getSplines()));
+    setSelectionFull(pts, lines, circles, arcs, splines);
 }
 
 glm::vec2 SketchTool::mirrorReflect(glm::vec2 p) const {

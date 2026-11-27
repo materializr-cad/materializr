@@ -2471,6 +2471,7 @@ void Application::beginConstructionAxis() {
     // two vertices, a planar face's normal, two planes' intersection).
     m_axisOpHaveCylinder = m_axisOpHaveEdge = m_axisOpHaveTwoVerts = false;
     m_axisOpHaveFaceNormal = m_axisOpHaveTwoPlanes = false;
+    m_axisOpExtraEdges.clear();
     {
         std::vector<gp_Pln> planarPlanes;
         std::vector<gp_Pnt> vertices;
@@ -2517,9 +2518,13 @@ void Application::beginConstructionAxis() {
                         }
                     } else if (e.type == SelectionType::Edge) {
                         BRepAdaptor_Curve ad(TopoDS::Edge(e.shape));
-                        if (ad.GetType() == GeomAbs_Line && !m_axisOpHaveEdge) {
-                            m_axisOpEdgeAxis = ad.Line().Position();
-                            m_axisOpHaveEdge = true;
+                        if (ad.GetType() == GeomAbs_Line) {
+                            if (!m_axisOpHaveEdge) {
+                                m_axisOpEdgeAxis = ad.Line().Position();
+                                m_axisOpHaveEdge = true;
+                            } else {
+                                m_axisOpExtraEdges.push_back(ad.Line().Position());
+                            }
                         }
                     } else if (e.type == SelectionType::Vertex) {
                         vertices.push_back(BRep_Tool::Pnt(TopoDS::Vertex(e.shape)));
@@ -2666,12 +2671,28 @@ void Application::updateConstructionAxis() {
 }
 
 void Application::commitConstructionAxis() {
-    m_axisOpPreview.commit(*m_history, *m_document);
+    const bool committed = m_axisOpPreview.commit(*m_history, *m_document);
+    // Along-edge with several straight edges selected: one axis per edge, each
+    // its own history step like the first (#198).
+    if (committed && m_axisOpKindIdx == 4 && m_history && m_document) {
+        for (const gp_Ax1& ax : m_axisOpExtraEdges) {
+            auto op = std::make_unique<ConstructionAxisOp>();
+            op->setType(AxisCreationType::AlongEdge);
+            op->setOrigin(ax.Location());
+            op->setDirection(ax.Direction());
+            op->setName("Edge Axis");
+            materializr::LiveOpPreview extra;
+            extra.hold(std::move(op), *m_document);
+            if (extra.apply(*m_document)) extra.commit(*m_history, *m_document);
+        }
+    }
+    m_axisOpExtraEdges.clear();
     m_axisOpActive = false;
 }
 
 void Application::cancelConstructionAxis() {
     m_axisOpPreview.clear(*m_document);
+    m_axisOpExtraEdges.clear();
     m_axisOpActive = false;
 }
 

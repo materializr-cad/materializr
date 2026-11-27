@@ -1,3 +1,4 @@
+#include "ui/ToolDialog.h"
 #include <map>
 #include "ui/LengthField.h"
 #include "PushPullController.h"
@@ -773,21 +774,17 @@ void PushPullController::renderPushPullPanel(const IopContext& ctx) {
         ImGui::SetNextWindowPos(ImVec2(ax, ay), ImGuiCond_Appearing);
         ppAnchored = true;
     }
-    if (!ppAnchored)
-        ImGui::SetNextWindowPos(ImVec2(
-            std::max(ImGui::GetWindowPos().x + 6.0f,
-                     ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - 250.0f * s),
-            ImGui::GetWindowPos().y + 50), ImGuiCond_Appearing);
+    if (!ppAnchored) materializr::toolDialogPlace(s);
     // Pin the width (min == max) so moving the panel can't feed back into
     // the value field's content-avail width and ratchet the window wider.
     ImGui::SetNextWindowSizeConstraints(ImVec2(240.0f * s, 0.0f),
                                         ImVec2(240.0f * s, 100000.0f));
     const ImVec2 hostPos = ImGui::GetWindowPos(), hostSize = ImGui::GetWindowSize();
-    ImGui::Begin("##PushPullInput", nullptr,
-        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking |
-        ImGuiWindowFlags_AlwaysAutoResize);
-    opDialogDragGrip(s);
+    materializr::toolDialogBegin("##PushPullInput", nullptr,
+        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
+        ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_AlwaysAutoResize,
+        materializr::tr("Push / Pull"));
+    materializr::toolDialogRemember(s, /*align=*/!ppAnchored);
 
     if (!imTouch) {   // im-touch: just the value well below
         ImGui::TextUnformatted(materializr::trFormat(m_st.symmetric ? "Distance per side (%s)"

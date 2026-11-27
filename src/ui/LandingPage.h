@@ -1,4 +1,5 @@
 #pragma once
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -30,11 +31,13 @@ public:
 
     enum class ActionType { None, NewProject, OpenEntry, OpenFileDialog, Dismiss,
                             ExportStep, ExportStl, OpenSettings, OpenHelp,
-                            ImportParts, DeleteEntry, Exit, SwitchTab };
+                            ImportParts, DeleteEntry, Exit, SwitchTab,
+                            // Right-click menu on an open project (#192); `tab` is its index.
+                            TabSave, TabSaveAs, TabClose };
     struct Action {
         ActionType type = ActionType::None;
         std::string ref, name;   // OpenEntry / ExportStep / ExportStl / DeleteEntry
-        size_t tab = 0;          // SwitchTab: OpenTab::index
+        size_t tab = 0;          // SwitchTab / Tab*: OpenTab::index
     };
 
     ~LandingPage();
@@ -46,6 +49,11 @@ public:
     // chip uses). 0 = text-only header. Set by the caller each show/frame;
     // NOT owned by this class (unlike the entry thumbnails).
     void setLogoTexture(unsigned int tex) { m_logoTex = tex; }
+
+    // When set, the header calls this (cursor already at the logo's place, with
+    // the side length to use) instead of drawing the plain logo, so a layout can
+    // make the emblem its menu button (#197). Empty = plain logo.
+    void setLogoMenu(std::function<void(float side)> fn) { m_logoMenu = std::move(fn); }
 
     // Whether the header shows a close (×) button. False at startup - there
     // is nothing behind the page, so closing it equals New Project. True when
@@ -84,6 +92,7 @@ private:
     bool m_takeFocus = false;   // one-shot on show: lift above the panels
     bool m_canDismiss = false;  // see setCanDismiss
     unsigned int m_logoTex = 0; // not owned
+    std::function<void(float)> m_logoMenu;
     std::vector<Entry> m_entries;
     std::vector<OpenTab> m_openTabs;
 };

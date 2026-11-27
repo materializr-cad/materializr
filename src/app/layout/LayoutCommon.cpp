@@ -249,11 +249,15 @@ void Application::renderTabMenuItems(size_t i) {
         if (activateTabFor(i)) saveProject();
     }
     ImGui::Separator();
-    if (ImGui::MenuItem(materializr::tr("Close Tab"))) {
-        if (activateTabFor(i))
-            guardedOpen([this]() { closeSession(m_activeSession); saveAppSettings(); },
-                        /*closingTab=*/true);
-    }
+    // Reordering never switches or loads anything (#192).
+    if (ImGui::MenuItem(materializr::tr("Move Left"), nullptr, false, i > 0))
+        moveSession(i, i - 1);
+    if (ImGui::MenuItem(materializr::tr("Move Right"), nullptr, false,
+                        i + 1 < m_sessions.size()))
+        moveSession(i, i + 1);
+    ImGui::Separator();
+    if (ImGui::MenuItem(materializr::tr("Close Tab")))
+        requestCloseTab(i);
 }
 
 bool Application::openNewTab() {
@@ -290,8 +294,13 @@ void Application::renderViewportTabBar() {
     // Classic only: the strip lives INSIDE the Viewport window, above the 3D
     // image, styled like the dock tab bars - but it is a plain ImGui tab bar,
     // not a dock node, so tabs cannot be dragged into the Tools/Items docks.
-    const ImGuiTabBarFlags barFlags = ImGuiTabBarFlags_FittingPolicyScroll;
-    if (!ImGui::BeginTabBar("##projectTabs", barFlags)) return;
+    // Tabs can be dragged into a new order (ImGui does the drag; the result is copied
+    // back into the project list below).
+    const ImGuiTabBarFlags barFlags = ImGuiTabBarFlags_FittingPolicyScroll |
+                                      ImGuiTabBarFlags_Reorderable;
+    const std::string barId = "##projectTabs" + std::to_string(m_tabBarGen);
+    if (!ImGui::BeginTabBar(barId.c_str(), barFlags)) return;
+    std::vector<std::pair<int, const ProjectSession*>> visualOrder;
     // On a sync frame (the active session changed OUTSIDE this bar - menus,
     // Ctrl+Tab, a refused switch), ImGui's internal selection still points at
     // the OLD tab for this frame. Interpreting that stale "visible" as a user
@@ -306,8 +315,9 @@ void Application::renderViewportTabBar() {
         m_tabBarHovered = true;
     bool closedOne = false;
     for (size_t i = 0; i < m_sessions.size() && !closedOne; ++i) {
-        ImGui::PushID(static_cast<int>(i));
-        ImGuiTabItemFlags tif = ImGuiTabItemFlags_NoReorder;
+        // Keyed on the session, not its position: a tab that moves keeps its identity.
+        ImGui::PushID(m_sessions[i].get());
+        ImGuiTabItemFlags tif = ImGuiTabItemFlags_None;
         if (i == m_activeSession && syncing)
             tif |= ImGuiTabItemFlags_SetSelected;
         if (sessionDirty(i)) tif |= ImGuiTabItemFlags_UnsavedDocument;
@@ -319,27 +329,97 @@ void Application::renderViewportTabBar() {
         // Screen then dropped you back on the tab you had left (#184).
         const std::string tabLabel = sessionDisplayLabel(i) + "###tab" +
             std::to_string(reinterpret_cast<std::uintptr_t>(m_sessions[i].get()));
+        const size_t tabsBefore = m_sessions.size();
+        const int genBefore = m_tabBarGen;
+        // Taken BEFORE BeginTabItem: a visible tab pushes its own id on the stack.
+        const ImGuiID tabId = ImGui::GetID(tabLabel.c_str());
         const bool visible = ImGui::BeginTabItem(tabLabel.c_str(), &open, tif);
+        if (ImGuiTabBar* tb = ImGui::GetCurrentTabBar())
+            if (ImGuiTabItem* ti = ImGui::TabBarFindTabByID(tb, tabId))
+                visualOrder.emplace_back(ImGui::TabBarGetTabOrder(tb, ti), m_sessions[i].get());
         if (ImGui::BeginPopupContextItem("tabctx")) {
+            m_tabCtxMenuSeen = true;
             renderTabMenuItems(i);
             ImGui::EndPopup();
         }
+        // The menu can close this very tab (or any other): `i` no longer names the tab
+        // this item was drawn for, and what follows must not read it as a click on
+        // whatever now sits at `i` (#184).
+        const bool listChanged = m_sessions.size() != tabsBefore || genBefore != m_tabBarGen;
         if (visible) {
             ImGui::EndTabItem();
             // Outside sync frames, a visible non-active tab = a user click.
             // A refused switch re-arms the sync so the visual snaps back.
-            if (!syncing && i != m_activeSession) {
-                if (!switchToSession(i)) m_tabSelectionSync = true;
+            //
+            // ImGui also selects a tab when it is RIGHT-clicked, which is how its menu
+            // opens. That is not a request to go there: it used to bring the project
+            // forward (and load it) just to show a menu or close it (#192). Only a left
+            // click switches. While the menu is up the right-clicked tab stays
+            // highlighted, as in any menu, and the real selection returns once it closes.
+            if (!listChanged && !syncing && i != m_activeSession) {
+                const bool leftClick = ImGui::IsMouseClicked(ImGuiMouseButton_Left) ||
+                                       ImGui::IsMouseDown(ImGuiMouseButton_Left) ||
+                                       ImGui::IsMouseReleased(ImGuiMouseButton_Left);
+                const bool rightClick = ImGui::IsMouseClicked(ImGuiMouseButton_Right) ||
+                                        ImGui::IsMouseDown(ImGuiMouseButton_Right) ||
+                                        ImGui::IsMouseReleased(ImGuiMouseButton_Right);
+                if (leftClick && (m_tabCtxHold || m_tabCtxSwallowLeft)) {
+                    // This tab is only highlighted because its menu is (or was just)
+                    // up, and the click went to closing the menu - clicking away from a
+                    // menu never also clicks what is under it. Stay where you are.
+                    m_tabCtxSwallowLeft = true;
+                    m_tabSelectionSync = true;
+                } else if (leftClick) {
+                    m_tabCtxHold = false;
+                    if (!switchToSession(i)) m_tabSelectionSync = true;
+                } else if (rightClick) {
+                    m_tabCtxHold = true;
+                } else if (!m_tabCtxHold) {
+                    m_tabSelectionSync = true;
+                }
             }
         }
+        if (listChanged) {
+            closedOne = true;   // indices shifted; finish this frame
+            ImGui::PopID();
+            break;
+        }
         if (!open) {
-            // The tab's × - same guarded flow as the menu item.
-            if (activateTabFor(i))
-                guardedOpen([this]() { closeSession(m_activeSession); saveAppSettings(); },
-                        /*closingTab=*/true);
+            // The tab's × - same flow as the menu item.
+            requestCloseTab(i);
             closedOne = true;   // indices may have shifted; finish this frame
         }
         ImGui::PopID();
+    }
+    // A left press while a tab's menu is up closes the menu, and nothing else, until
+    // the button is let go.
+    if (m_tabCtxHold && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+        m_tabCtxSwallowLeft = true;
+    if (m_tabCtxSwallowLeft && !m_tabCtxHold &&
+        !ImGui::IsMouseDown(ImGuiMouseButton_Left) &&
+        !ImGui::IsMouseReleased(ImGuiMouseButton_Left))
+        m_tabCtxSwallowLeft = false;
+    // The menu is gone and no button is down: the highlight goes back to the real tab.
+    if (m_tabCtxHold && !m_tabCtxMenuSeen &&
+        !ImGui::IsMouseDown(ImGuiMouseButton_Right) &&
+        !ImGui::IsMouseReleased(ImGuiMouseButton_Right)) {
+        m_tabCtxHold = false;
+        m_tabSelectionSync = true;
+    }
+    m_tabCtxMenuSeen = false;
+    // A drag in the bar may have changed the tab order: the project list follows what
+    // is on screen.
+    if (!closedOne && visualOrder.size() == m_sessions.size()) {
+        std::sort(visualOrder.begin(), visualOrder.end(),
+                  [](const auto& a, const auto& b) { return a.first < b.first; });
+        bool same = true;
+        for (size_t k = 0; k < visualOrder.size(); ++k)
+            if (visualOrder[k].second != m_sessions[k].get()) { same = false; break; }
+        if (!same) {
+            std::vector<const ProjectSession*> order;
+            for (const auto& v : visualOrder) order.push_back(v.second);
+            applyTabOrder(order);
+        }
     }
     if (!closedOne &&
         ImGui::TabItemButton("+", ImGuiTabItemFlags_Trailing |

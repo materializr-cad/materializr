@@ -19,6 +19,8 @@
 #include "io/ImageDecode.h"   // DecodedImage - thumbnail peek results
 #include "ui/UpdateChecker.h"
 #include "ui/RailOrder.h"
+#include "ui/ToolDialogSpot.h"
+#include "ui/SlideAnim.h"
 #include <TopoDS_Shape.hxx>
 #include "viewport/MeshDispatch.h"
 #ifdef MZR_PARALLEL_MESH_TESTING
@@ -245,23 +247,36 @@ private:
     bool m_tabMeshQueued = false;
     bool tabMeshRebuildPending() const { return m_tabMeshQueued && !m_deferredHeavy.empty(); }
     void queueTabMeshRebuild();
-    // The tabs the user came from, most recent last. Held by identity because the
-    // index of a tab moves when another one closes. Cancel on the "Preparing view"
-    // card walks back through it: to the tab you were on, and on from there.
+    // The places the user came from, most recent last: a tab, or a null entry for the
+    // Home Screen. Held by identity because the index of a tab moves when another one
+    // closes. Cancel on the "Preparing view" card walks back through it, and so does
+    // closing the active tab: back to wherever you were before, tab or Home Screen,
+    // the way a browser does (#184).
     std::vector<const ProjectSession*> m_tabBackStack;
     // A switch made BY Cancel: the tab being left is not somewhere to come back to.
     bool m_tabSwitchIsBack = false;
     // The switch was asked for from the Home Screen's open-projects strip, which has
     // already hidden the page by the time it calls in.
     bool m_tabSwitchFromHome = false;
-    // Every tab that was entered from the Home Screen. Closing one of them goes back to the
-    // Home Screen, however many switches there have been since (open two from Home, flip
-    // between them, close both: Home, not the tab that was behind the page). Held by
-    // identity; a tab leaves the set when it closes.
-    std::set<const ProjectSession*> m_homeEntered;
     // Cancel left the active tab unbuilt (nothing to go back to, so it landed on the
     // Home Screen); its view is built when it is next shown.
     bool m_tabViewCancelled = false;
+    // Close tab `i` from a menu, its x, or Ctrl+W. A clean tab in the background is
+    // simply closed, without being switched to first or loaded: there is nothing to
+    // save and no reason to show it. A tab with unsaved changes still comes forward,
+    // because the save prompt works on the open project (#192).
+    void requestCloseTab(size_t i);
+    // Put tab `from` at position `to` (tab order is the order of m_sessions). The open
+    // project stays the open project; nothing is switched or loaded (#192).
+    void moveSession(size_t from, size_t to);
+    // Classic's tab bar keeps its own tab order, so a move made anywhere else starts it
+    // a fresh bar (new id) that picks the new order up from the submission order.
+    int m_tabBarGen = 0;
+    // The tool-dialog spot as last written to settings (see saveRememberedUiStateIfChanged).
+    materializr::ToolDialogSpot m_savedDialogSpot;
+    // Re-order the tabs to `order` (every session exactly once), as the Classic tab
+    // bar's drag reports it. Ignored if it isn't a permutation of the current tabs.
+    void applyTabOrder(const std::vector<const ProjectSession*>& order);
     void pushTabBackStack(const ProjectSession* leaving);
     void forgetTabInBackStack(const ProjectSession* gone);
     void cancelTabView();
@@ -564,6 +579,16 @@ private:
     // (Ctrl+Tab, menus, a refused switch snapping back) so the bar re-asserts
     // the visual selection exactly once instead of fighting user clicks.
     bool m_tabSelectionSync = true;
+    // Classic tab bar: a right-clicked background tab is highlighted while its menu is up
+    // without becoming the open project (#192); the flag holds the real selection back
+    // until the menu closes. m_tabCtxMenuSeen: a tab menu was drawn this frame.
+    bool m_tabCtxHold = false;
+    bool m_tabCtxMenuSeen = false;
+    // The left click that closed that menu (by clicking away from it) is not a click on
+    // the highlighted tab: it is ignored until the button is let go (#192).
+    bool m_tabCtxSwallowLeft = false;
+    // Modern tab pills slide into place when one is dragged to a new position (#192).
+    materializr::SlideAnim m_pillSlide;
     // One-shot: raise the Settings window on the next render. Set by every
     // explicit open request - an already-open window buried under the home
     // page otherwise never surfaces.
@@ -2336,6 +2361,9 @@ private:
     // computes (computeDerivedAxisOD) and feeds via setOrigin/setDirection.
     bool   m_axisOpHaveCylinder = false;  gp_Ax1 m_axisOpCylAxis;
     bool   m_axisOpHaveEdge = false;      gp_Ax1 m_axisOpEdgeAxis;
+    // Further straight edges in the selection: Apply makes an axis along each
+    // of them too, after the previewed one (#198).
+    std::vector<gp_Ax1> m_axisOpExtraEdges;
     bool   m_axisOpHaveTwoVerts = false;  gp_Pnt m_axisOpV1, m_axisOpV2;
     bool   m_axisOpHaveFaceNormal = false; gp_Pnt m_axisOpFacePt; gp_Dir m_axisOpFaceNormal;
     bool   m_axisOpHaveTwoPlanes = false; gp_Pln m_axisOpPlaneA, m_axisOpPlaneB;

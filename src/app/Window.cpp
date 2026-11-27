@@ -659,7 +659,7 @@ void Window::handleFingerEvent(unsigned type, std::int64_t id, float nx, float n
             }
             const bool wantScroll =
                 materializr::touchMode() && !m_touchOnCanvas && !m_panelScroll &&
-                !onSplitter && !movingWindow && !onScrollbar &&
+                !onSplitter && !movingWindow && !onScrollbar && !m_touchDragOwned &&
                 (dx * dx + dy * dy) > 25.0f * 25.0f && std::fabs(dy) > std::fabs(dx);
             bool justLatched = false;
             // Arm on the first frame past the threshold, commit on the next - that

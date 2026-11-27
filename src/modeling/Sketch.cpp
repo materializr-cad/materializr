@@ -1017,6 +1017,115 @@ bool Sketch::isRoundableCorner(int pointId) const {
     return true;
 }
 
+bool Sketch::mergePointInto(int dropId, int keepId) {
+    if (dropId == keepId || !getPoint(dropId) || !getPoint(keepId)) return false;
+    for (const auto& ln : m_lines)
+        if ((ln.startPointId == dropId && ln.endPointId == keepId) ||
+            (ln.startPointId == keepId && ln.endPointId == dropId)) return false;
+    for (const auto& pg : m_polygons) {
+        auto owns = [&](int id) {
+            return pg.centerPointId == id ||
+                   std::find(pg.vertexPointIds.begin(), pg.vertexPointIds.end(), id) !=
+                       pg.vertexPointIds.end();
+        };
+        if (owns(dropId) || owns(keepId)) return false;
+    }
+
+    // Constraints between the two points have nothing left to say.
+    m_constraints.erase(
+        std::remove_if(m_constraints.begin(), m_constraints.end(),
+            [&](const Constraint& k) {
+                return (k.entityA == dropId && k.entityB == keepId) ||
+                       (k.entityA == keepId && k.entityB == dropId);
+            }),
+        m_constraints.end());
+
+    auto use = [&](int& id) { if (id == dropId) id = keepId; };
+    for (auto& ln : m_lines)   { use(ln.startPointId); use(ln.endPointId); }
+    for (auto& c  : m_circles) { use(c.centerPointId); }
+    for (auto& a  : m_arcs)    { use(a.centerPointId); use(a.startPointId); use(a.endPointId); }
+    for (auto& sp : m_splines) { for (int& id : sp.controlPointIds) use(id); }
+    for (auto& k  : m_constraints) { use(k.entityA); use(k.entityB); }
+
+    // Two lines that now join the same pair of points are one line.
+    std::set<std::pair<int, int>> seen;
+    for (auto it = m_lines.begin(); it != m_lines.end();) {
+        const auto key = std::minmax(it->startPointId, it->endPointId);
+        if (it->startPointId == it->endPointId || !seen.insert(key).second) {
+            const int gone = it->id;
+            it = m_lines.erase(it);
+            m_constraints.erase(
+                std::remove_if(m_constraints.begin(), m_constraints.end(),
+                    [&](const Constraint& k) { return k.entityA == gone || k.entityB == gone; }),
+                m_constraints.end());
+        } else ++it;
+    }
+    // A constraint that now names one thing twice is meaningless.
+    m_constraints.erase(
+        std::remove_if(m_constraints.begin(), m_constraints.end(),
+            [](const Constraint& k) { return k.entityA >= 0 && k.entityA == k.entityB; }),
+        m_constraints.end());
+
+    m_points.erase(
+        std::remove_if(m_points.begin(), m_points.end(),
+            [dropId](const SketchPoint& p) { return p.id == dropId; }),
+        m_points.end());
+    return true;
+}
+
+bool Sketch::joinLinesAt(int pointId, int* newLineId) {
+    if (!isRoundableCorner(pointId)) return false;
+
+    int l0 = -1, l1 = -1, a = -1, b = -1;
+    bool cons0 = false, cons1 = false, text = false;
+    for (const auto& ln : m_lines) {
+        if (ln.startPointId != pointId && ln.endPointId != pointId) continue;
+        const int other = ln.startPointId == pointId ? ln.endPointId : ln.startPointId;
+        text = text || ln.fromText;
+        if (l0 < 0) { l0 = ln.id; a = other; cons0 = ln.isConstruction; }
+        else        { l1 = ln.id; b = other; cons1 = ln.isConstruction; }
+    }
+    if (l0 < 0 || l1 < 0 || a == b || text) return false;
+    // A polygon owns its vertices and edges: deleting one takes the whole polygon,
+    // as it always has.
+    for (const auto& pg : m_polygons) {
+        if (std::find(pg.vertexPointIds.begin(), pg.vertexPointIds.end(), pointId) != pg.vertexPointIds.end() ||
+            std::find(pg.lineIds.begin(), pg.lineIds.end(), l0) != pg.lineIds.end() ||
+            std::find(pg.lineIds.begin(), pg.lineIds.end(), l1) != pg.lineIds.end())
+            return false;
+    }
+    // The shortcut would double an existing line.
+    for (const auto& ln : m_lines)
+        if ((ln.startPointId == a && ln.endPointId == b) ||
+            (ln.startPointId == b && ln.endPointId == a)) return false;
+    if (!getPoint(a) || !getPoint(b)) return false;
+
+    removeElement(l0);
+    removeElement(l1);
+    removeElement(pointId);
+    // Constraints that named the point or either old line are meaningless now.
+    {
+        std::unordered_set<int> valid;
+        for (const auto& pt : m_points)   valid.insert(pt.id);
+        for (const auto& l : m_lines)     valid.insert(l.id);
+        for (const auto& c : m_circles)   valid.insert(c.id);
+        for (const auto& ar : m_arcs)     valid.insert(ar.id);
+        for (const auto& sp : m_splines)  valid.insert(sp.id);
+        for (const auto& pg : m_polygons) valid.insert(pg.id);
+        m_constraints.erase(
+            std::remove_if(m_constraints.begin(), m_constraints.end(),
+                [&](const Constraint& k) {
+                    return (k.entityA >= 0 && valid.find(k.entityA) == valid.end()) ||
+                           (k.entityB >= 0 && valid.find(k.entityB) == valid.end());
+                }),
+            m_constraints.end());
+    }
+    const int joined = addLine(a, b);
+    if (cons0 && cons1) setElementConstruction(joined, true);
+    if (newLineId) *newLineId = joined;
+    return true;
+}
+
 bool Sketch::roundCorner(int pointId, double size, bool chamfer, std::vector<int>* createdIds) {
     if (!(size > 0.0) || !isRoundableCorner(pointId)) return false;
 

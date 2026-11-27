@@ -1,4 +1,5 @@
 #include "ui/UiTheme.h"
+#include "ui/ToolDialog.h"
 #include "gl_common.h"
 #include "platform_sdl.h"
 
@@ -739,6 +740,14 @@ void Application::runPendingHeavyTasks() {
 bool Application::switchToSession(size_t idx) {
     if (idx >= m_sessions.size()) return false;
     if (idx == m_activeSession) {
+        // Choosing the tab that is already open from the Home Screen is still a trip
+        // from Home: closing it should go back there.
+        if (m_tabSwitchFromHome || (m_landingPage && m_landingPage->isVisible())) {
+            m_tabBackStack.erase(std::remove(m_tabBackStack.begin(), m_tabBackStack.end(),
+                                             static_cast<const ProjectSession*>(nullptr)),
+                                 m_tabBackStack.end());
+            m_tabBackStack.push_back(nullptr);
+        }
         // Back on a tab whose view a Cancel left unbuilt (from the Home Screen).
         if (m_tabViewCancelled) {
             m_tabViewCancelled = false;
@@ -792,8 +801,6 @@ bool Application::switchToSession(size_t idx) {
     }
     m_tabViewCancelled = false;
     adoptSession(idx);
-    // The tab just entered from the Home Screen, so closing it goes back there.
-    if (fromHome && !m_tabSwitchIsBack) m_homeEntered.insert(m_sessions[idx].get());
 
     // Shelve the outgoing tab's GPU meshes on EVERY platform (uniform by
     // design - an invisible tab holds no GPU memory) and queue the incoming
@@ -848,6 +855,18 @@ void Application::queueTabMeshRebuild() {
     });
 }
 
+void Application::requestCloseTab(size_t i) {
+    if (i >= m_sessions.size()) return;
+    if (i != m_activeSession && !sessionDirty(i)) {
+        closeSession(i);
+        saveAppSettings();
+        return;
+    }
+    if (activateTabFor(i))
+        guardedOpen([this]() { closeSession(m_activeSession); saveAppSettings(); },
+                    /*closingTab=*/true);
+}
+
 void Application::pushTabBackStack(const ProjectSession* leaving) {
     if (!leaving) return;
     forgetTabInBackStack(leaving);
@@ -883,12 +902,43 @@ void Application::cancelTabView() {
     if (m_landingPage) showLandingPage(/*fromStartup=*/false);
 }
 
+void Application::moveSession(size_t from, size_t to) {
+    if (from >= m_sessions.size() || to >= m_sessions.size() || from == to) return;
+    const ProjectSession* active =
+        m_activeSession < m_sessions.size() ? m_sessions[m_activeSession].get() : nullptr;
+    auto moved = std::move(m_sessions[from]);
+    m_sessions.erase(m_sessions.begin() + static_cast<long>(from));
+    m_sessions.insert(m_sessions.begin() + static_cast<long>(to), std::move(moved));
+    for (size_t k = 0; k < m_sessions.size(); ++k)
+        if (m_sessions[k].get() == active) { m_activeSession = k; break; }
+    ++m_tabBarGen;
+    m_tabSelectionSync = true;
+}
+
+void Application::applyTabOrder(const std::vector<const ProjectSession*>& order) {
+    if (order.size() != m_sessions.size()) return;
+    std::vector<std::unique_ptr<ProjectSession>> next;
+    next.reserve(order.size());
+    std::vector<bool> used(m_sessions.size(), false);
+    for (const ProjectSession* p : order) {
+        bool found = false;
+        for (size_t k = 0; k < m_sessions.size(); ++k)
+            if (!used[k] && m_sessions[k].get() == p) { used[k] = true; found = true; break; }
+        if (!found) return;   // not a permutation: leave the order alone
+    }
+    const ProjectSession* active =
+        m_activeSession < m_sessions.size() ? m_sessions[m_activeSession].get() : nullptr;
+    for (const ProjectSession* p : order)
+        for (auto& u : m_sessions)
+            if (u && u.get() == p) { next.push_back(std::move(u)); break; }
+    m_sessions = std::move(next);
+    for (size_t k = 0; k < m_sessions.size(); ++k)
+        if (m_sessions[k].get() == active) { m_activeSession = k; break; }
+}
+
 void Application::closeSession(size_t idx) {
     if (idx >= m_sessions.size()) return;
     const bool wasActive = (idx == m_activeSession);
-    // A tab entered from the Home Screen and closed straight away goes back there.
-    const bool backToHome = wasActive && m_homeEntered.count(m_sessions[idx].get()) > 0;
-    m_homeEntered.erase(m_sessions[idx].get());
     // Closing the tab you are sketching in ends that sketch with it. The sketch
     // session lives on the Application, not on the session, so without this it
     // outlived the tab: the next New Project came up with the same sketch open
@@ -928,7 +978,21 @@ void Application::closeSession(size_t idx) {
         // cancel happened above, while its document was still alive.)
         m_sectionEnabled = false;
         m_sectionDirty = true;
-        applySessionState(std::min(idx, m_sessions.size() - 1));
+        // Where to land: the last place visited before this one - a tab, or the Home
+        // Screen - not whichever tab happens to sit next to it in the strip (#184).
+        // The history is held by identity, so it is read after the erase above.
+        size_t landOn = std::min(idx, m_sessions.size() - 1);
+        bool backToHome = false;
+        while (!closedLast && !m_tabBackStack.empty()) {
+            const ProjectSession* prev = m_tabBackStack.back();
+            m_tabBackStack.pop_back();
+            if (!prev) { backToHome = true; break; }
+            bool found = false;
+            for (size_t i = 0; i < m_sessions.size(); ++i)
+                if (m_sessions[i].get() == prev) { landOn = i; found = true; break; }
+            if (found) break;
+        }
+        applySessionState(landOn);
         if (m_shapeRenderer) m_shapeRenderer->clear();
         if (m_edgeRenderer) m_edgeRenderer->clear();
         m_meshDispatch = materializr::MeshDispatch{};
@@ -1085,9 +1149,10 @@ void Application::resetLayout() {
         ImGui::SaveIniSettingsToDisk(p);
 }
 
-// Where to read/write imgui.ini. On Linux we keep the relative "imgui.ini" path
-// (the AppImage runs from a user-writable cwd, which is the existing behaviour
-// the user prefers). On Windows the exe usually launches from Program Files,
+// Where to read/write imgui.ini. On Linux and macOS it lives in the per-user
+// config folder next to settings.cfg (XDG_CONFIG_HOME, else ~/.config/materializr)
+// instead of wherever the program happened to be launched from (#191); a layout
+// already sitting in the old place is copied across once. On Windows the exe usually launches from Program Files,
 // which is read-only without admin - the write would silently fail and ImGui
 // would fall back to its tiny "everything stacked at (0,0)" defaults. Anchor
 // the file under %APPDATA% there so it's both writable and per-user.
@@ -1118,6 +1183,27 @@ static const char* computeImguiIniPath() {
         s_imguiIniPath = base + "/imgui.ini";
     } else {
         s_imguiIniPath = "imgui.ini";
+    }
+#elif (defined(__linux__) && !defined(__ANDROID__)) || (defined(__APPLE__) && !defined(MZ_IOS))
+    {
+        std::string dir = SettingsIO::defaultPath();   // <config>/materializr/settings.cfg
+        const auto slash = dir.find_last_of('/');
+        s_imguiIniPath = "imgui.ini";                  // last resort: the old behaviour
+        if (slash != std::string::npos) {
+            dir.resize(slash);
+            std::error_code ec;
+            std::filesystem::create_directories(dir, ec);
+            const std::string target = dir + "/imgui.ini";
+            if (!ec) {
+                // First run after the move: carry the old layout over, leaving
+                // the original file where it was.
+                if (!std::filesystem::exists(target, ec) &&
+                    std::filesystem::exists("imgui.ini", ec)) {
+                    std::filesystem::copy_file("imgui.ini", target, ec);
+                }
+                s_imguiIniPath = target;
+            }
+        }
     }
 #else
     s_imguiIniPath = "imgui.ini";
@@ -2310,6 +2396,13 @@ AppSettings Application::currentSettings() const {
     s.touchRightW = m_touchRightW;
     s.touchRailW = m_touchRailW;
     s.toolOrder = m_railOrder.serialize();
+    {
+        const materializr::ToolDialogSpot& sp = materializr::toolDialogSpot();
+        const float us = std::max(0.25f, materializr::uiScale());
+        s.toolDialogSpotSet = sp.set;
+        s.toolDialogRightOff = sp.rightOff / us;
+        s.toolDialogTopOff = sp.topOff / us;
+    }
     s.orbitButton = m_orbitButton;
     s.panButton = m_panButton;
     s.levelOrbit = m_viewport->getCamera().isLevelOrbit();
@@ -2403,6 +2496,8 @@ int Application::packToolSwitches() const {
         if (m_sketchTool->polygonSpec().diameter)                       b |= 1 << 4;
         if (m_sketchTool->polygonSpec().inscribed)                      b |= 1 << 5;
         if (m_sketchTool->cornerChamfer())                              b |= 1 << 6;
+        if (m_sketchTool->getOffsetCorners() == materializr::OffsetCorners::Sharp)
+                                                                        b |= 1 << 8;
     }
     if (m_primitiveUseDiameter) b |= 1 << 7;
     return b;
@@ -2419,15 +2514,25 @@ void Application::unpackToolSwitches(int b) {
     m_sketchTool->polygonSpec().diameter  = (b & (1 << 4)) != 0;
     m_sketchTool->polygonSpec().inscribed = (b & (1 << 5)) != 0;
     m_sketchTool->setCornerChamfer((b & (1 << 6)) != 0);
+    m_sketchTool->setOffsetCorners((b & (1 << 8)) ? materializr::OffsetCorners::Sharp
+                                                  : materializr::OffsetCorners::Round);
 }
 
 // Called once a frame: when a remembered switch or menu section differs from
 // what was last written, write the settings again. Cheap - an int compare.
 void Application::saveRememberedUiStateIfChanged() {
     const int sw = packToolSwitches();
-    if (sw == m_savedToolSwitches && m_menuSectionsOpen == m_savedMenuSections) return;
+    // The dialog spot follows the pointer while a dialog is dragged; write it once
+    // the drag is over, not every frame of it.
+    const materializr::ToolDialogSpot& sp = materializr::toolDialogSpot();
+    const bool spotChanged = sp.set != m_savedDialogSpot.set ||
+                             sp.rightOff != m_savedDialogSpot.rightOff ||
+                             sp.topOff != m_savedDialogSpot.topOff;
+    const bool spotDue = spotChanged && !ImGui::IsMouseDown(ImGuiMouseButton_Left);
+    if (sw == m_savedToolSwitches && m_menuSectionsOpen == m_savedMenuSections && !spotDue) return;
     m_savedToolSwitches = sw;
     m_savedMenuSections = m_menuSectionsOpen;
+    m_savedDialogSpot = sp;
     saveAppSettings();
 }
 
@@ -2481,6 +2586,14 @@ void Application::applyAppSettings(const AppSettings& s) {
     if (m_touchRightW > 520.0f) m_touchRightW = 520.0f;
     m_touchRailW = s.touchRailW;
     m_railOrder.parse(s.toolOrder);
+    {
+        materializr::ToolDialogSpot& sp = materializr::toolDialogSpot();
+        const float us = std::max(0.25f, materializr::uiScale());
+        sp.set = s.toolDialogSpotSet;
+        sp.rightOff = std::min(0.0f, s.toolDialogRightOff * us);
+        sp.topOff = std::max(0.0f, s.toolDialogTopOff * us);
+        m_savedDialogSpot = sp;
+    }
     if (m_touchRailW < 64.0f)  m_touchRailW = 64.0f;
     if (m_touchRailW > 208.0f) m_touchRailW = 208.0f;   // 2-column rail range
     // Camera button bindings are honoured on every platform. Android defaults to
@@ -3572,6 +3685,12 @@ void Application::handleShortcuts() {
             switchToSession(prevTab ? (m_activeSession + n - 1) % n
                                     : (m_activeSession + 1) % n);
         }
+    }
+    // Ctrl+T / Ctrl+W: new tab / close this tab, as in a browser (#192). Inert while
+    // the Home Screen covers the window, like Ctrl+Tab.
+    if (!landingPageUp()) {
+        if (keyPressed(KeyAction::NewTab)) openNewTab();
+        if (keyPressed(KeyAction::CloseTab)) requestCloseTab(m_activeSession);
     }
     // Plain D - Dimension tool in sketch mode (Onshape-style). Ctrl+D stays
     // Duplicate (handled below); text-input focus swallows the key.
@@ -7591,7 +7710,21 @@ void Application::deleteSelectedSketchElements() {
         // two shared vertices, ...) can't have a later id lose its
         // owning-polygon protection because an earlier id already cascaded
         // that polygon away.
-        std::vector<int> ids(pts.begin(), pts.end());
+        // A point where two lines meet is DELETED without taking the lines with it:
+        // they become one line between their far ends (#190). Not when one of
+        // those lines is selected too - that selection means "delete the line".
+        std::vector<int> pointIds;
+        for (int pid : pts) {
+            bool lineAlsoSelected = false;
+            for (const auto& ln : m_activeSketch->getLines())
+                if ((ln.startPointId == pid || ln.endPointId == pid) && lns.count(ln.id)) {
+                    lineAlsoSelected = true;
+                    break;
+                }
+            if (!lineAlsoSelected && m_activeSketch->joinLinesAt(pid)) continue;
+            pointIds.push_back(pid);
+        }
+        std::vector<int> ids(pointIds.begin(), pointIds.end());
         ids.insert(ids.end(), lns.begin(), lns.end());
         ids.insert(ids.end(), crc.begin(), crc.end());
         ids.insert(ids.end(), arcs.begin(), arcs.end());
@@ -8815,6 +8948,10 @@ void Application::run() {
                 return true;                         // camera glide needs its frames
             if (!m_threadRecuts.empty()) return true; // async re-cut in flight
             if (m_railOrder.animating()) return true; // tool rail still sliding into place
+            if (m_pillSlide.animating()) return true; // Modern tab pills still sliding
+            // A tool dialog that has just opened is still being lined up on its spot.
+            if (ImGui::GetFrameCount() <= materializr::toolDialogHost().lastSettleFrame + 1)
+                return true;
             if (m_meshDispatch.anyPending()) return true; // off-thread mesh in flight: land it when it finishes
             for (auto* c : m_iops)
                 if (c->previewPending()) return true; // off-thread preview in flight

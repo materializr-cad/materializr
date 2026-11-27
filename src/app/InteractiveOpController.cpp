@@ -1,3 +1,5 @@
+#include "ui/OpDialogGrip.h"
+#include "ui/ToolDialog.h"
 #include "ui/UiTheme.h"
 #include "InteractiveOpController.h"
 #include "core/BodyChanges.h"
@@ -399,17 +401,15 @@ void InteractiveOpController::renderPanel(const IopContext& ctx) {
     // im-touch with no way to move it - issue #29). Dragging the panel body
     // (there's no title bar) moves it.
     const float w = panelWidth();
-    ImGui::SetNextWindowPos(ImVec2(ImGui::GetWindowPos().x +
-                                       ImGui::GetWindowWidth() - 20.0f,
-                                   ImGui::GetWindowPos().y + 50.0f),
-                            ImGuiCond_Appearing, ImVec2(1.0f, 0.0f));
+    materializr::toolDialogPlace(ctx.panel.uiScale);
     ImGui::SetNextWindowSize(ImVec2(w, 0), ImGuiCond_Appearing);
     char id[64];
     std::snprintf(id, sizeof(id), "##iop_%s", title());
-    ImGui::Begin(id, nullptr,
-                 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-                 ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking |
-                 ImGuiWindowFlags_AlwaysAutoResize);
+    materializr::toolDialogBegin(id, nullptr,
+                 ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
+                 ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_AlwaysAutoResize,
+                 title());
+    materializr::toolDialogRemember(ctx.panel.uiScale);
 
     ImGui::TextColored(materializr::accentText(), "%s", title());
     ImGui::Separator();

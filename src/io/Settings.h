@@ -78,6 +78,12 @@ struct AppSettings {
     // User-arranged tool-rail order (Modern / im-touch), serialized by
     // touchui::RailOrder: "ctx=key|key;ctx2=key|key". Empty = catalogue order.
     std::string toolOrder;
+    // Where tool dialogs open once the user has dragged one (ui/ToolDialog.h): the
+    // dialog's right edge from the viewport's right edge, and its top from the
+    // viewport's top, in logical px (x uiScale at use). Unset = the built-in default.
+    bool  toolDialogSpotSet = false;
+    float toolDialogRightOff = 0.0f;
+    float toolDialogTopOff = 0.0f;
 #if defined(MZ_MOBILE)
     // Touch-first default: trackpad mode (one-finger drag = orbit, two-finger
     // pan/zoom). Just the first-run default - the Settings dialog can rebind to

@@ -303,6 +303,11 @@ public:
     // to mirror.
     bool beginMirror();
     void cancelMirror();
+    // Close Mirror without mirroring (Cancel / the window's X): back to Select,
+    // with the elements that were selected when Mirror started selected again,
+    // as the other tools leave them (#200). A whole-sketch mirror (nothing was
+    // selected) leaves nothing selected.
+    void abortMirror();
     // Reflect a sketch-space point across the current mirror line.
     glm::vec2 mirrorReflect(glm::vec2 p) const;
     // Reflected ghost geometry for the live preview: closed/open polylines plus
@@ -908,6 +913,7 @@ private:
     // Captured source element ids (resolved at beginMirror).
     std::set<int> m_mirrorPoints, m_mirrorLines, m_mirrorCircles,
                   m_mirrorArcs, m_mirrorSplines;
+    bool m_mirrorFromSelection = false;   // sources came from a selection (see abortMirror)
 
     // Rectangle's typed-value placement is two-stage: first Enter sets the
     // horizontal side, second Enter sets the vertical side and commits.

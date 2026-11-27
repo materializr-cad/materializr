@@ -12,6 +12,7 @@
 // code - see layout/LayoutCommon.h for the keep-in-lockstep contract.
 
 #include <cstring>
+#include <functional>
 #include <algorithm>
 #include "app/Application.h"
 #include "app/layout/LayoutCommon.h"
@@ -215,8 +216,18 @@ void Application::renderModernLayout() {
                               ImGuiWindowFlags_HorizontalScrollbar |
                               ImGuiWindowFlags_NoBackground |
                               ImGuiWindowFlags_NoSavedSettings);
+            // Drag a pill sideways past its neighbour to reorder (#192). Touch keeps the
+            // "Move Left/Right" menu items instead: a finger drag here scrolls the strip.
+            // The pills slide into their new places as the rail's tools do, and the
+            // one being dragged looks picked up.
+            static bool s_pillDragged = false;
+            if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) s_pillDragged = false;
+            // A move is applied after the strip is drawn: every pill is drawn every
+            // frame, so each one's slide carries on from where it was.
+            size_t moveFrom = 0, moveTo = 0;
+            bool movePill = false;
             for (size_t i = 0; i < m_sessions.size(); ++i) {
-                ImGui::PushID(static_cast<int>(i));
+                ImGui::PushID(m_sessions[i].get());
                 std::string label = elide(sessionDisplayLabel(i), maxLabelW);
                 if (sessionDirty(i)) label += " \xe2\x80\xa2";
                 const bool active = (i == m_activeSession);
@@ -226,9 +237,31 @@ void Application::renderModernLayout() {
                 ImGui::PushStyleColor(ImGuiCol_Text,
                     ImGui::GetColorU32(active ? touchui::textPrimary()
                                               : touchui::textDim()));
-                if (ImGui::Button(label.c_str(), ImVec2(0, pillH)) && !active)
+                m_pillSlide.begin();
+                const bool pillClicked = ImGui::Button(label.c_str(), ImVec2(0, pillH));
+                const bool held = !materializr::touchMode() && ImGui::IsItemActive() &&
+                                  ImGui::IsMouseDragging(ImGuiMouseButton_Left, 6.0f * s);
+                if (held) {
+                    ImDrawList* dl = ImGui::GetWindowDrawList();
+                    const ImU32 acc = ImGui::GetColorU32(touchui::accentFill());
+                    const float r = ImGui::GetStyle().FrameRounding;
+                    dl->AddRectFilled(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(),
+                                      (acc & 0x00FFFFFFu) | 0x38000000u, r);
+                    dl->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), acc, r,
+                                0, 2.0f * s);
+                }
+                m_pillSlide.end(m_sessions[i].get());
+                if (pillClicked && !active && !s_pillDragged)
                     switchToSession(i);
                 ImGui::PopStyleColor(2);
+                if (held && !movePill) {
+                    const float mx = ImGui::GetIO().MousePos.x;
+                    if (mx < ImGui::GetItemRectMin().x && i > 0) {
+                        moveFrom = i; moveTo = i - 1; movePill = true; s_pillDragged = true;
+                    } else if (mx > ImGui::GetItemRectMax().x && i + 1 < m_sessions.size()) {
+                        moveFrom = i; moveTo = i + 1; movePill = true; s_pillDragged = true;
+                    }
+                }
                 // Hover on the pill itself feeds the long-press gate, so a
                 // press-and-hold reaches this menu on touch (m_tabBarHovered).
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup))
@@ -244,6 +277,7 @@ void Application::renderModernLayout() {
             // switch from the tab menu it may be off to one side.
             ImGui::EndChild();
             ImGui::PopStyleVar(2);
+            if (movePill) moveSession(moveFrom, moveTo);
 
             // "+" stays OUTSIDE the scrolling region: a new tab must never be
             // something you have to scroll to reach.
@@ -415,9 +449,12 @@ void Application::renderModernLayout() {
             };
             auto popPopupPad = [&] { if (touchPad) ImGui::PopStyleVar(2); };
             auto constructGroup = [&] {
-                if (touchui::railButton("constructGroup", MZ_ICON_FOCUS,
+                m_railOrder.beginEntry();
+                bool constructClicked = touchui::railButton("constructGroup", MZ_ICON_FOCUS,
                                         materializr::tr("Construct"), false, cell(),
-                                        false, /*hasMenu=*/true))
+                                        false, /*hasMenu=*/true);
+                constructClicked = m_railOrder.item("group:construct", constructClicked);
+                if (constructClicked)
                     ImGui::OpenPopup("##railConstruct");
                 tip(materializr::tr("Create a construction plane or axis derived from the selection"));
                 pushPopupPad();
@@ -430,12 +467,16 @@ void Application::renderModernLayout() {
 
             // With nothing selected the create tools lead (Sketch on… at the
             // very top) and railTools' Measure lands at the bottom; with a
-            // selection the contextual tools lead and Construct follows.
-            if (nothingSel) {
-                if (touchui::railButton("sketchOnGroup", MZ_ICON_SKETCH,
+            // selection the contextual tools lead and Construct follows. All
+            // three are entries in the rail's user-arranged order like every
+            // other button (queued below), not fixed furniture (#180).
+            auto sketchOnEntry = [&] {
+                m_railOrder.beginEntry();
+                bool clicked = touchui::railButton("sketchOnGroup", MZ_ICON_SKETCH,
                                         materializr::tr("Sketch on..."), false, cell(),
-                                        false, /*hasMenu=*/true))
-                    ImGui::OpenPopup("##railSketchOn");
+                                        false, /*hasMenu=*/true);
+                clicked = m_railOrder.item("group:sketchOn", clicked);
+                if (clicked) ImGui::OpenPopup("##railSketchOn");
                 tip(materializr::tr("Start a sketch on a world plane (XY / XZ / YZ)"));
                 pushPopupPad();
                 if (ImGui::BeginPopup("##railSketchOn")) {
@@ -448,10 +489,14 @@ void Application::renderModernLayout() {
                     ImGui::EndPopup();
                 }
                 popPopupPad();
-                if (touchui::railButton("primGroup", MZ_ICON_PRIMITIVE,
+            };
+            auto primitiveEntry = [&] {
+                m_railOrder.beginEntry();
+                bool clicked = touchui::railButton("primGroup", MZ_ICON_PRIMITIVE,
                                         materializr::tr("Primitive"), false, cell(),
-                                        false, /*hasMenu=*/true))
-                    ImGui::OpenPopup("##railPrimitive");
+                                        false, /*hasMenu=*/true);
+                clicked = m_railOrder.item("group:primitive", clicked);
+                if (clicked) ImGui::OpenPopup("##railPrimitive");
                 tip(materializr::tr("Add a primitive solid: box, cylinder, sphere, cone or torus"));
                 pushPopupPad();
                 if (ImGui::BeginPopup("##railPrimitive")) {
@@ -470,8 +515,7 @@ void Application::renderModernLayout() {
                     ImGui::EndPopup();
                 }
                 popPopupPad();
-                constructGroup();
-            }
+            };
 
             if (m_toolbar) {
                 const auto rail = m_toolbar->railTools();
@@ -539,8 +583,14 @@ void Application::renderModernLayout() {
                 // One entry per rail button: a plain tool, or a whole group
                 // (placed where its first member sat). The user can drag
                 // entries into their own order (long-press, see RailOrder).
-                struct Entry { std::string key; int group; const Toolbar::RailTool* tool; };
+                struct Entry { std::string key; int group; const Toolbar::RailTool* tool;
+                               std::function<void()> draw = nullptr; };
                 std::vector<Entry> entries;
+                if (nothingSel) {
+                    entries.push_back({ "group:sketchOn",   0, nullptr, sketchOnEntry });
+                    entries.push_back({ "group:primitive",  0, nullptr, primitiveEntry });
+                    entries.push_back({ "group:construct",  0, nullptr, constructGroup });
+                }
                 {
                     bool added[5] = { false, false, false, false, false };
                     std::set<std::string> seen;
@@ -565,6 +615,10 @@ void Application::renderModernLayout() {
                         entries.push_back({ k, 0, &t });
                     }
                 }
+                // With a selection Construct follows the contextual tools; its
+                // options derive from the selection.
+                if (!m_inSketchMode && !nothingSel)
+                    entries.push_back({ "group:construct", 0, nullptr, constructGroup });
                 std::vector<std::string> entryKeys;
                 for (const auto& e : entries) entryKeys.push_back(e.key);
                 const auto order = m_railOrder.arrange(
@@ -572,6 +626,7 @@ void Application::renderModernLayout() {
 
                 for (int oi : order) {
                     const Entry& e = entries[oi];
+                    if (e.draw) { e.draw(); continue; }
                     if (e.group != 0) {
                         const int g = e.group;
                         const char* gIcon  = g == 1 ? MZ_ICON_COPY
@@ -639,10 +694,6 @@ void Application::renderModernLayout() {
                 if (m_railOrder.takeChanged()) saveAppSettings();
             }
 
-            // Construction stays reachable with a selection too (its options
-            // derive from the selection) - after the contextual tools.
-            if (!m_inSketchMode && !nothingSel)
-                constructGroup();
         }
         ImGui::End();
     }

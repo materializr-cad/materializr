@@ -118,6 +118,9 @@ void applyKv(const std::map<std::string, std::string>& kv, AppSettings& s) {
     readFloat(kv, "touchRightW",         s.touchRightW);
     readFloat(kv, "touchRailW",          s.touchRailW);
     readString(kv, "toolOrder",          s.toolOrder);
+    readBool(kv, "toolDialogSpotSet",    s.toolDialogSpotSet);
+    readFloat(kv, "toolDialogRightOff",  s.toolDialogRightOff);
+    readFloat(kv, "toolDialogTopOff",    s.toolDialogTopOff);
     readIntClamped(kv, "orbitButton",    s.orbitButton, 0, 2);
     readIntClamped(kv, "panButton",      s.panButton,   0, 2);
     readBool(kv, "levelOrbit",           s.levelOrbit);
@@ -468,6 +471,9 @@ bool SettingsIO::save(const std::string& path, const AppSettings& s) {
     ofs << "touchRightW = "         << s.touchRightW         << "\n";
     ofs << "touchRailW = "          << s.touchRailW          << "\n";
     ofs << "toolOrder = "           << s.toolOrder           << "\n";
+    ofs << "toolDialogSpotSet = "   << (s.toolDialogSpotSet ? "true" : "false") << "\n";
+    ofs << "toolDialogRightOff = "  << s.toolDialogRightOff  << "\n";
+    ofs << "toolDialogTopOff = "    << s.toolDialogTopOff    << "\n";
     ofs << "orbitButton = "         << s.orbitButton         << "\n";
     ofs << "panButton = "           << s.panButton           << "\n";
     ofs << "levelOrbit = "          << (s.levelOrbit ? "true" : "false") << "\n";
