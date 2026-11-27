@@ -3952,9 +3952,24 @@ void Application::renderConstructionPlanePanel() {
     }
 
     // Gizmo for the preview plane appears automatically (the popup auto-
-    // selects the just-pushed plane). Switch modes with W/E or click the
-    // plane after committing.
-    ImGui::TextDisabled("%s", materializr::tr("W = Move gizmo, E = Rotate gizmo."));
+    // selects the just-pushed plane). W / E switch it from the keyboard; the
+    // toggle is the way there without one - touch had no route to Rotate (#201).
+    if (m_gizmo) {
+        const GizmoMode gm = m_gizmo->getMode();
+        if (ImGui::RadioButton(materializr::tr("Move"), gm != GizmoMode::Rotate)) {
+            m_gizmo->setMode(GizmoMode::Translate);
+            m_selection->setNavigationOnly(false);
+        }
+        ImGui::SameLine();
+        if (ImGui::RadioButton(materializr::tr("Rotate"), gm == GizmoMode::Rotate)) {
+            m_gizmo->setMode(GizmoMode::Rotate);
+            m_selection->setNavigationOnly(false);
+        }
+        if (!materializr::touchMode()) {
+            ImGui::SameLine();
+            ImGui::TextDisabled("%s", materializr::tr("(W / E)"));
+        }
+    }
 
     // Type-an-exact-angle rotation. Applies on top of whatever the popup
     // base orientation + gizmo edits produced; lets the user dial in a
@@ -5098,6 +5113,10 @@ void Application::renderConstructionAxisPanel() {
         if (i < 2 && !materializr::touchMode()) ImGui::SameLine();
     }
     ImGui::TextDisabled("%s", materializr::tr("Point the axis passes through. Drag the gizmo later (after Apply) to fine-tune."));
+    if (m_axisOpKindIdx == 4 && !m_axisOpExtraEdges.empty())
+        ImGui::TextColored(materializr::accentText(),
+                           materializr::tr("Apply adds an axis along each of the %d selected edges."),
+                           static_cast<int>(m_axisOpExtraEdges.size()) + 1);
 
     ImGui::Separator();
     bool applyClicked  = ImGui::Button(materializr::tr("Apply"), materializr::uiSz(120, 0));
@@ -5656,15 +5675,13 @@ void Application::renderMirrorToolPanel() {
         ImGui::SameLine();
         if (ImGui::Button(materializr::tr("Cancel"))) {
             m_mirrorPickingLine = false;
-            m_sketchTool->cancelMirror();
-            m_sketchTool->setMode(SketchToolMode::Select);
+            m_sketchTool->abortMirror();
         }
     }
     ImGui::End();
     if (!open) {
         m_mirrorPickingLine = false;
-        m_sketchTool->cancelMirror();
-        m_sketchTool->setMode(SketchToolMode::Select);
+        m_sketchTool->abortMirror();
     }
 }
 

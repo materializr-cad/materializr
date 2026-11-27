@@ -12,6 +12,7 @@
 // code - see layout/LayoutCommon.h for the keep-in-lockstep contract.
 
 #include <cstring>
+#include <functional>
 #include <algorithm>
 #include "app/Application.h"
 #include "app/layout/LayoutCommon.h"
@@ -415,9 +416,12 @@ void Application::renderModernLayout() {
             };
             auto popPopupPad = [&] { if (touchPad) ImGui::PopStyleVar(2); };
             auto constructGroup = [&] {
-                if (touchui::railButton("constructGroup", MZ_ICON_FOCUS,
+                m_railOrder.beginEntry();
+                bool constructClicked = touchui::railButton("constructGroup", MZ_ICON_FOCUS,
                                         materializr::tr("Construct"), false, cell(),
-                                        false, /*hasMenu=*/true))
+                                        false, /*hasMenu=*/true);
+                constructClicked = m_railOrder.item("group:construct", constructClicked);
+                if (constructClicked)
                     ImGui::OpenPopup("##railConstruct");
                 tip(materializr::tr("Create a construction plane or axis derived from the selection"));
                 pushPopupPad();
@@ -430,12 +434,16 @@ void Application::renderModernLayout() {
 
             // With nothing selected the create tools lead (Sketch on… at the
             // very top) and railTools' Measure lands at the bottom; with a
-            // selection the contextual tools lead and Construct follows.
-            if (nothingSel) {
-                if (touchui::railButton("sketchOnGroup", MZ_ICON_SKETCH,
+            // selection the contextual tools lead and Construct follows. All
+            // three are entries in the rail's user-arranged order like every
+            // other button (queued below), not fixed furniture (#180).
+            auto sketchOnEntry = [&] {
+                m_railOrder.beginEntry();
+                bool clicked = touchui::railButton("sketchOnGroup", MZ_ICON_SKETCH,
                                         materializr::tr("Sketch on..."), false, cell(),
-                                        false, /*hasMenu=*/true))
-                    ImGui::OpenPopup("##railSketchOn");
+                                        false, /*hasMenu=*/true);
+                clicked = m_railOrder.item("group:sketchOn", clicked);
+                if (clicked) ImGui::OpenPopup("##railSketchOn");
                 tip(materializr::tr("Start a sketch on a world plane (XY / XZ / YZ)"));
                 pushPopupPad();
                 if (ImGui::BeginPopup("##railSketchOn")) {
@@ -448,10 +456,14 @@ void Application::renderModernLayout() {
                     ImGui::EndPopup();
                 }
                 popPopupPad();
-                if (touchui::railButton("primGroup", MZ_ICON_PRIMITIVE,
+            };
+            auto primitiveEntry = [&] {
+                m_railOrder.beginEntry();
+                bool clicked = touchui::railButton("primGroup", MZ_ICON_PRIMITIVE,
                                         materializr::tr("Primitive"), false, cell(),
-                                        false, /*hasMenu=*/true))
-                    ImGui::OpenPopup("##railPrimitive");
+                                        false, /*hasMenu=*/true);
+                clicked = m_railOrder.item("group:primitive", clicked);
+                if (clicked) ImGui::OpenPopup("##railPrimitive");
                 tip(materializr::tr("Add a primitive solid: box, cylinder, sphere, cone or torus"));
                 pushPopupPad();
                 if (ImGui::BeginPopup("##railPrimitive")) {
@@ -470,8 +482,7 @@ void Application::renderModernLayout() {
                     ImGui::EndPopup();
                 }
                 popPopupPad();
-                constructGroup();
-            }
+            };
 
             if (m_toolbar) {
                 const auto rail = m_toolbar->railTools();
@@ -539,8 +550,14 @@ void Application::renderModernLayout() {
                 // One entry per rail button: a plain tool, or a whole group
                 // (placed where its first member sat). The user can drag
                 // entries into their own order (long-press, see RailOrder).
-                struct Entry { std::string key; int group; const Toolbar::RailTool* tool; };
+                struct Entry { std::string key; int group; const Toolbar::RailTool* tool;
+                               std::function<void()> draw = nullptr; };
                 std::vector<Entry> entries;
+                if (nothingSel) {
+                    entries.push_back({ "group:sketchOn",   0, nullptr, sketchOnEntry });
+                    entries.push_back({ "group:primitive",  0, nullptr, primitiveEntry });
+                    entries.push_back({ "group:construct",  0, nullptr, constructGroup });
+                }
                 {
                     bool added[5] = { false, false, false, false, false };
                     std::set<std::string> seen;
@@ -565,6 +582,10 @@ void Application::renderModernLayout() {
                         entries.push_back({ k, 0, &t });
                     }
                 }
+                // With a selection Construct follows the contextual tools; its
+                // options derive from the selection.
+                if (!m_inSketchMode && !nothingSel)
+                    entries.push_back({ "group:construct", 0, nullptr, constructGroup });
                 std::vector<std::string> entryKeys;
                 for (const auto& e : entries) entryKeys.push_back(e.key);
                 const auto order = m_railOrder.arrange(
@@ -572,6 +593,7 @@ void Application::renderModernLayout() {
 
                 for (int oi : order) {
                     const Entry& e = entries[oi];
+                    if (e.draw) { e.draw(); continue; }
                     if (e.group != 0) {
                         const int g = e.group;
                         const char* gIcon  = g == 1 ? MZ_ICON_COPY
@@ -639,10 +661,6 @@ void Application::renderModernLayout() {
                 if (m_railOrder.takeChanged()) saveAppSettings();
             }
 
-            // Construction stays reachable with a selection too (its options
-            // derive from the selection) - after the contextual tools.
-            if (!m_inSketchMode && !nothingSel)
-                constructGroup();
         }
         ImGui::End();
     }

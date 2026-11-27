@@ -2336,6 +2336,9 @@ private:
     // computes (computeDerivedAxisOD) and feeds via setOrigin/setDirection.
     bool   m_axisOpHaveCylinder = false;  gp_Ax1 m_axisOpCylAxis;
     bool   m_axisOpHaveEdge = false;      gp_Ax1 m_axisOpEdgeAxis;
+    // Further straight edges in the selection: Apply makes an axis along each
+    // of them too, after the previewed one (#198).
+    std::vector<gp_Ax1> m_axisOpExtraEdges;
     bool   m_axisOpHaveTwoVerts = false;  gp_Pnt m_axisOpV1, m_axisOpV2;
     bool   m_axisOpHaveFaceNormal = false; gp_Pnt m_axisOpFacePt; gp_Dir m_axisOpFaceNormal;
     bool   m_axisOpHaveTwoPlanes = false; gp_Pln m_axisOpPlaneA, m_axisOpPlaneB;

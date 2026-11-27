@@ -2403,6 +2403,8 @@ int Application::packToolSwitches() const {
         if (m_sketchTool->polygonSpec().diameter)                       b |= 1 << 4;
         if (m_sketchTool->polygonSpec().inscribed)                      b |= 1 << 5;
         if (m_sketchTool->cornerChamfer())                              b |= 1 << 6;
+        if (m_sketchTool->getOffsetCorners() == materializr::OffsetCorners::Sharp)
+                                                                        b |= 1 << 8;
     }
     if (m_primitiveUseDiameter) b |= 1 << 7;
     return b;
@@ -2419,6 +2421,8 @@ void Application::unpackToolSwitches(int b) {
     m_sketchTool->polygonSpec().diameter  = (b & (1 << 4)) != 0;
     m_sketchTool->polygonSpec().inscribed = (b & (1 << 5)) != 0;
     m_sketchTool->setCornerChamfer((b & (1 << 6)) != 0);
+    m_sketchTool->setOffsetCorners((b & (1 << 8)) ? materializr::OffsetCorners::Sharp
+                                                  : materializr::OffsetCorners::Round);
 }
 
 // Called once a frame: when a remembered switch or menu section differs from
