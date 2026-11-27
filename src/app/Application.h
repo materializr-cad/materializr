@@ -19,6 +19,7 @@
 #include "io/ImageDecode.h"   // DecodedImage - thumbnail peek results
 #include "ui/UpdateChecker.h"
 #include "ui/RailOrder.h"
+#include "ui/SlideAnim.h"
 #include <TopoDS_Shape.hxx>
 #include "viewport/MeshDispatch.h"
 #ifdef MZR_PARALLEL_MESH_TESTING
@@ -580,6 +581,11 @@ private:
     // until the menu closes. m_tabCtxMenuSeen: a tab menu was drawn this frame.
     bool m_tabCtxHold = false;
     bool m_tabCtxMenuSeen = false;
+    // The left click that closed that menu (by clicking away from it) is not a click on
+    // the highlighted tab: it is ignored until the button is let go (#192).
+    bool m_tabCtxSwallowLeft = false;
+    // Modern tab pills slide into place when one is dragged to a new position (#192).
+    materializr::SlideAnim m_pillSlide;
     // One-shot: raise the Settings window on the next render. Set by every
     // explicit open request - an already-open window buried under the home
     // page otherwise never surfaces.

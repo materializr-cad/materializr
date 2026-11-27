@@ -8920,6 +8920,7 @@ void Application::run() {
                 return true;                         // camera glide needs its frames
             if (!m_threadRecuts.empty()) return true; // async re-cut in flight
             if (m_railOrder.animating()) return true; // tool rail still sliding into place
+            if (m_pillSlide.animating()) return true; // Modern tab pills still sliding
             if (m_meshDispatch.anyPending()) return true; // off-thread mesh in flight: land it when it finishes
             for (auto* c : m_iops)
                 if (c->previewPending()) return true; // off-thread preview in flight
