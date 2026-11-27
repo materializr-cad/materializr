@@ -33,6 +33,10 @@ void platformSleepPreciseNs(std::uint64_t ns);
 // run so a Chinese tablet opens in Chinese instead of asking in English.
 std::string platformSystemLanguageCode();
 
+// The region of that same preferred locale ("TW", "CN", ...), or empty. Tells
+// Traditional Chinese (Taiwan, Hong Kong, Macau) from Simplified on first run.
+std::string platformSystemCountryCode();
+
 // Per-user writable data directory for Materializr, created if missing, with a
 // trailing path separator ("" if the platform can't provide one). Resolves to
 // the right place everywhere, including Android app storage and the iOS

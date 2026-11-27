@@ -95,7 +95,8 @@ void androidInitRuntime() {
         "Ubuntu-Regular.ttf", "ComicNeue-Regular.ttf",
         "BlackOpsOne-Regular.ttf", "Anton-Regular.ttf", "Pacifico-Regular.ttf",
         "Iconoir.ttf", // UI icon glyphs (im-touch shell), not a Text-tool font
-        "NotoSansSC.ttf" // CJK glyphs: Chinese UI + Chinese text engraving
+        "NotoSansSC.ttf", // CJK glyphs: Chinese UI + Chinese text engraving
+        "NotoSansTC.ttf"  // the same for Traditional Chinese
     };
     for (const char* f : fonts) {
         extractAsset(std::string("fonts/") + f, internal + "/assets/fonts/" + f);

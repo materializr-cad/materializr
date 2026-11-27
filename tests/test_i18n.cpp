@@ -18,6 +18,8 @@
 
 #include "i18n.h"
 #include "i18n_catalogue.h"
+#include "i18n_zh_catalogue.h"
+#include "i18n_zh_tw_catalogue.h"
 
 #include <gtest/gtest.h>
 #include <cstring>
@@ -285,6 +287,26 @@ TEST(I18n, StatefulLabelsKeepTheirPinnedId) {
 
 // Catalogues are keyed off English, so every key should exist in English form.
 // Cheap consistency check that the columns describe the same string set.
+// Traditional Chinese is built from the Simplified table's key list
+// (tools/i18n_zh_catalogue.py --keys-from), so the two must never drift: a key
+// only one of them has is a string one Chinese reader sees in English.
+TEST(I18n, TraditionalChineseCoversTheSimplifiedKeys) {
+    std::set<std::string> simplified, traditional;
+    for (int i = 0; i < materializr::kZhCount; ++i)
+        simplified.insert(materializr::kZhCatalogue[i].en);
+    for (int i = 0; i < materializr::kZhTwCount; ++i)
+        traditional.insert(materializr::kZhTwCatalogue[i].en);
+    EXPECT_EQ(traditional, simplified);
+}
+
+TEST(I18n, TraditionalChineseIsItsOwnLanguage) {
+    Restore r;
+    setLanguage(Lang::TraditionalChinese);
+    EXPECT_STREQ(tr("Save"), "\xe5\x84\xb2\xe5\xad\x98");   // 儲存 (Simplified: 保存)
+    setLanguage(Lang::Chinese);
+    EXPECT_STREQ(tr("Save"), "\xe4\xbf\x9d\xe5\xad\x98");   // 保存
+}
+
 TEST(I18n, AllLanguagesCoverTheSameKeys) {
     std::set<std::string> spanish;
     for (int i = 0; i < materializr::kEsCount; ++i)
