@@ -1,3 +1,4 @@
+#include "ui/ToolDialog.h"
 #include "ui/LengthField.h"
 #include "ExtrudeController.h"
 #include "core/BodyChanges.h"
@@ -406,21 +407,17 @@ void ExtrudeController::renderExtrudePanel(const IopContext& ctx) {
         ImGui::SetNextWindowPos(ImVec2(ax, ay), ImGuiCond_Appearing);
         extAnchored = true;
     }
-    if (!extAnchored)
-        ImGui::SetNextWindowPos(ImVec2(
-            std::max(ImGui::GetWindowPos().x + 6.0f,
-                     ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - 250.0f * s),
-            ImGui::GetWindowPos().y + 50), ImGuiCond_Appearing);
+    if (!extAnchored) materializr::toolDialogPlace(s);
     // Pin the width (min == max) so moving the panel can't feed back into
     // the value field's content-avail width and ratchet the window wider.
     ImGui::SetNextWindowSizeConstraints(ImVec2(240.0f * s, 0.0f),
                                         ImVec2(240.0f * s, 100000.0f));
     const ImVec2 hostPos = ImGui::GetWindowPos(), hostSize = ImGui::GetWindowSize();
-    ImGui::Begin("##ExtrudeInput", nullptr,
-        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking |
-        ImGuiWindowFlags_AlwaysAutoResize);
-    opDialogDragGrip(s);
+    materializr::toolDialogBegin("##ExtrudeInput", nullptr,
+        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
+        ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_AlwaysAutoResize,
+        materializr::tr("Extrude"));
+    materializr::toolDialogRemember(s, /*align=*/!extAnchored);
 
     if (!imTouch) {   // im-touch: just the value well below
         ImGui::Text("%s", materializr::trFormat("Extrude Distance (%s)", materializr::unitSuffix()).c_str());

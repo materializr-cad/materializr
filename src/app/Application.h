@@ -19,6 +19,7 @@
 #include "io/ImageDecode.h"   // DecodedImage - thumbnail peek results
 #include "ui/UpdateChecker.h"
 #include "ui/RailOrder.h"
+#include "ui/ToolDialogSpot.h"
 #include "ui/SlideAnim.h"
 #include <TopoDS_Shape.hxx>
 #include "viewport/MeshDispatch.h"
@@ -271,6 +272,8 @@ private:
     // Classic's tab bar keeps its own tab order, so a move made anywhere else starts it
     // a fresh bar (new id) that picks the new order up from the submission order.
     int m_tabBarGen = 0;
+    // The tool-dialog spot as last written to settings (see saveRememberedUiStateIfChanged).
+    materializr::ToolDialogSpot m_savedDialogSpot;
     // Re-order the tabs to `order` (every session exactly once), as the Classic tab
     // bar's drag reports it. Ignored if it isn't a permutation of the current tabs.
     void applyTabOrder(const std::vector<const ProjectSession*>& order);

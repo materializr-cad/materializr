@@ -784,6 +784,7 @@ inline const TrEntry kZhCatalogue[] = {
     { "Boundary fill from", "边界填充自" },
     { "Combine", "组合" },
     { "Twist Face", "扭转面" },
+    { "Tilt / Twist Face", "倾斜 / 扭转面" },
     { "Resize", "调整大小" },
     { "Text", "文字" },
     { "Spline", "样条" },

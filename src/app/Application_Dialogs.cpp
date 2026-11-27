@@ -52,7 +52,9 @@
 #include "ui/UpdateChecker.h"
 #include "ui/WelcomeScreen.h"
 #include "ui/LandingPage.h"
-#include "app/layout/LayoutCommon.h"  // layoutui::logoTexture for the landing header
+#include "app/layout/LayoutCommon.h"
+#include "ui/OpDialogGrip.h"
+#include "ui/ToolDialog.h"  // layoutui::logoTexture for the landing header
 #include "mobile_files.h"             // mobileOpenUri (content: refs on mobile)
 #include "platform_sdl.h"             // platformPrefPath: thumbnail cache dir
 #include <cstring>
@@ -1138,13 +1140,12 @@ void Application::renderRotatePanel() {
         }
     }
 
-    ImGui::SetNextWindowPos(ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - 250,
-                                    ImGui::GetWindowPos().y + 50));
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(230, 0));
-    ImGui::Begin("##RotatePanel", nullptr,
-        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
-        ImGuiWindowFlags_AlwaysAutoResize);
+    materializr::toolDialogBegin("##RotatePanel", nullptr,
+        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
+        ImGuiWindowFlags_AlwaysAutoResize, materializr::tr("Rotate"));
+    materializr::toolDialogRemember(uiScale());
 
     ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Rotate (degrees)"));
     ImGui::Separator();
@@ -1254,13 +1255,12 @@ void Application::renderMovePanel() {
         }
     }
 
-    ImGui::SetNextWindowPos(ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - 250,
-                                    ImGui::GetWindowPos().y + 50));
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(230, 0));
-    ImGui::Begin("##MovePanel", nullptr,
-        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
-        ImGuiWindowFlags_AlwaysAutoResize);
+    materializr::toolDialogBegin("##MovePanel", nullptr,
+        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
+        ImGuiWindowFlags_AlwaysAutoResize, materializr::tr("Move"));
+    materializr::toolDialogRemember(uiScale());
 
     ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Move"));
     ImGui::Separator();
@@ -1369,13 +1369,12 @@ void Application::renderScalePanel() {
         } catch (...) {}
     }
 
-    ImGui::SetNextWindowPos(ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - 250,
-                                    ImGui::GetWindowPos().y + 50));
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(230, 0));
-    ImGui::Begin("##ScalePanel", nullptr,
-        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
-        ImGuiWindowFlags_AlwaysAutoResize);
+    materializr::toolDialogBegin("##ScalePanel", nullptr,
+        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
+        ImGuiWindowFlags_AlwaysAutoResize, materializr::tr("Scale"));
+    materializr::toolDialogRemember(uiScale());
 
     const bool mm = (m_scaleUnitMode == ScaleUnitMode::Millimeter);
     // Two calls, not one format string with a conditional: TextColored is
@@ -1646,17 +1645,16 @@ void Application::renderInteractionsPanel() {
 void Application::renderSketchPatternPopup() {
     if (!m_sketchPatternActive) return;
 
-    ImGui::SetNextWindowPos(ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - 280,
-                                    ImGui::GetWindowPos().y + 50),
-                            ImGuiCond_Appearing);
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(280, 0), ImGuiCond_Appearing);
     const char* title = (m_sketchPatternKind == PatternKind::Linear)
                             ? "Sketch Linear Pattern"
                             : "Sketch Circular Pattern";
-    ImGui::Begin(title, nullptr,
+    materializr::toolDialogBegin(title, nullptr,
         ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoSavedSettings |
         ImGuiWindowFlags_AlwaysAutoResize);
+    materializr::toolDialogRemember(uiScale());
 
     if (m_sketchPatternKind == PatternKind::Linear) {
         ImGui::TextDisabled("%s", materializr::tr("Pick one or more directions. Two or more (e.g. Right + Down) make a grid."));
@@ -1824,17 +1822,16 @@ void Application::renderPatternPanel() {
 
     // Same anchor-then-drag pattern as Edit Diameter - first appearance only,
     // then the user can move the popup somewhere convenient.
-    ImGui::SetNextWindowPos(ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - 280,
-                                    ImGui::GetWindowPos().y + 50),
-                            ImGuiCond_Appearing);
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(280, 0), ImGuiCond_Appearing);
     const char* title = (m_patternKind == PatternKind::Linear)
                             ? "Linear Pattern"
                             : "Circular Pattern";
-    ImGui::Begin(title, nullptr,
+    materializr::toolDialogBegin(title, nullptr,
         ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoSavedSettings |
         ImGuiWindowFlags_AlwaysAutoResize);
+    materializr::toolDialogRemember(uiScale());
 
     bool axisChanged = false;
     if (m_patternKind == PatternKind::Linear) {
@@ -2099,14 +2096,13 @@ void Application::renderThreadPanel() {
     }
     if (!m_threadActive) return;
 
-    ImGui::SetNextWindowPos(ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - 280,
-                                    ImGui::GetWindowPos().y + 50),
-                            ImGuiCond_Appearing);
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(280, 0), ImGuiCond_Appearing);
-    ImGui::Begin("Thread", nullptr,
+    materializr::toolDialogBegin("Thread", nullptr,
         ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoSavedSettings |
         ImGuiWindowFlags_AlwaysAutoResize);
+    materializr::toolDialogRemember(uiScale());
 
     ImGui::TextColored(materializr::accentText(), materializr::tr("%s thread"),
                        m_threadIsHole ? "Internal" : "External");
@@ -2279,13 +2275,12 @@ void Application::renderThreadPanel() {
 
 void Application::renderSweepPanel() {
     if (!m_sweepActive) return;
-    ImGui::SetNextWindowPos(ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - 300,
-                                    ImGui::GetWindowPos().y + 50),
-                            ImGuiCond_Appearing);
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(300, 0), ImGuiCond_Appearing);
-    ImGui::Begin("Sweep", nullptr,
+    materializr::toolDialogBegin("Sweep", nullptr,
         ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
         ImGuiWindowFlags_AlwaysAutoResize);
+    materializr::toolDialogRemember(uiScale());
 
     auto sketchLabel = [&](int id) {
         std::string label = "Sketch " + std::to_string(id);
@@ -2333,14 +2328,13 @@ void Application::renderLoftPanel() {
 
     // Anchor near the top-right on first open; subsequent frames let the user
     // drag the popup somewhere convenient (same pattern as Pattern panel).
-    ImGui::SetNextWindowPos(ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - 280,
-                                    ImGui::GetWindowPos().y + 50),
-                            ImGuiCond_Appearing);
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(280, 0), ImGuiCond_Appearing);
-    ImGui::Begin("Loft", nullptr,
+    materializr::toolDialogBegin("Loft", nullptr,
         ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoSavedSettings |
         ImGuiWindowFlags_AlwaysAutoResize);
+    materializr::toolDialogRemember(uiScale());
 
     bool changed = false;
 
@@ -2800,13 +2794,12 @@ void Application::renderMeshTracePanel() {
     }
     if (planeId < 0 || !m_document->getMeshTrace(planeId)) return;
 
-    ImGui::SetNextWindowPos(ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - 300,
-                                   ImGui::GetWindowPos().y + 50),
-                            ImGuiCond_Appearing);
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(300, 0), ImGuiCond_Appearing);
-    ImGui::Begin("Mesh Trace", nullptr,
+    materializr::toolDialogBegin("Mesh Trace", nullptr,
                  ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
                  ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_AlwaysAutoResize);
+    materializr::toolDialogRemember(uiScale());
     ImGui::TextColored(materializr::accentText(), "%s",
                        m_document->getPlaneName(planeId).c_str());
     renderMeshTraceControls(planeId);
@@ -2824,13 +2817,12 @@ void Application::renderMeshTracePanel() {
 void Application::renderMeshTraceSetupDialog() {
     if (!m_meshTraceSetupActive || !m_document) return;
 
-    ImGui::SetNextWindowPos(ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - 300,
-                                   ImGui::GetWindowPos().y + 50),
-                            ImGuiCond_Appearing);
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(300, 0), ImGuiCond_Appearing);
-    ImGui::Begin("Set Up Tracing Planes", nullptr,
+    materializr::toolDialogBegin("Set Up Tracing Planes", nullptr,
                  ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
                  ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_AlwaysAutoResize);
+    materializr::toolDialogRemember(uiScale());
 
     ImGui::TextWrapped("%s", materializr::tr(
         "Position each plane (drag its gizmo, or use Slice position below), "
@@ -2926,13 +2918,12 @@ void Application::renderRefImagePanel() {
         return;
     }
 
-    ImGui::SetNextWindowPos(ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - 300,
-                                   ImGui::GetWindowPos().y + 50),
-                            ImGuiCond_Appearing);
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(300, 0), ImGuiCond_Appearing);
-    ImGui::Begin("Reference Image", nullptr,
+    materializr::toolDialogBegin("Reference Image", nullptr,
                  ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
                  ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_AlwaysAutoResize);
+    materializr::toolDialogRemember(uiScale());
 
     ImGui::TextColored(materializr::accentText(), "%s",
                        m_document->getPlaneName(planeId).c_str());
@@ -3057,10 +3048,12 @@ void Application::renderRefImageCalibrationPopup(int planeId) {
     }
 
     bool calibOpen = true;
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(540, 0), ImGuiCond_Appearing);
-    ImGui::Begin("Calibrate Image Scale", &calibOpen,
+    materializr::toolDialogBegin("Calibrate Image Scale", &calibOpen,
                  ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoSavedSettings |
                  ImGuiWindowFlags_AlwaysAutoResize);
+    materializr::toolDialogRemember(uiScale());
 
     ImGui::TextWrapped("%s", materializr::tr("Click two points a KNOWN distance apart (e.g. two marks on the ruler in your photo), then enter that distance."));
     ImGui::Spacing();
@@ -3217,13 +3210,12 @@ void Application::renderRefImageCalibrationPopup(int planeId) {
 void Application::renderBoundaryFillPanel() {
     if (!m_bfillActive) return;
 
-    ImGui::SetNextWindowPos(ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - 280,
-                                    ImGui::GetWindowPos().y + 50),
-                            ImGuiCond_Appearing);
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(280, 0), ImGuiCond_Appearing);
-    ImGui::Begin("Boundary Fill", nullptr,
+    materializr::toolDialogBegin("Boundary Fill", nullptr,
         ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
         ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_AlwaysAutoResize);
+    materializr::toolDialogRemember(uiScale());
 
     ImGui::TextColored(materializr::accentText(), materializr::tr("Silhouettes (%d)"),
                        static_cast<int>(m_bfillProfiles.size()));
@@ -3255,13 +3247,12 @@ void Application::renderBoundaryFillPanel() {
 void Application::renderPatchPanel() {
     if (!m_patchActive) return;
 
-    ImGui::SetNextWindowPos(ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - 300,
-                                   ImGui::GetWindowPos().y + 50),
-                            ImGuiCond_Appearing);
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(300, 0), ImGuiCond_Appearing);
-    ImGui::Begin("Patch", nullptr,
+    materializr::toolDialogBegin("Patch", nullptr,
         ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
         ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_AlwaysAutoResize);
+    materializr::toolDialogRemember(uiScale());
 
     ImGui::TextColored(materializr::accentText(), materializr::tr("Boundary edges: %d"),
                        static_cast<int>(m_patchEdges.size()));
@@ -3480,10 +3471,14 @@ void Application::renderSketchMovePanel() {
     m_sketchMoveConditionsMet = conditionsMet;
     if (!conditionsMet || !m_sketchMovePanelOpen) return;
 
-    ImGui::SetNextWindowSize(uiSz(340, 0), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Move Sketch###SketchMove", &m_sketchMovePanelOpen)) {
+    materializr::toolDialogPlace(uiScale());
+    ImGui::SetNextWindowSize(uiSz(340, 0), ImGuiCond_Appearing);
+    if (!materializr::toolDialogBegin("Move Sketch###SketchMove", &m_sketchMovePanelOpen,
+                      ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking |
+                      ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::End(); return;
     }
+    materializr::toolDialogRemember(uiScale());
 
     ImGui::TextWrapped("%s", materializr::tr("Type an exact offset to translate the sketch's plane by - useful when you want the second \"construction plane\" at a precise distance instead of dragging the gizmo. Apply nudges the sketch by the typed values (from its current pose) and resets the fields."));
     ImGui::Spacing();
@@ -3813,14 +3808,13 @@ void Application::renderSnapSettingsPopup() {
 void Application::renderConstructionPlanePanel() {
     if (!m_planeOpActive) return;
 
-    ImGui::SetNextWindowPos(ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - 280,
-                                    ImGui::GetWindowPos().y + 50),
-                            ImGuiCond_Appearing);
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(280, 0), ImGuiCond_Appearing);
-    ImGui::Begin("Construction Plane", nullptr,
+    materializr::toolDialogBegin("Construction Plane", nullptr,
         ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoSavedSettings |
         ImGuiWindowFlags_AlwaysAutoResize);
+    materializr::toolDialogRemember(uiScale());
 
     ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Alignment"));
     bool kindChanged = false;
@@ -4158,9 +4152,7 @@ void Application::beginRevolve() {
 void Application::renderRevolvePopup() {
     if (!m_revolveActive) return;
 
-    ImGui::SetNextWindowPos(ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - 320,
-                                    ImGui::GetWindowPos().y + 50),
-                            ImGuiCond_Appearing);
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(320, 0), ImGuiCond_Appearing);
     // The mode is chosen by the selection (sketch → Lathe, body → Revolve) in
     // beginRevolve(); the window title reflects it. No in-popup mode switch -
@@ -4193,10 +4185,11 @@ void Application::renderRevolvePopup() {
             m_revolveBodyId = bodies.front();
         }
     }
-    ImGui::Begin(lathe ? "Lathe###RevolvePopup" : "Revolve###RevolvePopup", nullptr,
+    materializr::toolDialogBegin(lathe ? "Lathe###RevolvePopup" : "Revolve###RevolvePopup", nullptr,
         ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoSavedSettings |
         ImGuiWindowFlags_AlwaysAutoResize);
+    materializr::toolDialogRemember(uiScale());
 
     // Selection summary so the popup reflects what the click captured.
     // Both flows want a body shown (Rotate Body operates on it; Sweep
@@ -4572,12 +4565,12 @@ void Application::cancelAlignFace() {
 
 void Application::renderAlignFacePopup() {
     if (!m_alignActive) return;
-    ImGui::SetNextWindowPos(ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - 360,
-                                    ImGui::GetWindowPos().y + 50), ImGuiCond_Appearing);
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(360, 0), ImGuiCond_Appearing);
-    ImGui::Begin("Lay Flat on Plane", nullptr,
+    materializr::toolDialogBegin("Lay Flat on Plane", nullptr,
         ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
         ImGuiWindowFlags_AlwaysAutoResize);
+    materializr::toolDialogRemember(uiScale());
 
     bool changed = false;
 
@@ -4722,14 +4715,13 @@ void Application::renderAlignFacePopup() {
 void Application::renderRotatePlaneAboutAxisPopup() {
     if (!m_rotPlaneActive) return;
 
-    ImGui::SetNextWindowPos(ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - 340,
-                                    ImGui::GetWindowPos().y + 50),
-                            ImGuiCond_Appearing);
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(340, 0), ImGuiCond_Appearing);
-    ImGui::Begin("Rotate Plane About Axis", nullptr,
+    materializr::toolDialogBegin("Rotate Plane About Axis", nullptr,
         ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoSavedSettings |
         ImGuiWindowFlags_AlwaysAutoResize);
+    materializr::toolDialogRemember(uiScale());
 
     if (m_document && m_rotPlaneId >= 0) {
         ImGui::Text(materializr::tr("Plane: %s"), m_document->getPlaneName(m_rotPlaneId).c_str());
@@ -5065,14 +5057,13 @@ bool Application::applyRevolve() {
 void Application::renderConstructionAxisPanel() {
     if (!m_axisOpActive) return;
 
-    ImGui::SetNextWindowPos(ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - 280,
-                                    ImGui::GetWindowPos().y + 50),
-                            ImGuiCond_Appearing);
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(280, 0), ImGuiCond_Appearing);
-    ImGui::Begin("Construction Axis", nullptr,
+    materializr::toolDialogBegin("Construction Axis", nullptr,
         ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoSavedSettings |
         ImGuiWindowFlags_AlwaysAutoResize);
+    materializr::toolDialogRemember(uiScale());
 
     ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Direction"));
     bool kindChanged = false;
@@ -5167,15 +5158,13 @@ void Application::renderSectionPanel() {
     // Top-centre, like the other tool popups. The first version pinned this
     // top-RIGHT - squarely behind the Items/Properties panels, so the plane
     // picker existed but was never seen.
-    ImGuiViewport* vp = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(
-        ImVec2(vp->WorkPos.x + vp->WorkSize.x * 0.5f, vp->WorkPos.y + 60.0f),
-        ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.0f));
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowBgAlpha(0.92f);
     bool open = true;
-    if (ImGui::Begin("Section View", &open,
+    if (materializr::toolDialogBegin("Section View", &open,
                      ImGuiWindowFlags_AlwaysAutoResize |
                      ImGuiWindowFlags_NoSavedSettings)) {
+        materializr::toolDialogRemember(uiScale());
         static const char* kWorldNames[3] = {
             "World XY (front)", "World XZ (ground)", "World YZ (side)"};
 
@@ -5270,15 +5259,13 @@ void Application::renderTextToolPanel() {
         m_sketchTool->getMode() != SketchToolMode::Text)
         return;
 
-    ImGuiViewport* vp = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(
-        ImVec2(vp->WorkPos.x + vp->WorkSize.x * 0.5f, vp->WorkPos.y + 60.0f),
-        ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.0f));
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowBgAlpha(0.92f);
     bool open = true;
-    if (ImGui::Begin("Text", &open,
+    if (materializr::toolDialogBegin("Text", &open,
                      ImGuiWindowFlags_AlwaysAutoResize |
                      ImGuiWindowFlags_NoSavedSettings)) {
+        materializr::toolDialogRemember(uiScale());
         // The string buffer lives here; the tool consumes the committed
         // std::string. Re-seeded each time the window (re)appears.
         static char buf[128];
@@ -5411,15 +5398,13 @@ void Application::renderAirfoilToolPanel() {
         m_sketchTool->getMode() != SketchToolMode::Airfoil)
         return;
 
-    ImGuiViewport* vp = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(
-        ImVec2(vp->WorkPos.x + vp->WorkSize.x * 0.5f, vp->WorkPos.y + 60.0f),
-        ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.0f));
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowBgAlpha(0.92f);
     bool open = true;
-    if (ImGui::Begin(materializr::tr("Airfoil Section###AirfoilTool"), &open,
+    if (materializr::toolDialogBegin((std::string(materializr::tr("Airfoil Section")) + "###AirfoilTool").c_str(), &open,
                      ImGuiWindowFlags_AlwaysAutoResize |
                      ImGuiWindowFlags_NoSavedSettings)) {
+        materializr::toolDialogRemember(uiScale());
         const materializr::AirfoilProfile& prof = m_sketchTool->getAirfoil();
         // Identify the section by what it IS, not by the filename: thickness
         // and camber are how aerofoils are named and the quickest check that
@@ -5542,15 +5527,13 @@ void Application::renderSvgToolPanel() {
         m_sketchTool->getMode() != SketchToolMode::Svg)
         return;
 
-    ImGuiViewport* vp = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(
-        ImVec2(vp->WorkPos.x + vp->WorkSize.x * 0.5f, vp->WorkPos.y + 60.0f),
-        ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.0f));
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowBgAlpha(0.92f);
     bool open = true;
-    if (ImGui::Begin("Import SVG", &open,
+    if (materializr::toolDialogBegin("Import SVG", &open,
                      ImGuiWindowFlags_AlwaysAutoResize |
                      ImGuiWindowFlags_NoSavedSettings)) {
+        materializr::toolDialogRemember(uiScale());
         const auto& svg = m_sketchTool->getSvgPaths();
         ImGui::TextDisabled(materializr::tr("%d path(s) ready."),
                             static_cast<int>(svg.loops.size()));
@@ -5616,15 +5599,13 @@ void Application::renderMirrorToolPanel() {
         return;
     }
 
-    ImGuiViewport* vp = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(
-        ImVec2(vp->WorkPos.x + vp->WorkSize.x * 0.5f, vp->WorkPos.y + 60.0f),
-        ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.0f));
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowBgAlpha(0.92f);
     bool open = true;
-    if (ImGui::Begin("Mirror", &open,
+    if (materializr::toolDialogBegin("Mirror", &open,
                      ImGuiWindowFlags_AlwaysAutoResize |
                      ImGuiWindowFlags_NoSavedSettings)) {
+        materializr::toolDialogRemember(uiScale());
         ImGui::TextDisabled(materializr::touchMode()
             ? "Drag the line to move it; drag the end dot to rotate."
             : "Drag the line to move it; drag the end dot to rotate.");
@@ -5694,16 +5675,14 @@ void Application::renderPolygonToolPanel() {
     if (const char* why = m_sketchTool->consumeShapeRejection())
         showToast(materializr::tr(why), 3.0);
 
-    ImGuiViewport* vp = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(
-        ImVec2(vp->WorkPos.x + vp->WorkSize.x * 0.5f, vp->WorkPos.y + 60.0f),
-        ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.0f));
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowBgAlpha(0.92f);
     bool open = true;
     auto& spec = m_sketchTool->polygonSpec();
-    if (ImGui::Begin("Polygon", &open,
+    if (materializr::toolDialogBegin("Polygon", &open,
                      ImGuiWindowFlags_AlwaysAutoResize |
                      ImGuiWindowFlags_NoSavedSettings)) {
+        materializr::toolDialogRemember(uiScale());
         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * 22.0f);
         ImGui::TextDisabled("%s", m_sketchTool->isPlacing()
             ? materializr::tr("Drag to size it, or type an exact size and angle below, then click or press Place.")
@@ -5831,14 +5810,12 @@ void Application::renderShapeToolPanel() {
     // One window id for all four so it keeps its place when the tool changes.
     const std::string title = std::string(tr(name)) + "###shapeToolPanel";
 
-    ImGuiViewport* vp = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(
-        ImVec2(vp->WorkPos.x + vp->WorkSize.x * 0.5f, vp->WorkPos.y + 60.0f),
-        ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.0f));
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowBgAlpha(0.92f);
     bool open = true;
-    if (ImGui::Begin(title.c_str(), &open,
+    if (materializr::toolDialogBegin(title.c_str(), &open,
                      ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings)) {
+        materializr::toolDialogRemember(uiScale());
         const char* hint = "";
         switch (mode) {
             case SketchToolMode::Line:
@@ -6002,15 +5979,13 @@ void Application::renderCornerToolPanel() {
     if (const char* why = m_sketchTool->consumeCornerRejection())
         showToast(materializr::tr(why), 3.0);
 
-    ImGuiViewport* vp = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(
-        ImVec2(vp->WorkPos.x + vp->WorkSize.x * 0.5f, vp->WorkPos.y + 60.0f),
-        ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.0f));
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowBgAlpha(0.92f);
     bool open = true;
-    if (ImGui::Begin("Corner", &open,
+    if (materializr::toolDialogBegin("Corner", &open,
                      ImGuiWindowFlags_AlwaysAutoResize |
                      ImGuiWindowFlags_NoSavedSettings)) {
+        materializr::toolDialogRemember(uiScale());
         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetFontSize() * 22.0f);
         ImGui::TextDisabled("%s", materializr::tr("Click a corner where two lines meet. Set the size first; it stays for the next corner."));
         ImGui::PopTextWrapPos();
@@ -6069,15 +6044,13 @@ void Application::renderOffsetToolPanel() {
     const bool picked =
         m_sketchTool->getOffsetPhase() == materializr::SketchTool::OffsetPhase::Distance;
 
-    ImGuiViewport* vp = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(
-        ImVec2(vp->WorkPos.x + vp->WorkSize.x * 0.5f, vp->WorkPos.y + 60.0f),
-        ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.0f));
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowBgAlpha(0.92f);
     bool open = true;
-    if (ImGui::Begin("Offset", &open,
+    if (materializr::toolDialogBegin("Offset", &open,
                      ImGuiWindowFlags_AlwaysAutoResize |
                      ImGuiWindowFlags_NoSavedSettings)) {
+        materializr::toolDialogRemember(uiScale());
         // Wrap the hints at a fixed width. Auto-resize otherwise sizes the
         // window to the longest unwrapped line, which at touch scale is wider
         // than a tablet - and since the position is only set on first use, the
@@ -6180,15 +6153,13 @@ void Application::renderPrimitivePopup() {
 
     // Same pinned top-right placement the IOp panels use, so the popup never
     // hides the viewport's body / selection.
-    ImGui::SetNextWindowPos(
-        ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - 260,
-               ImGui::GetWindowPos().y + 50),
-        ImGuiCond_Appearing);
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(260, 0), ImGuiCond_Appearing);
-    ImGui::Begin(titles[k], nullptr,
+    materializr::toolDialogBegin(titles[k], nullptr,
                  ImGuiWindowFlags_NoResize |
                  ImGuiWindowFlags_NoSavedSettings |
                  ImGuiWindowFlags_AlwaysAutoResize);
+    materializr::toolDialogRemember(uiScale());
 
     ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("Dimensions"));
     // im-touch: number-pad amount fields (the native keyboard froze iOS);
@@ -6389,15 +6360,13 @@ void Application::cancelStlImport() {
 void Application::renderStlImportDialog() {
     if (!m_stlDialogActive) return;
 
-    ImGui::SetNextWindowPos(
-        ImVec2(ImGui::GetWindowPos().x + ImGui::GetWindowWidth() - 300,
-               ImGui::GetWindowPos().y + 50),
-        ImGuiCond_Appearing);
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(300, 0), ImGuiCond_Appearing);
-    ImGui::Begin("Import STL", nullptr,
+    materializr::toolDialogBegin("Import STL", nullptr,
                  ImGuiWindowFlags_NoResize |
                  ImGuiWindowFlags_NoSavedSettings |
                  ImGuiWindowFlags_AlwaysAutoResize);
+    materializr::toolDialogRemember(uiScale());
 
     ImGui::TextColored(materializr::accentText(), "%s", materializr::tr("File"));
     if (ImGui::Button(materializr::tr("Browse\xE2\x80\xA6"), materializr::uiSz(90, 0))) {
@@ -6896,12 +6865,14 @@ void Application::recomputeUnfold() {
 void Application::renderUnfoldDialog() {
     if (!m_unfoldDialogActive || !m_unfoldPattern) return;
 
+    materializr::toolDialogPlace(uiScale());
     ImGui::SetNextWindowSize(uiSz(560, 580), ImGuiCond_Appearing);
-    if (!ImGui::Begin("Flat Pattern", &m_unfoldDialogActive,
-                      ImGuiWindowFlags_NoSavedSettings)) {
+    if (!materializr::toolDialogBegin("Flat Pattern", &m_unfoldDialogActive,
+                                      ImGuiWindowFlags_NoSavedSettings)) {
         ImGui::End();
         return;
     }
+    materializr::toolDialogRemember(uiScale());
 
     // Persist the current rigidity/thickness back onto the source body.
     auto persistSheet = [&]() {
