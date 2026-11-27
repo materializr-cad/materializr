@@ -226,8 +226,8 @@ void Application::renderSettings() {
                         int lang = (m_language < 0) ? 0 : m_language;
                         // Native names, so the list stays readable no matter
                         // what the UI is currently set to.
-                        const char* names[8];
-                        const int n = std::min(materializr::languageCount(), 8);
+                        const char* names[16];
+                        const int n = std::min(materializr::languageCount(), 16);
                         for (int i = 0; i < n; ++i)
                             names[i] = materializr::languageNativeName(i);
                         if (ImGui::Combo(materializr::tr("Interface language"), &lang, names, n)) {
@@ -5289,7 +5289,8 @@ void Application::renderTextToolPanel() {
                                            "Stencil (Black Ops)",
                                            "Impact (Anton)",
                                            "Script (Pacifico)",
-                                           "中文 (Noto Sans SC)"};
+                                           "中文 (Noto Sans SC)",
+                                           "繁體中文 (Noto Sans TC)"};
         static const char* kFontFiles[] = {"JetBrainsMono-Regular.ttf",
                                            "DejaVuSans.ttf",
                                            "DejaVuSerif.ttf",
@@ -5300,7 +5301,8 @@ void Application::renderTextToolPanel() {
                                            "BlackOpsOne-Regular.ttf",
                                            "Anton-Regular.ttf",
                                            "Pacifico-Regular.ttf",
-                                           "NotoSansSC.ttf"};
+                                           "NotoSansSC.ttf",
+                                           "NotoSansTC.ttf"};
         static_assert(IM_ARRAYSIZE(kFontNames) == IM_ARRAYSIZE(kFontFiles),
                       "font name/file lists must stay in lockstep");
         static int fontIdx = 0;

@@ -26,7 +26,7 @@ CONTROLS = (r'InputFloat\(|InputDouble\(|InputScalar|SliderFloat\(|DragFloat\(|i
 LITERALS = r'(?<![A-Za-z0-9_])mm(?![A-Za-z0-9_])'
 SKIP_CTRL = ("src/ui/NumField.h", "src/ui/LengthField.h", "src/core/NumParse.h", "src/ui/TouchWidgets", "src/core/Units.h", "src/ui/StepperRow.h")
 SKIP_LIT  = ("src/core/Units.h", "src/core/LengthEdit.h", "src/ui/LengthField.h", "i18n_catalogue.h",
-            "i18n_zh_catalogue.h")
+            "i18n_zh_catalogue.h", "i18n_zh_tw_catalogue.h")
 
 # (file, fragment-of-line) -> dimension, for rows the line alone does not reveal.
 OVERRIDE = [

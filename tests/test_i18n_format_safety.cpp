@@ -12,6 +12,7 @@
 
 #include "i18n_catalogue.h"
 #include "i18n_zh_catalogue.h"
+#include "i18n_zh_tw_catalogue.h"
 
 #include <gtest/gtest.h>
 #include <algorithm>
@@ -71,6 +72,7 @@ TEST(I18nFormatSafety, French)     { check("fr", kFrCatalogue); }
 TEST(I18nFormatSafety, German)     { check("de", kDeCatalogue); }
 TEST(I18nFormatSafety, Italian)    { check("it", kItCatalogue); }
 TEST(I18nFormatSafety, Chinese)    { check("zh", kZhCatalogue); }
+TEST(I18nFormatSafety, TraditionalChinese) { check("zh-TW", kZhTwCatalogue); }
 
 // The scanner itself.
 TEST(I18nFormatSafety, ScannerBehaves) {

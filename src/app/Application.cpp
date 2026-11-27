@@ -369,6 +369,9 @@ Application::Application(bool safeMode, float uiScaleOverride)
     {
         AppSettings early = SettingsIO::load(SettingsIO::defaultPath());
         materializr::setTouchMode(early.touchMode);
+        // The language decides which Chinese face initImGui() merges first.
+        // loadAppSettings() sets it again (and for real) later.
+        m_language = early.language;
         // Desktop UI scale must be known before the font atlas is baked in
         // initImGui() below - it's applied at the window level so uiScale()
         // (which fonts + style read) returns it.
@@ -1271,6 +1274,8 @@ std::string Application::resolveBundledFont(const std::string& fname) const {
     return std::string();
 }
 
+static int detectSystemLanguage();   // below, with applyAppSettings
+
 void Application::initImGui() {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -1409,8 +1414,20 @@ void Application::initImGui() {
         // for characters actually drawn. The bundled file is a 1.6 MB subset of
         // Noto Sans SC (GB2312 level-1 hanzi, symbols and every character the
         // UI strings use), so common Chinese typed into the Text tool has a glyph.
-        std::string cjk = resolveBundledFont("NotoSansSC.ttf");
-        if (fnt && !cjk.empty()) {
+        //
+        // Traditional Chinese needs its own face: 353 of the characters its
+        // catalogue uses are not in the Simplified subset, and the shared ones
+        // are drawn in Taiwan's standard shapes. Both are merged, so either
+        // language can be picked live; the first merged face wins a character
+        // both have, so the one the user reads goes first.
+        const int fontLang = (m_language >= 0) ? m_language : detectSystemLanguage();
+        const bool traditional = fontLang ==
+            static_cast<int>(materializr::Lang::TraditionalChinese);
+        const char* cjkFiles[2] = { "NotoSansSC.ttf", "NotoSansTC.ttf" };
+        if (traditional) std::swap(cjkFiles[0], cjkFiles[1]);
+        for (const char* file : cjkFiles) {
+            std::string cjk = resolveBundledFont(file);
+            if (!fnt || cjk.empty()) continue;
             ImFontConfig cfg;
             cfg.MergeMode = true;
             if (io.Fonts->AddFontFromFileTTF(cjk.c_str(), 15.0f * uiScale, &cfg))
@@ -2547,7 +2564,13 @@ void Application::saveRememberedUiStateIfChanged() {
 static int detectSystemLanguage() {
     const std::string code = materializr::platformSystemLanguageCode();
     if (code.empty()) return -1;
-    if (code == "zh") return static_cast<int>(materializr::Lang::Chinese);
+    if (code == "zh") {
+        // Taiwan, Hong Kong and Macau write Traditional Chinese.
+        const std::string region = materializr::platformSystemCountryCode();
+        if (region == "TW" || region == "HK" || region == "MO")
+            return static_cast<int>(materializr::Lang::TraditionalChinese);
+        return static_cast<int>(materializr::Lang::Chinese);
+    }
     if (code == "es") return static_cast<int>(materializr::Lang::Spanish);
     if (code == "pt") return static_cast<int>(materializr::Lang::Portuguese);
     if (code == "fr") return static_cast<int>(materializr::Lang::French);

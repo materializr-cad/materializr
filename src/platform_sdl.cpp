@@ -33,6 +33,24 @@ std::string platformSystemLanguageCode() {
     return code;
 }
 
+std::string platformSystemCountryCode() {
+    int count = 0;
+    SDL_Locale** locales = SDL_GetPreferredLocales(&count);
+    std::string code;
+    if (locales) {
+        // The country of the first locale that names a language, so it is the
+        // same entry platformSystemLanguageCode() reported.
+        for (int i = 0; i < count; ++i) {
+            if (locales[i] && locales[i]->language) {
+                if (locales[i]->country) code = locales[i]->country;
+                break;
+            }
+        }
+        SDL_free(locales);
+    }
+    return code;
+}
+
 std::string platformPrefPath() {
     char* base = SDL_GetPrefPath("Materializr", "Materializr");
     if (!base) return {};

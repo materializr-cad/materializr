@@ -17,11 +17,13 @@ are preserved below as required by their licenses.
 | Impact (Anton) | `Anton-Regular.ttf` | © The Anton Project Authors (Vernon Adams) | SIL OFL 1.1 |
 | Script (Pacifico) | `Pacifico-Regular.ttf` | © The Pacifico Project Authors (Vernon Adams) | SIL OFL 1.1 |
 | 中文 (Noto Sans SC) | `NotoSansSC.ttf` (subset: GB2312 level-1 hanzi + symbols + the UI strings) | © 2014-2021 Adobe (http://www.adobe.com/), Reserved Font Name 'Source'; Noto is a trademark of Google LLC | SIL OFL 1.1 |
+| 繁體中文 (Noto Sans TC) | `NotoSansTC.ttf` (subset: Big5 level-1 hanzi + symbols + the UI strings) | © 2014-2021 Adobe (http://www.adobe.com/), Reserved Font Name 'Source'; Noto is a trademark of Google LLC | SIL OFL 1.1 |
 | *(UI icons - not in the Text picker)* | `Iconoir.ttf` | Iconoir © Luca Burgio; font build © Silbad (iconoir-font) | MIT |
 
 License texts in `licenses/`:
 - `OFL-1.1.txt` - SIL Open Font License 1.1 (JetBrains Mono, Liberation, Comic Neue, Black Ops One, Anton, Pacifico).
 - `NotoSansSC-OFL.txt` - SIL Open Font License 1.1 (Noto Sans SC / Source Han Sans; Adobe copyright and Reserved Font Name notice).
+- `NotoSansTC-OFL.txt` - the same licence and notice, for Noto Sans TC.
 - `UFL-1.0.txt` - Ubuntu Font Licence 1.0 (Ubuntu).
 - `DejaVu-copyright.txt` - Bitstream Vera + Arev (DejaVu).
 - `Liberation-copyright.txt` - distribution copyright/license for the Liberation family.
@@ -46,3 +48,16 @@ upstream with the same characters and `ccmp`, `locl`, `vert`, `kern` layout feat
 `vmtx` tables byte for byte (`CFF` differs only in how the same glyphs are encoded, `head` in its
 timestamp). `licenses/NotoSansSC-OFL.txt` is the upstream OFL 1.1 text with the copyright line from the
 font's own name table. The font keeps its upstream name, "Noto Sans CJK SC".
+
+## Noto Sans TC: where the bundled file comes from
+
+`NotoSansTC.ttf` (the same file under `android/app/src/main/assets/fonts/`) is a subset of
+**Noto Sans CJK TC Regular, version 2.004**, from the same repository
+(`Sans/OTF/TraditionalChinese/NotoSansCJKtc-Regular.otf`,
+sha256 `dce08bd4fd91aa8aa76ed8fea4b694c2dfb8550f67871e326843212ddbeb88b4`). It was made on 2026-11-27
+with fontTools `pyftsubset` 4.69.1, the same `ccmp`, `locl`, `vert`, `kern` layout features as the SC
+subset, and 5,828 characters: the 423 non-ideograph characters of the SC subset (punctuation and
+symbols), the 5,401 Big5 level-1 hanzi (Taiwan's everyday set, the counterpart of GB2312 level-1), and
+every character in `tools/zh-TW.json`. Nothing was added to or changed in the font; it keeps its
+upstream name, "Noto Sans CJK TC". `licenses/NotoSansTC-OFL.txt` is the same OFL 1.1 text and Adobe
+notice as the SC file; the font's name table carries the same copyright.
