@@ -1357,3 +1357,8 @@ add_test(NAME test_sketch_edit_keeps_host COMMAND test_sketch_edit_keeps_host)
 add_executable(test_reload_then_move test_reload_then_move.cpp)
 target_link_libraries(test_reload_then_move PRIVATE materializr_core gtest gtest_main)
 add_test(NAME test_reload_then_move COMMAND test_reload_then_move)
+
+# test_combine_sketches - Combine Sketches keeps lines and constraints on the copied elements
+add_executable(test_combine_sketches test_combine_sketches.cpp)
+target_link_libraries(test_combine_sketches PRIVATE materializr_core gtest gtest_main)
+add_test(NAME test_combine_sketches COMMAND test_combine_sketches)
