@@ -22,27 +22,30 @@ void CombineSketchesOp::mergeInto(Sketch& dst, const Sketch& src) {
     int next = maxId(dst) + 1;
     std::unordered_map<int, int> id; // src id -> dst id (points + elements)
 
-    for (auto p : src.getPoints())   { id[p.id] = p.id = next++; dst.addRawPoint(p); }
+    // Take the old id before re-id'ing: in `id[p.id] = p.id = next++` the right
+    // side is evaluated first (C++17), so the map would be keyed by the NEW id
+    // and every later lookup of an old id would miss or hit the wrong element.
+    for (auto p : src.getPoints())   { int old = p.id; p.id = next++; id[old] = p.id; dst.addRawPoint(p); }
     for (auto l : src.getLines())    {
-        id[l.id] = l.id = next++;
+        int old = l.id; l.id = next++; id[old] = l.id;
         l.startPointId = id.count(l.startPointId) ? id[l.startPointId] : l.startPointId;
         l.endPointId   = id.count(l.endPointId)   ? id[l.endPointId]   : l.endPointId;
         dst.addRawLine(l);
     }
     for (auto c : src.getCircles())  {
-        id[c.id] = c.id = next++;
+        int old = c.id; c.id = next++; id[old] = c.id;
         c.centerPointId = id.count(c.centerPointId) ? id[c.centerPointId] : c.centerPointId;
         dst.addRawCircle(c);
     }
     for (auto a : src.getArcs())     {
-        id[a.id] = a.id = next++;
+        int old = a.id; a.id = next++; id[old] = a.id;
         a.centerPointId = id.count(a.centerPointId) ? id[a.centerPointId] : a.centerPointId;
         a.startPointId  = id.count(a.startPointId)  ? id[a.startPointId]  : a.startPointId;
         a.endPointId    = id.count(a.endPointId)    ? id[a.endPointId]    : a.endPointId;
         dst.addRawArc(a);
     }
     for (auto sp : src.getSplines()) {
-        id[sp.id] = sp.id = next++;
+        int old = sp.id; sp.id = next++; id[old] = sp.id;
         for (int& cp : sp.controlPointIds) if (id.count(cp)) cp = id[cp];
         dst.addRawSpline(sp);
     }
